@@ -55,11 +55,12 @@ serve(async (req) => {
 
     // Return empty 200 OK response for Twilio webhook
     // Twilio expects either empty response or TwiML, not JSON
-    return new Response(null, { 
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`;
+    return new Response(twiml, { 
       status: 200,
       headers: {
         ...corsHeaders,
-        'Content-Type': 'text/plain'
+        'Content-Type': 'text/xml; charset=utf-8'
       }
     });
   } catch (error) {
