@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      customer_contacts: {
+        Row: {
+          created_at: string | null
+          customer_address: string
+          customer_name: string
+          customer_phone: string
+          id: string
+          order_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          customer_address: string
+          customer_name: string
+          customer_phone: string
+          id?: string
+          order_id: string
+        }
+        Update: {
+          created_at?: string | null
+          customer_address?: string
+          customer_name?: string
+          customer_phone?: string
+          id?: string
+          order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_contacts_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_contacts_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_orders_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           content: string
@@ -45,6 +87,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_orders_view"
             referencedColumns: ["id"]
           },
         ]
@@ -178,6 +227,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "vendor_notifications_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_orders_view"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "vendor_notifications_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
@@ -251,10 +307,52 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      vendor_orders_view: {
+        Row: {
+          address_simplified: string | null
+          coordinates: Json | null
+          created_at: string | null
+          customer_name_masked: string | null
+          customer_phone_masked: string | null
+          delivery_person_name: string | null
+          delivery_person_phone: string | null
+          estimated_delivery: string | null
+          id: string | null
+          items: Json | null
+          notes: string | null
+          status: string | null
+          total: number | null
+          updated_at: string | null
+          vendor_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
-      [_ in never]: never
+      get_masked_phone: {
+        Args: { phone: string }
+        Returns: string
+      }
+      get_order_customer_details: {
+        Args: { order_id_param: string }
+        Returns: {
+          customer_address: string
+          customer_name: string
+          customer_phone: string
+        }[]
+      }
+      get_simplified_address: {
+        Args: { full_address: string }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
