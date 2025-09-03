@@ -77,69 +77,111 @@ serve(async (req) => {
 });
 
 async function processWithAI(messageData: any, supabase: any) {
-  const openAIKey = Deno.env.get('OPENAI_API_KEY');
-  
-  // Analyze message intent
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openAIKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'gpt-4-turbo-preview',
-      messages: [
-        {
-          role: 'system',
-          content: `Eres un asistente de delivery inteligente. Tu trabajo es:
-            1. Identificar la intención del usuario (nuevo pedido, consulta de estado, cancelación, etc)
-            2. Extraer información relevante (productos, dirección, etc)
-            3. Gestionar el flujo de pedidos
-            4. Responder de manera amigable y eficiente
-            
-            Tipos de intenciones:
-            - NEW_ORDER: Cliente quiere hacer un pedido
-            - CHECK_STATUS: Cliente consulta estado de pedido
-            - CANCEL_ORDER: Cliente quiere cancelar
-            - VENDOR_INQUIRY: Pregunta sobre vendedores disponibles
-            - GENERAL_HELP: Ayuda general
-            
-            Responde en formato JSON con:
-            {
-              "intent": "tipo_de_intencion",
-              "entities": { productos, dirección, etc },
-              "message": "respuesta al usuario",
-              "action": "acción a tomar"
-            }`
-        },
-        {
-          role: 'user',
-          content: messageData.body
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 500
-    }),
-  });
+  try {
+    const openAIKey = Deno.env.get('OPENAI_API_KEY');
+    
+    if (!openAIKey) {
+      console.error('OpenAI API key not configured');
+      return {
+        intent: 'ERROR',
+        message: 'Lo siento, el servicio no está disponible en este momento. Por favor, intenta más tarde.',
+        entities: {}
+      };
+    }
+    
+    // Analyze message intent
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini', // Using a valid model
+        messages: [
+          {
+            role: 'system',
+            content: `Eres un asistente de delivery inteligente. Tu trabajo es:
+              1. Identificar la intención del usuario (nuevo pedido, consulta de estado, cancelación, etc)
+              2. Extraer información relevante (productos, dirección, etc)
+              3. Gestionar el flujo de pedidos
+              4. Responder de manera amigable y eficiente
+              
+              Tipos de intenciones:
+              - NEW_ORDER: Cliente quiere hacer un pedido
+              - CHECK_STATUS: Cliente consulta estado de pedido
+              - CANCEL_ORDER: Cliente quiere cancelar
+              - VENDOR_INQUIRY: Pregunta sobre vendedores disponibles
+              - GENERAL_HELP: Ayuda general
+              
+              IMPORTANTE: Responde SOLO con un objeto JSON válido, sin texto adicional:
+              {
+                "intent": "tipo_de_intencion",
+                "entities": {},
+                "message": "respuesta al usuario",
+                "action": "acción a tomar"
+              }`
+          },
+          {
+            role: 'user',
+            content: messageData.body || 'Hola'
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 500
+      }),
+    });
 
-  const aiData = await response.json();
-  const aiResponse = JSON.parse(aiData.choices[0].message.content);
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error('OpenAI API error:', response.status, errorData);
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
 
-  // Execute action based on intent
-  switch(aiResponse.intent) {
-    case 'NEW_ORDER':
-      await createOrder(messageData, aiResponse.entities, supabase);
-      break;
-    case 'CHECK_STATUS':
-      const status = await checkOrderStatus(messageData.from, supabase);
-      aiResponse.message += `\n\nEstado actual: ${status}`;
-      break;
-    case 'CANCEL_ORDER':
-      await cancelOrder(messageData.from, supabase);
-      break;
+    const aiData = await response.json();
+    
+    if (!aiData.choices || !aiData.choices[0] || !aiData.choices[0].message) {
+      console.error('Unexpected OpenAI response structure:', aiData);
+      throw new Error('Invalid OpenAI response structure');
+    }
+    
+    let aiResponse;
+    try {
+      aiResponse = JSON.parse(aiData.choices[0].message.content);
+    } catch (parseError) {
+      console.error('Failed to parse AI response:', aiData.choices[0].message.content);
+      // Return a default response if parsing fails
+      aiResponse = {
+        intent: 'GENERAL_HELP',
+        entities: {},
+        message: 'Hola! Soy tu asistente de delivery. ¿En qué puedo ayudarte hoy?',
+        action: 'none'
+      };
+    }
+
+    // Execute action based on intent
+    switch(aiResponse.intent) {
+      case 'NEW_ORDER':
+        await createOrder(messageData, aiResponse.entities, supabase);
+        break;
+      case 'CHECK_STATUS':
+        const status = await checkOrderStatus(messageData.from, supabase);
+        aiResponse.message += `\n\nEstado actual: ${status}`;
+        break;
+      case 'CANCEL_ORDER':
+        await cancelOrder(messageData.from, supabase);
+        break;
+    }
+
+    return aiResponse;
+  } catch (error) {
+    console.error('Error in processWithAI:', error);
+    return {
+      intent: 'ERROR',
+      message: 'Lo siento, hubo un problema procesando tu mensaje. Por favor, intenta de nuevo.',
+      entities: {}
+    };
   }
-
-  return aiResponse;
 }
 
 async function sendTwilioMessage(to: string, message: string) {
