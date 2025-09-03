@@ -47,16 +47,14 @@ serve(async (req) => {
     // Process with AI agent
     const aiResponse = await processWithAI(messageData, supabase);
     
-    // Send response back via Twilio API (asynchronously)
-    await sendTwilioMessage(
-      messageData.from!,
-      aiResponse.message
-    );
+    // Reply synchronously via TwiML to ensure delivery reliability
+    // (Removed REST API send to avoid duplicate/no-delivery issues)
+    console.log('AI response to send via TwiML:', aiResponse);
 
     // Return empty 200 OK response for Twilio webhook
     // Twilio expects either empty response or TwiML, not JSON
-    const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`;
-    return new Response(twiml, { 
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response><Message><![CDATA[${aiResponse.message}]]></Message></Response>`;
+    return new Response(twiml, {
       status: 200,
       headers: {
         ...corsHeaders,
