@@ -141,51 +141,111 @@ export type Database = {
         }
         Relationships: []
       }
+      vendor_notifications: {
+        Row: {
+          created_at: string | null
+          id: string
+          message: string
+          order_id: string
+          sent_at: string | null
+          status: string | null
+          vendor_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message: string
+          order_id: string
+          sent_at?: string | null
+          status?: string | null
+          vendor_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message?: string
+          order_id?: string
+          sent_at?: string | null
+          status?: string | null
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_notifications_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_notifications_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendors: {
         Row: {
           address: string
+          available_products: Json | null
           category: string
+          closing_time: string | null
           created_at: string | null
+          days_open: string[] | null
           id: string
           image: string | null
           is_active: boolean | null
           joined_at: string | null
           name: string
+          opening_time: string | null
           phone: string
           rating: number | null
           total_orders: number | null
           updated_at: string | null
           user_id: string
+          whatsapp_number: string | null
         }
         Insert: {
           address: string
+          available_products?: Json | null
           category: string
+          closing_time?: string | null
           created_at?: string | null
+          days_open?: string[] | null
           id?: string
           image?: string | null
           is_active?: boolean | null
           joined_at?: string | null
           name: string
+          opening_time?: string | null
           phone: string
           rating?: number | null
           total_orders?: number | null
           updated_at?: string | null
           user_id: string
+          whatsapp_number?: string | null
         }
         Update: {
           address?: string
+          available_products?: Json | null
           category?: string
+          closing_time?: string | null
           created_at?: string | null
+          days_open?: string[] | null
           id?: string
           image?: string | null
           is_active?: boolean | null
           joined_at?: string | null
           name?: string
+          opening_time?: string | null
           phone?: string
           rating?: number | null
           total_orders?: number | null
           updated_at?: string | null
           user_id?: string
+          whatsapp_number?: string | null
         }
         Relationships: []
       }

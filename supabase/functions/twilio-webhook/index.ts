@@ -85,6 +85,9 @@ async function processWithAI(messageData: any, supabase: any) {
         entities: {}
       };
     }
+
+    // Get available vendors based on current time and products
+    const availableVendors = await getAvailableVendors(supabase, messageData.body);
     
     // Analyze message intent
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -104,12 +107,17 @@ async function processWithAI(messageData: any, supabase: any) {
               2. Extraer información relevante (productos, dirección, etc)
               3. Gestionar el flujo de pedidos
               4. Responder de manera amigable y eficiente
+              5. Informar sobre vendedores disponibles con sus horarios
+              
+              Vendedores disponibles ahora:
+              ${availableVendors.map(v => `- ${v.name}: ${v.opening_time} a ${v.closing_time}`).join('\n')}
               
               Tipos de intenciones:
               - NEW_ORDER: Cliente quiere hacer un pedido
               - CHECK_STATUS: Cliente consulta estado de pedido
               - CANCEL_ORDER: Cliente quiere cancelar
               - VENDOR_INQUIRY: Pregunta sobre vendedores disponibles
+              - CONNECT_VENDOR: Cliente quiere hablar directamente con el vendedor
               - GENERAL_HELP: Ayuda general
               
               IMPORTANTE: Responde SOLO con un objeto JSON válido, sin texto adicional:
@@ -117,7 +125,8 @@ async function processWithAI(messageData: any, supabase: any) {
                 "intent": "tipo_de_intencion",
                 "entities": {},
                 "message": "respuesta al usuario",
-                "action": "acción a tomar"
+                "action": "acción a tomar",
+                "suggestedVendor": "vendor_id si aplica"
               }`
           },
           {
@@ -160,7 +169,10 @@ async function processWithAI(messageData: any, supabase: any) {
     // Execute action based on intent
     switch(aiResponse.intent) {
       case 'NEW_ORDER':
-        await createOrder(messageData, aiResponse.entities, supabase);
+        const order = await createOrder(messageData, aiResponse.entities, supabase, aiResponse.suggestedVendor);
+        if (order) {
+          await notifyVendor(order.vendor_id, order.id, messageData.body, supabase);
+        }
         break;
       case 'CHECK_STATUS':
         const status = await checkOrderStatus(messageData.from, supabase);
@@ -168,6 +180,12 @@ async function processWithAI(messageData: any, supabase: any) {
         break;
       case 'CANCEL_ORDER':
         await cancelOrder(messageData.from, supabase);
+        break;
+      case 'CONNECT_VENDOR':
+        const vendorContact = await connectToVendor(messageData.from, supabase);
+        if (vendorContact) {
+          aiResponse.message = `Puedes contactar directamente al vendedor al: ${vendorContact.whatsapp_number}`;
+        }
         break;
     }
 
@@ -206,20 +224,134 @@ async function sendTwilioMessage(to: string, message: string) {
   return await response.json();
 }
 
-async function createOrder(messageData: any, entities: any, supabase: any) {
-  // First, get a default vendor (or use the provided vendor_id)
-  let vendorId = entities.vendor_id;
+
+async function checkOrderStatus(phone: string, supabase: any) {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('status, estimated_delivery')
+    .eq('customer_phone', phone)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+    
+  if (data) {
+    return `${data.status} - Entrega estimada: ${new Date(data.estimated_delivery).toLocaleString()}`;
+  }
+  return 'No se encontraron pedidos activos';
+}
+
+async function cancelOrder(phone: string, supabase: any) {
+  const { data, error } = await supabase
+    .from('orders')
+    .update({ status: 'cancelled' })
+    .eq('customer_phone', phone)
+    .eq('status', 'pending')
+    .select()
+    .single();
+    
+  return data;
+}
+
+async function getAvailableVendors(supabase: any, messageContent: string) {
+  const now = new Date();
+  const currentDay = now.toLocaleLowerCase('en-US', { weekday: 'long' });
+  const currentTime = now.toTimeString().split(' ')[0]; // HH:MM:SS format
   
-  if (!vendorId) {
-    // Get the first active vendor as default
+  // Get all active vendors with their business hours
+  const { data: vendors } = await supabase
+    .from('vendors')
+    .select('*')
+    .eq('is_active', true)
+    .contains('days_open', [currentDay]);
+  
+  // Filter by opening hours
+  const availableVendors = vendors?.filter((vendor: any) => {
+    return currentTime >= vendor.opening_time && currentTime <= vendor.closing_time;
+  }) || [];
+  
+  return availableVendors;
+}
+
+async function notifyVendor(vendorId: string, orderId: string, orderDetails: string, supabase: any) {
+  try {
+    // Get vendor details
     const { data: vendor } = await supabase
       .from('vendors')
-      .select('id')
-      .eq('is_active', true)
-      .limit(1)
+      .select('name, whatsapp_number')
+      .eq('id', vendorId)
       .single();
     
-    vendorId = vendor?.id;
+    if (!vendor || !vendor.whatsapp_number) {
+      console.log('Vendor WhatsApp not configured');
+      return;
+    }
+    
+    // Create notification record
+    await supabase
+      .from('vendor_notifications')
+      .insert({
+        vendor_id: vendorId,
+        order_id: orderId,
+        message: `Nuevo pedido recibido: ${orderDetails}`,
+        status: 'pending'
+      });
+    
+    // Send WhatsApp notification to vendor
+    const message = `🔔 *Nuevo Pedido*\n\n${orderDetails}\n\nPor favor, confirma el pedido en tu panel de control.`;
+    
+    await sendTwilioMessage(vendor.whatsapp_number, message);
+    
+    // Update notification status
+    await supabase
+      .from('vendor_notifications')
+      .update({ status: 'sent', sent_at: new Date().toISOString() })
+      .eq('order_id', orderId);
+    
+  } catch (error) {
+    console.error('Error notifying vendor:', error);
+  }
+}
+
+async function connectToVendor(customerPhone: string, supabase: any) {
+  // Get the customer's most recent order
+  const { data: order } = await supabase
+    .from('orders')
+    .select('vendor_id')
+    .eq('customer_phone', customerPhone)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+  
+  if (!order) {
+    return null;
+  }
+  
+  // Get vendor contact info
+  const { data: vendor } = await supabase
+    .from('vendors')
+    .select('name, whatsapp_number')
+    .eq('id', order.vendor_id)
+    .single();
+  
+  return vendor;
+}
+
+async function createOrder(messageData: any, entities: any, supabase: any, suggestedVendorId?: string) {
+  // Use suggested vendor or find the best match
+  let vendorId = suggestedVendorId || entities.vendor_id;
+  
+  if (!vendorId) {
+    // Get an available vendor based on current time and products
+    const availableVendors = await getAvailableVendors(supabase, messageData.body);
+    
+    if (availableVendors.length > 0) {
+      vendorId = availableVendors[0].id;
+    }
+  }
+  
+  if (!vendorId) {
+    // No vendors available
+    return null;
   }
   
   // Create new order based on extracted entities
@@ -248,33 +380,6 @@ async function createOrder(messageData: any, entities: any, supabase: any) {
         content: messageData.body
       });
   }
-    
-  return data;
-}
-
-async function checkOrderStatus(phone: string, supabase: any) {
-  const { data, error } = await supabase
-    .from('orders')
-    .select('status, estimated_delivery')
-    .eq('customer_phone', phone)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
-    
-  if (data) {
-    return `${data.status} - Entrega estimada: ${new Date(data.estimated_delivery).toLocaleString()}`;
-  }
-  return 'No se encontraron pedidos activos';
-}
-
-async function cancelOrder(phone: string, supabase: any) {
-  const { data, error } = await supabase
-    .from('orders')
-    .update({ status: 'cancelled' })
-    .eq('customer_phone', phone)
-    .eq('status', 'pending')
-    .select()
-    .single();
     
   return data;
 }

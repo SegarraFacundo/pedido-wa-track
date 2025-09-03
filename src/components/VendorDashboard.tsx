@@ -3,8 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OrderCard } from "@/components/OrderCard";
 import { Order, OrderStatus, Vendor } from "@/types/order";
-import { DollarSign, Package, TrendingUp, Users, Filter } from "lucide-react";
+import { DollarSign, Package, TrendingUp, Users, Filter, Clock, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -66,8 +67,58 @@ export function VendorDashboard({ vendor, orders, onStatusChange, onOpenChat }: 
     }
   ];
   
+  const isOpen = () => {
+    if (!vendor.openingTime || !vendor.closingTime) return true;
+    const now = new Date();
+    const currentTime = now.toTimeString().split(' ')[0];
+    const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+    
+    if (vendor.daysOpen && !vendor.daysOpen.includes(currentDay)) {
+      return false;
+    }
+    
+    return currentTime >= vendor.openingTime && currentTime <= vendor.closingTime;
+  };
+
   return (
     <div className="space-y-6">
+      {/* Business Info Card */}
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle className="text-2xl">{vendor.name}</CardTitle>
+              <p className="text-muted-foreground mt-1">{vendor.category}</p>
+            </div>
+            <Badge variant={isOpen() ? "default" : "secondary"}>
+              {isOpen() ? "Abierto" : "Cerrado"}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm">
+                {vendor.openingTime && vendor.closingTime 
+                  ? `${vendor.openingTime} - ${vendor.closingTime}`
+                  : 'Horario no especificado'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Phone className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm">
+                {vendor.whatsappNumber || vendor.phone}
+              </span>
+            </div>
+            <div className="text-sm">
+              <span className="font-medium">Días abierto: </span>
+              {vendor.daysOpen?.join(', ') || 'Todos los días'}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat, index) => (
           <Card key={index} className="hover:shadow-lg transition-shadow">

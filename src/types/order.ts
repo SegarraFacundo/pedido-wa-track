@@ -42,12 +42,17 @@ export interface Vendor {
   name: string;
   category: 'restaurant' | 'pharmacy' | 'market' | 'other';
   phone: string;
+  whatsappNumber?: string;
   address: string;
   isActive: boolean;
   rating: number;
   totalOrders: number;
   joinedAt: Date;
   image?: string;
+  openingTime?: string;
+  closingTime?: string;
+  daysOpen?: string[];
+  availableProducts?: any[];
 }
 
 export interface Message {
