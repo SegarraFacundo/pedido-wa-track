@@ -1,48 +1,27 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MapPin, Clock, Phone, Star, Store } from "lucide-react";
+import { MapPin, Clock, Phone, Star, Store, Pizza, Utensils, Coffee, ShoppingBag, Package } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Database } from "@/integrations/supabase/types";
+
+type VendorRow = Database['public']['Tables']['vendors']['Row'];
 
 interface Product {
-  id: string;
+  id?: string;
   name: string;
   price: number;
   description?: string;
   category?: string;
-  vendor_id: string;
 }
 
-interface VendorHours {
-  id: string;
-  vendor_id: string;
-  day_of_week: number;
-  open_time: string;
-  close_time: string;
-  is_closed: boolean;
-}
-
-interface Vendor {
-  id: string;
-  name: string;
-  category: string;
-  phone: string;
-  whatsapp_number?: string;
-  address: string;
-  is_active: boolean;
-  rating: number;
-  total_orders: number;
-  opening_time?: string;
-  closing_time?: string;
-  days_open?: string[];
+interface VendorWithProducts extends VendorRow {
   products?: Product[];
-  vendor_hours?: VendorHours[];
 }
 
 export function VendorCatalog() {
-  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [vendors, setVendors] = useState<VendorWithProducts[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [loading, setLoading] = useState(true);
 
@@ -51,19 +30,33 @@ export function VendorCatalog() {
   }, []);
 
   const fetchVendors = async () => {
-    const { data, error } = await supabase
-      .from('vendors')
-      .select('*')
-      .eq('is_active', true)
-      .order('rating', { ascending: false });
+    try {
+      const { data: vendorsData, error: vendorsError } = await supabase
+        .from('vendors')
+        .select('*')
+        .eq('is_active', true)
+        .order('rating', { ascending: false });
 
-    if (data && !error) {
-      setVendors(data);
+      if (vendorsError) throw vendorsError;
+
+      // Parse available_products JSON for each vendor
+      const vendorsWithProducts = vendorsData?.map(vendor => ({
+        ...vendor,
+        products: vendor.available_products ? 
+          (Array.isArray(vendor.available_products) ? 
+            (vendor.available_products as unknown as Product[]) : 
+            []) : []
+      })) || [];
+
+      setVendors(vendorsWithProducts);
+    } catch (error) {
+      console.error('Error fetching vendors:', error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  const isOpen = (vendor: Vendor) => {
+  const isOpen = (vendor: VendorWithProducts) => {
     const now = new Date();
     const currentTime = now.toTimeString().split(' ')[0];
     const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
@@ -79,11 +72,26 @@ export function VendorCatalog() {
     ? vendors 
     : vendors.filter(v => v.category === selectedCategory);
 
+  // Get unique categories from vendors
+  const uniqueCategories = Array.from(new Set(vendors.map(v => v.category)));
+  
   const categories = [
     { id: "all", label: "Todos", icon: Store },
-    { id: "restaurant", label: "Restaurantes", icon: "🍽️" },
-    { id: "pharmacy", label: "Farmacias", icon: "💊" },
-    { id: "market", label: "Mercados", icon: "🛒" },
+    ...uniqueCategories.map(cat => {
+      const iconMap: Record<string, any> = {
+        'Pizzería': Pizza,
+        'Sushi': '🍱',
+        'Hamburguesería': '🍔',
+        'Empanadas': '🥟',
+        'Pastas': '🍝',
+        'Cafetería': Coffee,
+      };
+      return {
+        id: cat,
+        label: cat,
+        icon: iconMap[cat] || Package
+      };
+    })
   ];
 
   if (loading) {
@@ -179,13 +187,18 @@ export function VendorCatalog() {
               )}
 
               {/* Botón de WhatsApp */}
-              <Button 
-                className="w-full bg-whatsapp hover:bg-whatsapp-dark"
-                onClick={() => window.open(`https://wa.me/${vendor.whatsapp_number}`, '_blank')}
-              >
-                <Phone className="h-4 w-4 mr-2" />
-                Pedir por WhatsApp
-              </Button>
+              {vendor.whatsapp_number && (
+                <Button 
+                  className="w-full bg-whatsapp hover:bg-whatsapp-dark text-white"
+                  onClick={() => {
+                    const phoneNumber = vendor.whatsapp_number?.replace(/\D/g, '');
+                    window.open(`https://wa.me/${phoneNumber}`, '_blank');
+                  }}
+                >
+                  <Phone className="h-4 w-4 mr-2" />
+                  Pedir por WhatsApp
+                </Button>
+              )}
             </CardContent>
           </Card>
         ))}
