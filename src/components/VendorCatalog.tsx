@@ -7,14 +7,21 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 
 interface Product {
+  id: string;
   name: string;
   price: number;
   description?: string;
+  category?: string;
+  vendor_id: string;
 }
 
-interface ProductCategory {
-  category: string;
-  items: Product[];
+interface VendorHours {
+  id: string;
+  vendor_id: string;
+  day_of_week: number;
+  open_time: string;
+  close_time: string;
+  is_closed: boolean;
 }
 
 interface Vendor {
@@ -22,15 +29,16 @@ interface Vendor {
   name: string;
   category: string;
   phone: string;
-  whatsapp_number: string;
+  whatsapp_number?: string;
   address: string;
   is_active: boolean;
   rating: number;
   total_orders: number;
-  opening_time: string;
-  closing_time: string;
-  days_open: string[];
-  available_products: any;
+  opening_time?: string;
+  closing_time?: string;
+  days_open?: string[];
+  products?: Product[];
+  vendor_hours?: VendorHours[];
 }
 
 export function VendorCatalog() {
@@ -143,43 +151,30 @@ export function VendorCatalog() {
                 </div>
               </div>
 
-              {/* Menú con Tabs */}
-              {vendor.available_products && vendor.available_products.length > 0 && (
+              {/* Menú con productos */}
+              {vendor.products && vendor.products.length > 0 && (
                 <div className="border-t pt-4">
                   <h4 className="font-semibold mb-3">Menú</h4>
-                  <Tabs defaultValue="0" className="w-full">
-                    <TabsList className="grid w-full" style={{ 
-                      gridTemplateColumns: `repeat(${Math.min(vendor.available_products.length, 3)}, 1fr)` 
-                    }}>
-                      {vendor.available_products.slice(0, 3).map((cat, idx) => (
-                        <TabsTrigger key={idx} value={idx.toString()} className="text-xs">
-                          {cat.category.split(' ')[0]}
-                        </TabsTrigger>
-                      ))}
-                    </TabsList>
-                    {vendor.available_products.slice(0, 3).map((cat, idx) => (
-                      <TabsContent key={idx} value={idx.toString()} className="mt-3 space-y-2">
-                        {cat.items.slice(0, 4).map((item, itemIdx) => (
-                          <div key={itemIdx} className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <p className="text-sm font-medium">{item.name}</p>
-                              {item.description && (
-                                <p className="text-xs text-muted-foreground">{item.description}</p>
-                              )}
-                            </div>
-                            <span className="text-sm font-semibold text-primary">
-                              ${item.price}
-                            </span>
-                          </div>
-                        ))}
-                        {cat.items.length > 4 && (
-                          <p className="text-xs text-muted-foreground text-center pt-2">
-                            +{cat.items.length - 4} productos más
-                          </p>
-                        )}
-                      </TabsContent>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {vendor.products.slice(0, 5).map((product) => (
+                      <div key={product.id} className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">{product.name}</p>
+                          {product.description && (
+                            <p className="text-xs text-muted-foreground">{product.description}</p>
+                          )}
+                        </div>
+                        <span className="text-sm font-semibold text-primary">
+                          ${product.price}
+                        </span>
+                      </div>
                     ))}
-                  </Tabs>
+                    {vendor.products.length > 5 && (
+                      <p className="text-xs text-muted-foreground text-center pt-2">
+                        +{vendor.products.length - 5} productos más
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
 
