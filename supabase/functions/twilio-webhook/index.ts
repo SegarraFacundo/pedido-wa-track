@@ -41,19 +41,8 @@ serve(async (req) => {
       timestamp: new Date().toISOString()
     };
 
-    // Store message in database
-    const { data: message, error: messageError } = await supabase
-      .from('messages')
-      .insert({
-        order_id: null, // Will be linked after order creation
-        sender_type: 'customer',
-        content: messageData.body,
-        phone_number: messageData.from
-      })
-      .select()
-      .single();
-
-    if (messageError) throw messageError;
+    // For now, we'll skip storing the message in the database until we have an order_id
+    // Messages table requires an order_id, so we'll handle message storage after order creation
 
     // Process with AI agent
     const aiResponse = await processWithAI(messageData, supabase);
@@ -178,21 +167,47 @@ async function sendTwilioMessage(to: string, message: string) {
 }
 
 async function createOrder(messageData: any, entities: any, supabase: any) {
+  // First, get a default vendor (or use the provided vendor_id)
+  let vendorId = entities.vendor_id;
+  
+  if (!vendorId) {
+    // Get the first active vendor as default
+    const { data: vendor } = await supabase
+      .from('vendors')
+      .select('id')
+      .eq('is_active', true)
+      .limit(1)
+      .single();
+    
+    vendorId = vendor?.id;
+  }
+  
   // Create new order based on extracted entities
   const { data, error } = await supabase
     .from('orders')
     .insert({
-      customer_name: messageData.profileName,
+      customer_name: messageData.profileName || 'Cliente WhatsApp',
       customer_phone: messageData.from,
-      customer_address: entities.address || 'Por confirmar',
+      address: entities.address || 'Por confirmar',
       items: entities.products || [],
-      total_price: entities.total || 0,
+      total: entities.total || 0,
       status: 'pending',
       estimated_delivery: new Date(Date.now() + 45 * 60000).toISOString(),
-      vendor_id: entities.vendor_id || null
+      vendor_id: vendorId
     })
     .select()
     .single();
+  
+  if (data) {
+    // Now store the message in the messages table with the order_id
+    await supabase
+      .from('messages')
+      .insert({
+        order_id: data.id,
+        sender: 'customer',
+        content: messageData.body
+      });
+  }
     
   return data;
 }
