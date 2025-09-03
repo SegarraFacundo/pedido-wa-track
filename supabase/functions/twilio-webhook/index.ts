@@ -125,10 +125,16 @@ async function processWithAI(messageData: any, supabase: any) {
               2. Extraer información relevante (productos, dirección, etc)
               3. Gestionar el flujo de pedidos
               4. Responder de manera amigable y eficiente
-              5. Informar sobre vendedores disponibles con sus horarios
+              5. Informar sobre vendedores disponibles con sus horarios y productos
               
-              Vendedores disponibles ahora:
-              ${availableVendors.map(v => `- ${v.name}: ${v.opening_time} a ${v.closing_time}`).join('\n')}
+              REGLAS CLAVE (no tienes memoria entre mensajes):
+              - Si el mensaje tiene productos pero NO dirección, pide SOLO la dirección.
+              - Si el mensaje tiene dirección pero NO productos, pide SOLO los productos (sugiere 3-5 de los locales abiertos).
+              - Si tiene ambos, crea el pedido sin volver a preguntar.
+              - Siempre indica si hay locales abiertos ahora y muestra algunos productos disponibles.
+              
+              Locales abiertos ahora:
+              ${availableVendors.map(v => `- ${v.name} (${v.category}) — Horario: ${v.opening_time} a ${v.closing_time}${Array.isArray(v.available_products) && v.available_products.length ? ` — Productos: ${v.available_products.slice(0,5).map((p:any)=> (typeof p === 'string' ? p : (p.name ?? ''))).filter(Boolean).join(', ')}` : ''}`).join('\n')}
               
               Tipos de intenciones:
               - NEW_ORDER: Cliente quiere hacer un pedido
@@ -137,6 +143,10 @@ async function processWithAI(messageData: any, supabase: any) {
               - VENDOR_INQUIRY: Pregunta sobre vendedores disponibles
               - CONNECT_VENDOR: Cliente quiere hablar directamente con el vendedor
               - GENERAL_HELP: Ayuda general
+              
+              FORMATO DE RESPUESTA:
+              - Mensajes breves en español.
+              - Si faltan datos, pregunta solo lo que falta con una sola pregunta clara.
               
               IMPORTANTE: Responde SOLO con un objeto JSON válido, sin texto adicional:
               {
