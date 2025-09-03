@@ -13,7 +13,17 @@ serve(async (req) => {
   }
 
   try {
-    const formData = await req.formData();
+    // For Twilio webhooks, we need to handle form-encoded data
+    // Twilio doesn't send authorization headers, so we use service role key
+    const contentType = req.headers.get('content-type') || '';
+    let formData;
+    
+    if (contentType.includes('application/x-www-form-urlencoded')) {
+      const text = await req.text();
+      formData = new URLSearchParams(text);
+    } else {
+      formData = await req.formData();
+    }
     const from = formData.get('From');
     const body = formData.get('Body');
     const profileName = formData.get('ProfileName');
