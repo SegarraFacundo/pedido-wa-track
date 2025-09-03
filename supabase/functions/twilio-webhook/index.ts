@@ -92,7 +92,8 @@ async function processWithAI(messageData: any, supabase: any) {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openAIKey}`,
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json; charset=utf-8',
+        'Accept': 'application/json',
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini', // Using a valid model
