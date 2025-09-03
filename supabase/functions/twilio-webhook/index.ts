@@ -47,23 +47,21 @@ serve(async (req) => {
     // Process with AI agent
     const aiResponse = await processWithAI(messageData, supabase);
     
-    // Send response back via Twilio
-    const twilioResponse = await sendTwilioMessage(
+    // Send response back via Twilio API (asynchronously)
+    await sendTwilioMessage(
       messageData.from!,
       aiResponse.message
     );
 
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: 'Message processed',
-        response: aiResponse 
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200 
+    // Return empty 200 OK response for Twilio webhook
+    // Twilio expects either empty response or TwiML, not JSON
+    return new Response(null, { 
+      status: 200,
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'text/plain'
       }
-    );
+    });
   } catch (error) {
     console.error('Error processing webhook:', error);
     return new Response(
