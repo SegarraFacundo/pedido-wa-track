@@ -44,16 +44,34 @@ serve(async (req) => {
     // For now, we'll skip storing the message in the database until we have an order_id
     // Messages table requires an order_id, so we'll handle message storage after order creation
 
-    // Process with AI agent
-    const aiResponse = await processWithAI(messageData, supabase);
-    
-    // Reply synchronously via TwiML to ensure delivery reliability
-    // (Removed REST API send to avoid duplicate/no-delivery issues)
-    console.log('AI response to send via TwiML:', aiResponse);
+    // Kick off AI processing but enforce fast webhook response
+    const aiPromise = processWithAI(messageData, supabase);
 
-    // Return empty 200 OK response for Twilio webhook
-    // Twilio expects either empty response or TwiML, not JSON
-    const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response><Message><![CDATA[${aiResponse.message}]]></Message></Response>`;
+    // 8s timeout to avoid Twilio webhook timeout (~15s)
+    const timeoutPromise = new Promise<{message: string; intent: string; entities: any}>(resolve => {
+      setTimeout(() => resolve({
+        intent: 'PROCESSING',
+        entities: {},
+        message: '✅ Recibido. Estoy procesando tu mensaje y te responderé en unos segundos…'
+      }), 8000);
+    });
+
+    const firstResponse = await Promise.race([aiPromise, timeoutPromise]);
+
+    // If we timed out, continue processing and then send via REST when ready
+    aiPromise.then(async (final) => {
+      if (final && final.message && final !== firstResponse) {
+        try {
+          await sendTwilioMessage(messageData.from!, final.message);
+        } catch (e) {
+          console.error('Error sending async Twilio message:', e);
+        }
+      }
+    }).catch((e) => console.error('AI processing failed after timeout:', e));
+
+    console.log('TwiML immediate reply:', firstResponse);
+
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response><Message><![CDATA[${firstResponse.message}]]></Message></Response>`;
     return new Response(twiml, {
       status: 200,
       headers: {
@@ -254,7 +272,7 @@ async function cancelOrder(phone: string, supabase: any) {
 
 async function getAvailableVendors(supabase: any, messageContent: string) {
   const now = new Date();
-  const currentDay = now.toLocaleLowerCase('en-US', { weekday: 'long' });
+  const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
   const currentTime = now.toTimeString().split(' ')[0]; // HH:MM:SS format
   
   // Get all active vendors with their business hours
