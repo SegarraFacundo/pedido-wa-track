@@ -355,12 +355,16 @@ async function createOrder(messageData: any, entities: any, supabase: any, sugge
   }
   
   // Create new order based on extracted entities
+  const customerName = messageData.profileName || 'Cliente WhatsApp';
+  const customerPhone = messageData.from;
+  const customerAddress = entities.address || 'Por confirmar';
+  
   const { data, error } = await supabase
     .from('orders')
     .insert({
-      customer_name: messageData.profileName || 'Cliente WhatsApp',
-      customer_phone: messageData.from,
-      address: entities.address || 'Por confirmar',
+      customer_name: customerName,
+      customer_phone: customerPhone,
+      address: customerAddress,
       items: entities.products || [],
       total: entities.total || 0,
       status: 'pending',
@@ -370,7 +374,17 @@ async function createOrder(messageData: any, entities: any, supabase: any, sugge
     .select()
     .single();
   
-  if (data) {
+  if (data && !error) {
+    // Store sensitive customer data separately in customer_contacts table
+    await supabase
+      .from('customer_contacts')
+      .insert({
+        order_id: data.id,
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        customer_address: customerAddress
+      });
+    
     // Now store the message in the messages table with the order_id
     await supabase
       .from('messages')
