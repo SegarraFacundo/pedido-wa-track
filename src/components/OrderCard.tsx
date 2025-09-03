@@ -58,17 +58,17 @@ export function OrderCard({ order, onStatusChange, onOpenChat, isVendorView = fa
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-sm">
             <User className="h-4 w-4 text-muted-foreground" />
-            <span>{order.customerName}</span>
+            <span>{isVendorView && order.customerNameMasked ? order.customerNameMasked : order.customerName}</span>
           </div>
           
           <div className="flex items-center gap-2 text-sm">
             <Phone className="h-4 w-4 text-muted-foreground" />
-            <span>{order.customerPhone}</span>
+            <span>{isVendorView && order.customerPhoneMasked ? order.customerPhoneMasked : order.customerPhone}</span>
           </div>
           
           <div className="flex items-center gap-2 text-sm">
             <MapPin className="h-4 w-4 text-muted-foreground" />
-            <span className="line-clamp-1">{order.address}</span>
+            <span className="line-clamp-1">{isVendorView && order.addressSimplified ? order.addressSimplified : order.address}</span>
           </div>
           
           {order.estimatedDelivery && (

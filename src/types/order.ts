@@ -35,6 +35,10 @@ export interface Order {
   notes?: string;
   deliveryPersonName?: string;
   deliveryPersonPhone?: string;
+  // Masked fields for vendor view
+  customerNameMasked?: string;
+  customerPhoneMasked?: string;
+  addressSimplified?: string;
 }
 
 export interface Vendor {
