@@ -104,10 +104,69 @@ async function processWithAI(messageData: any, supabase: any) {
       };
     }
 
-    // Get available vendors based on current time and products
+    // Get available vendors with products
     const availableVendors = await getAvailableVendors(supabase, messageData.body);
     
-    // Analyze message intent
+    // Get or create chat session
+    const { data: session } = await supabase
+      .from('chat_sessions')
+      .upsert({
+        phone: messageData.from,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'phone' })
+      .select()
+      .single();
+
+    // Build vendor menu with categories and prices
+    const vendorMenu = availableVendors.map((v: any) => {
+      let menu = `📍 *${v.name}* (${v.category})\n⏰ ${v.opening_time?.slice(0,5)} - ${v.closing_time?.slice(0,5)}\n`;
+      
+      if (v.available_products && Array.isArray(v.available_products)) {
+        const productsByCategory: any = {};
+        
+        // Sample products with categories if not defined
+        const sampleProducts = v.category === 'restaurant' ? [
+          { category: '🍕 Pizzas', items: [
+            { name: 'Napolitana', price: 3000 },
+            { name: 'Mozzarella', price: 2800 },
+            { name: 'Fugazzeta', price: 2900 }
+          ]},
+          { category: '🥤 Bebidas', items: [
+            { name: 'Coca Cola 1.5L', price: 800 },
+            { name: 'Agua mineral', price: 400 }
+          ]},
+          { category: '🍰 Postres', items: [
+            { name: 'Flan casero', price: 600 },
+            { name: 'Helado 1/4kg', price: 1200 }
+          ]}
+        ] : v.category === 'pharmacy' ? [
+          { category: '💊 Medicamentos', items: [
+            { name: 'Ibuprofeno 400mg', price: 500 },
+            { name: 'Paracetamol 500mg', price: 400 }
+          ]},
+          { category: '🧴 Cuidado Personal', items: [
+            { name: 'Shampoo', price: 1200 },
+            { name: 'Jabón', price: 300 }
+          ]}
+        ] : [
+          { category: '🛒 Productos', items: [
+            { name: 'Producto 1', price: 1000 },
+            { name: 'Producto 2', price: 1500 }
+          ]}
+        ];
+        
+        sampleProducts.forEach((cat: any) => {
+          menu += `\n${cat.category}:\n`;
+          cat.items.forEach((item: any) => {
+            menu += `  • ${item.name} - $${item.price}\n`;
+          });
+        });
+      }
+      
+      return menu;
+    }).join('\n---\n');
+    
+    // Analyze message intent with session context
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -116,45 +175,45 @@ async function processWithAI(messageData: any, supabase: any) {
         'Accept': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini', // Using a valid model
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
             content: `Eres un asistente de delivery inteligente. Tu trabajo es:
-              1. Identificar la intención del usuario (nuevo pedido, consulta de estado, cancelación, etc)
-              2. Extraer información relevante (productos, dirección, etc)
-              3. Gestionar el flujo de pedidos
-              4. Responder de manera amigable y eficiente
-              5. Informar sobre vendedores disponibles con sus horarios y productos
+              1. Identificar la intención del usuario
+              2. Extraer información relevante (productos, dirección)
+              3. NO repetir preguntas ya respondidas
+              4. Mostrar menús con precios cuando sea relevante
               
-              REGLAS CLAVE (no tienes memoria entre mensajes):
-              - Si el mensaje tiene productos pero NO dirección, pide SOLO la dirección.
-              - Si el mensaje tiene dirección pero NO productos, pide SOLO los productos (sugiere 3-5 de los locales abiertos).
-              - Si tiene ambos, crea el pedido sin volver a preguntar.
-              - Siempre indica si hay locales abiertos ahora y muestra algunos productos disponibles.
+              CONTEXTO DE LA SESIÓN:
+              - Productos pendientes: ${JSON.stringify(session?.pending_products || [])}
+              - Dirección pendiente: ${session?.pending_address || 'No indicada'}
               
-              Locales abiertos ahora:
-              ${availableVendors.map(v => `- ${v.name} (${v.category}) — Horario: ${v.opening_time} a ${v.closing_time}${Array.isArray(v.available_products) && v.available_products.length ? ` — Productos: ${v.available_products.slice(0,5).map((p:any)=> (typeof p === 'string' ? p : (p.name ?? ''))).filter(Boolean).join(', ')}` : ''}`).join('\n')}
+              LOCALES DISPONIBLES AHORA:
+              ${vendorMenu || 'No hay locales abiertos en este momento'}
+              
+              REGLAS IMPORTANTES:
+              - Si ya tienes productos y dirección, crea el pedido inmediatamente
+              - Si falta algo, pregunta SOLO lo que falta
+              - Cuando muestres productos, incluye precios
+              - Sé breve y claro
               
               Tipos de intenciones:
               - NEW_ORDER: Cliente quiere hacer un pedido
-              - CHECK_STATUS: Cliente consulta estado de pedido
-              - CANCEL_ORDER: Cliente quiere cancelar
-              - VENDOR_INQUIRY: Pregunta sobre vendedores disponibles
-              - CONNECT_VENDOR: Cliente quiere hablar directamente con el vendedor
+              - CHECK_STATUS: Cliente consulta estado
+              - VENDOR_INQUIRY: Pregunta sobre vendedores
               - GENERAL_HELP: Ayuda general
               
-              FORMATO DE RESPUESTA:
-              - Mensajes breves en español.
-              - Si faltan datos, pregunta solo lo que falta con una sola pregunta clara.
-              
-              IMPORTANTE: Responde SOLO con un objeto JSON válido, sin texto adicional:
+              Responde SOLO con JSON válido:
               {
-                "intent": "tipo_de_intencion",
-                "entities": {},
-                "message": "respuesta al usuario",
-                "action": "acción a tomar",
-                "suggestedVendor": "vendor_id si aplica"
+                "intent": "tipo",
+                "entities": {
+                  "products": [],
+                  "address": "",
+                  "vendor_id": ""
+                },
+                "message": "respuesta",
+                "action": "save_products|save_address|create_order|none"
               }`
           },
           {
@@ -162,8 +221,8 @@ async function processWithAI(messageData: any, supabase: any) {
             content: messageData.body || 'Hola'
           }
         ],
-        temperature: 0.7,
-        max_tokens: 500
+        temperature: 0.5,
+        max_tokens: 800
       }),
     });
 
@@ -185,36 +244,46 @@ async function processWithAI(messageData: any, supabase: any) {
       aiResponse = JSON.parse(aiData.choices[0].message.content);
     } catch (parseError) {
       console.error('Failed to parse AI response:', aiData.choices[0].message.content);
-      // Return a default response if parsing fails
       aiResponse = {
         intent: 'GENERAL_HELP',
         entities: {},
-        message: 'Hola! Soy tu asistente de delivery. ¿En qué puedo ayudarte hoy?',
+        message: `¡Hola! Puedo ayudarte a pedir delivery 🚚\n\n${vendorMenu ? 'Estos locales están abiertos ahora:\n\n' + vendorMenu : 'No hay locales abiertos en este momento.'}`,
         action: 'none'
       };
     }
 
-    // Execute action based on intent
-    switch(aiResponse.intent) {
-      case 'NEW_ORDER':
-        const order = await createOrder(messageData, aiResponse.entities, supabase, aiResponse.suggestedVendor);
-        if (order) {
-          await notifyVendor(order.vendor_id, order.id, messageData.body, supabase);
-        }
-        break;
-      case 'CHECK_STATUS':
-        const status = await checkOrderStatus(messageData.from, supabase);
-        aiResponse.message += `\n\nEstado actual: ${status}`;
-        break;
-      case 'CANCEL_ORDER':
-        await cancelOrder(messageData.from, supabase);
-        break;
-      case 'CONNECT_VENDOR':
-        const vendorContact = await connectToVendor(messageData.from, supabase);
-        if (vendorContact) {
-          aiResponse.message = `Puedes contactar directamente al vendedor al: ${vendorContact.whatsapp_number}`;
-        }
-        break;
+    // Update session based on action
+    if (aiResponse.action === 'save_products' && aiResponse.entities?.products) {
+      await supabase.from('chat_sessions').update({
+        pending_products: aiResponse.entities.products,
+        updated_at: new Date().toISOString()
+      }).eq('phone', messageData.from);
+    } else if (aiResponse.action === 'save_address' && aiResponse.entities?.address) {
+      await supabase.from('chat_sessions').update({
+        pending_address: aiResponse.entities.address,
+        updated_at: new Date().toISOString()
+      }).eq('phone', messageData.from);
+    } else if (aiResponse.action === 'create_order') {
+      // Merge session data with current entities
+      const finalEntities = {
+        ...aiResponse.entities,
+        products: aiResponse.entities.products || session?.pending_products || [],
+        address: aiResponse.entities.address || session?.pending_address || ''
+      };
+      
+      const order = await createOrder(messageData, finalEntities, supabase, aiResponse.entities?.vendor_id);
+      if (order) {
+        await notifyVendor(order.vendor_id, order.id, messageData.body, supabase);
+        // Clear session after successful order
+        await supabase.from('chat_sessions').update({
+          pending_products: [],
+          pending_address: null,
+          vendor_preference: null,
+          updated_at: new Date().toISOString()
+        }).eq('phone', messageData.from);
+        
+        aiResponse.message = `✅ ¡Pedido #${order.id.slice(0, 8)} creado!\n\n📍 Dirección: ${finalEntities.address}\n⏰ Entrega estimada: 30-45 minutos\n\nEl local fue notificado y confirmará tu pedido pronto.`;
+      }
     }
 
     return aiResponse;

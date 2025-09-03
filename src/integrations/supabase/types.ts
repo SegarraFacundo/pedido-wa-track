@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      chat_sessions: {
+        Row: {
+          pending_address: string | null
+          pending_products: Json | null
+          phone: string
+          updated_at: string
+          vendor_preference: string | null
+        }
+        Insert: {
+          pending_address?: string | null
+          pending_products?: Json | null
+          phone: string
+          updated_at?: string
+          vendor_preference?: string | null
+        }
+        Update: {
+          pending_address?: string | null
+          pending_products?: Json | null
+          phone?: string
+          updated_at?: string
+          vendor_preference?: string | null
+        }
+        Relationships: []
+      }
       customer_contacts: {
         Row: {
           created_at: string | null
