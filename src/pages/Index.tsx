@@ -4,10 +4,11 @@ import { VendorDashboard } from "@/components/VendorDashboard";
 import { OrderTracking } from "@/components/OrderTracking";
 import { ChatInterface } from "@/components/ChatInterface";
 import { AdminPanel } from "@/components/AdminPanel";
+import { TwilioConfig } from "@/components/TwilioConfig";
 import { Button } from "@/components/ui/button";
 import { mockOrders, mockVendors, mockMessages } from "@/data/mockData";
 import { Order, OrderStatus, Vendor, Message } from "@/types/order";
-import { MessageCircle, X, ShoppingBag } from "lucide-react";
+import { MessageCircle, X, ShoppingBag, Bot } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
@@ -154,10 +155,11 @@ const Index = () => {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue="vendor" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-8">
+          <TabsList className="grid w-full grid-cols-5 mb-8">
             <TabsTrigger value="vendor">Panel Vendedor</TabsTrigger>
             <TabsTrigger value="tracking">Seguimiento</TabsTrigger>
             <TabsTrigger value="admin">Administración</TabsTrigger>
+            <TabsTrigger value="whatsapp">WhatsApp Bot</TabsTrigger>
             <TabsTrigger value="about">Acerca de</TabsTrigger>
           </TabsList>
 
@@ -183,6 +185,10 @@ const Index = () => {
               vendors={vendors}
               onToggleVendorStatus={handleToggleVendorStatus}
             />
+          </TabsContent>
+
+          <TabsContent value="whatsapp">
+            <TwilioConfig />
           </TabsContent>
 
           <TabsContent value="about" className="space-y-6">
