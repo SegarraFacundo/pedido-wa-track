@@ -104,9 +104,6 @@ async function processWithAI(messageData: any, supabase: any) {
       };
     }
 
-    // Get available vendors with products
-    const availableVendors = await getAvailableVendors(supabase, messageData.body);
-    
     // Get or create chat session
     const { data: session } = await supabase
       .from('chat_sessions')
@@ -117,56 +114,104 @@ async function processWithAI(messageData: any, supabase: any) {
       .select()
       .single();
 
-    // Build vendor menu with categories and prices
-    const vendorMenu = availableVendors.map((v: any) => {
-      let menu = `📍 *${v.name}* (${v.category})\n⏰ ${v.opening_time?.slice(0,5)} - ${v.closing_time?.slice(0,5)}\n`;
+    // Check if asking about specific products/categories
+    const lowerBody = (messageData.body || '').toLowerCase();
+    const isAskingForPizza = lowerBody.includes('pizza');
+    const isAskingForVendors = lowerBody.includes('locales') || lowerBody.includes('abierto') || lowerBody.includes('disponible');
+    const isSelectingVendor = /\b(quiero|elijo|selecciono|prefiero)\s+.*\b(local|negocio|tienda|restaurante)\b/i.test(lowerBody);
+    
+    // Get available vendors, optionally filtered by product
+    const availableVendors = await getAvailableVendors(supabase, isAskingForPizza ? 'pizza' : undefined);
+    
+    // If user is selecting a vendor, try to find it
+    let selectedVendor = null;
+    if (isSelectingVendor || session?.vendor_preference) {
+      const vendorName = extractVendorName(messageData.body, availableVendors);
+      if (vendorName) {
+        selectedVendor = availableVendors.find((v: any) => 
+          v.name.toLowerCase().includes(vendorName.toLowerCase())
+        );
+        if (selectedVendor) {
+          // Save vendor preference
+          await supabase.from('chat_sessions').update({
+            vendor_preference: selectedVendor.id,
+            updated_at: new Date().toISOString()
+          }).eq('phone', messageData.from);
+        }
+      } else if (session?.vendor_preference) {
+        selectedVendor = availableVendors.find((v: any) => v.id === session.vendor_preference);
+      }
+    }
+
+    // Build response based on context
+    let vendorMenu = '';
+    
+    if (selectedVendor) {
+      // Show detailed menu for selected vendor
+      vendorMenu = `📍 *${selectedVendor.name}*\n`;
+      vendorMenu += `📞 Tel: ${selectedVendor.phone}\n`;
+      vendorMenu += `📍 Dirección: ${selectedVendor.address}\n`;
+      vendorMenu += `⏰ Horario: ${selectedVendor.opening_time?.slice(0,5)} - ${selectedVendor.closing_time?.slice(0,5)}\n`;
+      vendorMenu += `📅 Días: ${selectedVendor.days_open?.join(', ')}\n\n`;
+      vendorMenu += `🛒 *MENÚ DISPONIBLE:*\n`;
       
-      if (v.available_products && Array.isArray(v.available_products)) {
+      // Get actual products from database or use sample products
+      const { data: products } = await supabase
+        .from('products')
+        .select('*')
+        .eq('vendor_id', selectedVendor.id)
+        .eq('is_available', true);
+      
+      if (products && products.length > 0) {
         const productsByCategory: any = {};
+        products.forEach((p: any) => {
+          if (!productsByCategory[p.category]) {
+            productsByCategory[p.category] = [];
+          }
+          productsByCategory[p.category].push(p);
+        });
         
-        // Sample products with categories if not defined
-        const sampleProducts = v.category === 'restaurant' ? [
-          { category: '🍕 Pizzas', items: [
-            { name: 'Napolitana', price: 3000 },
-            { name: 'Mozzarella', price: 2800 },
-            { name: 'Fugazzeta', price: 2900 }
-          ]},
-          { category: '🥤 Bebidas', items: [
-            { name: 'Coca Cola 1.5L', price: 800 },
-            { name: 'Agua mineral', price: 400 }
-          ]},
-          { category: '🍰 Postres', items: [
-            { name: 'Flan casero', price: 600 },
-            { name: 'Helado 1/4kg', price: 1200 }
-          ]}
-        ] : v.category === 'pharmacy' ? [
-          { category: '💊 Medicamentos', items: [
-            { name: 'Ibuprofeno 400mg', price: 500 },
-            { name: 'Paracetamol 500mg', price: 400 }
-          ]},
-          { category: '🧴 Cuidado Personal', items: [
-            { name: 'Shampoo', price: 1200 },
-            { name: 'Jabón', price: 300 }
-          ]}
-        ] : [
-          { category: '🛒 Productos', items: [
-            { name: 'Producto 1', price: 1000 },
-            { name: 'Producto 2', price: 1500 }
-          ]}
-        ];
-        
-        sampleProducts.forEach((cat: any) => {
-          menu += `\n${cat.category}:\n`;
-          cat.items.forEach((item: any) => {
-            menu += `  • ${item.name} - $${item.price}\n`;
+        Object.entries(productsByCategory).forEach(([category, items]: any) => {
+          vendorMenu += `\n${getCategoryEmoji(category)} *${category}:*\n`;
+          items.forEach((item: any) => {
+            vendorMenu += `  • ${item.name} - $${item.price}`;
+            if (item.description) vendorMenu += ` (${item.description})`;
+            vendorMenu += '\n';
           });
+        });
+      } else if (selectedVendor.available_products && Array.isArray(selectedVendor.available_products)) {
+        selectedVendor.available_products.forEach((p: any) => {
+          vendorMenu += `  • ${p.name} - $${p.price}\n`;
         });
       }
       
-      return menu;
-    }).join('\n---\n');
+      vendorMenu += '\n📝 *Para pedir, escribe los productos que quieres y tu dirección*';
+      vendorMenu += '\n💬 *Para hablar con el local, escribe "hablar con vendedor"*';
+      
+    } else if (isAskingForVendors || isAskingForPizza) {
+      // Show list of available vendors
+      if (availableVendors.length > 0) {
+        vendorMenu = isAskingForPizza ? 
+          '🍕 *Locales con pizza disponibles ahora:*\n\n' : 
+          '🏪 *Locales abiertos ahora:*\n\n';
+        
+        availableVendors.forEach((v: any, index: number) => {
+          vendorMenu += `${index + 1}. *${v.name}* (${getCategoryEmoji(v.category)} ${v.category})\n`;
+          vendorMenu += `   📍 ${v.address}\n`;
+          vendorMenu += `   ⏰ ${v.opening_time?.slice(0,5)} - ${v.closing_time?.slice(0,5)}\n`;
+          if (v.rating > 0) vendorMenu += `   ⭐ ${v.rating}/5\n`;
+          vendorMenu += '\n';
+        });
+        
+        vendorMenu += '📝 *Escribe el nombre del local que prefieres para ver su menú completo*';
+      } else {
+        vendorMenu = isAskingForPizza ? 
+          '😔 No hay locales con pizza abiertos en este momento' :
+          '😔 No hay locales abiertos en este momento';
+      }
+    }
     
-    // Analyze message intent with session context
+    // Analyze message intent with enhanced context
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -179,29 +224,34 @@ async function processWithAI(messageData: any, supabase: any) {
         messages: [
           {
             role: 'system',
-            content: `Eres un asistente de delivery inteligente. Tu trabajo es:
-              1. Identificar la intención del usuario
-              2. Extraer información relevante (productos, dirección)
-              3. NO repetir preguntas ya respondidas
-              4. Mostrar menús con precios cuando sea relevante
+            content: `Eres un asistente de delivery inteligente. Tu trabajo es ayudar a los clientes a:
+              1. Ver locales disponibles (abiertos ahora)
+              2. Filtrar por tipo de producto (pizza, medicinas, etc)
+              3. Seleccionar un local específico y ver su menú
+              4. Hacer pedidos con productos y dirección
+              5. Comunicarse con el local si lo necesitan
               
               CONTEXTO DE LA SESIÓN:
               - Productos pendientes: ${JSON.stringify(session?.pending_products || [])}
               - Dirección pendiente: ${session?.pending_address || 'No indicada'}
+              - Vendedor seleccionado: ${selectedVendor ? selectedVendor.name : 'Ninguno'}
               
-              LOCALES DISPONIBLES AHORA:
-              ${vendorMenu || 'No hay locales abiertos en este momento'}
+              INFORMACIÓN DISPONIBLE:
+              ${vendorMenu || 'No hay información de vendedores disponible'}
               
               REGLAS IMPORTANTES:
-              - Si ya tienes productos y dirección, crea el pedido inmediatamente
-              - Si falta algo, pregunta SOLO lo que falta
-              - Cuando muestres productos, incluye precios
-              - Sé breve y claro
+              - Si el cliente pregunta por locales, muestra la lista
+              - Si pregunta por un producto específico, filtra los locales
+              - Si selecciona un local, muestra su menú completo
+              - Para crear pedido necesitas: vendedor, productos y dirección
+              - Si el cliente quiere hablar con el vendedor, indícale que escriba "hablar con vendedor"
               
               Tipos de intenciones:
-              - NEW_ORDER: Cliente quiere hacer un pedido
-              - CHECK_STATUS: Cliente consulta estado
-              - VENDOR_INQUIRY: Pregunta sobre vendedores
+              - SHOW_VENDORS: Mostrar locales disponibles
+              - SELECT_VENDOR: Seleccionar un local específico
+              - NEW_ORDER: Crear nuevo pedido
+              - VENDOR_CHAT: Comunicarse con vendedor
+              - CHECK_STATUS: Consultar estado de pedido
               - GENERAL_HELP: Ayuda general
               
               Responde SOLO con JSON válido:
@@ -210,10 +260,11 @@ async function processWithAI(messageData: any, supabase: any) {
                 "entities": {
                   "products": [],
                   "address": "",
-                  "vendor_id": ""
+                  "vendor_id": "",
+                  "vendor_name": ""
                 },
-                "message": "respuesta",
-                "action": "save_products|save_address|create_order|none"
+                "message": "respuesta en español con formato WhatsApp",
+                "action": "save_vendor|save_products|save_address|create_order|connect_vendor|none"
               }`
           },
           {
@@ -221,7 +272,7 @@ async function processWithAI(messageData: any, supabase: any) {
             content: messageData.body || 'Hola'
           }
         ],
-        temperature: 0.5,
+        temperature: 0.3,
         max_tokens: 800
       }),
     });
@@ -349,17 +400,30 @@ async function cancelOrder(phone: string, supabase: any) {
   return data;
 }
 
-async function getAvailableVendors(supabase: any, messageContent: string) {
+async function getAvailableVendors(supabase: any, productFilter?: string) {
   const now = new Date();
   const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
   const currentTime = now.toTimeString().split(' ')[0]; // HH:MM:SS format
   
   // Get all active vendors with their business hours
-  const { data: vendors } = await supabase
+  let query = supabase
     .from('vendors')
     .select('*')
     .eq('is_active', true)
     .contains('days_open', [currentDay]);
+  
+  // If filtering by product, look for it in available_products
+  if (productFilter) {
+    // This will need more sophisticated filtering in production
+    // For now, filter by category if it matches
+    if (productFilter.toLowerCase().includes('pizza')) {
+      query = query.eq('category', 'restaurant');
+    } else if (productFilter.toLowerCase().includes('medicina') || productFilter.toLowerCase().includes('farmacia')) {
+      query = query.eq('category', 'pharmacy');
+    }
+  }
+  
+  const { data: vendors } = await query;
   
   // Filter by opening hours
   const availableVendors = vendors?.filter((vendor: any) => {
@@ -367,6 +431,34 @@ async function getAvailableVendors(supabase: any, messageContent: string) {
   }) || [];
   
   return availableVendors;
+}
+
+function extractVendorName(message: string, availableVendors: any[]): string | null {
+  const lowerMessage = message.toLowerCase();
+  
+  // Check if any vendor name is mentioned in the message
+  for (const vendor of availableVendors) {
+    if (lowerMessage.includes(vendor.name.toLowerCase())) {
+      return vendor.name;
+    }
+  }
+  
+  return null;
+}
+
+function getCategoryEmoji(category: string): string {
+  const emojis: any = {
+    'restaurant': '🍔',
+    'pharmacy': '💊',
+    'market': '🏪',
+    'Pizzas': '🍕',
+    'Bebidas': '🥤',
+    'Postres': '🍰',
+    'Medicamentos': '💊',
+    'Cuidado Personal': '🧴',
+    'other': '📦'
+  };
+  return emojis[category] || '📦';
 }
 
 async function notifyVendor(vendorId: string, orderId: string, orderDetails: string, supabase: any) {
