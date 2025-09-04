@@ -184,6 +184,50 @@ export type Database = {
           },
         ]
       }
+      products: {
+        Row: {
+          category: string
+          created_at: string | null
+          description: string | null
+          id: string
+          is_available: boolean | null
+          name: string
+          price: number
+          updated_at: string | null
+          vendor_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_available?: boolean | null
+          name: string
+          price: number
+          updated_at?: string | null
+          vendor_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_available?: boolean | null
+          name?: string
+          price?: number
+          updated_at?: string | null
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string | null
@@ -213,6 +257,47 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      vendor_hours: {
+        Row: {
+          closing_time: string
+          created_at: string | null
+          day_of_week: string
+          id: string
+          is_closed: boolean | null
+          opening_time: string
+          updated_at: string | null
+          vendor_id: string
+        }
+        Insert: {
+          closing_time: string
+          created_at?: string | null
+          day_of_week: string
+          id?: string
+          is_closed?: boolean | null
+          opening_time: string
+          updated_at?: string | null
+          vendor_id: string
+        }
+        Update: {
+          closing_time?: string
+          created_at?: string | null
+          day_of_week?: string
+          id?: string
+          is_closed?: boolean | null
+          opening_time?: string
+          updated_at?: string | null
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_hours_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vendor_notifications: {
         Row: {
@@ -284,7 +369,7 @@ export type Database = {
           rating: number | null
           total_orders: number | null
           updated_at: string | null
-          user_id: string
+          user_id: string | null
           whatsapp_number: string | null
         }
         Insert: {
@@ -304,7 +389,7 @@ export type Database = {
           rating?: number | null
           total_orders?: number | null
           updated_at?: string | null
-          user_id: string
+          user_id?: string | null
           whatsapp_number?: string | null
         }
         Update: {
@@ -324,7 +409,7 @@ export type Database = {
           rating?: number | null
           total_orders?: number | null
           updated_at?: string | null
-          user_id?: string
+          user_id?: string | null
           whatsapp_number?: string | null
         }
         Relationships: []
