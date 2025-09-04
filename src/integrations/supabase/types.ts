@@ -434,6 +434,40 @@ export type Database = {
           updated_at: string | null
           vendor_id: string | null
         }
+        Insert: {
+          address_simplified?: never
+          coordinates?: Json | null
+          created_at?: string | null
+          customer_name_masked?: never
+          customer_phone_masked?: never
+          delivery_person_name?: string | null
+          delivery_person_phone?: string | null
+          estimated_delivery?: string | null
+          id?: string | null
+          items?: Json | null
+          notes?: string | null
+          status?: string | null
+          total?: number | null
+          updated_at?: string | null
+          vendor_id?: string | null
+        }
+        Update: {
+          address_simplified?: never
+          coordinates?: Json | null
+          created_at?: string | null
+          customer_name_masked?: never
+          customer_phone_masked?: never
+          delivery_person_name?: string | null
+          delivery_person_phone?: string | null
+          estimated_delivery?: string | null
+          id?: string | null
+          items?: Json | null
+          notes?: string | null
+          status?: string | null
+          total?: number | null
+          updated_at?: string | null
+          vendor_id?: string | null
+        }
         Relationships: [
           {
             foreignKeyName: "orders_vendor_id_fkey"

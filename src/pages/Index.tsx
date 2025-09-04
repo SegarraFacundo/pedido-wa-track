@@ -6,7 +6,7 @@ import { OrderTracking } from "@/components/OrderTracking";
 import { AdminPanel } from "@/components/AdminPanel";
 import { TwilioConfig } from "@/components/TwilioConfig";
 import { Vendor } from "@/types/order";
-import { TreePine } from "lucide-react";
+import { TreePine, Store } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useRealtimeOrders } from "@/hooks/useRealtimeOrders";
@@ -127,9 +127,13 @@ const Index = () => {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground">
-                Tu delivery de confianza
-              </span>
+              <a 
+                href="/vendor-auth"
+                className="text-sm text-primary hover:underline flex items-center gap-1"
+              >
+                <Store className="h-4 w-4" />
+                Acceso Vendedores
+              </a>
               <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
             </div>
           </div>
