@@ -120,26 +120,48 @@ async function processWithAI(messageData: any, supabase: any) {
     const isAskingForVendors = lowerBody.includes('locales') || lowerBody.includes('abierto') || lowerBody.includes('disponible');
     const isSelectingVendor = /\b(quiero|elijo|selecciono|prefiero)\s+.*\b(local|negocio|tienda|restaurante)\b/i.test(lowerBody);
     
+    // Check if the message is a numeric selection (1, 2, 3, etc.)
+    const isNumericSelection = /^[0-9]+$/.test(messageData.body?.trim() || '');
+    
     // Get available vendors, optionally filtered by product
     const availableVendors = await getAvailableVendors(supabase, isAskingForPizza ? 'pizza' : undefined);
     
     // If user is selecting a vendor, try to find it
     let selectedVendor = null;
-    if (isSelectingVendor || session?.vendor_preference) {
+    
+    // First check if we have an existing vendor preference from the session
+    if (session?.vendor_preference) {
+      selectedVendor = availableVendors.find((v: any) => v.id === session.vendor_preference);
+      
+      // If it's a numeric selection and we already have a vendor selected, 
+      // the user is selecting from the menu, not changing vendors
+      if (isNumericSelection && selectedVendor) {
+        // Keep the current vendor, this is a menu item selection
+      }
+    }
+    
+    // Only look for a new vendor if we don't have one selected or if explicitly selecting a vendor
+    if (!selectedVendor && (isSelectingVendor || (isNumericSelection && !session?.vendor_preference))) {
       const vendorName = extractVendorName(messageData.body, availableVendors);
-      if (vendorName) {
+      
+      // Also check for numeric selection from vendor list
+      if (isNumericSelection && !session?.vendor_preference) {
+        const vendorIndex = parseInt(messageData.body.trim()) - 1;
+        if (vendorIndex >= 0 && vendorIndex < availableVendors.length) {
+          selectedVendor = availableVendors[vendorIndex];
+        }
+      } else if (vendorName) {
         selectedVendor = availableVendors.find((v: any) => 
           v.name.toLowerCase().includes(vendorName.toLowerCase())
         );
-        if (selectedVendor) {
-          // Save vendor preference
-          await supabase.from('chat_sessions').update({
-            vendor_preference: selectedVendor.id,
-            updated_at: new Date().toISOString()
-          }).eq('phone', messageData.from);
-        }
-      } else if (session?.vendor_preference) {
-        selectedVendor = availableVendors.find((v: any) => v.id === session.vendor_preference);
+      }
+      
+      if (selectedVendor) {
+        // Save vendor preference
+        await supabase.from('chat_sessions').update({
+          vendor_preference: selectedVendor.id,
+          updated_at: new Date().toISOString()
+        }).eq('phone', messageData.from);
       }
     }
 
@@ -235,20 +257,28 @@ async function processWithAI(messageData: any, supabase: any) {
               - Productos pendientes: ${JSON.stringify(session?.pending_products || [])}
               - Dirección pendiente: ${session?.pending_address || 'No indicada'}
               - Vendedor seleccionado: ${selectedVendor ? selectedVendor.name : 'Ninguno'}
+              - Tiene vendedor guardado: ${session?.vendor_preference ? 'SÍ' : 'NO'}
               
               INFORMACIÓN DISPONIBLE:
               ${vendorMenu || 'No hay información de vendedores disponible'}
               
-              REGLAS IMPORTANTES:
+              REGLAS MUY IMPORTANTES:
               - Si el cliente pregunta por locales, muestra la lista
-              - Si pregunta por un producto específico, filtra los locales
+              - Si pregunta por un producto específico, filtra los locales  
               - Si selecciona un local, muestra su menú completo
+              - Si YA HAY UN VENDEDOR SELECCIONADO y el usuario envía un número, está seleccionando del MENÚ, NO cambiando de vendedor
+              - Si el usuario dice un número como "4" y hay un vendedor seleccionado, está pidiendo el producto #4 del menú
               - Para crear pedido necesitas: vendedor, productos y dirección
               - Si el cliente quiere hablar con el vendedor, indícale que escriba "hablar con vendedor"
+              
+              DETECCIÓN DE INTENCIÓN PARA NÚMEROS:
+              - Si hay vendedor seleccionado + número = selección de producto del menú
+              - Si NO hay vendedor + número = selección de vendedor de la lista
               
               Tipos de intenciones:
               - SHOW_VENDORS: Mostrar locales disponibles
               - SELECT_VENDOR: Seleccionar un local específico
+              - SELECT_PRODUCT: Seleccionar producto del menú (cuando ya hay vendedor)
               - NEW_ORDER: Crear nuevo pedido
               - VENDOR_CHAT: Comunicarse con vendedor
               - CHECK_STATUS: Consultar estado de pedido
@@ -261,7 +291,8 @@ async function processWithAI(messageData: any, supabase: any) {
                   "products": [],
                   "address": "",
                   "vendor_id": "",
-                  "vendor_name": ""
+                  "vendor_name": "",
+                  "product_selection": ""
                 },
                 "message": "respuesta en español con formato WhatsApp",
                 "action": "save_vendor|save_products|save_address|create_order|connect_vendor|none"
