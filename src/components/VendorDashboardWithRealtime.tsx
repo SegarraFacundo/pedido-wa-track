@@ -147,7 +147,7 @@ export function VendorDashboardWithRealtime({ vendor }: VendorDashboardWithRealt
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Calendar className="h-4 w-4" />
-                  Desde {format(vendor.joinedAt, 'dd/MM/yyyy', { locale: es })}
+                  Desde {vendor.joinedAt ? format(new Date(vendor.joinedAt), 'dd/MM/yyyy', { locale: es }) : 'N/A'}
                 </div>
               </div>
             </div>
