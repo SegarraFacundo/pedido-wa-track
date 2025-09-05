@@ -1,12 +1,9 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Clock, Phone, Star, Store, Pizza, Utensils, Coffee, ShoppingBag, Package } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Database } from "@/integrations/supabase/types";
-
-type VendorRow = Database['public']['Tables']['vendors']['Row'];
+import { MapPin, Clock, Phone, Star, Store, Pizza, Coffee, Package } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Product {
   id?: string;
@@ -16,12 +13,27 @@ interface Product {
   category?: string;
 }
 
-interface VendorWithProducts extends VendorRow {
+// Define interface for public vendor view (which doesn't expose sensitive data)
+interface PublicVendor {
+  id: string;
+  name: string;
+  category: string;
+  is_active: boolean;
+  rating: number;
+  total_orders: number;
+  opening_time: string | null;
+  closing_time: string | null;
+  days_open: string[] | null;
+  image: string | null;
+  joined_at: string | null;
+  address_area: string | null;
+  has_products: boolean;
+  available_products: any;
   products?: Product[];
 }
 
 export function VendorCatalog() {
-  const [vendors, setVendors] = useState<VendorWithProducts[]>([]);
+  const [vendors, setVendors] = useState<PublicVendor[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [loading, setLoading] = useState(true);
 
@@ -31,10 +43,10 @@ export function VendorCatalog() {
 
   const fetchVendors = async () => {
     try {
+      // Use the secure public_vendors view that doesn't expose sensitive data
       const { data: vendorsData, error: vendorsError } = await supabase
-        .from('vendors')
+        .from('public_vendors')
         .select('*')
-        .eq('is_active', true)
         .order('rating', { ascending: false });
 
       if (vendorsError) throw vendorsError;
@@ -42,6 +54,11 @@ export function VendorCatalog() {
       // Parse available_products JSON for each vendor
       const vendorsWithProducts = vendorsData?.map(vendor => ({
         ...vendor,
+        // Map the simplified address from the view
+        address: vendor.address_area || 'Ubicación no disponible',
+        // Note: phone and whatsapp_number are not available in public view for security
+        phone: null,
+        whatsapp_number: null,
         products: vendor.available_products ? 
           (Array.isArray(vendor.available_products) ? 
             (vendor.available_products as unknown as Product[]) : 
@@ -56,7 +73,7 @@ export function VendorCatalog() {
     }
   };
 
-  const isOpen = (vendor: VendorWithProducts) => {
+  const isOpen = (vendor: PublicVendor) => {
     const now = new Date();
     const currentTime = now.toTimeString().split(' ')[0];
     const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
@@ -147,15 +164,11 @@ export function VendorCatalog() {
               <div className="space-y-2 text-sm">
                 <div className="flex items-center gap-2">
                   <MapPin className="h-4 w-4 text-muted-foreground" />
-                  <span>{vendor.address}</span>
+                  <span>{vendor.address_area || 'Ubicación no disponible'}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-muted-foreground" />
                   <span>{vendor.opening_time?.slice(0,5)} - {vendor.closing_time?.slice(0,5)}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  <span>{vendor.whatsapp_number || vendor.phone}</span>
                 </div>
               </div>
 
@@ -186,19 +199,11 @@ export function VendorCatalog() {
                 </div>
               )}
 
-              {/* Botón de WhatsApp */}
-              {vendor.whatsapp_number && (
-                <Button 
-                  className="w-full bg-whatsapp hover:bg-whatsapp-dark text-white"
-                  onClick={() => {
-                    const phoneNumber = vendor.whatsapp_number?.replace(/\D/g, '');
-                    window.open(`https://wa.me/${phoneNumber}`, '_blank');
-                  }}
-                >
-                  <Phone className="h-4 w-4 mr-2" />
-                  Pedir por WhatsApp
-                </Button>
-              )}
+              {/* Contact info is now protected - vendors must be contacted through the WhatsApp bot */}
+              <div className="text-center text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
+                <p>Para realizar pedidos, usa nuestro servicio de WhatsApp</p>
+                <p className="font-semibold mt-1">Envía un mensaje al bot de pedidos</p>
+              </div>
             </CardContent>
           </Card>
         ))}

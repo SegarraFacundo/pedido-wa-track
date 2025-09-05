@@ -179,6 +179,13 @@ export type Database = {
             foreignKeyName: "orders_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
+            referencedRelation: "public_vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
             referencedRelation: "vendors"
             referencedColumns: ["id"]
           },
@@ -219,6 +226,13 @@ export type Database = {
           vendor_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "products_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "public_vendors"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "products_vendor_id_fkey"
             columns: ["vendor_id"]
@@ -294,6 +308,13 @@ export type Database = {
             foreignKeyName: "vendor_hours_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
+            referencedRelation: "public_vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_hours_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
             referencedRelation: "vendors"
             referencedColumns: ["id"]
           },
@@ -340,6 +361,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "vendor_orders_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_notifications_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "public_vendors"
             referencedColumns: ["id"]
           },
           {
@@ -416,6 +444,57 @@ export type Database = {
       }
     }
     Views: {
+      public_vendors: {
+        Row: {
+          address_area: string | null
+          available_products: Json | null
+          category: string | null
+          closing_time: string | null
+          days_open: string[] | null
+          has_products: boolean | null
+          id: string | null
+          image: string | null
+          is_active: boolean | null
+          joined_at: string | null
+          name: string | null
+          opening_time: string | null
+          rating: number | null
+          total_orders: number | null
+        }
+        Insert: {
+          address_area?: never
+          available_products?: Json | null
+          category?: string | null
+          closing_time?: string | null
+          days_open?: string[] | null
+          has_products?: never
+          id?: string | null
+          image?: string | null
+          is_active?: boolean | null
+          joined_at?: string | null
+          name?: string | null
+          opening_time?: string | null
+          rating?: number | null
+          total_orders?: number | null
+        }
+        Update: {
+          address_area?: never
+          available_products?: Json | null
+          category?: string | null
+          closing_time?: string | null
+          days_open?: string[] | null
+          has_products?: never
+          id?: string | null
+          image?: string | null
+          is_active?: boolean | null
+          joined_at?: string | null
+          name?: string | null
+          opening_time?: string | null
+          rating?: number | null
+          total_orders?: number | null
+        }
+        Relationships: []
+      }
       vendor_orders_view: {
         Row: {
           address_simplified: string | null
@@ -469,6 +548,13 @@ export type Database = {
           vendor_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "orders_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "public_vendors"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "orders_vendor_id_fkey"
             columns: ["vendor_id"]
