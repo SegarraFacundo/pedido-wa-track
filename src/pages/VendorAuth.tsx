@@ -48,7 +48,7 @@ export default function VendorAuth() {
       .from('vendors')
       .select('*')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
 
     if (vendor) {
       navigate('/vendor-dashboard');
