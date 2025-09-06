@@ -202,44 +202,131 @@ async function showOpenVendors(supabase: any): Promise<string> {
 }
 
 async function showProductsWithPrices(message: string, supabase: any, session: any): Promise<string> {
-  // Extract vendor name or product category
+  // Default behavior: show all products if just "2" or "productos" is sent
   const parts = message.toLowerCase().split(' ');
-  const searchTerm = parts.slice(1).join(' ');
+  const isJustNumber = message.trim() === '2';
+  const searchTerm = !isJustNumber && parts.length > 1 ? parts.slice(1).join(' ') : null;
   
-  // Get products with prices
+  // Get products - if no search term, get all available products
   const { data: products } = await supabase
-    .rpc('get_products_by_category', { category_filter: searchTerm || null });
+    .from('products')
+    .select('*, vendors!inner(id, name, average_rating, is_active, opening_time, closing_time, days_open)')
+    .eq('is_available', true)
+    .eq('vendors.is_active', true);
   
   if (!products || products.length === 0) {
-    return '😕 No encontramos productos disponibles.\n\nEscribe "locales abiertos" para ver opciones.';
+    return '😕 No encontramos productos disponibles.\n\nEscribe "1" o "locales abiertos" para ver opciones.';
   }
   
-  // Group by vendor
+  // Filter by search term if provided
+  let filteredProducts = products;
+  if (searchTerm) {
+    filteredProducts = products.filter((p: any) => 
+      p.name.toLowerCase().includes(searchTerm) ||
+      p.category.toLowerCase().includes(searchTerm) ||
+      p.vendors.name.toLowerCase().includes(searchTerm)
+    );
+    
+    if (filteredProducts.length === 0) {
+      return `😕 No encontramos productos para "${searchTerm}".\n\nEscribe "2" para ver todos los productos disponibles.`;
+    }
+  }
+  
+  // Check which vendors are open now
+  const now = new Date();
+  const currentTime = now.toTimeString().slice(0, 5);
+  const currentDay = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][now.getDay()];
+  
+  // Group by vendor and check if open
   const productsByVendor: any = {};
-  products.forEach((p: any) => {
-    if (p.vendor_is_open) {
-      if (!productsByVendor[p.vendor_name]) {
-        productsByVendor[p.vendor_name] = {
-          vendor_id: p.vendor_id,
-          rating: p.vendor_rating,
+  const vendorIds = new Set<string>();
+  
+  filteredProducts.forEach((p: any) => {
+    const vendor = p.vendors;
+    const isInDays = vendor.days_open?.includes(currentDay) ?? true;
+    const isInHours = currentTime >= vendor.opening_time?.slice(0, 5) && 
+                      currentTime <= vendor.closing_time?.slice(0, 5);
+    const isOpen = isInDays && isInHours;
+    
+    if (isOpen) {
+      if (!productsByVendor[vendor.name]) {
+        productsByVendor[vendor.name] = {
+          vendor_id: vendor.id,
+          rating: vendor.average_rating,
           products: []
         };
+        vendorIds.add(vendor.id);
       }
-      productsByVendor[p.vendor_name].products.push(p);
+      productsByVendor[vendor.name].products.push({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        price: p.price,
+        category: p.category
+      });
     }
+  });
+  
+  if (Object.keys(productsByVendor).length === 0) {
+    return '😕 No hay locales abiertos con productos disponibles en este momento.\n\nIntenta más tarde o escribe "menu" para ver otras opciones.';
+  }
+  
+  // Get active offers for these vendors
+  const { data: offers } = await supabase
+    .from('vendor_offers')
+    .select('*')
+    .in('vendor_id', Array.from(vendorIds))
+    .eq('is_active', true)
+    .gte('valid_until', new Date().toISOString());
+  
+  // Group offers by vendor
+  const offersByVendor: any = {};
+  offers?.forEach((offer: any) => {
+    if (!offersByVendor[offer.vendor_id]) {
+      offersByVendor[offer.vendor_id] = [];
+    }
+    offersByVendor[offer.vendor_id].push(offer);
   });
   
   let reply = '🛒 *PRODUCTOS DISPONIBLES:*\n\n';
   let productNumber = 1;
+  const productList: any[] = [];
   
   Object.entries(productsByVendor).forEach(([vendorName, data]: any) => {
     reply += `📍 *${vendorName}* ⭐${data.rating?.toFixed(1) || 'N/A'}\n`;
     
+    // Show offers for this vendor if any
+    const vendorOffers = offersByVendor[data.vendor_id];
+    if (vendorOffers && vendorOffers.length > 0) {
+      reply += `\n🎉 *OFERTAS ACTIVAS:*\n`;
+      vendorOffers.forEach((offer: any) => {
+        reply += `   🏷️ ${offer.title}\n`;
+        if (offer.description) {
+          reply += `      ${offer.description}\n`;
+        }
+        if (offer.discount_percentage) {
+          reply += `      *${offer.discount_percentage}% OFF*\n`;
+        }
+        if (offer.original_price && offer.offer_price) {
+          reply += `      ~S/${offer.original_price}~ *S/${offer.offer_price}*\n`;
+        }
+      });
+      reply += '\n';
+    }
+    
+    reply += `*Productos:*\n`;
     data.products.forEach((p: any) => {
-      reply += `${productNumber}. ${p.product_name} - *S/${p.product_price}*\n`;
-      if (p.product_description) {
-        reply += `   ${p.product_description}\n`;
+      reply += `${productNumber}. ${p.name} - *S/${p.price}*\n`;
+      if (p.description) {
+        reply += `   ${p.description}\n`;
       }
+      productList.push({
+        ...p,
+        vendor_id: data.vendor_id,
+        vendor_name: vendorName,
+        vendor_rating: data.rating,
+        product_number: productNumber
+      });
       productNumber++;
     });
     reply += '\n';
@@ -253,13 +340,12 @@ async function showProductsWithPrices(message: string, supabase: any, session: a
   await supabase
     .from('chat_sessions')
     .update({
-      pending_products: products,
+      pending_products: productList,
       updated_at: new Date().toISOString()
     })
     .eq('phone', session.phone);
   
   return reply;
-}
 
 async function startOrder(message: string, phone: string, supabase: any, session: any): Promise<string> {
   // Parse order: "pedir [número] [cantidad] [dirección]"
@@ -276,11 +362,11 @@ async function startOrder(message: string, phone: string, supabase: any, session
   const address = parts.slice(3).join(' ');
   
   if (!session?.pending_products || productIndex < 0 || productIndex >= session.pending_products.length) {
-    return '❌ Producto no válido. Primero busca productos con "productos"';
+    return '❌ Producto no válido. Primero busca productos con "2" o "productos"';
   }
   
   const selectedProduct = session.pending_products[productIndex];
-  const totalAmount = selectedProduct.product_price * quantity;
+  const totalAmount = selectedProduct.price * quantity;
   
   // Create order
   const { data: order, error } = await supabase
@@ -290,10 +376,10 @@ async function startOrder(message: string, phone: string, supabase: any, session
       customer_phone: phone,
       vendor_id: selectedProduct.vendor_id,
       items: [{
-        id: selectedProduct.product_id,
-        name: selectedProduct.product_name,
+        id: selectedProduct.id,
+        name: selectedProduct.name,
         quantity: quantity,
-        price: selectedProduct.product_price
+        price: selectedProduct.price
       }],
       total: totalAmount,
       address: address,
@@ -310,7 +396,7 @@ async function startOrder(message: string, phone: string, supabase: any, session
   
   // Notify vendor
   await notifyVendor(selectedProduct.vendor_id, order.id, 
-    `Nuevo pedido: ${quantity}x ${selectedProduct.product_name}`, supabase);
+    `Nuevo pedido: ${quantity}x ${selectedProduct.name}`, supabase);
   
   // Get payment methods
   const { data: paymentMethods } = await supabase
