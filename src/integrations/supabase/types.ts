@@ -14,6 +14,38 @@ export type Database = {
   }
   public: {
     Tables: {
+      chat_messages: {
+        Row: {
+          chat_id: string
+          created_at: string | null
+          id: string
+          message: string
+          sender_type: string
+        }
+        Insert: {
+          chat_id: string
+          created_at?: string | null
+          id?: string
+          message: string
+          sender_type: string
+        }
+        Update: {
+          chat_id?: string
+          created_at?: string | null
+          id?: string
+          message?: string
+          sender_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_chat_id_fkey"
+            columns: ["chat_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_chats"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_sessions: {
         Row: {
           pending_address: string | null
@@ -272,6 +304,54 @@ export type Database = {
         }
         Relationships: []
       }
+      vendor_chats: {
+        Row: {
+          created_at: string | null
+          customer_phone: string
+          ended_at: string | null
+          id: string
+          is_active: boolean | null
+          started_at: string | null
+          vendor_agent_name: string | null
+          vendor_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          customer_phone: string
+          ended_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          started_at?: string | null
+          vendor_agent_name?: string | null
+          vendor_id: string
+        }
+        Update: {
+          created_at?: string | null
+          customer_phone?: string
+          ended_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          started_at?: string | null
+          vendor_agent_name?: string | null
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_chats_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "public_vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_chats_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendor_hours: {
         Row: {
           closing_time: string
@@ -379,10 +459,116 @@ export type Database = {
           },
         ]
       }
+      vendor_offers: {
+        Row: {
+          created_at: string | null
+          description: string
+          discount_percentage: number | null
+          id: string
+          is_active: boolean | null
+          offer_price: number | null
+          original_price: number | null
+          title: string
+          updated_at: string | null
+          valid_from: string | null
+          valid_until: string | null
+          vendor_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description: string
+          discount_percentage?: number | null
+          id?: string
+          is_active?: boolean | null
+          offer_price?: number | null
+          original_price?: number | null
+          title: string
+          updated_at?: string | null
+          valid_from?: string | null
+          valid_until?: string | null
+          vendor_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string
+          discount_percentage?: number | null
+          id?: string
+          is_active?: boolean | null
+          offer_price?: number | null
+          original_price?: number | null
+          title?: string
+          updated_at?: string | null
+          valid_from?: string | null
+          valid_until?: string | null
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_offers_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "public_vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_offers_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vendor_reviews: {
+        Row: {
+          comment: string | null
+          created_at: string | null
+          customer_name: string | null
+          customer_phone: string
+          id: string
+          rating: number
+          vendor_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string | null
+          customer_name?: string | null
+          customer_phone: string
+          id?: string
+          rating: number
+          vendor_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string | null
+          customer_name?: string | null
+          customer_phone?: string
+          id?: string
+          rating?: number
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_reviews_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "public_vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_reviews_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendors: {
         Row: {
           address: string
           available_products: Json | null
+          average_rating: number | null
           category: string
           closing_time: string | null
           created_at: string | null
@@ -396,6 +582,7 @@ export type Database = {
           phone: string
           rating: number | null
           total_orders: number | null
+          total_reviews: number | null
           updated_at: string | null
           user_id: string | null
           whatsapp_number: string | null
@@ -403,6 +590,7 @@ export type Database = {
         Insert: {
           address: string
           available_products?: Json | null
+          average_rating?: number | null
           category: string
           closing_time?: string | null
           created_at?: string | null
@@ -416,6 +604,7 @@ export type Database = {
           phone: string
           rating?: number | null
           total_orders?: number | null
+          total_reviews?: number | null
           updated_at?: string | null
           user_id?: string | null
           whatsapp_number?: string | null
@@ -423,6 +612,7 @@ export type Database = {
         Update: {
           address?: string
           available_products?: Json | null
+          average_rating?: number | null
           category?: string
           closing_time?: string | null
           created_at?: string | null
@@ -436,6 +626,7 @@ export type Database = {
           phone?: string
           rating?: number | null
           total_orders?: number | null
+          total_reviews?: number | null
           updated_at?: string | null
           user_id?: string | null
           whatsapp_number?: string | null
