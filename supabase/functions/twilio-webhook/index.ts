@@ -76,7 +76,7 @@ async function processMessage(messageData: any, supabase: any): Promise<string> 
       updated_at: new Date().toISOString()
     }, { onConflict: 'phone' })
     .select()
-    .single();
+    .maybeSingle();
 
   // Check if user is in active chat with vendor
   const { data: activeChat } = await supabase
@@ -84,7 +84,7 @@ async function processMessage(messageData: any, supabase: any): Promise<string> 
     .select('*')
     .eq('customer_phone', phone)
     .eq('is_active', true)
-    .single();
+    .maybeSingle();
 
   if (activeChat) {
     // Handle vendor chat
@@ -855,7 +855,7 @@ async function notifyVendor(vendorId: string, orderId: string, message: string, 
       .from('vendors')
       .select('whatsapp_number')
       .eq('id', vendorId)
-      .single();
+      .maybeSingle();
       
     if (vendor?.whatsapp_number) {
       await sendTwilioMessage(vendor.whatsapp_number, 
