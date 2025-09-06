@@ -13,8 +13,6 @@ serve(async (req) => {
   }
 
   try {
-    // For Twilio webhooks, we need to handle form-encoded data
-    // Twilio doesn't send authorization headers, so we use service role key
     const contentType = req.headers.get('content-type') || '';
     let formData;
     
@@ -24,6 +22,7 @@ serve(async (req) => {
     } else {
       formData = await req.formData();
     }
+    
     const from = formData.get('From');
     const body = formData.get('Body');
     const profileName = formData.get('ProfileName');
@@ -33,7 +32,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Process incoming WhatsApp message
     const messageData = {
       from: from?.toString().replace('whatsapp:', ''),
       body: body?.toString(),
@@ -41,37 +39,11 @@ serve(async (req) => {
       timestamp: new Date().toISOString()
     };
 
-    // For now, we'll skip storing the message in the database until we have an order_id
-    // Messages table requires an order_id, so we'll handle message storage after order creation
+    // Process message
+    const response = await processMessage(messageData, supabase);
 
-    // Kick off AI processing but enforce fast webhook response
-    const aiPromise = processWithAI(messageData, supabase);
-
-    // 8s timeout to avoid Twilio webhook timeout (~15s)
-    const timeoutPromise = new Promise<{message: string; intent: string; entities: any}>(resolve => {
-      setTimeout(() => resolve({
-        intent: 'PROCESSING',
-        entities: {},
-        message: '✅ Recibido. Estoy procesando tu mensaje y te responderé en unos segundos…'
-      }), 8000);
-    });
-
-    const firstResponse = await Promise.race([aiPromise, timeoutPromise]);
-
-    // If we timed out, continue processing and then send via REST when ready
-    aiPromise.then(async (final) => {
-      if (final && final.message && final !== firstResponse) {
-        try {
-          await sendTwilioMessage(messageData.from!, final.message);
-        } catch (e) {
-          console.error('Error sending async Twilio message:', e);
-        }
-      }
-    }).catch((e) => console.error('AI processing failed after timeout:', e));
-
-    console.log('TwiML immediate reply:', firstResponse);
-
-    const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response><Message><![CDATA[${firstResponse.message}]]></Message></Response>`;
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response><Message><![CDATA[${response}]]></Message></Response>`;
+    
     return new Response(twiml, {
       status: 200,
       headers: {
@@ -91,529 +63,691 @@ serve(async (req) => {
   }
 });
 
-async function processWithAI(messageData: any, supabase: any) {
-  try {
-    const openAIKey = Deno.env.get('OPENAI_API_KEY');
-    
-    if (!openAIKey) {
-      console.error('OpenAI API key not configured');
-      return {
-        intent: 'ERROR',
-        message: 'Lo siento, el servicio no está disponible en este momento. Por favor, intenta más tarde.',
-        entities: {}
-      };
-    }
+async function processMessage(messageData: any, supabase: any): Promise<string> {
+  const lowerMessage = messageData.body?.toLowerCase().trim() || '';
+  const phone = messageData.from;
+  
+  // Get or create chat session
+  const { data: session } = await supabase
+    .from('chat_sessions')
+    .upsert({
+      phone: phone,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'phone' })
+    .select()
+    .single();
 
-    // Get or create chat session
-    const { data: session } = await supabase
-      .from('chat_sessions')
-      .upsert({
-        phone: messageData.from,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'phone' })
-      .select()
-      .single();
+  // Check if user is in active chat with vendor
+  const { data: activeChat } = await supabase
+    .from('vendor_chats')
+    .select('*')
+    .eq('customer_phone', phone)
+    .eq('is_active', true)
+    .single();
 
-    // Check if asking about specific products/categories
-    const lowerBody = (messageData.body || '').toLowerCase();
-    const isAskingForPizza = lowerBody.includes('pizza');
-    const isAskingForVendors = lowerBody.includes('locales') || lowerBody.includes('abierto') || lowerBody.includes('disponible');
-    const isSelectingVendor = /\b(quiero|elijo|selecciono|prefiero)\s+.*\b(local|negocio|tienda|restaurante)\b/i.test(lowerBody);
-    
-    // Check if the message is a numeric selection (1, 2, 3, etc.)
-    const isNumericSelection = /^[0-9]+$/.test(messageData.body?.trim() || '');
-    
-    // Get available vendors, optionally filtered by product
-    const availableVendors = await getAvailableVendors(supabase, isAskingForPizza ? 'pizza' : undefined);
-    
-    // If user is selecting a vendor, try to find it
-    let selectedVendor = null;
-    
-    // First check if we have an existing vendor preference from the session
-    if (session?.vendor_preference) {
-      selectedVendor = availableVendors.find((v: any) => v.id === session.vendor_preference);
+  if (activeChat) {
+    // Handle vendor chat
+    if (lowerMessage === 'terminar chat') {
+      await supabase
+        .from('vendor_chats')
+        .update({ is_active: false, ended_at: new Date().toISOString() })
+        .eq('id', activeChat.id);
       
-      // If it's a numeric selection and we already have a vendor selected, 
-      // the user is selecting from the menu, not changing vendors
-      if (isNumericSelection && selectedVendor) {
-        // Keep the current vendor, this is a menu item selection
-      }
+      return '✅ Chat terminado. Gracias por contactarnos!';
     }
     
-    // Only look for a new vendor if we don't have one selected or if explicitly selecting a vendor
-    if (!selectedVendor && (isSelectingVendor || (isNumericSelection && !session?.vendor_preference))) {
-      const vendorName = extractVendorName(messageData.body, availableVendors);
-      
-      // Also check for numeric selection from vendor list
-      if (isNumericSelection && !session?.vendor_preference) {
-        const vendorIndex = parseInt(messageData.body.trim()) - 1;
-        if (vendorIndex >= 0 && vendorIndex < availableVendors.length) {
-          selectedVendor = availableVendors[vendorIndex];
-        }
-      } else if (vendorName) {
-        selectedVendor = availableVendors.find((v: any) => 
-          v.name.toLowerCase().includes(vendorName.toLowerCase())
-        );
-      }
-      
-      if (selectedVendor) {
-        // Save vendor preference
-        await supabase.from('chat_sessions').update({
-          vendor_preference: selectedVendor.id,
-          updated_at: new Date().toISOString()
-        }).eq('phone', messageData.from);
-      }
-    }
+    // Forward message to vendor
+    await supabase
+      .from('chat_messages')
+      .insert({
+        chat_id: activeChat.id,
+        sender_type: 'customer',
+        message: messageData.body
+      });
+    
+    return '📩 Mensaje enviado al vendedor. Te responderán pronto.';
+  }
 
-    // Build response based on context
-    let vendorMenu = '';
-    
-    if (selectedVendor) {
-      // Show detailed menu for selected vendor
-      vendorMenu = `📍 *${selectedVendor.name}*\n`;
-      vendorMenu += `📞 Tel: ${selectedVendor.phone}\n`;
-      vendorMenu += `📍 Dirección: ${selectedVendor.address}\n`;
-      vendorMenu += `⏰ Horario: ${selectedVendor.opening_time?.slice(0,5)} - ${selectedVendor.closing_time?.slice(0,5)}\n`;
-      vendorMenu += `📅 Días: ${selectedVendor.days_open?.join(', ')}\n\n`;
-      vendorMenu += `🛒 *MENÚ DISPONIBLE:*\n`;
-      
-      // Get actual products from database or use sample products
-      const { data: products } = await supabase
-        .from('products')
-        .select('*')
-        .eq('vendor_id', selectedVendor.id)
-        .eq('is_available', true);
-      
-      if (products && products.length > 0) {
-        const productsByCategory: any = {};
-        products.forEach((p: any) => {
-          if (!productsByCategory[p.category]) {
-            productsByCategory[p.category] = [];
-          }
-          productsByCategory[p.category].push(p);
-        });
-        
-        Object.entries(productsByCategory).forEach(([category, items]: any) => {
-          vendorMenu += `\n${getCategoryEmoji(category)} *${category}:*\n`;
-          items.forEach((item: any) => {
-            vendorMenu += `  • ${item.name} - $${item.price}`;
-            if (item.description) vendorMenu += ` (${item.description})`;
-            vendorMenu += '\n';
-          });
-        });
-      } else if (selectedVendor.available_products && Array.isArray(selectedVendor.available_products)) {
-        selectedVendor.available_products.forEach((p: any) => {
-          vendorMenu += `  • ${p.name} - $${p.price}\n`;
-        });
+  // Command routing
+  if (lowerMessage.includes('locales') || lowerMessage.includes('abiertos')) {
+    return await showOpenVendors(supabase);
+  }
+  
+  if (lowerMessage.includes('productos') || lowerMessage.includes('menu')) {
+    return await showProductsWithPrices(messageData.body, supabase, session);
+  }
+  
+  if (lowerMessage.includes('pedir') || lowerMessage.includes('ordenar')) {
+    return await startOrder(messageData.body, phone, supabase, session);
+  }
+  
+  if (lowerMessage.includes('pagar') || lowerMessage.includes('pago')) {
+    return await handlePayment(messageData.body, phone, supabase);
+  }
+  
+  if (lowerMessage.includes('estado pedido') || lowerMessage === 'estado') {
+    return await checkOrderStatus(phone, supabase);
+  }
+  
+  if (lowerMessage.includes('cancelar pedido')) {
+    return await cancelOrder(phone, supabase);
+  }
+  
+  if (lowerMessage.includes('cambiar estado')) {
+    return await changeOrderStatus(messageData.body, phone, supabase);
+  }
+  
+  if (lowerMessage.includes('ofertas')) {
+    return await getActiveOffers(supabase);
+  }
+  
+  if (lowerMessage.includes('hablar con vendedor')) {
+    return await startVendorChat(phone, supabase);
+  }
+  
+  if (lowerMessage.startsWith('calificar')) {
+    return await handleReview(messageData.body, phone, supabase);
+  }
+  
+  return getMainMenu();
+}
+
+function getMainMenu(): string {
+  return `👋 *¡Bienvenido a DeliveryBot!*\n\n` +
+         `📱 *MENÚ PRINCIPAL:*\n\n` +
+         `1️⃣ Ver *locales abiertos*\n` +
+         `2️⃣ Ver *productos* disponibles\n` +
+         `3️⃣ *Pedir* un producto\n` +
+         `4️⃣ Ver *ofertas* del día\n` +
+         `5️⃣ *Estado* de mi pedido\n` +
+         `6️⃣ *Hablar con vendedor*\n` +
+         `7️⃣ *Calificar* servicio\n\n` +
+         `💬 Escribe cualquier opción para comenzar!`;
+}
+
+async function showOpenVendors(supabase: any): Promise<string> {
+  const { data: vendors } = await supabase
+    .from('vendors')
+    .select('*')
+    .eq('is_active', true);
+  
+  const now = new Date();
+  const currentTime = now.toTimeString().slice(0, 5);
+  const currentDay = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][now.getDay()];
+  
+  const openVendors = vendors?.filter((v: any) => {
+    const isInDays = v.days_open?.includes(currentDay) ?? true;
+    const isInHours = currentTime >= v.opening_time?.slice(0, 5) && 
+                      currentTime <= v.closing_time?.slice(0, 5);
+    return isInDays && isInHours;
+  }) || [];
+  
+  if (openVendors.length === 0) {
+    return '😕 No hay locales abiertos en este momento.\n\nIntenta más tarde o escribe "menu" para ver otras opciones.';
+  }
+  
+  let message = '🏪 *LOCALES ABIERTOS AHORA:*\n\n';
+  
+  openVendors.forEach((vendor: any, index: number) => {
+    message += `${index + 1}. *${vendor.name}*\n`;
+    message += `   📍 ${vendor.address}\n`;
+    message += `   ⭐ ${vendor.average_rating || 0} (${vendor.total_reviews || 0} reseñas)\n`;
+    message += `   ⏰ Hasta las ${vendor.closing_time?.slice(0, 5)}\n\n`;
+  });
+  
+  message += '📝 Escribe "productos [nombre del local]" para ver su menú.';
+  
+  return message;
+}
+
+async function showProductsWithPrices(message: string, supabase: any, session: any): Promise<string> {
+  // Extract vendor name or product category
+  const parts = message.toLowerCase().split(' ');
+  const searchTerm = parts.slice(1).join(' ');
+  
+  // Get products with prices
+  const { data: products } = await supabase
+    .rpc('get_products_by_category', { category_filter: searchTerm || null });
+  
+  if (!products || products.length === 0) {
+    return '😕 No encontramos productos disponibles.\n\nEscribe "locales abiertos" para ver opciones.';
+  }
+  
+  // Group by vendor
+  const productsByVendor: any = {};
+  products.forEach((p: any) => {
+    if (p.vendor_is_open) {
+      if (!productsByVendor[p.vendor_name]) {
+        productsByVendor[p.vendor_name] = {
+          vendor_id: p.vendor_id,
+          rating: p.vendor_rating,
+          products: []
+        };
       }
-      
-      vendorMenu += '\n📝 *Para pedir, escribe los productos que quieres y tu dirección*';
-      vendorMenu += '\n💬 *Para hablar con el local, escribe "hablar con vendedor"*';
-      
-    } else if (isAskingForVendors || isAskingForPizza) {
-      // Show list of available vendors
-      if (availableVendors.length > 0) {
-        vendorMenu = isAskingForPizza ? 
-          '🍕 *Locales con pizza disponibles ahora:*\n\n' : 
-          '🏪 *Locales abiertos ahora:*\n\n';
-        
-        availableVendors.forEach((v: any, index: number) => {
-          vendorMenu += `${index + 1}. *${v.name}* (${getCategoryEmoji(v.category)} ${v.category})\n`;
-          vendorMenu += `   📍 ${v.address}\n`;
-          vendorMenu += `   ⏰ ${v.opening_time?.slice(0,5)} - ${v.closing_time?.slice(0,5)}\n`;
-          if (v.rating > 0) vendorMenu += `   ⭐ ${v.rating}/5\n`;
-          vendorMenu += '\n';
-        });
-        
-        vendorMenu += '📝 *Escribe el nombre del local que prefieres para ver su menú completo*';
-      } else {
-        vendorMenu = isAskingForPizza ? 
-          '😔 No hay locales con pizza abiertos en este momento' :
-          '😔 No hay locales abiertos en este momento';
-      }
+      productsByVendor[p.vendor_name].products.push(p);
     }
+  });
+  
+  let message = '🛒 *PRODUCTOS DISPONIBLES:*\n\n';
+  let productNumber = 1;
+  
+  Object.entries(productsByVendor).forEach(([vendorName, data]: any) => {
+    message += `📍 *${vendorName}* ⭐${data.rating?.toFixed(1) || 'N/A'}\n`;
     
-    // Analyze message intent with enhanced context
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIKey}`,
-        'Content-Type': 'application/json; charset=utf-8',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: `Eres un asistente de delivery inteligente. Tu trabajo es ayudar a los clientes a:
-              1. Ver locales disponibles (abiertos ahora)
-              2. Filtrar por tipo de producto (pizza, medicinas, etc)
-              3. Seleccionar un local específico y ver su menú
-              4. Hacer pedidos con productos y dirección
-              5. Comunicarse con el local si lo necesitan
-              
-              CONTEXTO DE LA SESIÓN:
-              - Productos pendientes: ${JSON.stringify(session?.pending_products || [])}
-              - Dirección pendiente: ${session?.pending_address || 'No indicada'}
-              - Vendedor seleccionado: ${selectedVendor ? selectedVendor.name : 'Ninguno'}
-              - Tiene vendedor guardado: ${session?.vendor_preference ? 'SÍ' : 'NO'}
-              
-              INFORMACIÓN DISPONIBLE:
-              ${vendorMenu || 'No hay información de vendedores disponible'}
-              
-              REGLAS MUY IMPORTANTES:
-              - Si el cliente pregunta por locales, muestra la lista
-              - Si pregunta por un producto específico, filtra los locales  
-              - Si selecciona un local, muestra su menú completo
-              - Si YA HAY UN VENDEDOR SELECCIONADO y el usuario envía un número, está seleccionando del MENÚ, NO cambiando de vendedor
-              - Si el usuario dice un número como "4" y hay un vendedor seleccionado, está pidiendo el producto #4 del menú
-              - Para crear pedido necesitas: vendedor, productos y dirección
-              - Si el cliente quiere hablar con el vendedor, indícale que escriba "hablar con vendedor"
-              
-              DETECCIÓN DE INTENCIÓN PARA NÚMEROS:
-              - Si hay vendedor seleccionado + número = selección de producto del menú
-              - Si NO hay vendedor + número = selección de vendedor de la lista
-              
-              Tipos de intenciones:
-              - SHOW_VENDORS: Mostrar locales disponibles
-              - SELECT_VENDOR: Seleccionar un local específico
-              - SELECT_PRODUCT: Seleccionar producto del menú (cuando ya hay vendedor)
-              - NEW_ORDER: Crear nuevo pedido
-              - VENDOR_CHAT: Comunicarse con vendedor
-              - CHECK_STATUS: Consultar estado de pedido
-              - GENERAL_HELP: Ayuda general
-              
-              Responde SOLO con JSON válido:
-              {
-                "intent": "tipo",
-                "entities": {
-                  "products": [],
-                  "address": "",
-                  "vendor_id": "",
-                  "vendor_name": "",
-                  "product_selection": ""
-                },
-                "message": "respuesta en español con formato WhatsApp",
-                "action": "save_vendor|save_products|save_address|create_order|connect_vendor|none"
-              }`
-          },
-          {
-            role: 'user',
-            content: messageData.body || 'Hola'
-          }
-        ],
-        temperature: 0.3,
-        max_tokens: 800
-      }),
+    data.products.forEach((p: any) => {
+      message += `${productNumber}. ${p.product_name} - *S/${p.product_price}*\n`;
+      if (p.product_description) {
+        message += `   ${p.product_description}\n`;
+      }
+      productNumber++;
     });
+    message += '\n';
+  });
+  
+  message += '📝 Para pedir, escribe:\n';
+  message += '"pedir [número] [cantidad] [dirección]"\n';
+  message += 'Ejemplo: pedir 1 2 Av. Larco 123';
+  
+  // Save products in session for easy ordering
+  await supabase
+    .from('chat_sessions')
+    .update({
+      pending_products: products,
+      updated_at: new Date().toISOString()
+    })
+    .eq('phone', session.phone);
+  
+  return message;
+}
 
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error('OpenAI API error:', response.status, errorData);
-      throw new Error(`OpenAI API error: ${response.status}`);
-    }
+async function startOrder(message: string, phone: string, supabase: any, session: any): Promise<string> {
+  // Parse order: "pedir [número] [cantidad] [dirección]"
+  const parts = message.split(' ');
+  
+  if (parts.length < 4) {
+    return '❌ Formato incorrecto.\n\n' +
+           'Usa: "pedir [número] [cantidad] [dirección]"\n' +
+           'Ejemplo: pedir 1 2 Av. Larco 123';
+  }
+  
+  const productIndex = parseInt(parts[1]) - 1;
+  const quantity = parseInt(parts[2]);
+  const address = parts.slice(3).join(' ');
+  
+  if (!session?.pending_products || productIndex < 0 || productIndex >= session.pending_products.length) {
+    return '❌ Producto no válido. Primero busca productos con "productos"';
+  }
+  
+  const selectedProduct = session.pending_products[productIndex];
+  const totalAmount = selectedProduct.product_price * quantity;
+  
+  // Create order
+  const { data: order, error } = await supabase
+    .from('orders')
+    .insert({
+      customer_name: session.profileName || 'Cliente',
+      customer_phone: phone,
+      vendor_id: selectedProduct.vendor_id,
+      items: [{
+        id: selectedProduct.product_id,
+        name: selectedProduct.product_name,
+        quantity: quantity,
+        price: selectedProduct.product_price
+      }],
+      total: totalAmount,
+      address: address,
+      status: 'pending',
+      payment_status: 'pending',
+      payment_amount: totalAmount
+    })
+    .select()
+    .single();
+  
+  if (error) {
+    return '❌ Error al crear el pedido. Intenta nuevamente.';
+  }
+  
+  // Notify vendor
+  await notifyVendor(selectedProduct.vendor_id, order.id, 
+    `Nuevo pedido: ${quantity}x ${selectedProduct.product_name}`, supabase);
+  
+  // Get payment methods
+  const { data: paymentMethods } = await supabase
+    .from('payment_methods')
+    .select('*')
+    .eq('is_active', true);
+  
+  let response = `✅ *PEDIDO CREADO #${order.id.slice(0, 8)}*\n\n`;
+  response += `📦 ${quantity}x ${selectedProduct.product_name}\n`;
+  response += `💰 Total: *S/${totalAmount}*\n`;
+  response += `📍 Dirección: ${address}\n\n`;
+  response += `💳 *SELECCIONA FORMA DE PAGO:*\n\n`;
+  
+  paymentMethods?.forEach((method: any, index: number) => {
+    response += `${index + 1}. ${method.name}\n`;
+  });
+  
+  response += '\nEscribe "pagar [número] [referencia]"\n';
+  response += 'Ejemplo: pagar 1 (para efectivo)\n';
+  response += 'Ejemplo: pagar 2 REF123456 (para transferencia)';
+  
+  return response;
+}
 
-    const aiData = await response.json();
+async function handlePayment(message: string, phone: string, supabase: any): Promise<string> {
+  // Get last pending order
+  const { data: order } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('customer_phone', phone)
+    .eq('payment_status', 'pending')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+  
+  if (!order) {
+    return '❌ No tienes pedidos pendientes de pago.';
+  }
+  
+  // Parse payment: "pagar [método] [referencia opcional]"
+  const parts = message.split(' ');
+  const methodIndex = parseInt(parts[1]) - 1;
+  const reference = parts.slice(2).join(' ') || null;
+  
+  // Get payment methods
+  const { data: methods } = await supabase
+    .from('payment_methods')
+    .select('*')
+    .eq('is_active', true);
+  
+  if (!methods || methodIndex < 0 || methodIndex >= methods.length) {
+    return '❌ Método de pago no válido.';
+  }
+  
+  const selectedMethod = methods[methodIndex];
+  
+  // Record payment
+  const { error: paymentError } = await supabase
+    .from('order_payments')
+    .insert({
+      order_id: order.id,
+      payment_method_id: selectedMethod.id,
+      payment_method_name: selectedMethod.name,
+      amount: order.total,
+      status: selectedMethod.name === 'Efectivo' ? 'pending' : 'processing',
+      transaction_reference: reference,
+      payment_date: new Date().toISOString()
+    });
+  
+  if (paymentError) {
+    return '❌ Error al registrar el pago. Intenta nuevamente.';
+  }
+  
+  // Update order
+  await supabase
+    .from('orders')
+    .update({
+      payment_method: selectedMethod.name,
+      payment_status: selectedMethod.name === 'Efectivo' ? 'pending' : 'processing',
+      status: 'confirmed',
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', order.id);
+  
+  // Record status change
+  await supabase
+    .from('order_status_history')
+    .insert({
+      order_id: order.id,
+      status: 'confirmed',
+      changed_by: 'customer',
+      reason: `Pago con ${selectedMethod.name}`
+    });
+  
+  let response = `✅ *PAGO REGISTRADO*\n\n`;
+  response += `📦 Pedido: #${order.id.slice(0, 8)}\n`;
+  response += `💳 Método: ${selectedMethod.name}\n`;
+  
+  if (reference) {
+    response += `📝 Referencia: ${reference}\n`;
+  }
+  
+  if (selectedMethod.name === 'Efectivo') {
+    response += '\n💵 Prepara el efectivo exacto para la entrega.';
+  } else {
+    response += '\n⏳ Verificando pago...';
+  }
+  
+  response += '\n\n📱 Tu pedido está confirmado y en preparación.';
+  response += '\n\nEscribe "estado" para ver el progreso.';
+  
+  return response;
+}
+
+async function checkOrderStatus(phone: string, supabase: any): Promise<string> {
+  const { data: orders } = await supabase
+    .from('orders')
+    .select('*, vendors(name, phone)')
+    .eq('customer_phone', phone)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  
+  if (!orders || orders.length === 0) {
+    return '😕 No tienes pedidos recientes.';
+  }
+  
+  const order = orders[0];
+  const statusEmoji: any = {
+    'pending': '⏳',
+    'confirmed': '✅',
+    'preparing': '👨‍🍳',
+    'ready': '📦',
+    'delivering': '🚚',
+    'delivered': '✅',
+    'cancelled': '❌'
+  };
+  
+  const statusText: any = {
+    'pending': 'Pendiente',
+    'confirmed': 'Confirmado',
+    'preparing': 'En preparación',
+    'ready': 'Listo para entrega',
+    'delivering': 'En camino',
+    'delivered': 'Entregado',
+    'cancelled': 'Cancelado'
+  };
+  
+  let response = `📋 *ESTADO DE TU PEDIDO*\n\n`;
+  response += `🆔 Pedido: #${order.id.slice(0, 8)}\n`;
+  response += `${statusEmoji[order.status]} Estado: *${statusText[order.status]}*\n`;
+  response += `📍 Local: ${order.vendors.name}\n`;
+  response += `📞 Teléfono: ${order.vendors.phone}\n`;
+  response += `💰 Total: S/${order.total}\n`;
+  response += `💳 Pago: ${order.payment_method || 'Pendiente'} - ${order.payment_status}\n\n`;
+  
+  if (order.delivery_person_name) {
+    response += `🚴 Repartidor: ${order.delivery_person_name}\n`;
+    response += `📱 Contacto: ${order.delivery_person_phone}\n\n`;
+  }
+  
+  // Get status history
+  const { data: history } = await supabase
+    .from('order_status_history')
+    .select('*')
+    .eq('order_id', order.id)
+    .order('created_at', { ascending: false })
+    .limit(5);
+  
+  if (history && history.length > 0) {
+    response += `📜 *HISTORIAL:*\n`;
+    history.forEach((h: any) => {
+      const time = new Date(h.created_at).toLocaleTimeString('es-PE', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+      response += `• ${time} - ${statusText[h.status]}\n`;
+    });
+  }
+  
+  if (order.status === 'pending' || order.status === 'confirmed') {
+    response += '\n❌ Para cancelar: "cancelar pedido"';
+  }
+  
+  return response;
+}
+
+async function cancelOrder(phone: string, supabase: any): Promise<string> {
+  const { data: order } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('customer_phone', phone)
+    .in('status', ['pending', 'confirmed'])
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+  
+  if (!order) {
+    return '❌ No tienes pedidos que se puedan cancelar.';
+  }
+  
+  // Use the change_order_status function
+  const { data: result } = await supabase
+    .rpc('change_order_status', {
+      p_order_id: order.id,
+      p_new_status: 'cancelled',
+      p_changed_by: 'customer',
+      p_reason: 'Cancelado por el cliente'
+    });
+  
+  if (!result) {
+    return '❌ No se pudo cancelar el pedido.';
+  }
+  
+  return `✅ *PEDIDO CANCELADO*\n\n` +
+         `🆔 Pedido #${order.id.slice(0, 8)} ha sido cancelado.\n\n` +
+         `Gracias por avisarnos.`;
+}
+
+async function changeOrderStatus(message: string, phone: string, supabase: any): Promise<string> {
+  // This would typically be used by vendors, but customers can update certain statuses
+  // Format: "cambiar estado [delivered/cancelled] [razón]"
+  const parts = message.split(' ');
+  
+  if (parts.length < 3) {
+    return '❌ Formato: "cambiar estado [delivered/cancelled] [razón]"';
+  }
+  
+  const newStatus = parts[2];
+  const reason = parts.slice(3).join(' ');
+  
+  if (!['delivered', 'cancelled'].includes(newStatus)) {
+    return '❌ Solo puedes marcar como "delivered" o "cancelled"';
+  }
+  
+  const { data: order } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('customer_phone', phone)
+    .not('status', 'in', '(delivered,cancelled)')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+  
+  if (!order) {
+    return '❌ No tienes pedidos activos.';
+  }
+  
+  const { data: result } = await supabase
+    .rpc('change_order_status', {
+      p_order_id: order.id,
+      p_new_status: newStatus,
+      p_changed_by: 'customer',
+      p_reason: reason
+    });
+  
+  if (!result) {
+    return '❌ No se pudo actualizar el estado.';
+  }
+  
+  return `✅ Estado actualizado a: ${newStatus}\n\n` +
+         `Razón: ${reason}`;
+}
+
+async function getActiveOffers(supabase: any): Promise<string> {
+  const { data: offers } = await supabase
+    .from('vendor_offers')
+    .select('*, vendors(name)')
+    .eq('is_active', true)
+    .gte('valid_until', new Date().toISOString())
+    .limit(10);
+  
+  if (!offers || offers.length === 0) {
+    return '😕 No hay ofertas activas en este momento.';
+  }
+  
+  let message = '🎉 *OFERTAS DEL DÍA:*\n\n';
+  
+  offers.forEach((offer: any, index: number) => {
+    message += `${index + 1}. *${offer.title}*\n`;
+    message += `   📍 ${offer.vendors.name}\n`;
+    message += `   ${offer.description}\n`;
     
-    if (!aiData.choices || !aiData.choices[0] || !aiData.choices[0].message) {
-      console.error('Unexpected OpenAI response structure:', aiData);
-      throw new Error('Invalid OpenAI response structure');
+    if (offer.discount_percentage) {
+      message += `   🏷️ *${offer.discount_percentage}% OFF*\n`;
     }
     
-    let aiResponse;
-    try {
-      aiResponse = JSON.parse(aiData.choices[0].message.content);
-    } catch (parseError) {
-      console.error('Failed to parse AI response:', aiData.choices[0].message.content);
-      aiResponse = {
-        intent: 'GENERAL_HELP',
-        entities: {},
-        message: `¡Hola! Puedo ayudarte a pedir delivery 🚚\n\n${vendorMenu ? 'Estos locales están abiertos ahora:\n\n' + vendorMenu : 'No hay locales abiertos en este momento.'}`,
-        action: 'none'
-      };
+    if (offer.original_price && offer.offer_price) {
+      message += `   💰 ~S/${offer.original_price}~ *S/${offer.offer_price}*\n`;
     }
+    
+    message += '\n';
+  });
+  
+  return message;
+}
 
-    // Update session based on action
-    if (aiResponse.action === 'save_products' && aiResponse.entities?.products) {
-      await supabase.from('chat_sessions').update({
-        pending_products: aiResponse.entities.products,
-        updated_at: new Date().toISOString()
-      }).eq('phone', messageData.from);
-    } else if (aiResponse.action === 'save_address' && aiResponse.entities?.address) {
-      await supabase.from('chat_sessions').update({
-        pending_address: aiResponse.entities.address,
-        updated_at: new Date().toISOString()
-      }).eq('phone', messageData.from);
-    } else if (aiResponse.action === 'create_order') {
-      // Merge session data with current entities
-      const finalEntities = {
-        ...aiResponse.entities,
-        products: aiResponse.entities.products || session?.pending_products || [],
-        address: aiResponse.entities.address || session?.pending_address || ''
-      };
+async function startVendorChat(phone: string, supabase: any): Promise<string> {
+  // Get the vendor from the last order
+  const { data: lastOrder } = await supabase
+    .from('orders')
+    .select('vendor_id, vendors(name)')
+    .eq('customer_phone', phone)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+  
+  if (!lastOrder) {
+    return '😕 Primero debes hacer un pedido para chatear con el vendedor.';
+  }
+  
+  // Create chat session
+  const { data: chat, error } = await supabase
+    .from('vendor_chats')
+    .insert({
+      vendor_id: lastOrder.vendor_id,
+      customer_phone: phone,
+      is_active: true
+    })
+    .select()
+    .single();
+  
+  if (error) {
+    return '❌ No se pudo iniciar el chat.';
+  }
+  
+  // Send initial message
+  await supabase
+    .from('chat_messages')
+    .insert({
+      chat_id: chat.id,
+      sender_type: 'bot',
+      message: `Cliente ${phone} ha iniciado un chat`
+    });
+  
+  return `✅ *Chat iniciado con ${lastOrder.vendors.name}*\n\n` +
+         `Un vendedor te atenderá en breve.\n\n` +
+         `Para terminar el chat, escribe "terminar chat".`;
+}
+
+async function handleReview(message: string, phone: string, supabase: any): Promise<string> {
+  const parts = message.split(' ');
+  const rating = parseInt(parts[1]);
+  
+  if (!rating || rating < 1 || rating > 5) {
+    return '⭐ Para calificar:\n' +
+           '"calificar [1-5] [comentario]"\n\n' +
+           'Ejemplo: calificar 5 Excelente servicio!';
+  }
+  
+  const comment = parts.slice(2).join(' ');
+  
+  // Get last delivered order
+  const { data: lastOrder } = await supabase
+    .from('orders')
+    .select('vendor_id')
+    .eq('customer_phone', phone)
+    .eq('status', 'delivered')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+  
+  if (!lastOrder) {
+    return '😕 No tienes pedidos entregados para calificar.';
+  }
+  
+  const { error } = await supabase
+    .from('vendor_reviews')
+    .insert({
+      vendor_id: lastOrder.vendor_id,
+      customer_phone: phone,
+      rating: rating,
+      comment: comment || null
+    });
+  
+  if (error) {
+    return '❌ No se pudo guardar tu calificación.';
+  }
+  
+  const stars = '⭐'.repeat(rating);
+  return `✅ *¡Gracias por tu calificación!*\n\n` +
+         `${stars}\n` +
+         `${comment ? `"${comment}"` : ''}\n\n` +
+         `Tu opinión nos ayuda a mejorar.`;
+}
+
+async function notifyVendor(vendorId: string, orderId: string, message: string, supabase: any) {
+  try {
+    await supabase
+      .from('vendor_notifications')
+      .insert({
+        vendor_id: vendorId,
+        order_id: orderId,
+        message: message,
+        status: 'pending'
+      });
       
-      const order = await createOrder(messageData, finalEntities, supabase, aiResponse.entities?.vendor_id);
-      if (order) {
-        await notifyVendor(order.vendor_id, order.id, messageData.body, supabase);
-        // Clear session after successful order
-        await supabase.from('chat_sessions').update({
-          pending_products: [],
-          pending_address: null,
-          vendor_preference: null,
-          updated_at: new Date().toISOString()
-        }).eq('phone', messageData.from);
-        
-        aiResponse.message = `✅ ¡Pedido #${order.id.slice(0, 8)} creado!\n\n📍 Dirección: ${finalEntities.address}\n⏰ Entrega estimada: 30-45 minutos\n\nEl local fue notificado y confirmará tu pedido pronto.`;
-      }
+    // También podrías enviar un WhatsApp al vendedor aquí
+    const { data: vendor } = await supabase
+      .from('vendors')
+      .select('whatsapp_number')
+      .eq('id', vendorId)
+      .single();
+      
+    if (vendor?.whatsapp_number) {
+      await sendTwilioMessage(vendor.whatsapp_number, 
+        `🔔 Nuevo pedido #${orderId.slice(0, 8)}\n${message}`);
     }
-
-    return aiResponse;
   } catch (error) {
-    console.error('Error in processWithAI:', error);
-    return {
-      intent: 'ERROR',
-      message: 'Lo siento, hubo un problema procesando tu mensaje. Por favor, intenta de nuevo.',
-      entities: {}
-    };
+    console.error('Error notifying vendor:', error);
   }
 }
 
 async function sendTwilioMessage(to: string, message: string) {
   const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
   const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
-  const fromNumber = Deno.env.get('TWILIO_WHATSAPP_NUMBER'); // whatsapp:+14155238886
+  const from = Deno.env.get('TWILIO_WHATSAPP_NUMBER');
   
-  const response = await fetch(
-    `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Basic ' + btoa(`${accountSid}:${authToken}`),
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        From: fromNumber!,
-        To: `whatsapp:${to}`,
-        Body: message,
-      }),
-    }
-  );
-
-  return await response.json();
-}
-
-
-async function checkOrderStatus(phone: string, supabase: any) {
-  const { data, error } = await supabase
-    .from('orders')
-    .select('status, estimated_delivery')
-    .eq('customer_phone', phone)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
-    
-  if (data) {
-    return `${data.status} - Entrega estimada: ${new Date(data.estimated_delivery).toLocaleString()}`;
-  }
-  return 'No se encontraron pedidos activos';
-}
-
-async function cancelOrder(phone: string, supabase: any) {
-  const { data, error } = await supabase
-    .from('orders')
-    .update({ status: 'cancelled' })
-    .eq('customer_phone', phone)
-    .eq('status', 'pending')
-    .select()
-    .single();
-    
-  return data;
-}
-
-async function getAvailableVendors(supabase: any, productFilter?: string) {
-  const now = new Date();
-  const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-  const currentTime = now.toTimeString().split(' ')[0]; // HH:MM:SS format
-  
-  // Get all active vendors with their business hours
-  let query = supabase
-    .from('vendors')
-    .select('*')
-    .eq('is_active', true)
-    .contains('days_open', [currentDay]);
-  
-  // If filtering by product, look for it in available_products
-  if (productFilter) {
-    // This will need more sophisticated filtering in production
-    // For now, filter by category if it matches
-    if (productFilter.toLowerCase().includes('pizza')) {
-      query = query.eq('category', 'restaurant');
-    } else if (productFilter.toLowerCase().includes('medicina') || productFilter.toLowerCase().includes('farmacia')) {
-      query = query.eq('category', 'pharmacy');
-    }
+  if (!accountSid || !authToken || !from) {
+    console.error('Twilio credentials not configured');
+    return;
   }
   
-  const { data: vendors } = await query;
+  const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
   
-  // Filter by opening hours
-  const availableVendors = vendors?.filter((vendor: any) => {
-    return currentTime >= vendor.opening_time && currentTime <= vendor.closing_time;
-  }) || [];
-  
-  return availableVendors;
-}
-
-function extractVendorName(message: string, availableVendors: any[]): string | null {
-  const lowerMessage = message.toLowerCase();
-  
-  // Check if any vendor name is mentioned in the message
-  for (const vendor of availableVendors) {
-    if (lowerMessage.includes(vendor.name.toLowerCase())) {
-      return vendor.name;
-    }
-  }
-  
-  return null;
-}
-
-function getCategoryEmoji(category: string): string {
-  const emojis: any = {
-    'restaurant': '🍔',
-    'pharmacy': '💊',
-    'market': '🏪',
-    'Pizzas': '🍕',
-    'Bebidas': '🥤',
-    'Postres': '🍰',
-    'Medicamentos': '💊',
-    'Cuidado Personal': '🧴',
-    'other': '📦'
-  };
-  return emojis[category] || '📦';
-}
-
-async function notifyVendor(vendorId: string, orderId: string, orderDetails: string, supabase: any) {
-  try {
-    // Get vendor details
-    const { data: vendor } = await supabase
-      .from('vendors')
-      .select('name, whatsapp_number')
-      .eq('id', vendorId)
-      .single();
-    
-    if (!vendor || !vendor.whatsapp_number) {
-      console.log('Vendor WhatsApp not configured');
-      return;
-    }
-    
-    // Create notification record
-    await supabase
-      .from('vendor_notifications')
-      .insert({
-        vendor_id: vendorId,
-        order_id: orderId,
-        message: `Nuevo pedido recibido: ${orderDetails}`,
-        status: 'pending'
-      });
-    
-    // Send WhatsApp notification to vendor
-    const message = `🔔 *Nuevo Pedido*\n\n${orderDetails}\n\nPor favor, confirma el pedido en tu panel de control.`;
-    
-    await sendTwilioMessage(vendor.whatsapp_number, message);
-    
-    // Update notification status
-    await supabase
-      .from('vendor_notifications')
-      .update({ status: 'sent', sent_at: new Date().toISOString() })
-      .eq('order_id', orderId);
-    
-  } catch (error) {
-    console.error('Error notifying vendor:', error);
-  }
-}
-
-async function connectToVendor(customerPhone: string, supabase: any) {
-  // Get the customer's most recent order
-  const { data: order } = await supabase
-    .from('orders')
-    .select('vendor_id')
-    .eq('customer_phone', customerPhone)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
-  
-  if (!order) {
-    return null;
-  }
-  
-  // Get vendor contact info
-  const { data: vendor } = await supabase
-    .from('vendors')
-    .select('name, whatsapp_number')
-    .eq('id', order.vendor_id)
-    .single();
-  
-  return vendor;
-}
-
-async function createOrder(messageData: any, entities: any, supabase: any, suggestedVendorId?: string) {
-  // Use suggested vendor or find the best match
-  let vendorId = suggestedVendorId || entities.vendor_id;
-  
-  if (!vendorId) {
-    // Get an available vendor based on current time and products
-    const availableVendors = await getAvailableVendors(supabase, messageData.body);
-    
-    if (availableVendors.length > 0) {
-      vendorId = availableVendors[0].id;
-    }
-  }
-  
-  if (!vendorId) {
-    // No vendors available
-    return null;
-  }
-  
-  // Create new order based on extracted entities
-  const customerName = messageData.profileName || 'Cliente WhatsApp';
-  const customerPhone = messageData.from;
-  const customerAddress = entities.address || 'Por confirmar';
-  
-  const { data, error } = await supabase
-    .from('orders')
-    .insert({
-      customer_name: customerName,
-      customer_phone: customerPhone,
-      address: customerAddress,
-      items: entities.products || [],
-      total: entities.total || 0,
-      status: 'pending',
-      estimated_delivery: new Date(Date.now() + 45 * 60000).toISOString(),
-      vendor_id: vendorId
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Basic ' + btoa(`${accountSid}:${authToken}`),
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      From: `whatsapp:${from}`,
+      To: `whatsapp:${to}`,
+      Body: message
     })
-    .select()
-    .single();
+  });
   
-  if (data && !error) {
-    // Store sensitive customer data separately in customer_contacts table
-    await supabase
-      .from('customer_contacts')
-      .insert({
-        order_id: data.id,
-        customer_name: customerName,
-        customer_phone: customerPhone,
-        customer_address: customerAddress
-      });
-    
-    // Now store the message in the messages table with the order_id
-    await supabase
-      .from('messages')
-      .insert({
-        order_id: data.id,
-        sender: 'customer',
-        content: messageData.body
-      });
+  if (!response.ok) {
+    console.error('Failed to send Twilio message:', await response.text());
   }
-    
-  return data;
 }

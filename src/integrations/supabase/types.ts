@@ -154,6 +154,112 @@ export type Database = {
           },
         ]
       }
+      order_payments: {
+        Row: {
+          amount: number
+          created_at: string | null
+          id: string
+          notes: string | null
+          order_id: string
+          payment_date: string | null
+          payment_method_id: string | null
+          payment_method_name: string
+          status: string | null
+          transaction_reference: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          order_id: string
+          payment_date?: string | null
+          payment_method_id?: string | null
+          payment_method_name: string
+          status?: string | null
+          transaction_reference?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string
+          payment_date?: string | null
+          payment_method_id?: string | null
+          payment_method_name?: string
+          status?: string | null
+          transaction_reference?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_orders_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_payments_payment_method_id_fkey"
+            columns: ["payment_method_id"]
+            isOneToOne: false
+            referencedRelation: "payment_methods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_status_history: {
+        Row: {
+          changed_by: string
+          created_at: string | null
+          id: string
+          order_id: string
+          reason: string | null
+          status: string
+        }
+        Insert: {
+          changed_by: string
+          created_at?: string | null
+          id?: string
+          order_id: string
+          reason?: string | null
+          status: string
+        }
+        Update: {
+          changed_by?: string
+          created_at?: string | null
+          id?: string
+          order_id?: string
+          reason?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_status_history_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_status_history_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_orders_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           address: string
@@ -167,6 +273,10 @@ export type Database = {
           id: string
           items: Json
           notes: string | null
+          paid_at: string | null
+          payment_amount: number | null
+          payment_method: string | null
+          payment_status: string | null
           status: string | null
           total: number
           updated_at: string | null
@@ -184,6 +294,10 @@ export type Database = {
           id?: string
           items: Json
           notes?: string | null
+          paid_at?: string | null
+          payment_amount?: number | null
+          payment_method?: string | null
+          payment_status?: string | null
           status?: string | null
           total: number
           updated_at?: string | null
@@ -201,6 +315,10 @@ export type Database = {
           id?: string
           items?: Json
           notes?: string | null
+          paid_at?: string | null
+          payment_amount?: number | null
+          payment_method?: string | null
+          payment_status?: string | null
           status?: string | null
           total?: number
           updated_at?: string | null
@@ -222,6 +340,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      payment_methods: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+        }
+        Relationships: []
       }
       products: {
         Row: {
@@ -757,6 +896,15 @@ export type Database = {
       }
     }
     Functions: {
+      change_order_status: {
+        Args: {
+          p_changed_by: string
+          p_new_status: string
+          p_order_id: string
+          p_reason?: string
+        }
+        Returns: boolean
+      }
       get_masked_phone: {
         Args: { phone: string }
         Returns: string
@@ -767,6 +915,21 @@ export type Database = {
           customer_address: string
           customer_name: string
           customer_phone: string
+        }[]
+      }
+      get_products_by_category: {
+        Args: { category_filter?: string }
+        Returns: {
+          is_available: boolean
+          product_category: string
+          product_description: string
+          product_id: string
+          product_name: string
+          product_price: number
+          vendor_id: string
+          vendor_is_open: boolean
+          vendor_name: string
+          vendor_rating: number
         }[]
       }
       get_simplified_address: {
