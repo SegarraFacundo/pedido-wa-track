@@ -346,23 +346,69 @@ async function showProductsWithPrices(message: string, supabase: any, session: a
     .eq('phone', session.phone);
   
   return reply;
+}
 
 async function startOrder(message: string, phone: string, supabase: any, session: any): Promise<string> {
+  // Check if user has viewed products first
+  if (!session?.pending_products || session.pending_products.length === 0) {
+    return '❌ *Primero debes ver los productos disponibles.*\n\n' +
+           '📱 Escribe "2" para ver todos los productos\n' +
+           'O escribe "productos [búsqueda]" para buscar algo específico\n\n' +
+           'Ejemplo: "productos pizza"';
+  }
+  
   // Parse order: "pedir [número] [cantidad] [dirección]"
   const parts = message.split(' ');
   
+  // If user just writes "pedir" or "3", show instructions
+  if (parts.length < 2 || (parts.length === 1 && (parts[0] === '3' || parts[0].toLowerCase() === 'pedir'))) {
+    let response = '📝 *CÓMO HACER UN PEDIDO:*\n\n';
+    response += 'Primero revisa los productos disponibles (ya lo hiciste ✅)\n\n';
+    response += '📦 *Productos que viste:*\n';
+    
+    // Show summary of products they can order
+    session.pending_products.forEach((product: any, index: number) => {
+      response += `${index + 1}. ${product.product_name} - S/${product.price}\n`;
+      response += `   📍 ${product.vendor_name}\n`;
+    });
+    
+    response += '\n📝 *Para ordenar escribe:*\n';
+    response += '"pedir [número] [cantidad] [dirección]"\n\n';
+    response += '✅ *Ejemplos:*\n';
+    response += '• pedir 1 2 Av. Larco 123\n';
+    response += '• pedir 3 1 Jr. Unión 456, Barranco\n';
+    
+    return response;
+  }
+  
   if (parts.length < 4) {
-    return '❌ Formato incorrecto.\n\n' +
-           'Usa: "pedir [número] [cantidad] [dirección]"\n' +
-           'Ejemplo: pedir 1 2 Av. Larco 123';
+    return '❌ *Formato incorrecto.*\n\n' +
+           '📝 Usa: "pedir [número] [cantidad] [dirección]"\n' +
+           'Ejemplo: pedir 1 2 Av. Larco 123\n\n' +
+           'Escribe solo "3" o "pedir" para ver instrucciones detalladas.';
   }
   
   const productIndex = parseInt(parts[1]) - 1;
   const quantity = parseInt(parts[2]);
   const address = parts.slice(3).join(' ');
   
-  if (!session?.pending_products || productIndex < 0 || productIndex >= session.pending_products.length) {
-    return '❌ Producto no válido. Primero busca productos con "2" o "productos"';
+  // Validate inputs
+  if (isNaN(productIndex) || isNaN(quantity)) {
+    return '❌ El número de producto y cantidad deben ser números.\n\n' +
+           'Ejemplo correcto: pedir 1 2 Av. Larco 123';
+  }
+  
+  if (productIndex < 0 || productIndex >= session.pending_products.length) {
+    return `❌ Producto no válido. Debes elegir un número entre 1 y ${session.pending_products.length}.\n\n` +
+           'Escribe "2" para ver los productos disponibles nuevamente.';
+  }
+  
+  if (quantity <= 0 || quantity > 10) {
+    return '❌ La cantidad debe ser entre 1 y 10 unidades.';
+  }
+  
+  if (address.length < 5) {
+    return '❌ Por favor ingresa una dirección válida más completa.';
   }
   
   const selectedProduct = session.pending_products[productIndex];
@@ -376,8 +422,8 @@ async function startOrder(message: string, phone: string, supabase: any, session
       customer_phone: phone,
       vendor_id: selectedProduct.vendor_id,
       items: [{
-        id: selectedProduct.id,
-        name: selectedProduct.name,
+        id: selectedProduct.product_id,
+        name: selectedProduct.product_name,
         quantity: quantity,
         price: selectedProduct.price
       }],
@@ -391,12 +437,22 @@ async function startOrder(message: string, phone: string, supabase: any, session
     .single();
   
   if (error) {
+    console.error('Error creating order:', error);
     return '❌ Error al crear el pedido. Intenta nuevamente.';
   }
   
+  // Clear pending products after successful order
+  await supabase
+    .from('chat_sessions')
+    .update({
+      pending_products: [],
+      updated_at: new Date().toISOString()
+    })
+    .eq('phone', phone);
+  
   // Notify vendor
   await notifyVendor(selectedProduct.vendor_id, order.id, 
-    `Nuevo pedido: ${quantity}x ${selectedProduct.name}`, supabase);
+    `Nuevo pedido: ${quantity}x ${selectedProduct.product_name}`, supabase);
   
   // Get payment methods
   const { data: paymentMethods } = await supabase
