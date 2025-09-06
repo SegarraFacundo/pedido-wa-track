@@ -108,25 +108,38 @@ async function processMessage(messageData: any, supabase: any): Promise<string> 
     return '📩 Mensaje enviado al vendedor. Te responderán pronto.';
   }
 
-  // Command routing
-  if (lowerMessage.includes('locales') || lowerMessage.includes('abiertos')) {
+  // Command routing - Check for numeric options first
+  if (lowerMessage === '1' || lowerMessage.includes('locales abiertos') || lowerMessage.includes('ver locales')) {
     return await showOpenVendors(supabase);
   }
   
-  if (lowerMessage.includes('productos') || lowerMessage.includes('menu')) {
+  if (lowerMessage === '2' || lowerMessage.includes('productos disponibles') || lowerMessage.includes('ver productos')) {
     return await showProductsWithPrices(messageData.body, supabase, session);
   }
   
-  if (lowerMessage.includes('pedir') || lowerMessage.includes('ordenar')) {
+  if (lowerMessage === '3' || lowerMessage.includes('pedir un producto') || lowerMessage.includes('ordenar')) {
     return await startOrder(messageData.body, phone, supabase, session);
   }
   
-  if (lowerMessage.includes('pagar') || lowerMessage.includes('pago')) {
-    return await handlePayment(messageData.body, phone, supabase);
+  if (lowerMessage === '4' || lowerMessage.includes('ofertas del día') || lowerMessage.includes('ver ofertas')) {
+    return await getActiveOffers(supabase);
   }
   
-  if (lowerMessage.includes('estado pedido') || lowerMessage === 'estado') {
+  if (lowerMessage === '5' || lowerMessage.includes('estado de mi pedido') || lowerMessage === 'estado') {
     return await checkOrderStatus(phone, supabase);
+  }
+  
+  if (lowerMessage === '6' || lowerMessage.includes('hablar con vendedor')) {
+    return await startVendorChat(phone, supabase);
+  }
+  
+  if (lowerMessage === '7' || lowerMessage.includes('calificar servicio') || lowerMessage.startsWith('calificar')) {
+    return await handleReview(messageData.body, phone, supabase);
+  }
+  
+  // Additional specific commands
+  if (lowerMessage.includes('pagar') || lowerMessage.includes('pago')) {
+    return await handlePayment(messageData.body, phone, supabase);
   }
   
   if (lowerMessage.includes('cancelar pedido')) {
@@ -135,18 +148,6 @@ async function processMessage(messageData: any, supabase: any): Promise<string> 
   
   if (lowerMessage.includes('cambiar estado')) {
     return await changeOrderStatus(messageData.body, phone, supabase);
-  }
-  
-  if (lowerMessage.includes('ofertas')) {
-    return await getActiveOffers(supabase);
-  }
-  
-  if (lowerMessage.includes('hablar con vendedor')) {
-    return await startVendorChat(phone, supabase);
-  }
-  
-  if (lowerMessage.startsWith('calificar')) {
-    return await handleReview(messageData.body, phone, supabase);
   }
   
   return getMainMenu();
