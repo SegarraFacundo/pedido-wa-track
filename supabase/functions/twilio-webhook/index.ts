@@ -228,25 +228,25 @@ async function showProductsWithPrices(message: string, supabase: any, session: a
     }
   });
   
-  let message = '🛒 *PRODUCTOS DISPONIBLES:*\n\n';
+  let reply = '🛒 *PRODUCTOS DISPONIBLES:*\n\n';
   let productNumber = 1;
   
   Object.entries(productsByVendor).forEach(([vendorName, data]: any) => {
-    message += `📍 *${vendorName}* ⭐${data.rating?.toFixed(1) || 'N/A'}\n`;
+    reply += `📍 *${vendorName}* ⭐${data.rating?.toFixed(1) || 'N/A'}\n`;
     
     data.products.forEach((p: any) => {
-      message += `${productNumber}. ${p.product_name} - *S/${p.product_price}*\n`;
+      reply += `${productNumber}. ${p.product_name} - *S/${p.product_price}*\n`;
       if (p.product_description) {
-        message += `   ${p.product_description}\n`;
+        reply += `   ${p.product_description}\n`;
       }
       productNumber++;
     });
-    message += '\n';
+    reply += '\n';
   });
   
-  message += '📝 Para pedir, escribe:\n';
-  message += '"pedir [número] [cantidad] [dirección]"\n';
-  message += 'Ejemplo: pedir 1 2 Av. Larco 123';
+  reply += '📝 Para pedir, escribe:\n';
+  reply += '"pedir [número] [cantidad] [dirección]"\n';
+  reply += 'Ejemplo: pedir 1 2 Av. Larco 123';
   
   // Save products in session for easy ordering
   await supabase
@@ -257,7 +257,7 @@ async function showProductsWithPrices(message: string, supabase: any, session: a
     })
     .eq('phone', session.phone);
   
-  return message;
+  return reply;
 }
 
 async function startOrder(message: string, phone: string, supabase: any, session: any): Promise<string> {
