@@ -6,11 +6,14 @@ import { VendorDashboardWithRealtime } from '@/components/VendorDashboardWithRea
 import { VendorProductManager } from '@/components/VendorProductManager';
 import { VendorHoursManager } from '@/components/VendorHoursManager';
 import { VendorSettings } from '@/components/VendorSettings';
+import { VendorOffersManager } from '@/components/VendorOffersManager';
+import { VendorReviews } from '@/components/VendorReviews';
+import { VendorDirectChat } from '@/components/VendorDirectChat';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Package, Clock, Settings, LayoutDashboard } from 'lucide-react';
+import { Loader2, Package, Clock, Settings, LayoutDashboard, Tag, Star, MessageCircle } from 'lucide-react';
 
 export default function VendorDashboard() {
   const [user, setUser] = useState<User | null>(null);
@@ -115,7 +118,7 @@ export default function VendorDashboard() {
       {/* Dashboard tabs */}
       <div className="container mx-auto p-4">
         <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-6">
+          <TabsList className="flex flex-wrap gap-2 h-auto p-1 mb-6">
             <TabsTrigger value="dashboard" className="flex items-center gap-1">
               <LayoutDashboard className="h-4 w-4" />
               <span className="hidden sm:inline">Pedidos</span>
@@ -123,6 +126,18 @@ export default function VendorDashboard() {
             <TabsTrigger value="products" className="flex items-center gap-1">
               <Package className="h-4 w-4" />
               <span className="hidden sm:inline">Productos</span>
+            </TabsTrigger>
+            <TabsTrigger value="offers" className="flex items-center gap-1">
+              <Tag className="h-4 w-4" />
+              <span className="hidden sm:inline">Ofertas</span>
+            </TabsTrigger>
+            <TabsTrigger value="chats" className="flex items-center gap-1">
+              <MessageCircle className="h-4 w-4" />
+              <span className="hidden sm:inline">Chats</span>
+            </TabsTrigger>
+            <TabsTrigger value="reviews" className="flex items-center gap-1">
+              <Star className="h-4 w-4" />
+              <span className="hidden sm:inline">Reseñas</span>
             </TabsTrigger>
             <TabsTrigger value="hours" className="flex items-center gap-1">
               <Clock className="h-4 w-4" />
@@ -140,6 +155,18 @@ export default function VendorDashboard() {
 
           <TabsContent value="products">
             <VendorProductManager vendorId={vendor.id} />
+          </TabsContent>
+
+          <TabsContent value="offers">
+            <VendorOffersManager vendorId={vendor.id} />
+          </TabsContent>
+
+          <TabsContent value="chats">
+            <VendorDirectChat vendorId={vendor.id} />
+          </TabsContent>
+
+          <TabsContent value="reviews">
+            <VendorReviews vendorId={vendor.id} />
           </TabsContent>
 
           <TabsContent value="hours">
