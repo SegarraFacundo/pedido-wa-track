@@ -51,15 +51,16 @@ serve(async (req) => {
         'Content-Type': 'text/xml; charset=utf-8'
       }
     });
-  } catch (error) {
-    console.error('Error processing webhook:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400 
-      }
-    );
+  } catch (error: any) {
+    console.error('Error processing webhook:', error?.message || error);
+    if (error?.stack) console.error(error.stack);
+    const fallback = `<?xml version="1.0" encoding="UTF-8"?><Response><Message><![CDATA[😕 Ocurrió un error procesando tu mensaje.
+
+Intenta nuevamente o escribe "menu" para ver opciones.]]></Message></Response>`;
+    return new Response(fallback, {
+      headers: { ...corsHeaders, 'Content-Type': 'text/xml; charset=utf-8' },
+      status: 200
+    });
   }
 });
 
@@ -368,7 +369,7 @@ async function startOrder(message: string, phone: string, supabase: any, session
     
     // Show summary of products they can order
     session.pending_products.forEach((product: any, index: number) => {
-      response += `${index + 1}. ${product.product_name} - S/${product.price}\n`;
+      response += `${index + 1}. ${product.name} - S/${product.price}\n`;
       response += `   📍 ${product.vendor_name}\n`;
     });
     
@@ -422,8 +423,8 @@ async function startOrder(message: string, phone: string, supabase: any, session
       customer_phone: phone,
       vendor_id: selectedProduct.vendor_id,
       items: [{
-        id: selectedProduct.product_id,
-        name: selectedProduct.product_name,
+        id: selectedProduct.id,
+        name: selectedProduct.name,
         quantity: quantity,
         price: selectedProduct.price
       }],
@@ -452,7 +453,7 @@ async function startOrder(message: string, phone: string, supabase: any, session
   
   // Notify vendor
   await notifyVendor(selectedProduct.vendor_id, order.id, 
-    `Nuevo pedido: ${quantity}x ${selectedProduct.product_name}`, supabase);
+    `Nuevo pedido: ${quantity}x ${selectedProduct.name}`, supabase);
   
   // Get payment methods
   const { data: paymentMethods } = await supabase
@@ -461,7 +462,7 @@ async function startOrder(message: string, phone: string, supabase: any, session
     .eq('is_active', true);
   
   let response = `✅ *PEDIDO CREADO #${order.id.slice(0, 8)}*\n\n`;
-  response += `📦 ${quantity}x ${selectedProduct.product_name}\n`;
+  response += `📦 ${quantity}x ${selectedProduct.name}\n`;
   response += `💰 Total: *S/${totalAmount}*\n`;
   response += `📍 Dirección: ${address}\n\n`;
   response += `💳 *SELECCIONA FORMA DE PAGO:*\n\n`;
