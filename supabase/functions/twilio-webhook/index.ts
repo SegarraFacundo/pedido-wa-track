@@ -838,3 +838,4 @@ async function sendTwilioMessage(to: string, message: string) {
     console.error('Failed to send Twilio message:', await response.text());
   }
 }
+});
