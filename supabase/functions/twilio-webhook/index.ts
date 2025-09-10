@@ -396,32 +396,6 @@ async function handleQuickProductSelection(productIndex: number, phone: string, 
   return response;
 }
 
-async function handleQuickProductSelection(productIndex: number, phone: string, session: any, supabase: any): Promise<string> {
-  const product = session.pending_products[productIndex];
-  
-  // Save selected product in session
-  await supabase
-    .from('chat_sessions')
-    .update({
-      selected_product: product,
-      selected_quantity: 1,
-      updated_at: new Date().toISOString()
-    })
-    .eq('phone', phone);
-  
-  let response = `✅ *Producto seleccionado:*\n`;
-  response += `📦 ${product.name} - S/${product.price}\n`;
-  response += `📍 ${product.vendor_name}\n\n`;
-  response += `📝 *Para continuar con el pedido, escribe:*\n\n`;
-  response += `• La cantidad (número entre 1-10)\n`;
-  response += `• O directamente tu dirección completa\n\n`;
-  response += `💡 *Ejemplos:*\n`;
-  response += `"2" (para 2 unidades)\n`;
-  response += `"Av. Larco 1582" (1 unidad a esa dirección)\n`;
-  response += `"3 Av. España 1234" (3 unidades a esa dirección)`;
-  
-  return response;
-}
 
 async function handleQuickOrderFlow(message: string, phone: string, session: any, supabase: any): Promise<string> {
   const product = session.selected_product;
