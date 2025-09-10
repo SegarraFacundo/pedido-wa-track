@@ -98,6 +98,11 @@ export function VendorDashboardWithRealtime({ vendor }: VendorDashboardWithRealt
   ];
 
   const isOpen = () => {
+    // If no opening/closing times are configured, show as closed
+    if (!vendor.openingTime || !vendor.closingTime) {
+      return false;
+    }
+    
     // Get Peru time (UTC-5)
     const now = new Date();
     const peruTime = new Date(now.getTime() - (5 * 60 * 60 * 1000));
@@ -106,8 +111,8 @@ export function VendorDashboardWithRealtime({ vendor }: VendorDashboardWithRealt
     
     if (!vendor.daysOpen?.includes(currentDay)) return false;
     
-    const openingTime = vendor.openingTime?.slice(0, 5) || '00:00';
-    const closingTime = vendor.closingTime?.slice(0, 5) || '23:59';
+    const openingTime = vendor.openingTime.slice(0, 5);
+    const closingTime = vendor.closingTime.slice(0, 5);
     
     return currentTime >= openingTime && currentTime <= closingTime;
   };
@@ -130,7 +135,7 @@ export function VendorDashboardWithRealtime({ vendor }: VendorDashboardWithRealt
               <div>
                 <h2 className="text-2xl font-bold">{vendor.name}</h2>
                 <Badge variant={isOpen() ? "default" : "secondary"} className="mt-2">
-                  {isOpen() ? "Abierto" : "Cerrado"}
+                  {isOpen() ? "Abierto" : vendor.openingTime && vendor.closingTime ? "Cerrado" : "Sin horario"}
                 </Badge>
               </div>
               
@@ -145,7 +150,9 @@ export function VendorDashboardWithRealtime({ vendor }: VendorDashboardWithRealt
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Clock className="h-4 w-4" />
-                  {vendor.openingTime} - {vendor.closingTime}
+                  {vendor.openingTime && vendor.closingTime 
+                    ? `${vendor.openingTime} - ${vendor.closingTime}`
+                    : 'Horario no configurado'}
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Calendar className="h-4 w-4" />
