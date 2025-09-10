@@ -35,7 +35,7 @@ export function VendorReviews({ vendorId }: VendorReviewsProps) {
   const fetchReviews = async () => {
     try {
       const { data, error } = await supabase
-        .from('vendor_reviews')
+        .from('vendor_reviews_public')
         .select('*')
         .eq('vendor_id', vendorId)
         .order('created_at', { ascending: false })
