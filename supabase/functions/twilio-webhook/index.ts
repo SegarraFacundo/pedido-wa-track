@@ -137,15 +137,15 @@ async function processMessage(messageData: any, supabase: any): Promise<string> 
   }
   
   if (lowerMessage === '4' || lowerMessage.includes('ofertas del día') || lowerMessage.includes('ver ofertas')) {
-    return await getActiveOffers(supabase);
+    return await getActiveOffers(supabase, session);
   }
   
   if (lowerMessage === '5' || lowerMessage.includes('estado de mi pedido') || lowerMessage === 'estado') {
-    return await checkOrderStatus(phone, supabase);
+    return await checkOrderStatus(phone, supabase, session);
   }
   
   if (lowerMessage === '6' || lowerMessage.includes('hablar con vendedor')) {
-    return await startVendorChat(phone, supabase);
+    return await startVendorChat(phone, supabase, session);
   }
   
   if (lowerMessage === '7' || lowerMessage.includes('calificar servicio') || lowerMessage.startsWith('calificar')) {
@@ -153,7 +153,19 @@ async function processMessage(messageData: any, supabase: any): Promise<string> 
     if (!session?.vendor_preference) {
       return '⚠️ Primero debes seleccionar un local para calificar.\n\nEscribe "1" para ver locales abiertos.';
     }
-    return await handleReview(messageData.body, phone, supabase);
+    return await handleReview(messageData.body, phone, supabase, session);
+  }
+
+  if (lowerMessage === 'mi local' || lowerMessage.includes('local seleccionado') || lowerMessage === 'local') {
+    return await showSelectedVendor(phone, session, supabase);
+  }
+
+  if (lowerMessage.includes('cambiar local') || lowerMessage.includes('resetear local') || lowerMessage.includes('quitar local')) {
+    return await clearSelectedVendor(phone, supabase);
+  }
+
+  if (lowerMessage === 'menu') {
+    return await getContextualMenu(phone, session, supabase);
   }
   
   // Additional specific commands
@@ -316,12 +328,47 @@ async function selectVendor(selection: string, phone: string, supabase: any): Pr
 }
 
 async function showProductsWithPrices(message: string, supabase: any, session: any): Promise<string> {
-  // Default behavior: show all products if just "2" or "productos" is sent
   const parts = message.toLowerCase().split(' ');
-  const isJustNumber = message.trim() === '2';
-  const searchTerm = !isJustNumber && parts.length > 1 ? parts.slice(1).join(' ') : null;
-  
-  // Get products - if no search term, get all available products
+  const isJustNumber = message.trim() === '2' || message.toLowerCase().startsWith('productos');
+  const searchTerm = parts[0] === 'productos' && parts.length > 1 ? parts.slice(1).join(' ') : null;
+
+  // If a vendor is selected, show ONLY that vendor's products
+  if (session?.vendor_preference) {
+    const vendorId = session.vendor_preference;
+
+    // Fetch vendor info
+    const { data: vendor } = await supabase
+      .from('vendors')
+      .select('id, name, average_rating, opening_time, closing_time, days_open, address')
+      .eq('id', vendorId)
+      .maybeSingle();
+
+    if (!vendor) {
+      return '❌ No se encontró el local seleccionado. Escribe "cambiar local" para elegir otro.';
+    }
+
+    // Fetch products for selected vendor
+    let query = supabase
+      .from('products')
+      .select('id, name, description, price, category')
+      .eq('vendor_id', vendorId)
+      .eq('is_available', true);
+
+    if (searchTerm) {
+      // We'll filter client-side for simplicity since we selected vendor already
+      const { data: prods } = await query;
+      const filtered = (prods || []).filter((p: any) =>
+        p.name.toLowerCase().includes(searchTerm) ||
+        (p.category || '').toLowerCase().includes(searchTerm)
+      );
+      return buildProductsReplyForSingleVendor(vendor, filtered, session, supabase);
+    }
+
+    const { data: products } = await query;
+    return buildProductsReplyForSingleVendor(vendor, products || [], session, supabase);
+  }
+
+  // Otherwise, show products grouped by open vendors now (Argentina time)
   const { data: products } = await supabase
     .from('products')
     .select('*, vendors!inner(id, name, average_rating, is_active, opening_time, closing_time, days_open)')
@@ -329,9 +376,9 @@ async function showProductsWithPrices(message: string, supabase: any, session: a
     .eq('vendors.is_active', true);
   
   if (!products || products.length === 0) {
-    return '😕 No encontramos productos disponibles.\n\nEscribe "1" o "locales abiertos" para ver opciones.';
+    return '😕 No encontramos productos disponibles.\n\nEscribe "1" para ver locales abiertos.';
   }
-  
+
   // Filter by search term if provided
   let filteredProducts = products;
   if (searchTerm) {
@@ -340,17 +387,14 @@ async function showProductsWithPrices(message: string, supabase: any, session: a
       p.category.toLowerCase().includes(searchTerm) ||
       p.vendors.name.toLowerCase().includes(searchTerm)
     );
-    
     if (filteredProducts.length === 0) {
       return `😕 No encontramos productos para "${searchTerm}".\n\nEscribe "2" para ver todos los productos disponibles.`;
     }
   }
-  
-  // Check which vendors are open now
-  const now = new Date();
-  const currentTime = now.toTimeString().slice(0, 5);
-  const currentDay = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][now.getDay()];
-  
+
+  // Argentina time
+  const { day: currentDay, time: currentTime } = nowInTimeZone('America/Argentina/Buenos_Aires');
+
   // Group by vendor and check if open
   const productsByVendor: any = {};
   const vendorIds = new Set<string>();
@@ -415,15 +459,9 @@ async function showProductsWithPrices(message: string, supabase: any, session: a
       reply += `\n🎉 *OFERTAS ACTIVAS:*\n`;
       vendorOffers.forEach((offer: any) => {
         reply += `   🏷️ ${offer.title}\n`;
-        if (offer.description) {
-          reply += `      ${offer.description}\n`;
-        }
-        if (offer.discount_percentage) {
-          reply += `      *${offer.discount_percentage}% OFF*\n`;
-        }
-        if (offer.original_price && offer.offer_price) {
-          reply += `      ~S/${offer.original_price}~ *S/${offer.offer_price}*\n`;
-        }
+        if (offer.description) reply += `      ${offer.description}\n`;
+        if (offer.discount_percentage) reply += `      *${offer.discount_percentage}% OFF*\n`;
+        if (offer.original_price && offer.offer_price) reply += `      ~S/${offer.original_price}~ *S/${offer.offer_price}*\n`;
       });
       reply += '\n';
     }
@@ -431,9 +469,7 @@ async function showProductsWithPrices(message: string, supabase: any, session: a
     reply += `*Productos:*\n`;
     data.products.forEach((p: any) => {
       reply += `${productNumber}. ${p.name} - *S/${p.price}*\n`;
-      if (p.description) {
-        reply += `   ${p.description}\n`;
-      }
+      if (p.description) reply += `   ${p.description}\n`;
       productList.push({
         ...p,
         vendor_id: data.vendor_id,
@@ -446,9 +482,7 @@ async function showProductsWithPrices(message: string, supabase: any, session: a
     reply += '\n';
   });
   
-  reply += '📝 Para pedir, escribe:\n';
-  reply += '"pedir [número] [cantidad] [dirección]"\n';
-  reply += 'Ejemplo: pedir 1 2 Av. Larco 123';
+  reply += '📝 Para pedir, escribe:\n"pedir [número] [cantidad] [dirección]"\nEjemplo: pedir 1 2 Av. Corrientes 123';
   
   // Save products in session for easy ordering
   await supabase
@@ -459,6 +493,38 @@ async function showProductsWithPrices(message: string, supabase: any, session: a
     })
     .eq('phone', session.phone);
   
+  return reply;
+}
+
+function buildProductsReplyForSingleVendor(vendor: any, products: any[], session: any, supabase: any) {
+  let reply = `🛒 *PRODUCTOS DE ${vendor.name}:*\n\n`;
+  if (!products || products.length === 0) {
+    return reply + '😕 Este local no tiene productos disponibles ahora.';
+  }
+
+  let productNumber = 1;
+  const productList: any[] = [];
+  products.forEach((p: any) => {
+    reply += `${productNumber}. ${p.name} - *S/${p.price}*\n`;
+    if (p.description) reply += `   ${p.description}\n`;
+    productList.push({
+      ...p,
+      vendor_id: vendor.id,
+      vendor_name: vendor.name,
+      vendor_rating: vendor.average_rating,
+      product_number: productNumber
+    });
+    productNumber++;
+  });
+
+  reply += '\n📝 Para pedir, escribe:\n"pedir [número] [cantidad] [dirección]"';
+
+  // Save products in session
+  supabase
+    .from('chat_sessions')
+    .update({ pending_products: productList, updated_at: new Date().toISOString() })
+    .eq('phone', session.phone);
+
   return reply;
 }
 
@@ -830,13 +896,19 @@ async function changeOrderStatus(message: string, phone: string, supabase: any):
          `Razón: ${reason}`;
 }
 
-async function getActiveOffers(supabase: any): Promise<string> {
-  const { data: offers } = await supabase
+async function getActiveOffers(supabase: any, session?: any): Promise<string> {
+  let query = supabase
     .from('vendor_offers')
     .select('*, vendors(name)')
     .eq('is_active', true)
     .gte('valid_until', new Date().toISOString())
     .limit(10);
+
+  if (session?.vendor_preference) {
+    query = query.eq('vendor_id', session.vendor_preference);
+  }
+  
+  const { data: offers } = await query;
   
   if (!offers || offers.length === 0) {
     return '😕 No hay ofertas activas en este momento.';
@@ -847,44 +919,37 @@ async function getActiveOffers(supabase: any): Promise<string> {
   offers.forEach((offer: any, index: number) => {
     message += `${index + 1}. *${offer.title}*\n`;
     message += `   📍 ${offer.vendors.name}\n`;
-    message += `   ${offer.description}\n`;
-    
-    if (offer.discount_percentage) {
-      message += `   🏷️ *${offer.discount_percentage}% OFF*\n`;
-    }
-    
-    if (offer.original_price && offer.offer_price) {
-      message += `   💰 ~S/${offer.original_price}~ *S/${offer.offer_price}*\n`;
-    }
-    
+    if (offer.description) message += `   ${offer.description}\n`;
+    if (offer.discount_percentage) message += `   🏷️ *${offer.discount_percentage}% OFF*\n`;
+    if (offer.original_price && offer.offer_price) message += `   💰 ~S/${offer.original_price}~ *S/${offer.offer_price}*\n`;
     message += '\n';
   });
   
   return message;
 }
 
-async function startVendorChat(phone: string, supabase: any): Promise<string> {
-  // Get the vendor from the last order
-  const { data: lastOrder } = await supabase
-    .from('orders')
-    .select('vendor_id, vendors(name)')
-    .eq('customer_phone', phone)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
-  
-  if (!lastOrder) {
-    return '😕 Primero debes hacer un pedido para chatear con el vendedor.';
+async function startVendorChat(phone: string, supabase: any, session?: any): Promise<string> {
+  let vendorId: string | null = session?.vendor_preference || null;
+
+  if (!vendorId) {
+    // Fallback: last order vendor
+    const { data: lastOrder } = await supabase
+      .from('orders')
+      .select('vendor_id, vendors(name)')
+      .eq('customer_phone', phone)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!lastOrder) {
+      return '😕 Primero selecciona un local u realiza un pedido para chatear.\nEscribe "1" para ver locales abiertos.';
+    }
+    vendorId = lastOrder.vendor_id;
   }
-  
+
   // Create chat session
   const { data: chat, error } = await supabase
     .from('vendor_chats')
-    .insert({
-      vendor_id: lastOrder.vendor_id,
-      customer_phone: phone,
-      is_active: true
-    })
+    .insert({ vendor_id: vendorId, customer_phone: phone, is_active: true })
     .select()
     .single();
   
@@ -895,18 +960,13 @@ async function startVendorChat(phone: string, supabase: any): Promise<string> {
   // Send initial message
   await supabase
     .from('chat_messages')
-    .insert({
-      chat_id: chat.id,
-      sender_type: 'bot',
-      message: `Cliente ${phone} ha iniciado un chat`
-    });
-  
-  return `✅ *Chat iniciado con ${lastOrder.vendors.name}*\n\n` +
-         `Un vendedor te atenderá en breve.\n\n` +
-         `Para terminar el chat, escribe "terminar chat".`;
+    .insert({ chat_id: chat.id, sender_type: 'bot', message: `Cliente ${phone} ha iniciado un chat` });
+
+  const { data: v } = await supabase.from('vendors').select('name').eq('id', vendorId).maybeSingle();
+  return `✅ *Chat iniciado con ${v?.name || 'el vendedor'}*\n\nUn vendedor te atenderá en breve.\n\nPara terminar el chat, escribe "terminar chat".`;
 }
 
-async function handleReview(message: string, phone: string, supabase: any): Promise<string> {
+async function handleReview(message: string, phone: string, supabase: any, session?: any): Promise<string> {
   const parts = message.split(' ');
   const rating = parseInt(parts[1]);
   
@@ -918,38 +978,34 @@ async function handleReview(message: string, phone: string, supabase: any): Prom
   
   const comment = parts.slice(2).join(' ');
   
-  // Get last delivered order
-  const { data: lastOrder } = await supabase
-    .from('orders')
-    .select('vendor_id')
-    .eq('customer_phone', phone)
-    .eq('status', 'delivered')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
+  let vendorId: string | null = session?.vendor_preference || null;
   
-  if (!lastOrder) {
-    return '😕 No tienes pedidos entregados para calificar.';
+  if (!vendorId) {
+    // Fallback: last delivered order
+    const { data: lastOrder } = await supabase
+      .from('orders')
+      .select('vendor_id')
+      .eq('customer_phone', phone)
+      .eq('status', 'delivered')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!lastOrder) {
+      return '😕 No tienes pedidos entregados para calificar. O selecciona un local con "1" y luego "calificar [1-5]"';
+    }
+    vendorId = lastOrder.vendor_id;
   }
   
   const { error } = await supabase
     .from('vendor_reviews')
-    .insert({
-      vendor_id: lastOrder.vendor_id,
-      customer_phone: phone,
-      rating: rating,
-      comment: comment || null
-    });
+    .insert({ vendor_id: vendorId, customer_phone: phone, rating: rating, comment: comment || null });
   
   if (error) {
     return '❌ No se pudo guardar tu calificación.';
   }
   
   const stars = '⭐'.repeat(rating);
-  return `✅ *¡Gracias por tu calificación!*\n\n` +
-         `${stars}\n` +
-         `${comment ? `"${comment}"` : ''}\n\n` +
-         `Tu opinión nos ayuda a mejorar.`;
+  return `✅ *¡Gracias por tu calificación!*\n\n${stars}\n${comment ? `"${comment}"` : ''}`;
 }
 
 async function notifyVendor(vendorId: string, orderId: string, message: string, supabase: any) {
