@@ -98,16 +98,18 @@ export function VendorDashboardWithRealtime({ vendor }: VendorDashboardWithRealt
   ];
 
   const isOpen = () => {
+    // Get Peru time (UTC-5)
     const now = new Date();
-    const currentHour = now.getHours();
-    const currentDay = now.toLocaleDateString('es-ES', { weekday: 'long' }).toLowerCase();
+    const peruTime = new Date(now.getTime() - (5 * 60 * 60 * 1000));
+    const currentTime = peruTime.toTimeString().slice(0, 5);
+    const currentDay = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][peruTime.getDay()];
     
     if (!vendor.daysOpen?.includes(currentDay)) return false;
     
-    const openHour = parseInt(vendor.openingTime?.split(':')[0] || '0');
-    const closeHour = parseInt(vendor.closingTime?.split(':')[0] || '0');
+    const openingTime = vendor.openingTime?.slice(0, 5) || '00:00';
+    const closingTime = vendor.closingTime?.slice(0, 5) || '23:59';
     
-    return currentHour >= openHour && currentHour < closeHour;
+    return currentTime >= openingTime && currentTime <= closingTime;
   };
 
   if (loading) {

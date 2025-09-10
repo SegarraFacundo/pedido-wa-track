@@ -109,16 +109,30 @@ async function processMessage(messageData: any, supabase: any): Promise<string> 
     return '📩 Mensaje enviado al vendedor. Te responderán pronto.';
   }
 
+  // Check for vendor selection
+  if (lowerMessage.startsWith('seleccionar ')) {
+    const selection = lowerMessage.replace('seleccionar ', '').trim();
+    return await selectVendor(selection, phone, supabase);
+  }
+
   // Command routing - Check for numeric options first
   if (lowerMessage === '1' || lowerMessage.includes('locales abiertos') || lowerMessage.includes('ver locales')) {
     return await showOpenVendors(supabase);
   }
   
   if (lowerMessage === '2' || lowerMessage.includes('productos disponibles') || lowerMessage.includes('ver productos')) {
+    // Only show products if vendor is selected
+    if (!session?.vendor_preference) {
+      return '⚠️ Primero debes seleccionar un local.\n\nEscribe "1" para ver locales abiertos.';
+    }
     return await showProductsWithPrices(messageData.body, supabase, session);
   }
   
   if (lowerMessage === '3' || lowerMessage.includes('pedir un producto') || lowerMessage.includes('ordenar')) {
+    // Only allow ordering if vendor is selected
+    if (!session?.vendor_preference) {
+      return '⚠️ Primero debes seleccionar un local.\n\nEscribe "1" para ver locales abiertos.';
+    }
     return await startOrder(messageData.body, phone, supabase, session);
   }
   
@@ -135,6 +149,10 @@ async function processMessage(messageData: any, supabase: any): Promise<string> 
   }
   
   if (lowerMessage === '7' || lowerMessage.includes('calificar servicio') || lowerMessage.startsWith('calificar')) {
+    // Only allow rating if vendor is selected
+    if (!session?.vendor_preference) {
+      return '⚠️ Primero debes seleccionar un local para calificar.\n\nEscribe "1" para ver locales abiertos.';
+    }
     return await handleReview(messageData.body, phone, supabase);
   }
   
@@ -151,20 +169,54 @@ async function processMessage(messageData: any, supabase: any): Promise<string> 
     return await changeOrderStatus(messageData.body, phone, supabase);
   }
   
-  return getMainMenu();
+  return await getContextualMenu(phone, session, supabase);
 }
 
-function getMainMenu(): string {
-  return `👋 *¡Bienvenido a DeliveryBot!*\n\n` +
-         `📱 *MENÚ PRINCIPAL:*\n\n` +
-         `1️⃣ Ver *locales abiertos*\n` +
-         `2️⃣ Ver *productos* disponibles\n` +
-         `3️⃣ *Pedir* un producto\n` +
-         `4️⃣ Ver *ofertas* del día\n` +
-         `5️⃣ *Estado* de mi pedido\n` +
-         `6️⃣ *Hablar con vendedor*\n` +
-         `7️⃣ *Calificar* servicio\n\n` +
-         `💬 Escribe cualquier opción para comenzar!`;
+async function getContextualMenu(phone: string, session: any, supabase: any): Promise<string> {
+  // Check if user has recent orders (within 24 hours)
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { data: recentOrders } = await supabase
+    .from('orders')
+    .select('id, status')
+    .eq('customer_phone', phone)
+    .or(`status.in.(pending,confirmed,preparing,ready,delivering),and(status.eq.delivered,created_at.gte.${twentyFourHoursAgo})`)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  
+  const hasRecentOrder = recentOrders && recentOrders.length > 0;
+  const hasVendorSelected = session?.vendor_preference !== null;
+  
+  let menu = `👋 *¡Bienvenido a DeliveryBot!*\n\n`;
+  menu += `📱 *MENÚ PRINCIPAL:*\n\n`;
+  menu += `1️⃣ Ver *locales abiertos*\n`;
+  
+  // Only show products and order options if vendor is selected
+  if (hasVendorSelected) {
+    menu += `2️⃣ Ver *productos* disponibles\n`;
+    menu += `3️⃣ *Pedir* un producto\n`;
+  }
+  
+  menu += `4️⃣ Ver *ofertas* del día\n`;
+  
+  // Only show order status if user has recent orders
+  if (hasRecentOrder) {
+    menu += `5️⃣ *Estado* de mi pedido\n`;
+  }
+  
+  menu += `6️⃣ *Hablar con vendedor*\n`;
+  
+  // Only show rating option if vendor is selected
+  if (hasVendorSelected) {
+    menu += `7️⃣ *Calificar* servicio\n`;
+  }
+  
+  menu += `\n💬 Escribe cualquier opción para comenzar!`;
+  
+  if (!hasVendorSelected) {
+    menu += `\n\n💡 *Tip:* Selecciona primero un local (opción 1) para ver más opciones.`;
+  }
+  
+  return menu;
 }
 
 async function showOpenVendors(supabase: any): Promise<string> {
@@ -173,9 +225,11 @@ async function showOpenVendors(supabase: any): Promise<string> {
     .select('*')
     .eq('is_active', true);
   
+  // Get Peru time (UTC-5)
   const now = new Date();
-  const currentTime = now.toTimeString().slice(0, 5);
-  const currentDay = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][now.getDay()];
+  const peruTime = new Date(now.getTime() - (5 * 60 * 60 * 1000));
+  const currentTime = peruTime.toTimeString().slice(0, 5);
+  const currentDay = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][peruTime.getDay()];
   
   const openVendors = vendors?.filter((v: any) => {
     const isInDays = v.days_open?.includes(currentDay) ?? true;
@@ -197,9 +251,58 @@ async function showOpenVendors(supabase: any): Promise<string> {
     message += `   ⏰ Hasta las ${vendor.closing_time?.slice(0, 5)}\n\n`;
   });
   
-  message += '📝 Escribe "productos [nombre del local]" para ver su menú.';
+  message += '📝 Escribe "seleccionar [número]" para elegir un local.';
   
   return message;
+}
+
+async function selectVendor(selection: string, phone: string, supabase: any): Promise<string> {
+  const vendorNumber = parseInt(selection);
+  
+  if (isNaN(vendorNumber)) {
+    return '❌ Por favor, escribe un número válido.\n\nEjemplo: "seleccionar 1"';
+  }
+  
+  // Get current open vendors
+  const { data: vendors } = await supabase
+    .from('vendors')
+    .select('*')
+    .eq('is_active', true);
+  
+  // Get Peru time (UTC-5)
+  const now = new Date();
+  const peruTime = new Date(now.getTime() - (5 * 60 * 60 * 1000));
+  const currentTime = peruTime.toTimeString().slice(0, 5);
+  const currentDay = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][peruTime.getDay()];
+  
+  const openVendors = vendors?.filter((v: any) => {
+    const isInDays = v.days_open?.includes(currentDay) ?? true;
+    const isInHours = currentTime >= v.opening_time?.slice(0, 5) && 
+                      currentTime <= v.closing_time?.slice(0, 5);
+    return isInDays && isInHours;
+  }) || [];
+  
+  if (vendorNumber < 1 || vendorNumber > openVendors.length) {
+    return `❌ Número inválido. Por favor, selecciona un número entre 1 y ${openVendors.length}.`;
+  }
+  
+  const selectedVendor = openVendors[vendorNumber - 1];
+  
+  // Update session with selected vendor
+  await supabase
+    .from('chat_sessions')
+    .update({ 
+      vendor_preference: selectedVendor.id,
+      updated_at: new Date().toISOString()
+    })
+    .eq('phone', phone);
+  
+  return `✅ Has seleccionado *${selectedVendor.name}*\n\n` +
+         `Ahora puedes:\n` +
+         `2️⃣ Ver productos disponibles\n` +
+         `3️⃣ Pedir un producto\n` +
+         `7️⃣ Calificar este local\n\n` +
+         `Escribe cualquier opción para continuar.`;
 }
 
 async function showProductsWithPrices(message: string, supabase: any, session: any): Promise<string> {
