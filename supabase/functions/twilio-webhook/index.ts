@@ -219,17 +219,30 @@ async function getContextualMenu(phone: string, session: any, supabase: any): Pr
   return menu;
 }
 
+function nowInTimeZone(timeZone: string): { day: string; time: string } {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    weekday: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date());
+
+  const day = (parts.find(p => p.type === 'weekday')?.value || 'sunday').toLowerCase();
+  const hour = parts.find(p => p.type === 'hour')?.value || '00';
+  const minute = parts.find(p => p.type === 'minute')?.value || '00';
+
+  return { day, time: `${hour}:${minute}` };
+}
+
 async function showOpenVendors(supabase: any): Promise<string> {
   const { data: vendors } = await supabase
     .from('vendors')
     .select('*')
     .eq('is_active', true);
   
-  // Get Peru time (UTC-5)
-  const now = new Date();
-  const peruTime = new Date(now.getTime() - (5 * 60 * 60 * 1000));
-  const currentTime = peruTime.toTimeString().slice(0, 5);
-  const currentDay = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][peruTime.getDay()];
+  // Time in Argentina
+  const { day: currentDay, time: currentTime } = nowInTimeZone('America/Argentina/Buenos_Aires');
   
   const openVendors = vendors?.filter((v: any) => {
     const isInDays = v.days_open?.includes(currentDay) ?? true;
@@ -269,11 +282,8 @@ async function selectVendor(selection: string, phone: string, supabase: any): Pr
     .select('*')
     .eq('is_active', true);
   
-  // Get Peru time (UTC-5)
-  const now = new Date();
-  const peruTime = new Date(now.getTime() - (5 * 60 * 60 * 1000));
-  const currentTime = peruTime.toTimeString().slice(0, 5);
-  const currentDay = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][peruTime.getDay()];
+  // Time in Argentina
+  const { day: currentDay, time: currentTime } = nowInTimeZone('America/Argentina/Buenos_Aires');
   
   const openVendors = vendors?.filter((v: any) => {
     const isInDays = v.days_open?.includes(currentDay) ?? true;

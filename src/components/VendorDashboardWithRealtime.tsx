@@ -26,6 +26,7 @@ import {
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface VendorDashboardWithRealtimeProps {
   vendor: Vendor;
@@ -37,6 +38,21 @@ export function VendorDashboardWithRealtime({ vendor }: VendorDashboardWithRealt
   const [soundEnabled, setSoundEnabled] = useState(true);
   const { orders, loading, updateOrderStatus } = useRealtimeOrders(vendor.id);
   const { toast } = useToast();
+
+  // Today hours (from vendor_hours)
+  const [todayHours, setTodayHours] = useState<{ opening_time: string; closing_time: string; is_closed: boolean } | null>(null);
+  const timeZone = 'America/Argentina/Buenos_Aires';
+
+  useEffect(() => {
+    const currentDay = new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone }).toLowerCase();
+    supabase
+      .from('vendor_hours')
+      .select('opening_time, closing_time, is_closed')
+      .eq('vendor_id', vendor.id)
+      .eq('day_of_week', currentDay)
+      .maybeSingle()
+      .then(({ data }) => setTodayHours(data));
+  }, [vendor.id]);
 
   // Play notification sound for new orders
   useEffect(() => {
@@ -98,22 +114,23 @@ export function VendorDashboardWithRealtime({ vendor }: VendorDashboardWithRealt
   ];
 
   const isOpen = () => {
-    // If no opening/closing times are configured, show as closed
-    if (!vendor.openingTime || !vendor.closingTime) {
-      return false;
-    }
-    
-    // Get Peru time (UTC-5)
-    const now = new Date();
-    const peruTime = new Date(now.getTime() - (5 * 60 * 60 * 1000));
-    const currentTime = peruTime.toTimeString().slice(0, 5);
-    const currentDay = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][peruTime.getDay()];
-    
-    if (!vendor.daysOpen?.includes(currentDay)) return false;
-    
-    const openingTime = vendor.openingTime.slice(0, 5);
-    const closingTime = vendor.closingTime.slice(0, 5);
-    
+    if (!todayHours) return false;
+    if (todayHours.is_closed) return false;
+
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(new Date());
+
+    const hh = parts.find(p => p.type === 'hour')?.value || '00';
+    const mm = parts.find(p => p.type === 'minute')?.value || '00';
+    const currentTime = `${hh}:${mm}`;
+
+    const openingTime = todayHours.opening_time.slice(0, 5);
+    const closingTime = todayHours.closing_time.slice(0, 5);
+
     return currentTime >= openingTime && currentTime <= closingTime;
   };
 
@@ -135,7 +152,7 @@ export function VendorDashboardWithRealtime({ vendor }: VendorDashboardWithRealt
               <div>
                 <h2 className="text-2xl font-bold">{vendor.name}</h2>
                 <Badge variant={isOpen() ? "default" : "secondary"} className="mt-2">
-                  {isOpen() ? "Abierto" : vendor.openingTime && vendor.closingTime ? "Cerrado" : "Sin horario"}
+                  {isOpen() ? "Abierto" : todayHours ? "Cerrado" : "Sin horario"}
                 </Badge>
               </div>
               
@@ -150,8 +167,8 @@ export function VendorDashboardWithRealtime({ vendor }: VendorDashboardWithRealt
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Clock className="h-4 w-4" />
-                  {vendor.openingTime && vendor.closingTime 
-                    ? `${vendor.openingTime} - ${vendor.closingTime}`
+                  {todayHours 
+                    ? `${todayHours.opening_time} - ${todayHours.closing_time}`
                     : 'Horario no configurado'}
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
