@@ -24,22 +24,76 @@ serve(async (req) => {
     }
     
     const from = formData.get('From');
-    const body = formData.get('Body');
+    let body = formData.get('Body');
     const profileName = formData.get('ProfileName');
+    const mediaUrl = formData.get('MediaUrl0'); // Voice message URL if present
+    const mediaContentType = formData.get('MediaContentType0');
     
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // Handle voice messages
+    if (mediaUrl && mediaContentType?.includes('audio')) {
+      console.log('Processing voice message:', mediaUrl);
+      
+      try {
+        // Download the audio file from Twilio
+        const audioResponse = await fetch(mediaUrl);
+        if (!audioResponse.ok) {
+          throw new Error('Failed to download audio');
+        }
+        
+        const audioBuffer = await audioResponse.arrayBuffer();
+        
+        // Prepare form data for OpenAI Whisper
+        const openAIFormData = new FormData();
+        const blob = new Blob([audioBuffer], { type: mediaContentType });
+        openAIFormData.append('file', blob, 'audio.ogg');
+        openAIFormData.append('model', 'whisper-1');
+        openAIFormData.append('language', 'es'); // Spanish language
+        
+        // Send to OpenAI Whisper API
+        const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+          },
+          body: openAIFormData,
+        });
+        
+        if (!whisperResponse.ok) {
+          const error = await whisperResponse.text();
+          console.error('Whisper API error:', error);
+          throw new Error('Failed to transcribe audio');
+        }
+        
+        const transcription = await whisperResponse.json();
+        body = transcription.text;
+        
+        console.log('Voice transcription:', body);
+      } catch (error) {
+        console.error('Error processing voice message:', error);
+        const errorResponse = `<?xml version="1.0" encoding="UTF-8"?><Response><Message><![CDATA[😕 No pude procesar tu mensaje de voz.
+
+Por favor intenta enviar un mensaje de texto o graba un audio más claro.]]></Message></Response>`;
+        return new Response(errorResponse, {
+          headers: { ...corsHeaders, 'Content-Type': 'text/xml; charset=utf-8' },
+          status: 200
+        });
+      }
+    }
+
     const messageData = {
       from: from?.toString().replace('whatsapp:', ''),
       body: body?.toString(),
       profileName: profileName?.toString(),
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      isVoiceMessage: !!mediaUrl
     };
 
-    // Process message
+    // Process message (text or transcribed voice)
     const response = await processMessage(messageData, supabase);
 
     const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response><Message><![CDATA[${response}]]></Message></Response>`;
@@ -67,6 +121,11 @@ Intenta nuevamente o escribe "menu" para ver opciones.]]></Message></Response>`;
 async function processMessage(messageData: any, supabase: any): Promise<string> {
   const lowerMessage = messageData.body?.toLowerCase().trim() || '';
   const phone = messageData.from;
+  
+  // Add voice message indicator if it was transcribed
+  const voicePrefix = messageData.isVoiceMessage ? '🎤 *Audio transcrito:*\n' : '';
+  
+  // Get or create chat session
   
   // Get or create chat session
   const { data: session } = await supabase
@@ -186,7 +245,7 @@ async function processMessage(messageData: any, supabase: any): Promise<string> 
   }
 
   if (lowerMessage === 'menu') {
-    return await getContextualMenu(phone, session, supabase);
+  return await getContextualMenu(phone, session, supabase, messageData.isVoiceMessage);
   }
   
   // Additional specific commands
@@ -205,7 +264,13 @@ async function processMessage(messageData: any, supabase: any): Promise<string> 
   return await getContextualMenu(phone, session, supabase);
 }
 
-async function getContextualMenu(phone: string, session: any, supabase: any): Promise<string> {
+async function getContextualMenu(phone: string, session: any, supabase: any, isVoiceMessage: boolean = false): Promise<string> {
+  // Add voice message confirmation if applicable
+  let voiceConfirmation = '';
+  if (isVoiceMessage) {
+    voiceConfirmation = '🎤 *Tu mensaje de voz fue procesado exitosamente*\n\n';
+  }
+  
   // Check if user has recent orders (within 24 hours)
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { data: recentOrders } = await supabase
@@ -219,7 +284,8 @@ async function getContextualMenu(phone: string, session: any, supabase: any): Pr
   const hasRecentOrder = recentOrders && recentOrders.length > 0;
   const hasVendorSelected = session?.vendor_preference !== null;
   
-  let menu = `👋 *¡Bienvenido a DeliveryBot!*\n\n`;
+  let menu = voiceConfirmation;
+  menu += `👋 *¡Bienvenido a DeliveryBot!*\n\n`;
   menu += `📱 *MENÚ PRINCIPAL:*\n\n`;
   menu += `1️⃣ Ver *locales abiertos*\n`;
   
@@ -244,6 +310,7 @@ async function getContextualMenu(phone: string, session: any, supabase: any): Pr
   }
   
   menu += `\n💬 Escribe cualquier opción para comenzar!`;
+  menu += `\n🎤 También puedes enviar mensajes de voz`;
   
   if (!hasVendorSelected) {
     menu += `\n\n💡 *Tip:* Selecciona primero un local (opción 1) para ver más opciones.`;
