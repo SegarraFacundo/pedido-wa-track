@@ -51,6 +51,8 @@ export type Database = {
           pending_address: string | null
           pending_products: Json | null
           phone: string
+          selected_product: Json | null
+          selected_quantity: number | null
           updated_at: string
           vendor_preference: string | null
         }
@@ -58,6 +60,8 @@ export type Database = {
           pending_address?: string | null
           pending_products?: Json | null
           phone: string
+          selected_product?: Json | null
+          selected_quantity?: number | null
           updated_at?: string
           vendor_preference?: string | null
         }
@@ -65,6 +69,8 @@ export type Database = {
           pending_address?: string | null
           pending_products?: Json | null
           phone?: string
+          selected_product?: Json | null
+          selected_quantity?: number | null
           updated_at?: string
           vendor_preference?: string | null
         }

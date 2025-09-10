@@ -109,6 +109,27 @@ async function processMessage(messageData: any, supabase: any): Promise<string> 
     return '📩 Mensaje enviado al vendedor. Te responderán pronto.';
   }
 
+  // Check for quick product selection (just a number)
+  if (/^\d+$/.test(lowerMessage) && session?.pending_products) {
+    const productIndex = parseInt(lowerMessage) - 1;
+    if (productIndex >= 0 && productIndex < session.pending_products.length) {
+      return await handleQuickProductSelection(productIndex, phone, session, supabase);
+    }
+  }
+
+  // Check for quick product selection (just a number)
+  if (/^\d+$/.test(lowerMessage) && session?.pending_products) {
+    const productIndex = parseInt(lowerMessage) - 1;
+    if (productIndex >= 0 && productIndex < session.pending_products.length) {
+      return await handleQuickProductSelection(productIndex, phone, session, supabase);
+    }
+  }
+
+  // Check if user has selected product and is providing quantity or address
+  if (session?.selected_product) {
+    return await handleQuickOrderFlow(messageData.body, phone, session, supabase);
+  }
+
   // Check for vendor selection
   if (lowerMessage.startsWith('seleccionar ')) {
     const selection = lowerMessage.replace('seleccionar ', '').trim();
@@ -135,7 +156,7 @@ async function processMessage(messageData: any, supabase: any): Promise<string> 
     }
     return await startOrder(messageData.body, phone, supabase, session);
   }
-  
+
   if (lowerMessage === '4' || lowerMessage.includes('ofertas del día') || lowerMessage.includes('ver ofertas')) {
     return await getActiveOffers(supabase, session);
   }
@@ -279,6 +300,220 @@ async function showOpenVendors(supabase: any): Promise<string> {
   message += '📝 Escribe "seleccionar [número]" para elegir un local.';
   
   return message;
+}
+
+async function handleQuickProductSelection(productIndex: number, phone: string, session: any, supabase: any): Promise<string> {
+  const product = session.pending_products[productIndex];
+  
+  // Save selected product in session
+  await supabase
+    .from('chat_sessions')
+    .update({
+      selected_product: product,
+      selected_quantity: 1,
+      updated_at: new Date().toISOString()
+    })
+    .eq('phone', phone);
+  
+  let response = `✅ *Producto seleccionado:*\n`;
+  response += `📦 ${product.name} - S/${product.price}\n`;
+  response += `📍 ${product.vendor_name}\n\n`;
+  response += `📝 *Para continuar con el pedido, escribe:*\n\n`;
+  response += `• La cantidad (número entre 1-10)\n`;
+  response += `• O directamente tu dirección completa\n\n`;
+  response += `💡 *Ejemplos:*\n`;
+  response += `"2" (para 2 unidades)\n`;
+  response += `"Av. Larco 1582" (1 unidad a esa dirección)\n`;
+  response += `"3 Av. España 1234" (3 unidades a esa dirección)`;
+  
+  return response;
+}
+
+async function handleQuickProductSelection(productIndex: number, phone: string, session: any, supabase: any): Promise<string> {
+  const product = session.pending_products[productIndex];
+  
+  // Save selected product in session
+  await supabase
+    .from('chat_sessions')
+    .update({
+      selected_product: product,
+      selected_quantity: 1,
+      updated_at: new Date().toISOString()
+    })
+    .eq('phone', phone);
+  
+  let response = `✅ *Producto seleccionado:*\n`;
+  response += `📦 ${product.name} - S/${product.price}\n`;
+  response += `📍 ${product.vendor_name}\n\n`;
+  response += `📝 *Para continuar con el pedido, escribe:*\n\n`;
+  response += `• La cantidad (número entre 1-10)\n`;
+  response += `• O directamente tu dirección completa\n\n`;
+  response += `💡 *Ejemplos:*\n`;
+  response += `"2" (para 2 unidades)\n`;
+  response += `"Av. Larco 1582" (1 unidad a esa dirección)\n`;
+  response += `"3 Av. España 1234" (3 unidades a esa dirección)`;
+  
+  return response;
+}
+
+async function handleQuickOrderFlow(message: string, phone: string, session: any, supabase: any): Promise<string> {
+  const product = session.selected_product;
+  const parts = message.trim().split(' ');
+  
+  // Check if message is just a number (quantity)
+  if (/^\d+$/.test(message.trim())) {
+    const quantity = parseInt(message.trim());
+    if (quantity < 1 || quantity > 10) {
+      return '❌ La cantidad debe ser entre 1 y 10 unidades.';
+    }
+    
+    // Update quantity in session
+    await supabase
+      .from('chat_sessions')
+      .update({
+        selected_quantity: quantity,
+        updated_at: new Date().toISOString()
+      })
+      .eq('phone', phone);
+    
+    return `✅ Cantidad: ${quantity} unidades\n\n` +
+           `📝 Ahora escribe tu dirección completa para finalizar el pedido.\n` +
+           `Ejemplo: Av. Larco 1582, Miraflores`;
+  }
+  
+  // Check if it's an address (with or without quantity)
+  let quantity = session.selected_quantity || 1;
+  let address = message.trim();
+  
+  // Check if starts with number and space (quantity + address)
+  const firstPart = parts[0];
+  if (/^\d+$/.test(firstPart) && parts.length > 1) {
+    quantity = parseInt(firstPart);
+    address = parts.slice(1).join(' ');
+    
+    if (quantity < 1 || quantity > 10) {
+      return '❌ La cantidad debe ser entre 1 y 10 unidades.';
+    }
+  }
+  
+  if (address.length < 5) {
+    return '❌ Por favor ingresa una dirección válida más completa.';
+  }
+  
+  // Create the order
+  const totalAmount = product.price * quantity;
+  
+  const { data: order, error } = await supabase
+    .from('orders')
+    .insert({
+      customer_name: session.profileName || 'Cliente',
+      customer_phone: phone,
+      vendor_id: product.vendor_id,
+      items: [{
+        id: product.id,
+        name: product.name,
+        quantity: quantity,
+        price: product.price
+      }],
+      total: totalAmount,
+      address: address,
+      status: 'pending',
+      payment_status: 'pending',
+      payment_amount: totalAmount
+    })
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error creating order:', error);
+    return '❌ Error al crear el pedido. Intenta nuevamente.';
+  }
+  
+  // Clear selection from session
+  await supabase
+    .from('chat_sessions')
+    .update({
+      selected_product: null,
+      selected_quantity: 1,
+      pending_products: [],
+      updated_at: new Date().toISOString()
+    })
+    .eq('phone', phone);
+  
+  // Notify vendor
+  await notifyVendor(product.vendor_id, order.id, 
+    `Nuevo pedido: ${quantity}x ${product.name}`, supabase);
+  
+  // Get payment methods
+  const { data: paymentMethods } = await supabase
+    .from('payment_methods')
+    .select('*')
+    .eq('is_active', true);
+  
+  let response = `✅ *PEDIDO CREADO #${order.id.slice(0, 8)}*\n\n`;
+  response += `📦 ${quantity}x ${product.name}\n`;
+  response += `💰 Total: *S/${totalAmount}*\n`;
+  response += `📍 Dirección: ${address}\n\n`;
+  
+  if (paymentMethods && paymentMethods.length > 0) {
+    response += `💳 *MÉTODOS DE PAGO:*\n`;
+    paymentMethods.forEach((method: any) => {
+      response += `• ${method.name}\n`;
+    });
+    response += `\n📝 Para pagar, escribe:\n"pagar [método] [detalles]"\n\n`;
+    response += `Ejemplo: pagar yape 991234567`;
+  }
+  
+  response += `\n📱 Tu pedido está confirmado y en preparación.`;
+  response += `\n\nEscribe "estado" para ver el progreso.`;
+  
+  return response;
+}
+
+async function showSelectedVendor(phone: string, session: any, supabase: any): Promise<string> {
+  if (!session?.vendor_preference) {
+    return '❌ No tienes un local seleccionado.\n\nEscribe "1" para ver locales abiertos.';
+  }
+  
+  const { data: vendor } = await supabase
+    .from('vendors')
+    .select('*')
+    .eq('id', session.vendor_preference)
+    .maybeSingle();
+  
+  if (!vendor) {
+    return '❌ El local seleccionado ya no está disponible.\n\nEscribe "1" para elegir otro.';
+  }
+  
+  let response = `📍 *LOCAL SELECCIONADO:*\n\n`;
+  response += `🏪 *${vendor.name}*\n`;
+  response += `📍 ${vendor.address}\n`;
+  response += `⭐ ${vendor.average_rating || 0} (${vendor.total_reviews || 0} reseñas)\n`;
+  response += `📞 ${vendor.phone}\n`;
+  response += `⏰ ${vendor.opening_time || 'N/A'} - ${vendor.closing_time || 'N/A'}\n\n`;
+  response += `💡 *Opciones disponibles:*\n`;
+  response += `2️⃣ Ver productos\n`;
+  response += `3️⃣ Hacer pedido\n`;
+  response += `4️⃣ Ver ofertas\n`;
+  response += `7️⃣ Calificar\n\n`;
+  response += `Para cambiar de local, escribe "cambiar local"`;
+  
+  return response;
+}
+
+async function clearSelectedVendor(phone: string, supabase: any): Promise<string> {
+  await supabase
+    .from('chat_sessions')
+    .update({
+      vendor_preference: null,
+      pending_products: [],
+      selected_product: null,
+      selected_quantity: 1,
+      updated_at: new Date().toISOString()
+    })
+    .eq('phone', phone);
+  
+  return `✅ Local deseleccionado.\n\nEscribe "1" para ver locales abiertos y elegir uno nuevo.`;
 }
 
 async function selectVendor(selection: string, phone: string, supabase: any): Promise<string> {
