@@ -342,6 +342,13 @@ export type Database = {
             foreignKeyName: "orders_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
+            referencedRelation: "vendor_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
             referencedRelation: "vendors"
             referencedColumns: ["id"]
           },
@@ -408,6 +415,13 @@ export type Database = {
             columns: ["vendor_id"]
             isOneToOne: false
             referencedRelation: "public_vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_details"
             referencedColumns: ["id"]
           },
           {
@@ -492,6 +506,13 @@ export type Database = {
             foreignKeyName: "vendor_chats_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
+            referencedRelation: "vendor_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_chats_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
             referencedRelation: "vendors"
             referencedColumns: ["id"]
           },
@@ -534,6 +555,13 @@ export type Database = {
             columns: ["vendor_id"]
             isOneToOne: false
             referencedRelation: "public_vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_hours_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_details"
             referencedColumns: ["id"]
           },
           {
@@ -593,6 +621,13 @@ export type Database = {
             columns: ["vendor_id"]
             isOneToOne: false
             referencedRelation: "public_vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_notifications_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_details"
             referencedColumns: ["id"]
           },
           {
@@ -659,6 +694,13 @@ export type Database = {
             foreignKeyName: "vendor_offers_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
+            referencedRelation: "vendor_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_offers_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
             referencedRelation: "vendors"
             referencedColumns: ["id"]
           },
@@ -698,6 +740,13 @@ export type Database = {
             columns: ["vendor_id"]
             isOneToOne: false
             referencedRelation: "public_vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_reviews_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_details"
             referencedColumns: ["id"]
           },
           {
@@ -799,7 +848,7 @@ export type Database = {
         }
         Insert: {
           address_area?: never
-          available_products?: Json | null
+          available_products?: never
           category?: string | null
           closing_time?: string | null
           days_open?: string[] | null
@@ -815,7 +864,7 @@ export type Database = {
         }
         Update: {
           address_area?: never
-          available_products?: Json | null
+          available_products?: never
           category?: string | null
           closing_time?: string | null
           days_open?: string[] | null
@@ -828,6 +877,84 @@ export type Database = {
           opening_time?: string | null
           rating?: number | null
           total_orders?: number | null
+        }
+        Relationships: []
+      }
+      vendor_details: {
+        Row: {
+          address: string | null
+          available_products: Json | null
+          average_rating: number | null
+          category: string | null
+          closing_time: string | null
+          created_at: string | null
+          days_open: string[] | null
+          full_address: string | null
+          full_phone: string | null
+          full_whatsapp: string | null
+          id: string | null
+          image: string | null
+          is_active: boolean | null
+          joined_at: string | null
+          name: string | null
+          opening_time: string | null
+          phone: string | null
+          rating: number | null
+          total_orders: number | null
+          total_reviews: number | null
+          updated_at: string | null
+          user_id: string | null
+          whatsapp_number: string | null
+        }
+        Insert: {
+          address?: string | null
+          available_products?: Json | null
+          average_rating?: number | null
+          category?: string | null
+          closing_time?: string | null
+          created_at?: string | null
+          days_open?: string[] | null
+          full_address?: never
+          full_phone?: never
+          full_whatsapp?: never
+          id?: string | null
+          image?: string | null
+          is_active?: boolean | null
+          joined_at?: string | null
+          name?: string | null
+          opening_time?: string | null
+          phone?: string | null
+          rating?: number | null
+          total_orders?: number | null
+          total_reviews?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+          whatsapp_number?: string | null
+        }
+        Update: {
+          address?: string | null
+          available_products?: Json | null
+          average_rating?: number | null
+          category?: string | null
+          closing_time?: string | null
+          created_at?: string | null
+          days_open?: string[] | null
+          full_address?: never
+          full_phone?: never
+          full_whatsapp?: never
+          id?: string | null
+          image?: string | null
+          is_active?: boolean | null
+          joined_at?: string | null
+          name?: string | null
+          opening_time?: string | null
+          phone?: string | null
+          rating?: number | null
+          total_orders?: number | null
+          total_reviews?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+          whatsapp_number?: string | null
         }
         Relationships: []
       }
@@ -895,6 +1022,13 @@ export type Database = {
             foreignKeyName: "orders_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
+            referencedRelation: "vendor_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
             referencedRelation: "vendors"
             referencedColumns: ["id"]
           },
@@ -934,6 +1068,13 @@ export type Database = {
             columns: ["vendor_id"]
             isOneToOne: false
             referencedRelation: "public_vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_reviews_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_details"
             referencedColumns: ["id"]
           },
           {
