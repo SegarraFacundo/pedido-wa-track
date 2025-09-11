@@ -30,45 +30,31 @@ serve(async (req) => {
     
     console.log('Using Twilio WhatsApp number:', fromNumber);
     
-    // Format phone number - handle different formats
+    // Format phone number - keep as provided (expecting E.164), just clean and ensure prefix
     let formattedPhone = phoneNumber.toString().trim();
-    
+
     // Remove whatsapp: prefix if present
     if (formattedPhone.startsWith('whatsapp:')) {
-      formattedPhone = formattedPhone.replace('whatsapp:', '');
+      formattedPhone = formattedPhone.slice('whatsapp:'.length);
     }
-    
-    // Remove any non-digit characters except +
-    formattedPhone = formattedPhone.replace(/[^\d+]/g, '');
-    
-    // Remove + if present
-    if (formattedPhone.startsWith('+')) {
-      formattedPhone = formattedPhone.substring(1);
+
+    // Remove spaces
+    formattedPhone = formattedPhone.replace(/\s+/g, '');
+
+    // Ensure it starts with + and looks like E.164
+    if (!formattedPhone.startsWith('+')) {
+      console.error('Invalid phone format (missing +):', formattedPhone);
+      throw new Error('El teléfono del cliente debe estar en formato internacional (+[código país][número]).');
     }
-    
-    // Add country code if not present (assuming Argentina +54)
-    if (!formattedPhone.startsWith('54')) {
-      // If it starts with 11 (Buenos Aires area code), prepend 54
-      // Otherwise prepend 549 for mobile numbers
-      if (formattedPhone.startsWith('11')) {
-        formattedPhone = '549' + formattedPhone;
-      } else {
-        formattedPhone = '549' + formattedPhone;
-      }
-    }
-    
-    // Ensure it starts with +
-    formattedPhone = '+' + formattedPhone;
-    
-    console.log('Formatted phone number:', formattedPhone);
-    
+
     // Format the From number correctly
     let formattedFromNumber = fromNumber;
     if (!formattedFromNumber.startsWith('whatsapp:')) {
       formattedFromNumber = 'whatsapp:' + formattedFromNumber;
     }
-    
-    console.log('Sending from:', formattedFromNumber, 'to:', `whatsapp:${formattedPhone}`);
+
+    const toParam = `whatsapp:${formattedPhone}`;
+    console.log('Sending from:', formattedFromNumber, 'to:', toParam);
     
     // Send WhatsApp message via Twilio
     const response = await fetch(
@@ -81,7 +67,7 @@ serve(async (req) => {
         },
         body: new URLSearchParams({
           From: formattedFromNumber,
-          To: `whatsapp:${formattedPhone}`,
+          To: toParam,
           Body: message,
         }),
       }
@@ -94,10 +80,8 @@ serve(async (req) => {
         status: response.status,
         statusText: response.statusText,
         error: twilioResponse,
-        from: formattedFromNumber,
-        to: `whatsapp:${formattedPhone}`
       });
-      throw new Error(twilioResponse.message || twilioResponse.error_message || 'Failed to send WhatsApp message');
+      throw new Error(twilioResponse.message || twilioResponse.error_message || 'No se pudo enviar por WhatsApp');
     }
     
     console.log('WhatsApp message sent successfully:', twilioResponse.sid);

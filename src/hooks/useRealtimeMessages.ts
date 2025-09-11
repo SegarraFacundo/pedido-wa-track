@@ -129,7 +129,7 @@ export function useRealtimeMessages(orderId: string) {
             console.error('Error sending WhatsApp notification:', whatsappError);
             toast({
               title: 'Advertencia',
-              description: 'El mensaje se guardó pero no se pudo enviar por WhatsApp',
+              description: `No se pudo enviar por WhatsApp: ${whatsappError.message || 'revisa el número del cliente o las credenciales de Twilio'}`,
               variant: 'destructive'
             });
           } else {
