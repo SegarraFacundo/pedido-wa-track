@@ -30,21 +30,16 @@ serve(async (req) => {
     
     console.log('Using Twilio WhatsApp number:', fromNumber);
     
-    // Format phone number - keep as provided (expecting E.164), just clean and ensure prefix
-    let formattedPhone = phoneNumber.toString().trim();
-
-    // Remove whatsapp: prefix if present
+    // Normalize phone number: strip prefixes/spaces, ensure E.164
+    let formattedPhone = (phoneNumber ?? '').toString().trim();
     if (formattedPhone.startsWith('whatsapp:')) {
       formattedPhone = formattedPhone.slice('whatsapp:'.length);
     }
-
-    // Remove spaces
-    formattedPhone = formattedPhone.replace(/\s+/g, '');
-
-    // Ensure it starts with + and looks like E.164
+    // Remove spaces and any non-digits except +
+    formattedPhone = formattedPhone.replace(/[^\d+]/g, '');
+    // If it doesn't start with +, default to Argentina (+54). Adjust for your region.
     if (!formattedPhone.startsWith('+')) {
-      console.error('Invalid phone format (missing +):', formattedPhone);
-      throw new Error('El teléfono del cliente debe estar en formato internacional (+[código país][número]).');
+      formattedPhone = '+54' + formattedPhone.replace(/^0+/, '');
     }
 
     // Format the From number correctly
@@ -81,7 +76,14 @@ serve(async (req) => {
         statusText: response.statusText,
         error: twilioResponse,
       });
-      throw new Error(twilioResponse.message || twilioResponse.error_message || 'No se pudo enviar por WhatsApp');
+      // Return 200 with success:false so frontend can show Twilio message instead of generic 4xx
+      return new Response(
+        JSON.stringify({ success: false, error: twilioResponse.message || twilioResponse.error_message || 'No se pudo enviar por WhatsApp', twilio: twilioResponse }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
     }
     
     console.log('WhatsApp message sent successfully:', twilioResponse.sid);
