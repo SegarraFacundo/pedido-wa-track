@@ -39,9 +39,15 @@ serve(async (req) => {
       console.log('Processing voice message:', mediaUrl);
       
       try {
-        // Download the audio file from Twilio
-        const audioResponse = await fetch(mediaUrl);
+        // Download the audio file from Twilio (requires basic auth)
+        const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
+        const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
+        const headers: HeadersInit = accountSid && authToken
+          ? { 'Authorization': 'Basic ' + btoa(`${accountSid}:${authToken}`) }
+          : {};
+        const audioResponse = await fetch(mediaUrl.toString(), { headers });
         if (!audioResponse.ok) {
+          console.error('Failed to download audio from Twilio:', audioResponse.status);
           throw new Error('Failed to download audio');
         }
         
