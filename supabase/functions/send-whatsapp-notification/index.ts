@@ -17,13 +17,18 @@ serve(async (req) => {
     
     const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
     const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
-    const fromNumber = Deno.env.get('TWILIO_WHATSAPP_NUMBER');
+    let fromNumber = Deno.env.get('TWILIO_WHATSAPP_NUMBER');
     
-    if (!accountSid || !authToken || !fromNumber) {
+    // Use Twilio Sandbox number if not configured
+    if (!fromNumber || fromNumber === '') {
+      fromNumber = '+14155238886';
+      console.log('Using Twilio Sandbox WhatsApp number');
+    }
+    
+    if (!accountSid || !authToken) {
       console.error('Missing Twilio credentials:', {
         hasAccountSid: !!accountSid,
-        hasAuthToken: !!authToken,
-        hasFromNumber: !!fromNumber
+        hasAuthToken: !!authToken
       });
       throw new Error('Twilio credentials not configured');
     }
@@ -39,14 +44,18 @@ serve(async (req) => {
     formattedPhone = formattedPhone.replace(/[^\d+]/g, '');
     // If it doesn't start with +, default to Argentina (+54). Adjust for your region.
     if (!formattedPhone.startsWith('+')) {
-      formattedPhone = '+54' + formattedPhone.replace(/^0+/, '');
+      // For Argentina mobile numbers, use +549
+      if (formattedPhone.startsWith('54')) {
+        formattedPhone = '+' + formattedPhone;
+      } else if (formattedPhone.startsWith('9')) {
+        formattedPhone = '+54' + formattedPhone;
+      } else {
+        formattedPhone = '+549' + formattedPhone;
+      }
     }
 
-    // Format the From number correctly
-    let formattedFromNumber = fromNumber;
-    if (!formattedFromNumber.startsWith('whatsapp:')) {
-      formattedFromNumber = 'whatsapp:' + formattedFromNumber;
-    }
+    // Format the From number correctly - always include whatsapp: prefix
+    const formattedFromNumber = 'whatsapp:' + fromNumber.replace('whatsapp:', '');
 
     const toParam = `whatsapp:${formattedPhone}`;
     console.log('Sending from:', formattedFromNumber, 'to:', toParam);
