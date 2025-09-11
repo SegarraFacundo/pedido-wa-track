@@ -102,20 +102,45 @@ export function useRealtimeMessages(orderId: string) {
 
       // If vendor is sending, notify customer via WhatsApp
       if (sender === 'vendor') {
-        const { data: orderData } = await supabase
+        console.log('Vendor sending message, fetching order data...');
+        const { data: orderData, error: orderError } = await supabase
           .from('orders')
           .select('customer_phone')
           .eq('id', orderId)
           .single();
 
-        if (orderData) {
-          await supabase.functions.invoke('send-whatsapp-notification', {
+        if (orderError) {
+          console.error('Error fetching order data:', orderError);
+          throw orderError;
+        }
+
+        if (orderData && orderData.customer_phone) {
+          console.log('Sending WhatsApp notification to:', orderData.customer_phone);
+          
+          const { data: whatsappResponse, error: whatsappError } = await supabase.functions.invoke('send-whatsapp-notification', {
             body: {
               orderId,
               phoneNumber: orderData.customer_phone,
               message: `📩 Mensaje del vendedor: ${content}`
             }
           });
+
+          if (whatsappError) {
+            console.error('Error sending WhatsApp notification:', whatsappError);
+            toast({
+              title: 'Advertencia',
+              description: 'El mensaje se guardó pero no se pudo enviar por WhatsApp',
+              variant: 'destructive'
+            });
+          } else {
+            console.log('WhatsApp notification sent successfully:', whatsappResponse);
+            toast({
+              title: 'Mensaje enviado',
+              description: 'El cliente recibirá el mensaje por WhatsApp',
+            });
+          }
+        } else {
+          console.error('No customer phone found for order:', orderId);
         }
       }
 
