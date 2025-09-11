@@ -940,93 +940,146 @@ async function startOrder(message: string, phone: string, supabase: any, session
 }
 
 async function handlePayment(message: string, phone: string, supabase: any): Promise<string> {
-  // Get last pending order
-  const { data: order } = await supabase
-    .from('orders')
-    .select('*')
-    .eq('customer_phone', phone)
-    .eq('payment_status', 'pending')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
+  try {
+    console.log('Processing payment for:', phone, 'Message:', message);
+    
+    // Get last pending order
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('customer_phone', phone)
+      .eq('payment_status', 'pending')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+    
+    if (orderError) {
+      console.error('Error fetching order:', orderError);
+      return '❌ Error al buscar tu pedido. Intenta nuevamente.';
+    }
+    
+    if (!order) {
+      return '❌ No tienes pedidos pendientes de pago.';
+    }
+    
+    // Parse payment: "pagar [método] [referencia opcional]"
+    const parts = message.toLowerCase().split(' ');
+    
+    // If just "pagar" was sent, show payment methods
+    if (parts.length === 1 || !parts[1]) {
+      const { data: methods } = await supabase
+        .from('payment_methods')
+        .select('*')
+        .eq('is_active', true)
+        .order('id');
+      
+      if (!methods || methods.length === 0) {
+        return '❌ No hay métodos de pago disponibles.';
+      }
+      
+      let response = `💳 *MÉTODOS DE PAGO DISPONIBLES:*\n\n`;
+      methods.forEach((method: any, index: number) => {
+        response += `${index + 1}. ${method.name}\n`;
+      });
+      response += '\n📝 Para pagar, escribe:\n';
+      response += '"pagar [número] [referencia]"\n\n';
+      response += 'Ejemplos:\n';
+      response += '• pagar 1 (para efectivo)\n';
+      response += '• pagar 2 991234567 (para Yape/Plin)';
+      
+      return response;
+    }
+    
+    const methodIndex = parseInt(parts[1]) - 1;
+    const reference = parts.slice(2).join(' ') || null;
+    
+    if (isNaN(methodIndex)) {
+      return '❌ Por favor, indica el número del método de pago.\nEjemplo: "pagar 1" para efectivo';
+    }
+    
+    // Get payment methods
+    const { data: methods } = await supabase
+      .from('payment_methods')
+      .select('*')
+      .eq('is_active', true)
+      .order('id');
   
-  if (!order) {
-    return '❌ No tienes pedidos pendientes de pago.';
+    if (!methods || methods.length === 0) {
+      return '❌ No hay métodos de pago disponibles.';
+    }
+    
+    if (methodIndex < 0 || methodIndex >= methods.length) {
+      return '❌ Método de pago no válido. Por favor, selecciona un número del 1 al ' + methods.length;
+    }
+    
+    const selectedMethod = methods[methodIndex];
+    
+    // Record payment
+    const { error: paymentError } = await supabase
+      .from('order_payments')
+      .insert({
+        order_id: order.id,
+        payment_method_id: selectedMethod.id,
+        payment_method_name: selectedMethod.name,
+        amount: order.total,
+        status: selectedMethod.name === 'Efectivo' ? 'pending' : 'processing',
+        transaction_reference: reference,
+        payment_date: new Date().toISOString()
+      });
+    
+    if (paymentError) {
+      console.error('Payment error:', paymentError);
+      return '❌ Error al registrar el pago. Intenta nuevamente.';
+    }
+    
+    // Update order
+    const { error: updateError } = await supabase
+      .from('orders')
+      .update({
+        payment_method: selectedMethod.name,
+        payment_status: selectedMethod.name === 'Efectivo' ? 'pending' : 'processing',
+        status: 'confirmed',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', order.id);
+    
+    if (updateError) {
+      console.error('Order update error:', updateError);
+      return '❌ Error al actualizar el pedido. Intenta nuevamente.';
+    }
+    
+    // Record status change
+    await supabase
+      .from('order_status_history')
+      .insert({
+        order_id: order.id,
+        status: 'confirmed',
+        changed_by: 'customer',
+        reason: `Pago con ${selectedMethod.name}`
+      });
+  
+    let response = `✅ *PAGO REGISTRADO*\n\n`;
+    response += `📦 Pedido: #${order.id.slice(0, 8)}\n`;
+    response += `💳 Método: ${selectedMethod.name}\n`;
+    
+    if (reference) {
+      response += `📝 Referencia: ${reference}\n`;
+    }
+    
+    if (selectedMethod.name === 'Efectivo') {
+      response += '\n💵 Prepara el efectivo exacto para la entrega.';
+    } else {
+      response += '\n⏳ Verificando pago...';
+    }
+    
+    response += '\n\n📱 Tu pedido está confirmado y en preparación.';
+    response += '\n\nEscribe "estado" para ver el progreso.';
+    
+    return response;
+  } catch (error) {
+    console.error('Error in handlePayment:', error);
+    return '❌ Error al procesar el pago. Por favor intenta nuevamente o escribe "menu" para opciones.';
   }
-  
-  // Parse payment: "pagar [método] [referencia opcional]"
-  const parts = message.split(' ');
-  const methodIndex = parseInt(parts[1]) - 1;
-  const reference = parts.slice(2).join(' ') || null;
-  
-  // Get payment methods
-  const { data: methods } = await supabase
-    .from('payment_methods')
-    .select('*')
-    .eq('is_active', true);
-  
-  if (!methods || methodIndex < 0 || methodIndex >= methods.length) {
-    return '❌ Método de pago no válido.';
-  }
-  
-  const selectedMethod = methods[methodIndex];
-  
-  // Record payment
-  const { error: paymentError } = await supabase
-    .from('order_payments')
-    .insert({
-      order_id: order.id,
-      payment_method_id: selectedMethod.id,
-      payment_method_name: selectedMethod.name,
-      amount: order.total,
-      status: selectedMethod.name === 'Efectivo' ? 'pending' : 'processing',
-      transaction_reference: reference,
-      payment_date: new Date().toISOString()
-    });
-  
-  if (paymentError) {
-    return '❌ Error al registrar el pago. Intenta nuevamente.';
-  }
-  
-  // Update order
-  await supabase
-    .from('orders')
-    .update({
-      payment_method: selectedMethod.name,
-      payment_status: selectedMethod.name === 'Efectivo' ? 'pending' : 'processing',
-      status: 'confirmed',
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', order.id);
-  
-  // Record status change
-  await supabase
-    .from('order_status_history')
-    .insert({
-      order_id: order.id,
-      status: 'confirmed',
-      changed_by: 'customer',
-      reason: `Pago con ${selectedMethod.name}`
-    });
-  
-  let response = `✅ *PAGO REGISTRADO*\n\n`;
-  response += `📦 Pedido: #${order.id.slice(0, 8)}\n`;
-  response += `💳 Método: ${selectedMethod.name}\n`;
-  
-  if (reference) {
-    response += `📝 Referencia: ${reference}\n`;
-  }
-  
-  if (selectedMethod.name === 'Efectivo') {
-    response += '\n💵 Prepara el efectivo exacto para la entrega.';
-  } else {
-    response += '\n⏳ Verificando pago...';
-  }
-  
-  response += '\n\n📱 Tu pedido está confirmado y en preparación.';
-  response += '\n\nEscribe "estado" para ver el progreso.';
-  
-  return response;
 }
 
 async function checkOrderStatus(phone: string, supabase: any): Promise<string> {
