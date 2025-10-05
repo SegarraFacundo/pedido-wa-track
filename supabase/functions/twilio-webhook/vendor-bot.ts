@@ -128,16 +128,34 @@ export async function handleVendorBot(
     };
     await saveSession(newSession, supabase);
     
-    return `👋 *¡Bienvenido a Lapacho!*\n\n` +
+    const welcomeMsg = `👋 *¡Bienvenido a Lapacho!*\n\n` +
            `Tu plataforma de pedidos y entregas.\n\n` +
            await showVendorSelection(supabase);
+    return addHelpFooter(welcomeMsg, false);
+  }
+
+  // Soporte de Lapacho
+  if (lowerMessage === 'soporte' || lowerMessage === 'ayuda lapacho') {
+    const supportMsg = `🆘 *SOPORTE LAPACHO*\n\n` +
+           `¿Tienes problemas con el bot?\n\n` +
+           `📧 Email: soporte@lapacho.com\n` +
+           `📱 WhatsApp: +51 999 999 999\n` +
+           `🌐 Web: https://tu-sitio.lovable.app/ayuda\n\n` +
+           `Horario: Lun-Dom 8am-10pm`;
+    return addHelpFooter(supportMsg, false);
   }
 
   if (lowerMessage === 'ayuda' || lowerMessage === 'help') {
-    return `ℹ️ *CENTRO DE AYUDA*\n\n` +
-           `🌐 *Visita nuestra web:*\n` +
-           `https://tu-sitio.lovable.app\n\n` +
-           `💬 Escribe *menu* para empezar a hacer tu pedido`;
+    const helpMsg = `ℹ️ *CENTRO DE AYUDA*\n\n` +
+           `📖 *Manual de uso:*\n` +
+           `https://tu-sitio.lovable.app/ayuda\n\n` +
+           `💬 Comandos útiles:\n` +
+           `• *menu* - Ver negocios\n` +
+           `• *estado* - Ver tu pedido\n` +
+           `• *vendedor* - Hablar con vendedor\n` +
+           `• *soporte* - Contactar a Lapacho\n` +
+           `• *cancelar* - Cancelar pedido`;
+    return addHelpFooter(helpMsg, false);
   }
 
   if (lowerMessage === 'cancelar' || lowerMessage === 'salir') {
@@ -216,7 +234,8 @@ export async function handleVendorBot(
         session.context.selected_vendor_name = vendor.name;
         session.state = 'BROWSING_PRODUCTS';
         await saveSession(session, supabase);
-        return await showVendorProducts(vendor.id, vendor.name, supabase);
+        const productsMsg = await showVendorProducts(vendor.id, vendor.name, supabase);
+        return addHelpFooter(productsMsg, true);
       }
     }
     
@@ -234,11 +253,13 @@ export async function handleVendorBot(
       session.context.selected_vendor_name = vendor.name;
       session.state = 'BROWSING_PRODUCTS';
       await saveSession(session, supabase);
-      return await showVendorProducts(vendor.id, vendor.name, supabase);
+      const productsMsg = await showVendorProducts(vendor.id, vendor.name, supabase);
+      return addHelpFooter(productsMsg, true);
     }
     
     // No encontró el negocio
-    return `🤔 No encontré ese negocio.\n\n` + await showVendorSelection(supabase);
+    const notFoundMsg = `🤔 No encontré ese negocio.\n\n` + await showVendorSelection(supabase);
+    return addHelpFooter(notFoundMsg, false);
   }
 
   // Estado: NAVEGANDO PRODUCTOS
@@ -255,14 +276,16 @@ export async function handleVendorBot(
       session.context = session.context || {};
       session.context.pending_product = product;
       await saveSession(session, supabase);
-      return `🛒 *${product.name}* - $${product.price}\n\n` +
+      const productMsg = `🛒 *${product.name}* - $${product.price}\n\n` +
              `¿Cuántas unidades quieres? (ej: "2", "tres")\n\n` +
              `_Escribe *cancelar* para volver._`;
+      return addHelpFooter(productMsg, true);
     }
     
-    return `🤔 No encontré ese producto.\n\n` +
+    const notFoundMsg = `🤔 No encontré ese producto.\n\n` +
            `Escribe el nombre o número del producto que quieres agregar.\n` +
            `O escribe *vendedor* si necesitas ayuda.`;
+    return addHelpFooter(notFoundMsg, true);
   }
 
   // Estado: AGREGANDO CANTIDAD
@@ -297,7 +320,7 @@ export async function handleVendorBot(
         cartSummary += `• Escribe *confirmar* para continuar con el pedido\n`;
         cartSummary += `• Escribe *cancelar* para empezar de nuevo`;
         
-        return cartSummary;
+        return addHelpFooter(cartSummary, true);
       }
     }
     return `❌ Por favor escribe una cantidad válida (ej: "2", "tres")`;
@@ -308,10 +331,11 @@ export async function handleVendorBot(
     if (lowerMessage === 'confirmar' || lowerMessage.includes('continuar') || lowerMessage.includes('siguiente')) {
       session.state = 'COLLECTING_ADDRESS';
       await saveSession(session, supabase);
-      return `📍 *Perfecto! Ahora necesito tu dirección de entrega*\n\n` +
+      const addressMsg = `📍 *Perfecto! Ahora necesito tu dirección de entrega*\n\n` +
              `Por favor escribe tu dirección completa.\n` +
              `Ejemplo: "Av. Principal 123, San Isidro"\n\n` +
              `_Escribe *cancelar* para volver al inicio._`;
+      return addHelpFooter(addressMsg, true);
     }
 
     // Agregar más productos
@@ -321,11 +345,13 @@ export async function handleVendorBot(
       session.context = session.context || {};
       session.context.pending_product = product;
       await saveSession(session, supabase);
-      return `🛒 *${product.name}* - $${product.price}\n\n` +
+      const productMsg = `🛒 *${product.name}* - $${product.price}\n\n` +
              `¿Cuántas unidades? (ej: "2", "tres")`;
+      return addHelpFooter(productMsg, true);
     }
 
-    return `💡 Escribe el nombre del producto para agregar más, o *confirmar* para continuar.`;
+    const hintMsg = `💡 Escribe el nombre del producto para agregar más, o *confirmar* para continuar.`;
+    return addHelpFooter(hintMsg, true);
   }
 
   // Estado: RECOLECTANDO DIRECCIÓN
@@ -336,14 +362,16 @@ export async function handleVendorBot(
       session.state = 'COLLECTING_PAYMENT';
       await saveSession(session, supabase);
       
-      return `💳 *¿Cómo vas a pagar?*\n\n` +
+      const paymentMsg = `💳 *¿Cómo vas a pagar?*\n\n` +
              `1️⃣ Efectivo\n` +
              `2️⃣ Yape\n` +
              `3️⃣ Plin\n` +
              `4️⃣ Tarjeta\n\n` +
              `Escribe el número o nombre del método de pago.`;
+      return addHelpFooter(paymentMsg, true);
     }
-    return `❌ Por favor escribe una dirección válida (mínimo 10 caracteres).`;
+    const errorMsg = `❌ Por favor escribe una dirección válida (mínimo 10 caracteres).`;
+    return addHelpFooter(errorMsg, true);
   }
 
   // Estado: RECOLECTANDO FORMA DE PAGO
@@ -371,9 +399,10 @@ export async function handleVendorBot(
       confirmation += `• Escribe *confirmar* para realizar el pedido\n`;
       confirmation += `• Escribe *cancelar* para empezar de nuevo`;
       
-      return confirmation;
+      return addHelpFooter(confirmation, true);
     }
-    return `❌ Por favor elige un método de pago válido (1-4 o el nombre).`;
+    const errorMsg = `❌ Por favor elige un método de pago válido (1-4 o el nombre).`;
+    return addHelpFooter(errorMsg, true);
   }
 
   // Estado: CONFIRMACIÓN FINAL
@@ -387,19 +416,22 @@ export async function handleVendorBot(
         session.context = { cart: [] };
         await saveSession(session, supabase);
         
-        return `✅ *¡PEDIDO REALIZADO!*\n\n` +
+        const successMsg = `✅ *¡PEDIDO REALIZADO!*\n\n` +
                `📋 Número de pedido: #${orderResult.orderId.substring(0, 8)}\n\n` +
                `${session.context.selected_vendor_name} está preparando tu pedido.\n` +
                `Te notificaremos cuando esté en camino! 🚚\n\n` +
                `💡 Escribe *estado* para ver tu pedido\n` +
                `📝 Escribe *calificar* después de recibir tu orden\n\n` +
                `¡Gracias por tu compra! 😊`;
+        return addHelpFooter(successMsg, true);
       }
       
-      return `❌ Hubo un problema al crear tu pedido. Escribe *vendedor* para ayuda.`;
+      const errorMsg = `❌ Hubo un problema al crear tu pedido. Escribe *vendedor* para ayuda.`;
+      return addHelpFooter(errorMsg, true);
     }
     
-    return `💡 Escribe *confirmar* para realizar el pedido o *cancelar* para empezar de nuevo.`;
+    const hintMsg = `💡 Escribe *confirmar* para realizar el pedido o *cancelar* para empezar de nuevo.`;
+    return addHelpFooter(hintMsg, true);
   }
 
   // Estado: SEGUIMIENTO DE PEDIDO
@@ -467,17 +499,34 @@ export async function handleVendorBot(
 
   // Por defecto - Si no entendió nada, dar ayuda según el estado actual
   if (session.state === 'SELECTING_VENDOR') {
-    return `🤔 No entendí.\n\n` + await showVendorSelection(supabase);
+    const defaultMsg = `🤔 No entendí.\n\n` + await showVendorSelection(supabase);
+    return addHelpFooter(defaultMsg, false);
   }
   
   if (session.state === 'BROWSING_PRODUCTS' && session.context?.selected_vendor_name) {
-    return `🤔 No encontré ese producto en ${session.context.selected_vendor_name}.\n\nEscribe el número o nombre del producto, o *menu* para volver.`;
+    const defaultMsg = `🤔 No encontré ese producto en ${session.context.selected_vendor_name}.\n\nEscribe el número o nombre del producto, o *menu* para volver.`;
+    return addHelpFooter(defaultMsg, true);
   }
 
-  return `🤔 No entendí tu mensaje.\n\nEscribe *menu* para empezar o *vendedor* para ayuda.`;
+  const defaultMsg = `🤔 No entendí tu mensaje.\n\nEscribe *menu* para empezar o *vendedor* para ayuda.`;
+  return addHelpFooter(defaultMsg, session.context?.selected_vendor_id ? true : false);
 }
 
 // === FUNCIONES DE APOYO ===
+
+// Agregar footer con ayuda y contacto
+function addHelpFooter(message: string, hasVendorSelected: boolean = false): string {
+  let footer = `\n\n━━━━━━━━━━━━━━━\n`;
+  footer += `📘 *Ayuda:* https://tu-sitio.lovable.app/ayuda\n`;
+  
+  if (hasVendorSelected) {
+    footer += `💬 *Contactar vendedor:* Escribe "vendedor"\n`;
+  }
+  
+  footer += `🆘 *Soporte Lapacho:* Escribe "soporte"`;
+  
+  return message + footer;
+}
 
 async function getWelcomeMessage(supabase: any): Promise<string> {
   return `👋 *¡Hola! Bienvenido*\n\n` +
