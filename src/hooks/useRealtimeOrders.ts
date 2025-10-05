@@ -158,6 +158,25 @@ export function useRealtimeOrders(vendorId?: string) {
 
   const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
     try {
+      // Primero verificar el estado actual
+      const currentOrder = orders.find(o => o.id === orderId);
+      if (!currentOrder) {
+        throw new Error('Pedido no encontrado');
+      }
+
+      // Evitar actualizar al mismo estado
+      if (currentOrder.status === newStatus) {
+        console.log(`Pedido ya está en estado ${newStatus}, ignorando actualización`);
+        return;
+      }
+
+      // Actualizar localmente primero para feedback inmediato
+      setOrders(prev => prev.map(order => 
+        order.id === orderId
+          ? { ...order, status: newStatus, updatedAt: new Date() }
+          : order
+      ));
+
       const { error } = await supabase
         .from('orders')
         .update({ 
@@ -169,23 +188,20 @@ export function useRealtimeOrders(vendorId?: string) {
       if (error) throw error;
 
       // Send WhatsApp notification to customer
-      const order = orders.find(o => o.id === orderId);
-      if (order) {
-        await supabase.functions.invoke('send-whatsapp-notification', {
-          body: {
-            orderId,
-            phoneNumber: order.customerPhone,
-            message: `Tu pedido #${orderId.slice(0, 8)} ha sido ${newStatus}. ${
-              newStatus === 'confirmed' ? 'El vendedor está preparando tu pedido.' :
-              newStatus === 'preparing' ? 'Tu pedido está siendo preparado.' :
-              newStatus === 'ready' ? 'Tu pedido está listo para entrega.' :
-              newStatus === 'delivering' ? 'Tu pedido está en camino.' :
-              newStatus === 'delivered' ? '¡Tu pedido ha sido entregado! Gracias por tu compra.' :
-              newStatus === 'cancelled' ? 'Tu pedido ha sido cancelado.' : ''
-            }`
-          }
-        });
-      }
+      await supabase.functions.invoke('send-whatsapp-notification', {
+        body: {
+          orderId,
+          phoneNumber: currentOrder.customerPhone,
+          message: `Tu pedido #${orderId.slice(0, 8)} ha sido ${newStatus}. ${
+            newStatus === 'confirmed' ? 'El vendedor está preparando tu pedido.' :
+            newStatus === 'preparing' ? 'Tu pedido está siendo preparado.' :
+            newStatus === 'ready' ? 'Tu pedido está listo para entrega.' :
+            newStatus === 'delivering' ? 'Tu pedido está en camino.' :
+            newStatus === 'delivered' ? '¡Tu pedido ha sido entregado! Gracias por tu compra.' :
+            newStatus === 'cancelled' ? 'Tu pedido ha sido cancelado.' : ''
+          }`
+        }
+      });
 
       toast({
         title: 'Estado actualizado',
@@ -193,6 +209,28 @@ export function useRealtimeOrders(vendorId?: string) {
       });
     } catch (error) {
       console.error('Error updating order status:', error);
+      // Refrescar desde la base de datos para obtener el estado correcto
+      const { data } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          vendor:vendors(*)
+        `)
+        .eq('id', orderId)
+        .single();
+      
+      if (data) {
+        setOrders(prev => prev.map(order => 
+          order.id === orderId
+            ? {
+                ...order,
+                status: data.status as OrderStatus,
+                updatedAt: new Date(data.updated_at)
+              }
+            : order
+        ));
+      }
+      
       toast({
         title: 'Error',
         description: 'No se pudo actualizar el estado del pedido',
