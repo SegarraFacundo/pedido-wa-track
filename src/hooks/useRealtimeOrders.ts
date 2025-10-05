@@ -188,18 +188,29 @@ export function useRealtimeOrders(vendorId?: string) {
       if (error) throw error;
 
       // Send WhatsApp notification to customer
+      const statusMessages = {
+        confirmed: 'confirmado',
+        preparing: 'está siendo preparado',
+        ready: 'está listo',
+        delivering: 'está en camino',
+        delivered: 'ha sido entregado',
+        cancelled: 'ha sido cancelado'
+      };
+
+      const statusDescriptions = {
+        confirmed: 'El vendedor está preparando tu pedido.',
+        preparing: 'Tu pedido está siendo preparado.',
+        ready: 'Tu pedido está listo para entrega.',
+        delivering: 'Tu pedido está en camino.',
+        delivered: '¡Gracias por tu compra!',
+        cancelled: 'Si tienes alguna duda, contacta al vendedor.'
+      };
+
       await supabase.functions.invoke('send-whatsapp-notification', {
         body: {
           orderId,
           phoneNumber: currentOrder.customerPhone,
-          message: `Tu pedido #${orderId.slice(0, 8)} ha sido ${newStatus}. ${
-            newStatus === 'confirmed' ? 'El vendedor está preparando tu pedido.' :
-            newStatus === 'preparing' ? 'Tu pedido está siendo preparado.' :
-            newStatus === 'ready' ? 'Tu pedido está listo para entrega.' :
-            newStatus === 'delivering' ? 'Tu pedido está en camino.' :
-            newStatus === 'delivered' ? '¡Tu pedido ha sido entregado! Gracias por tu compra.' :
-            newStatus === 'cancelled' ? 'Tu pedido ha sido cancelado.' : ''
-          }`
+          message: `Tu pedido #${orderId.slice(0, 8)} ${statusMessages[newStatus as keyof typeof statusMessages]}. ${statusDescriptions[newStatus as keyof typeof statusDescriptions]}`
         }
       });
 
