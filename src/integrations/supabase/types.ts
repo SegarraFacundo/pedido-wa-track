@@ -118,6 +118,30 @@ export type Database = {
           },
         ]
       }
+      customer_messages: {
+        Row: {
+          created_at: string | null
+          customer_phone: string
+          id: string
+          message: string
+          read: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          customer_phone: string
+          id?: string
+          message: string
+          read?: boolean | null
+        }
+        Update: {
+          created_at?: string | null
+          customer_phone?: string
+          id?: string
+          message?: string
+          read?: boolean | null
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           content: string
@@ -459,6 +483,36 @@ export type Database = {
           id?: string
           phone?: string | null
           role?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      user_sessions: {
+        Row: {
+          assigned_vendor_phone: string | null
+          created_at: string | null
+          in_vendor_chat: boolean | null
+          last_bot_message: string | null
+          phone: string
+          previous_state: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_vendor_phone?: string | null
+          created_at?: string | null
+          in_vendor_chat?: boolean | null
+          last_bot_message?: string | null
+          phone: string
+          previous_state?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_vendor_phone?: string | null
+          created_at?: string | null
+          in_vendor_chat?: boolean | null
+          last_bot_message?: string | null
+          phone?: string
+          previous_state?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -1096,6 +1150,10 @@ export type Database = {
           p_reason?: string
         }
         Returns: boolean
+      }
+      cleanup_old_sessions: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       get_masked_phone: {
         Args: { phone: string }
