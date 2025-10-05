@@ -11,6 +11,7 @@ export default function AdminAuth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -32,6 +33,36 @@ export default function AdminAuth() {
       if (roles) {
         navigate('/admin');
       }
+    }
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const { data: { user }, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (signUpError) throw signUpError;
+
+      if (user) {
+        toast({
+          title: "Cuenta creada",
+          description: "Ahora ve al SQL Editor de Supabase y ejecuta: SELECT public.make_user_admin('" + email + "');",
+          duration: 10000,
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -58,7 +89,7 @@ export default function AdminAuth() {
 
         if (roleError || !roles) {
           await supabase.auth.signOut();
-          throw new Error('No tienes permisos de administrador');
+          throw new Error('No tienes permisos de administrador. Ejecuta: SELECT public.make_user_admin(\'' + email + '\'); en el SQL Editor');
         }
 
         toast({
@@ -92,7 +123,7 @@ export default function AdminAuth() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSignIn} className="space-y-4">
+          <form onSubmit={isSignUp ? handleSignUp : handleSignIn} className="space-y-4">
             <div className="space-y-2">
               <Input
                 type="email"
@@ -109,12 +140,34 @@ export default function AdminAuth() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                minLength={6}
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Verificando..." : "Iniciar Sesión"}
+              {loading ? "Procesando..." : (isSignUp ? "Crear Cuenta Admin" : "Iniciar Sesión")}
             </Button>
+            <div className="text-center">
+              <Button
+                type="button"
+                variant="link"
+                onClick={() => setIsSignUp(!isSignUp)}
+                className="text-sm"
+              >
+                {isSignUp ? "¿Ya tienes cuenta? Inicia sesión" : "¿Primera vez? Crea tu cuenta admin"}
+              </Button>
+            </div>
           </form>
+          
+          {isSignUp && (
+            <div className="mt-4 p-4 bg-muted rounded-lg text-sm">
+              <p className="font-medium mb-2">Después de crear tu cuenta:</p>
+              <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+                <li>Ve al SQL Editor de Supabase</li>
+                <li>Ejecuta: <code className="bg-background px-1 py-0.5 rounded">SELECT public.make_user_admin('tu-email@ejemplo.com');</code></li>
+                <li>Regresa aquí e inicia sesión</li>
+              </ol>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
