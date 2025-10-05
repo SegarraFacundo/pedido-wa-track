@@ -247,9 +247,25 @@ serve(async (req) => {
       return createTwiMLResponse('👋 Eres un vendedor. Para devolver el control al bot, escribe "sigue bot"');
     }
 
-    // CASO 2: Cliente solicita hablar con vendedor
+    // CASO 2: Comandos globales que CIERRAN chat con vendedor
     const quickCommand = getQuickCommand(message);
     
+    if (quickCommand === 'MENU' || message.toLowerCase().trim() === 'hola' || message.toLowerCase().trim() === 'hi') {
+      // CERRAR chat con vendedor si existe
+      if (session.in_vendor_chat) {
+        session.in_vendor_chat = false;
+        session.assigned_vendor_phone = null;
+        await saveSession(session);
+        console.log('Chat con vendedor cerrado por comando global');
+      }
+      
+      const menuMsg = await handleVendorBot(message, phoneNumber, supabase);
+      session.last_bot_message = menuMsg;
+      await saveSession(session);
+      return createTwiMLResponse(menuMsg);
+    }
+
+    // CASO 3: Cliente solicita hablar con vendedor
     if (quickCommand === 'REQUEST_VENDOR') {
       // Marcar sesión como en chat con vendedor
       session.in_vendor_chat = true;
@@ -267,7 +283,7 @@ serve(async (req) => {
       );
     }
 
-    // CASO 3: Cliente está en chat con vendedor - no responder
+    // CASO 4: Cliente está en chat con vendedor - no responder
     if (session.in_vendor_chat) {
       // El mensaje queda registrado en la conversación pero el bot no responde
       console.log('Cliente en chat con vendedor, bot silenciado');
@@ -291,14 +307,7 @@ serve(async (req) => {
       return new Response('', { headers: corsHeaders, status: 200 });
     }
 
-    // CASO 4: Comandos rápidos de menú
-    if (quickCommand === 'MENU') {
-      const menuMsg = await handleVendorBot('menu', phoneNumber, supabase);
-      session.last_bot_message = menuMsg;
-      await saveSession(session);
-      return createTwiMLResponse(menuMsg);
-    }
-
+    // CASO 5: Comandos rápidos adicionales
     if (quickCommand === 'STATUS') {
       const statusMsg = await handleVendorBot('estado', phoneNumber, supabase);
       session.last_bot_message = statusMsg;
@@ -318,7 +327,7 @@ serve(async (req) => {
       );
     }
 
-    // CASO 5: Flujo normal del bot
+    // CASO 6: Flujo normal del bot
     try {
       const botReply = await handleVendorBot(message, phoneNumber, supabase);
       
