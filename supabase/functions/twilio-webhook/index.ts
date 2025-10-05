@@ -50,9 +50,10 @@
           .select('phone')
           .eq('phone', normalized)
           .limit(1);
-        return (data && data.length > 0);
+        return !!(data && data.length > 0);
       } catch (e) {
-        console.warn('isVendor supabase error', e?.message || e);
+        const errorMsg = e instanceof Error ? e.message : String(e);
+        console.warn('isVendor supabase error', errorMsg);
         return false;
       }
     }
@@ -117,10 +118,11 @@
     ctx.updatedAt = new Date().toISOString();
     if (supabase) {
       try {
-        await supabase.from('user_contexts').upsert(ctx, { onConflict: ['phone'] });
+        await supabase.from('user_contexts').upsert([ctx], { onConflict: 'phone' });
         return;
       } catch (e) {
-        console.warn('saveUserContext supabase error', e?.message || e);
+        const errorMsg = e instanceof Error ? e.message : String(e);
+        console.warn('saveUserContext supabase error', errorMsg);
       }
     }
     inMemoryContexts.set(ctx.phone, ctx);
@@ -156,7 +158,8 @@
         await supabase.from('vendor_notifications').insert({ phone: ctx.phone, order_id: ctx.orderId, created_at: new Date().toISOString() });
       }
     } catch (e) {
-      console.warn('notifyVendorForUser error', e?.message || e);
+      const errorMsg = e instanceof Error ? e.message : String(e);
+      console.warn('notifyVendorForUser error', errorMsg);
     }
   }
 
@@ -313,9 +316,10 @@
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     } catch (error) {
-      console.error('Error en endpoint webhook:', error?.message || error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Error en endpoint webhook:', errorMessage);
       return new Response(
-        JSON.stringify({ error: error?.message || String(error) }),
+        JSON.stringify({ error: errorMessage }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       );
     }
