@@ -52,17 +52,21 @@ async function getSession(phone: string, supabase: any): Promise<UserSession> {
       context = { cart: [] };
     }
 
+    const state = (data.previous_state as BotState) || 'SELECTING_VENDOR';
+    console.log('Sesión recuperada:', phone, 'Estado:', state);
+
     return {
       phone: data.phone,
-      state: (data.previous_state as BotState) || 'WELCOME',
+      state,
       context
     };
   }
 
   // Crear nueva sesión
+  console.log('Creando nueva sesión para:', phone);
   const newSession: UserSession = {
     phone,
-    state: 'WELCOME',
+    state: 'SELECTING_VENDOR',
     context: { cart: [] }
   };
   
@@ -70,24 +74,30 @@ async function getSession(phone: string, supabase: any): Promise<UserSession> {
     .from('user_sessions')
     .upsert({
       phone,
-      previous_state: 'WELCOME',
+      previous_state: 'SELECTING_VENDOR',
       last_bot_message: JSON.stringify({ cart: [] }),
       updated_at: new Date().toISOString()
-    });
+    }, { onConflict: 'phone' });
 
   return newSession;
 }
 
 // Guardar sesión
 async function saveSession(session: UserSession, supabase: any): Promise<void> {
-  await supabase
-    .from('user_sessions')
-    .upsert({
-      phone: session.phone,
-      previous_state: session.state,
-      last_bot_message: JSON.stringify(session.context || {}),
-      updated_at: new Date().toISOString()
-    });
+  try {
+    await supabase
+      .from('user_sessions')
+      .upsert({
+        phone: session.phone,
+        previous_state: session.state,  // Este es el estado actual
+        last_bot_message: JSON.stringify(session.context || {}),
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'phone' });
+    
+    console.log('Sesión guardada:', session.phone, 'Estado:', session.state);
+  } catch (e) {
+    console.error('Error guardando sesión:', e);
+  }
 }
 
 export async function handleVendorBot(
