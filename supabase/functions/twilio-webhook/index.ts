@@ -61,7 +61,7 @@ async function isVendor(phone: string): Promise<boolean> {
   }
 }
 
-// Obtener o crear sesión de usuario
+// Obtener sesión de usuario (SIN sobrescribir)
 async function getOrCreateSession(phone: string): Promise<UserSession> {
   if (!phone) {
     return {
@@ -72,20 +72,33 @@ async function getOrCreateSession(phone: string): Promise<UserSession> {
   }
 
   try {
-    const { data, error } = await supabase
+    // SOLO LEER, NO HACER UPSERT
+    const { data } = await supabase
       .from('user_sessions')
-      .upsert({
+      .select('*')
+      .eq('phone', phone)
+      .maybeSingle();
+
+    if (data) {
+      return data as UserSession;
+    }
+
+    // Si no existe, crear nueva sesión
+    const { data: newSession, error } = await supabase
+      .from('user_sessions')
+      .insert({
         phone: phone,
+        in_vendor_chat: false,
+        previous_state: 'SELECTING_VENDOR',
         updated_at: new Date().toISOString()
-      }, { onConflict: 'phone' })
+      })
       .select()
       .single();
 
     if (error) throw error;
-    return data as UserSession;
+    return newSession as UserSession;
   } catch (e) {
     console.error('Error obteniendo sesión:', e);
-    // Fallback en memoria
     return {
       phone: phone,
       in_vendor_chat: false,
