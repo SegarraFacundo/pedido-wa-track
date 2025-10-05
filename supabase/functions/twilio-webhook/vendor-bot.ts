@@ -99,7 +99,7 @@ export async function handleVendorBot(
 
   // COMANDOS GLOBALES - Verificar PRIMERO antes que cualquier otra cosa
   
-  // Menu/Inicio - Cierra cualquier chat activo y reinicia
+  // Menu/Inicio/Hola - Cierra cualquier chat activo y va DIRECTO a selección de vendedores
   if (lowerMessage === 'menu' || lowerMessage === 'inicio' || lowerMessage === 'empezar' || lowerMessage === 'hola' || lowerMessage === 'hi') {
     // Cerrar chat activo si existe
     await supabase
@@ -109,10 +109,10 @@ export async function handleVendorBot(
       .eq('is_active', true);
 
     const session = await getSession(phone, supabase);
-    session.state = 'WELCOME';
+    session.state = 'SELECTING_VENDOR';  // Cambio crítico: ir directo a selección
     session.context = { cart: [] };
     await saveSession(session, supabase);
-    return await getWelcomeMessage(supabase);
+    return await showVendorSelection(supabase);  // Cambio crítico: mostrar vendedores directamente
   }
 
   if (lowerMessage === 'ayuda' || lowerMessage === 'help') {
@@ -131,10 +131,10 @@ export async function handleVendorBot(
       .eq('is_active', true);
 
     const session = await getSession(phone, supabase);
-    session.state = 'WELCOME';
+    session.state = 'SELECTING_VENDOR';
     session.context = { cart: [] };
     await saveSession(session, supabase);
-    return `❌ Pedido cancelado.\n\nEscribe *menu* cuando quieras hacer un nuevo pedido.`;
+    return `❌ Pedido cancelado.\n\n` + await showVendorSelection(supabase);
   }
 
   // Obtener sesión
@@ -175,13 +175,8 @@ export async function handleVendorBot(
 
   // FLUJO PRINCIPAL DEL BOT VENDEDOR
   
-  // Estado: BIENVENIDA
-  if (session.state === 'WELCOME') {
-    session.state = 'SELECTING_VENDOR';
-    await saveSession(session, supabase);
-    return await showVendorSelection(supabase);
-  }
-
+  // Ya no necesitamos el estado WELCOME porque "menu" y "hola" van directo a SELECTING_VENDOR
+  
   // Estado: SELECCIONANDO VENDEDOR/NEGOCIO
   if (session.state === 'SELECTING_VENDOR') {
     const vendorId = await findVendorFromMessage(lowerMessage, supabase);
@@ -402,11 +397,12 @@ async function showVendorSelection(supabase: any): Promise<string> {
       }
       message += '\n';
     });
-    message += `💬 Escribe el número o nombre del negocio.`;
+    message += `💬 Escribe el número del negocio (ej: "1", "2")`;
 
     return message;
   } catch (e) {
-    return `❌ Error al cargar negocios. Intenta de nuevo.`;
+    console.error('Error en showVendorSelection:', e);
+    return `❌ Error al cargar negocios. Escribe *menu* para intentar de nuevo.`;
   }
 }
 
