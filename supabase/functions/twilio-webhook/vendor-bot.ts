@@ -179,7 +179,10 @@ export async function handleVendorBot(
   
   // Estado: SELECCIONANDO VENDEDOR/NEGOCIO
   if (session.state === 'SELECTING_VENDOR') {
+    console.log('Estado SELECTING_VENDOR, mensaje:', lowerMessage);
     const vendorId = await findVendorFromMessage(lowerMessage, supabase);
+    console.log('Vendor encontrado:', vendorId);
+    
     if (vendorId) {
       session.context = session.context || {};
       session.context.selected_vendor_id = vendorId.id;
@@ -189,7 +192,9 @@ export async function handleVendorBot(
       await saveSession(session, supabase);
       return await showVendorProducts(vendorId.id, vendorId.name, supabase);
     }
-    return `🤔 No encontré ese negocio.\n\nEscribe el número o nombre del negocio que quieres.`;
+    
+    // Si no encontró el negocio, volver a mostrar la lista
+    return `🤔 No encontré ese negocio.\n\n` + await showVendorSelection(supabase);
   }
 
   // Estado: NAVEGANDO PRODUCTOS
@@ -415,8 +420,12 @@ async function showVendorSelection(supabase: any): Promise<string> {
 }
 
 async function findVendorFromMessage(message: string, supabase: any): Promise<{id: string, name: string} | null> {
+  console.log('Buscando vendor con mensaje:', message);
+  
   // Buscar por número
   const number = parseInt(message);
+  console.log('Número parseado:', number);
+  
   if (number > 0) {
     const { data: vendors } = await supabase
       .from('vendors')
@@ -425,7 +434,10 @@ async function findVendorFromMessage(message: string, supabase: any): Promise<{i
       .order('average_rating', { ascending: false })
       .limit(20);
     
+    console.log('Vendors disponibles:', vendors?.length);
+    
     if (vendors && vendors[number - 1]) {
+      console.log('Vendor seleccionado:', vendors[number - 1]);
       return vendors[number - 1];
     }
   }
@@ -438,6 +450,7 @@ async function findVendorFromMessage(message: string, supabase: any): Promise<{i
     .ilike('name', `%${message}%`)
     .maybeSingle();
 
+  console.log('Vendor por nombre:', vendor);
   return vendor;
 }
 
