@@ -272,9 +272,8 @@ serve(async (req) => {
         console.log('Chat con vendedor cerrado por comando global');
       }
       
+      // handleVendorBot YA guarda la sesión, no guardar de nuevo aquí
       const menuMsg = await handleVendorBot(message, phoneNumber, supabase);
-      session.last_bot_message = menuMsg;
-      await saveSession(session);
       return createTwiMLResponse(menuMsg);
     }
 
@@ -322,9 +321,8 @@ serve(async (req) => {
 
     // CASO 5: Comandos rápidos adicionales
     if (quickCommand === 'STATUS') {
+      // handleVendorBot YA guarda la sesión
       const statusMsg = await handleVendorBot('estado', phoneNumber, supabase);
-      session.last_bot_message = statusMsg;
-      await saveSession(session);
       return createTwiMLResponse(statusMsg);
     }
 
@@ -342,12 +340,8 @@ serve(async (req) => {
 
     // CASO 6: Flujo normal del bot
     try {
+      // handleVendorBot YA guarda la sesión con el estado correcto
       const botReply = await handleVendorBot(message, phoneNumber, supabase);
-      
-      // Guardar último mensaje del bot
-      session.last_bot_message = botReply;
-      await saveSession(session);
-
       return createTwiMLResponse(botReply);
     } catch (botError) {
       console.error('Error en handleVendorBot:', botError);
