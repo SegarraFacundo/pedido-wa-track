@@ -363,8 +363,16 @@ export async function handleVendorBot(
     return await handleRatingForVendor(message, phone, session.context.selected_vendor_id, supabase);
   }
 
-  // Por defecto
-  return await getWelcomeMessage(supabase);
+  // Por defecto - Si no entendió nada, dar ayuda según el estado actual
+  if (session.state === 'SELECTING_VENDOR') {
+    return `🤔 No entendí.\n\n` + await showVendorSelection(supabase);
+  }
+  
+  if (session.state === 'BROWSING_PRODUCTS' && session.context?.selected_vendor_name) {
+    return `🤔 No encontré ese producto en ${session.context.selected_vendor_name}.\n\nEscribe el número o nombre del producto, o *menu* para volver.`;
+  }
+
+  return `🤔 No entendí tu mensaje.\n\nEscribe *menu* para empezar o *vendedor* para ayuda.`;
 }
 
 // === FUNCIONES DE APOYO ===
