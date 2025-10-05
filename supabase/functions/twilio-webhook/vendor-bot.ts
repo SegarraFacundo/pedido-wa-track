@@ -41,10 +41,21 @@ async function getSession(phone: string, supabase: any): Promise<UserSession> {
     .maybeSingle();
 
   if (data) {
+    let context = {};
+    try {
+      // Intentar parsear si es JSON válido
+      if (data.last_bot_message && data.last_bot_message.startsWith('{')) {
+        context = JSON.parse(data.last_bot_message);
+      }
+    } catch (e) {
+      // Si falla el parse, inicializar contexto vacío
+      context = { cart: [] };
+    }
+
     return {
       phone: data.phone,
       state: (data.previous_state as BotState) || 'WELCOME',
-      context: data.last_bot_message ? JSON.parse(data.last_bot_message) : {}
+      context
     };
   }
 
