@@ -193,7 +193,23 @@
     }
 
     try {
-      const body = await req.json();
+      // Parse incoming data - Twilio sends form-urlencoded data
+      const contentType = req.headers.get('content-type') || '';
+      let body: any = {};
+      
+      if (contentType.includes('application/x-www-form-urlencoded')) {
+        // Twilio webhook format
+        const formData = await req.formData();
+        body = {
+          message: formData.get('Body') || '',
+          phoneNumber: (formData.get('From') || '').toString().replace('whatsapp:', ''),
+          orderId: null
+        };
+      } else {
+        // JSON format (for direct API calls)
+        body = await req.json();
+      }
+      
       const orderId = body?.orderId || null;
       const message = (body?.message || '').toString();
       const phoneNumber = (body?.phoneNumber || '').toString().trim();
