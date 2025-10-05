@@ -76,6 +76,67 @@ export type Database = {
         }
         Relationships: []
       }
+      commission_settings: {
+        Row: {
+          commission_percentage: number | null
+          commission_type: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          subscription_monthly_fee: number | null
+          subscription_orders_included: number | null
+          subscription_plan_id: string | null
+          updated_at: string | null
+          vendor_id: string
+        }
+        Insert: {
+          commission_percentage?: number | null
+          commission_type: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          subscription_monthly_fee?: number | null
+          subscription_orders_included?: number | null
+          subscription_plan_id?: string | null
+          updated_at?: string | null
+          vendor_id: string
+        }
+        Update: {
+          commission_percentage?: number | null
+          commission_type?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          subscription_monthly_fee?: number | null
+          subscription_orders_included?: number | null
+          subscription_plan_id?: string | null
+          updated_at?: string | null
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commission_settings_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: true
+            referencedRelation: "public_vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commission_settings_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: true
+            referencedRelation: "vendor_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commission_settings_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: true
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_contacts: {
         Row: {
           created_at: string | null
@@ -487,6 +548,57 @@ export type Database = {
         }
         Relationships: []
       }
+      subscription_plans: {
+        Row: {
+          commission_after_limit: number
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          monthly_fee: number
+          name: string
+          orders_included: number
+        }
+        Insert: {
+          commission_after_limit: number
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          monthly_fee: number
+          name: string
+          orders_included: number
+        }
+        Update: {
+          commission_after_limit?: number
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          monthly_fee?: number
+          name?: string
+          orders_included?: number
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_sessions: {
         Row: {
           assigned_vendor_phone: string | null
@@ -565,6 +677,81 @@ export type Database = {
           },
           {
             foreignKeyName: "vendor_chats_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vendor_commissions: {
+        Row: {
+          commission_amount: number
+          commission_percentage: number | null
+          commission_type: string
+          created_at: string | null
+          id: string
+          order_id: string
+          order_total: number
+          paid_at: string | null
+          status: string | null
+          vendor_id: string
+        }
+        Insert: {
+          commission_amount: number
+          commission_percentage?: number | null
+          commission_type: string
+          created_at?: string | null
+          id?: string
+          order_id: string
+          order_total: number
+          paid_at?: string | null
+          status?: string | null
+          vendor_id: string
+        }
+        Update: {
+          commission_amount?: number
+          commission_percentage?: number | null
+          commission_type?: string
+          created_at?: string | null
+          id?: string
+          order_id?: string
+          order_total?: number
+          paid_at?: string | null
+          status?: string | null
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_commissions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_commissions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_orders_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_commissions_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "public_vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_commissions_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_commissions_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
             referencedRelation: "vendors"
@@ -825,10 +1012,14 @@ export type Database = {
           image: string | null
           is_active: boolean | null
           joined_at: string | null
+          last_payment_date: string | null
           name: string
+          next_payment_due: string | null
           opening_time: string | null
+          payment_status: string | null
           phone: string
           rating: number | null
+          suspended_reason: string | null
           total_orders: number | null
           total_reviews: number | null
           updated_at: string | null
@@ -847,10 +1038,14 @@ export type Database = {
           image?: string | null
           is_active?: boolean | null
           joined_at?: string | null
+          last_payment_date?: string | null
           name: string
+          next_payment_due?: string | null
           opening_time?: string | null
+          payment_status?: string | null
           phone: string
           rating?: number | null
+          suspended_reason?: string | null
           total_orders?: number | null
           total_reviews?: number | null
           updated_at?: string | null
@@ -869,10 +1064,14 @@ export type Database = {
           image?: string | null
           is_active?: boolean | null
           joined_at?: string | null
+          last_payment_date?: string | null
           name?: string
+          next_payment_due?: string | null
           opening_time?: string | null
+          payment_status?: string | null
           phone?: string
           rating?: number | null
+          suspended_reason?: string | null
           total_orders?: number | null
           total_reviews?: number | null
           updated_at?: string | null
@@ -1186,9 +1385,16 @@ export type Database = {
         Args: { full_address: string }
         Returns: string
       }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "vendor" | "customer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1315,6 +1521,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "vendor", "customer"],
+    },
   },
 } as const
