@@ -286,7 +286,7 @@
             );
           case 'help':
             return new Response(
-              JSON.stringify({ reply: '¿Necesitas ayuda? Consultá: <AQUI_TU_LINK_DE_DOCUMENTACION>' }),
+              JSON.stringify({ reply: '📚 *Centro de Ayuda*\n\nVisitá nuestra página de ayuda para ver toda la documentación: lovable.app/ayuda\n\nO escribí *"hablar con vendedor"* para asistencia personalizada.' }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
             );
           case 'cancel':

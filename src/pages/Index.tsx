@@ -128,6 +128,12 @@ const Index = () => {
             </div>
             <div className="flex items-center gap-4">
               <a 
+                href="/ayuda"
+                className="text-sm text-primary hover:underline flex items-center gap-1"
+              >
+                Ayuda
+              </a>
+              <a 
                 href="/vendor-auth"
                 className="text-sm text-primary hover:underline flex items-center gap-1"
               >
