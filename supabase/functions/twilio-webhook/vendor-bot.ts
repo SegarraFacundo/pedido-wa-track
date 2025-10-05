@@ -86,15 +86,17 @@ export async function handleVendorBot(
 ): Promise<string> {
   const lowerMessage = message.toLowerCase().trim();
 
-  // COMANDOS GLOBALES
-  if (lowerMessage === 'ayuda' || lowerMessage === 'help') {
-    return `ℹ️ *CENTRO DE AYUDA*\n\n` +
-           `🌐 *Visita nuestra web:*\n` +
-           `https://tu-sitio.lovable.app\n\n` +
-           `💬 Escribe *menu* para empezar a hacer tu pedido`;
-  }
+  // COMANDOS GLOBALES - Verificar PRIMERO antes que cualquier otra cosa
+  
+  // Menu/Inicio - Cierra cualquier chat activo y reinicia
+  if (lowerMessage === 'menu' || lowerMessage === 'inicio' || lowerMessage === 'empezar' || lowerMessage === 'hola' || lowerMessage === 'hi') {
+    // Cerrar chat activo si existe
+    await supabase
+      .from('vendor_chats')
+      .update({ is_active: false, ended_at: new Date().toISOString() })
+      .eq('customer_phone', phone)
+      .eq('is_active', true);
 
-  if (lowerMessage === 'menu' || lowerMessage === 'inicio' || lowerMessage === 'empezar') {
     const session = await getSession(phone, supabase);
     session.state = 'WELCOME';
     session.context = { cart: [] };
@@ -102,7 +104,21 @@ export async function handleVendorBot(
     return await getWelcomeMessage(supabase);
   }
 
+  if (lowerMessage === 'ayuda' || lowerMessage === 'help') {
+    return `ℹ️ *CENTRO DE AYUDA*\n\n` +
+           `🌐 *Visita nuestra web:*\n` +
+           `https://tu-sitio.lovable.app\n\n` +
+           `💬 Escribe *menu* para empezar a hacer tu pedido`;
+  }
+
   if (lowerMessage === 'cancelar' || lowerMessage === 'salir') {
+    // Cerrar chat activo si existe
+    await supabase
+      .from('vendor_chats')
+      .update({ is_active: false, ended_at: new Date().toISOString() })
+      .eq('customer_phone', phone)
+      .eq('is_active', true);
+
     const session = await getSession(phone, supabase);
     session.state = 'WELCOME';
     session.context = { cart: [] };
@@ -113,7 +129,7 @@ export async function handleVendorBot(
   // Obtener sesión
   const session = await getSession(phone, supabase);
 
-  // Verificar chat con vendedor humano
+  // Verificar chat con vendedor humano DESPUÉS de comandos globales
   const { data: activeChat } = await supabase
     .from('vendor_chats')
     .select('*')
@@ -127,6 +143,11 @@ export async function handleVendorBot(
         .from('vendor_chats')
         .update({ is_active: false, ended_at: new Date().toISOString() })
         .eq('id', activeChat.id);
+      
+      session.state = 'WELCOME';
+      session.context = { cart: [] };
+      await saveSession(session, supabase);
+      
       return `✅ Chat cerrado.\n\nEscribe *menu* para volver a empezar.`;
     }
 
@@ -138,13 +159,13 @@ export async function handleVendorBot(
         message: message
       });
     
-    return `📩 Mensaje enviado. Un vendedor te responderá pronto.\n\n_Escribe *cerrar* para terminar el chat._`;
+    return `📩 Mensaje enviado al vendedor.\n\n_Escribe *cerrar* para terminar el chat o *menu* para volver al inicio._`;
   }
 
   // FLUJO PRINCIPAL DEL BOT VENDEDOR
   
   // Estado: BIENVENIDA
-  if (session.state === 'WELCOME' || lowerMessage === 'hola' || lowerMessage === 'hi') {
+  if (session.state === 'WELCOME') {
     session.state = 'SELECTING_VENDOR';
     await saveSession(session, supabase);
     return await showVendorSelection(supabase);
