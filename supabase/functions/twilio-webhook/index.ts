@@ -10,7 +10,7 @@
 
   // --- Config Supabase (si corresponde) ---
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
-  const SUPABASE_KEY = Deno.env.get('SUPABASE_KEY') || '';
+  const SUPABASE_KEY = Deno.env.get('SUPABASE_ANON_KEY') || '';
   const supabase = SUPABASE_URL && SUPABASE_KEY
     ? createClient(SUPABASE_URL, SUPABASE_KEY)
     : undefined;
@@ -20,6 +20,18 @@
     .split(',')
     .map(n => n.trim())
     .filter(Boolean);
+
+  // Helper to create TwiML response
+  function createTwiMLResponse(message: string): Response {
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Message>${message}</Message>
+</Response>`;
+    return new Response(twiml, {
+      headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
+      status: 200
+    });
+  }
 
   // --- Persistencia simple en memoria como fallback ---
   const inMemoryContexts = new Map<string, any>();
@@ -228,10 +240,7 @@
         if (!ctx) ctx = await findAnyEnManoHumanaAssignedToVendor(phoneNumber);
 
         if (!ctx) {
-          return new Response(
-            JSON.stringify({ reply: 'No encontré una conversación derivada a este vendedor para reanudar.' }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-          );
+          return createTwiMLResponse('No encontré una conversación derivada a este vendedor para reanudar.');
         }
 
         ctx.en_mano_humana = false;
@@ -241,10 +250,7 @@
 
         const resumeMessage = ctx.lastBotMessage || 'El bot se reactivó y retomará el flujo donde quedó.';
 
-        return new Response(
-          JSON.stringify({ reply: resumeMessage }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-        );
+        return createTwiMLResponse(resumeMessage);
       }
 
       // If sender is a user and asks for a vendor -> mark and notify
@@ -252,26 +258,18 @@
         const ctx = await getUserContextByPhone(phoneNumber);
         ctx.previousState = ctx.currentState || 'start';
         ctx.en_mano_humana = true;
-        ctx.assignedVendorPhone = null; // puede ser asignado por el sistema o por el primer vendedor que se haga cargo
+        ctx.assignedVendorPhone = null;
         await saveUserContext(ctx);
         await notifyVendorForUser(ctx);
 
-        return new Response(
-          JSON.stringify({ reply: 'Perfecto, un vendedor continúa con la conversación.' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-        );
+        return createTwiMLResponse('Perfecto, un vendedor continúa con la conversación.');
       }
 
       // If the conversation is currently en_mano_humana and the sender is NOT a vendor,
-      // the bot should stop responding (we already notified when the user requested human).
+      // the bot should stop responding
       const ctx = await getUserContextByPhone(phoneNumber);
       if (ctx.en_mano_humana && !senderIsVendor) {
-        // Do not process further. Return 200 with no reply (or explicit null) so downstream
-        // message-sender won't send anything.
-        return new Response(
-          JSON.stringify({ reply: null }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-        );
+        return new Response('', { headers: corsHeaders, status: 200 });
       }
 
       // Global menu commands that can be invoked anytime
@@ -279,58 +277,37 @@
       if (globalCommand) {
         switch (globalCommand) {
           case 'menu':
-            // reset context and show menu
             ctx.currentState = 'start';
             ctx.flowData = {};
             await saveUserContext(ctx);
-            return new Response(
-              JSON.stringify({ reply: handleMenu() }),
-              { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-            );
+            return createTwiMLResponse(handleMenu());
           case 'back':
             ctx.currentState = ctx.previousState || 'start';
             ctx.previousState = null;
             await saveUserContext(ctx);
-            return new Response(
-              JSON.stringify({ reply: 'Volvimos un paso atrás.' }),
-              { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-            );
+            return createTwiMLResponse('Volvimos un paso atrás.');
           case 'status':
-            return new Response(
-              JSON.stringify({ reply: `Estado actual: ${ctx.currentState}` }),
-              { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-            );
+            return createTwiMLResponse(`Estado actual: ${ctx.currentState}`);
           case 'help':
-            return new Response(
-              JSON.stringify({ reply: '📚 *Centro de Ayuda*\n\nVisitá nuestra página de ayuda para ver toda la documentación: lovable.app/ayuda\n\nO escribí *"hablar con vendedor"* para asistencia personalizada.' }),
-              { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-            );
+            return createTwiMLResponse('📚 *Centro de Ayuda*\n\nVisitá nuestra página de ayuda para ver toda la documentación: lovable.app/ayuda\n\nO escribí *"hablar con vendedor"* para asistencia personalizada.');
           case 'cancel':
             ctx.currentState = 'start';
             ctx.flowData = {};
             ctx.previousState = null;
             ctx.en_mano_humana = false;
             await saveUserContext(ctx);
-            return new Response(
-              JSON.stringify({ reply: 'Pedido cancelado. Volvimos al inicio.' }),
-              { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-            );
+            return createTwiMLResponse('Pedido cancelado. Volvimos al inicio.');
         }
       }
 
       // Finalmente, procesa el mensaje con el handler existente (user flow)
-      // Este handler devuelve el texto a enviar al usuario y debe encargarse de actualizar
-      // el contexto (guardar ctx.lastBotMessage cuando envía una pregunta, etc.).
       const botReply = await handleVendorBot(message, phoneNumber, supabase);
 
-      // Guardar último mensaje enviado por el bot para permitir reanudar exactamente donde quedó
+      // Guardar último mensaje enviado por el bot
       ctx.lastBotMessage = botReply || ctx.lastBotMessage;
       await saveUserContext(ctx);
 
-      return new Response(
-        JSON.stringify({ reply: botReply }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-      );
+      return createTwiMLResponse(botReply || 'No entendí tu mensaje. Escribí "menu" para ver las opciones.');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('Error en endpoint webhook:', errorMessage);
