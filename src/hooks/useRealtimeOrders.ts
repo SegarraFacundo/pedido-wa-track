@@ -206,11 +206,31 @@ export function useRealtimeOrders(vendorId?: string) {
         cancelled: 'Si tienes alguna duda, contacta al vendedor.'
       };
 
+      let notificationMessage = `Tu pedido #${orderId.slice(0, 8)} ${statusMessages[newStatus as keyof typeof statusMessages]}. ${statusDescriptions[newStatus as keyof typeof statusDescriptions]}`;
+      
+      // Si el estado es delivered, activar calificación
+      if (newStatus === 'delivered') {
+        notificationMessage += `\n\n⭐ *¿Cómo fue tu experiencia?*\n\nCalifica del 1 al 5:\n1️⃣ Muy malo\n2️⃣ Malo\n3️⃣ Regular\n4️⃣ Bueno\n5️⃣ Excelente\n\nEscribe solo el número (o "omitir" para saltar)`;
+        
+        // Actualizar sesión del usuario para que esté en modo RATING_ORDER
+        await supabase
+          .from('user_sessions')
+          .upsert({
+            phone: currentOrder.customerPhone,
+            previous_state: 'RATING_ORDER',
+            last_bot_message: JSON.stringify({
+              selected_vendor_id: currentOrder.vendorId,
+              pending_order_id: orderId
+            }),
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'phone' });
+      }
+
       await supabase.functions.invoke('send-whatsapp-notification', {
         body: {
           orderId,
           phoneNumber: currentOrder.customerPhone,
-          message: `Tu pedido #${orderId.slice(0, 8)} ${statusMessages[newStatus as keyof typeof statusMessages]}. ${statusDescriptions[newStatus as keyof typeof statusDescriptions]}`
+          message: notificationMessage
         }
       });
 

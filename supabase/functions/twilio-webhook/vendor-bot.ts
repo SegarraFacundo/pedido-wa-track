@@ -10,7 +10,8 @@ type BotState =
   | 'CONFIRMING_ORDER'
   | 'ORDER_PLACED'
   | 'VENDOR_CHAT'
-  | 'TRACKING_ORDER';
+  | 'TRACKING_ORDER'
+  | 'RATING_ORDER';
 
 interface CartItem {
   product_id: string;
@@ -29,6 +30,7 @@ interface UserSession {
     delivery_address?: string;
     payment_method?: string;
     last_interaction?: string;
+    pending_order_id?: string;
   };
 }
 
@@ -408,6 +410,59 @@ export async function handleVendorBot(
   // Estado: CALIFICAR (solo si tiene pedido con ese vendor)
   if (lowerMessage.includes('calificar') && session.context?.selected_vendor_id) {
     return await handleRatingForVendor(message, phone, session.context.selected_vendor_id, supabase);
+  }
+
+  // Estado: RATING_ORDER - Calificación después de entrega
+  if (session.state === 'RATING_ORDER') {
+    const rating = parseInt(lowerMessage);
+    
+    // Si escriben "no" o "omitir", saltear calificación
+    if (lowerMessage === 'no' || lowerMessage === 'omitir' || lowerMessage === 'skip') {
+      session.state = 'SELECTING_VENDOR';
+      session.context = { cart: [] };
+      await saveSession(session, supabase);
+      return `✅ ¡Gracias por usar nuestro servicio!\n\nEscribe *menu* cuando quieras pedir de nuevo.`;
+    }
+    
+    // Validar calificación
+    if (!rating || rating < 1 || rating > 5) {
+      return `⭐ *Por favor califica del 1 al 5*\n\n` +
+             `1️⃣ Muy malo\n` +
+             `2️⃣ Malo\n` +
+             `3️⃣ Regular\n` +
+             `4️⃣ Bueno\n` +
+             `5️⃣ Excelente\n\n` +
+             `Escribe solo el número (o "omitir" para saltar)`;
+    }
+    
+    // Guardar calificación
+    try {
+      const { error } = await supabase
+        .from('vendor_reviews')
+        .insert({
+          vendor_id: session.context?.selected_vendor_id,
+          customer_phone: phone,
+          rating: rating,
+          comment: null
+        });
+      
+      if (error) {
+        console.error('Error guardando calificación:', error);
+      }
+      
+      // Resetear sesión
+      session.state = 'SELECTING_VENDOR';
+      session.context = { cart: [] };
+      await saveSession(session, supabase);
+      
+      const stars = '⭐'.repeat(rating);
+      return `${stars}\n\n✅ *¡Gracias por tu calificación!*\n\n` +
+             `Tu opinión nos ayuda a mejorar el servicio.\n\n` +
+             `Escribe *menu* cuando quieras pedir de nuevo.`;
+    } catch (e) {
+      console.error('Error al guardar calificación:', e);
+      return `❌ Error al guardar tu calificación.\n\nEscribe *menu* para continuar.`;
+    }
   }
 
   // Por defecto - Si no entendió nada, dar ayuda según el estado actual
