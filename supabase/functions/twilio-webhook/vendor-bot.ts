@@ -100,7 +100,7 @@ export async function handleVendorBot(
   // COMANDOS GLOBALES - Verificar PRIMERO antes que cualquier otra cosa
   
   // Menu/Inicio/Hola - Cierra cualquier chat activo y va DIRECTO a selección de vendedores
-  if (lowerMessage === 'menu' || lowerMessage === 'inicio' || lowerMessage === 'empezar' || lowerMessage === 'hola' || lowerMessage === 'hi') {
+  if (lowerMessage === 'menu' || lowerMessage === 'inicio' || lowerMessage === 'empezar' || lowerMessage === 'hola' || lowerMessage === 'hi' || lowerMessage === 'buenos dias' || lowerMessage === 'buenas tardes' || lowerMessage === 'buenas noches') {
     // Cerrar chat activo si existe
     await supabase
       .from('vendor_chats')
@@ -108,11 +108,17 @@ export async function handleVendorBot(
       .eq('customer_phone', phone)
       .eq('is_active', true);
 
-    const session = await getSession(phone, supabase);
-    session.state = 'SELECTING_VENDOR';  // Cambio crítico: ir directo a selección
-    session.context = { cart: [] };
-    await saveSession(session, supabase);
-    return await showVendorSelection(supabase);  // Cambio crítico: mostrar vendedores directamente
+    // Crear sesión nueva
+    const newSession: UserSession = {
+      phone,
+      state: 'SELECTING_VENDOR',
+      context: { cart: [] }
+    };
+    await saveSession(newSession, supabase);
+    
+    return `👋 *¡Bienvenido a Lapacho!*\n\n` +
+           `Tu plataforma de pedidos y entregas.\n\n` +
+           await showVendorSelection(supabase);
   }
 
   if (lowerMessage === 'ayuda' || lowerMessage === 'help') {
@@ -179,21 +185,47 @@ export async function handleVendorBot(
   
   // Estado: SELECCIONANDO VENDEDOR/NEGOCIO
   if (session.state === 'SELECTING_VENDOR') {
-    console.log('Estado SELECTING_VENDOR, mensaje:', lowerMessage);
-    const vendorId = await findVendorFromMessage(lowerMessage, supabase);
-    console.log('Vendor encontrado:', vendorId);
+    // Primero intentar parsear como número
+    const number = parseInt(lowerMessage);
     
-    if (vendorId) {
-      session.context = session.context || {};
-      session.context.selected_vendor_id = vendorId.id;
-      session.context.selected_vendor_name = vendorId.name;
-      session.context.cart = [];
-      session.state = 'BROWSING_PRODUCTS';
-      await saveSession(session, supabase);
-      return await showVendorProducts(vendorId.id, vendorId.name, supabase);
+    if (!isNaN(number) && number > 0 && number <= 20) {
+      // Es un número válido, buscar vendor
+      const { data: vendors } = await supabase
+        .from('vendors')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('average_rating', { ascending: false })
+        .limit(20);
+      
+      if (vendors && vendors[number - 1]) {
+        const vendor = vendors[number - 1];
+        session.context = { cart: [] };
+        session.context.selected_vendor_id = vendor.id;
+        session.context.selected_vendor_name = vendor.name;
+        session.state = 'BROWSING_PRODUCTS';
+        await saveSession(session, supabase);
+        return await showVendorProducts(vendor.id, vendor.name, supabase);
+      }
     }
     
-    // Si no encontró el negocio, volver a mostrar la lista
+    // Buscar por nombre
+    const { data: vendor } = await supabase
+      .from('vendors')
+      .select('id, name')
+      .eq('is_active', true)
+      .ilike('name', `%${lowerMessage}%`)
+      .maybeSingle();
+    
+    if (vendor) {
+      session.context = { cart: [] };
+      session.context.selected_vendor_id = vendor.id;
+      session.context.selected_vendor_name = vendor.name;
+      session.state = 'BROWSING_PRODUCTS';
+      await saveSession(session, supabase);
+      return await showVendorProducts(vendor.id, vendor.name, supabase);
+    }
+    
+    // No encontró el negocio
     return `🤔 No encontré ese negocio.\n\n` + await showVendorSelection(supabase);
   }
 
