@@ -14,6 +14,10 @@ export async function handleVendorBot(
     return await startVendorChat(phone, supabase) || fallbackMessage();
   }
 
+  if (lowerMessage.includes('estado') || lowerMessage.includes('pedido')) {
+    return await getOrderStatus(phone, supabase) || fallbackMessage();
+  }
+
   if (lowerMessage.startsWith('calificar') || lowerMessage.startsWith('review')) {
     return await handleReview(message, phone, supabase) || fallbackMessage();
   }
@@ -22,8 +26,8 @@ export async function handleVendorBot(
     return await getVendorHours(supabase) || fallbackMessage();
   }
 
-  // Respuesta por defecto con menú
-  return getWelcomeMessage();
+  // Respuesta por defecto con menú dinámico
+  return await getWelcomeMessage(phone, supabase);
 }
 
 async function getActiveOffers(supabase: any): Promise<string> {
@@ -188,17 +192,101 @@ async function getVendorHours(supabase: any): Promise<string> {
   }
 }
 
-function getWelcomeMessage(): string {
-  return `👋 *¡Bienvenido a nuestro servicio!*\n\n` +
-         `Soy tu asistente virtual. ¿En qué puedo ayudarte?\n\n` +
-         `📱 *OPCIONES DISPONIBLES:*\n` +
-         `1️⃣ Ver *ofertas* del día\n` +
-         `2️⃣ *Hacer pedido* (escribe lo que necesitas)\n` +
-         `3️⃣ *Hablar con vendedor*\n` +
-         `4️⃣ Ver *horarios* de atención\n` +
-         `5️⃣ *Calificar* servicio\n` +
-         `6️⃣ Ver *estado* de tu pedido\n\n` +
-         `💬 Escribe cualquier opción para comenzar!`;
+async function getOrderStatus(phone: string, supabase: any): Promise<string> {
+  try {
+    const { data: orders } = await supabase
+      .from('orders')
+      .select('id, status, created_at, total')
+      .eq('customer_phone', phone)
+      .in('status', ['pending', 'confirmed', 'preparing', 'in_transit'])
+      .order('created_at', { ascending: false })
+      .limit(3);
+
+    if (!orders || orders.length === 0) {
+      return '📦 No tienes pedidos activos en este momento.\n\nEscribe "ofertas" para ver las promociones disponibles o "hacer pedido" para realizar uno nuevo.';
+    }
+
+    let message = '📦 *TUS PEDIDOS ACTIVOS*\n\n';
+
+    orders.forEach((order: any, index: number) => {
+      const statusEmoji = {
+        'pending': '⏳',
+        'confirmed': '✅',
+        'preparing': '👨‍🍳',
+        'in_transit': '🚚',
+      }[order.status] || '📋';
+
+      const statusText = {
+        'pending': 'Pendiente',
+        'confirmed': 'Confirmado',
+        'preparing': 'En preparación',
+        'in_transit': 'En camino',
+      }[order.status] || order.status;
+
+      message += `${index + 1}. ${statusEmoji} *${statusText}*\n`;
+      message += `   Total: $${order.total}\n`;
+      message += `   Realizado: ${new Date(order.created_at).toLocaleString('es-AR')}\n\n`;
+    });
+
+    return message;
+  } catch (e) {
+    return '❌ No se pudo consultar el estado de tus pedidos. Intenta más tarde.';
+  }
+}
+
+async function getWelcomeMessage(phone: string, supabase: any): Promise<string> {
+  try {
+    // Verificar si tiene pedidos activos
+    const { data: activeOrders } = await supabase
+      .from('orders')
+      .select('id')
+      .eq('customer_phone', phone)
+      .in('status', ['pending', 'confirmed', 'preparing', 'in_transit'])
+      .limit(1);
+
+    const hasActiveOrders = activeOrders && activeOrders.length > 0;
+
+    // Verificar si tiene pedidos completados para calificar
+    const { data: completedOrders } = await supabase
+      .from('orders')
+      .select('id, created_at')
+      .eq('customer_phone', phone)
+      .eq('status', 'delivered')
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    const hasCompletedOrders = completedOrders && completedOrders.length > 0;
+
+    let message = `👋 *¡Bienvenido a nuestro servicio!*\n\n` +
+                  `Soy tu asistente virtual. ¿En qué puedo ayudarte?\n\n` +
+                  `📱 *OPCIONES DISPONIBLES:*\n` +
+                  `1️⃣ Ver *ofertas* del día\n` +
+                  `2️⃣ *Hacer pedido* (escribe lo que necesitas)\n` +
+                  `3️⃣ *Hablar con vendedor*\n` +
+                  `4️⃣ Ver *horarios* de atención\n`;
+
+    if (hasActiveOrders) {
+      message += `5️⃣ Ver *estado* de tu pedido\n`;
+    }
+
+    if (hasCompletedOrders) {
+      message += `6️⃣ *Calificar* servicio\n`;
+    }
+
+    message += `\n💬 Escribe cualquier opción para comenzar!`;
+
+    return message;
+  } catch (e) {
+    // Si hay error al consultar, mostrar menú básico
+    return `👋 *¡Bienvenido a nuestro servicio!*\n\n` +
+           `Soy tu asistente virtual. ¿En qué puedo ayudarte?\n\n` +
+           `📱 *OPCIONES DISPONIBLES:*\n` +
+           `1️⃣ Ver *ofertas* del día\n` +
+           `2️⃣ *Hacer pedido* (escribe lo que necesitas)\n` +
+           `3️⃣ *Hablar con vendedor*\n` +
+           `4️⃣ Ver *horarios* de atención\n\n` +
+           `💬 Escribe cualquier opción para comenzar!`;
+  }
 }
 
 // Mensaje fallback genérico para garantizar que siempre se devuelve un string
