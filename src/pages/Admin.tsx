@@ -82,7 +82,7 @@ export default function Admin() {
           <div className="flex items-center gap-3 justify-center md:justify-start flex-1 md:flex-initial">
             <img src={lapachoIcon} alt="Lapacho" className="h-8 md:hidden" />
             <img src={lapachoLogo} alt="Lapacho Logo" className="h-10 hidden md:block" />
-            <h1 className="text-xl font-bold md:inline">Lapacho</h1>
+            <h1 className="text-xl font-bold md:hidden">Lapacho</h1>
           </div>
           <Button onClick={handleSignOut} variant="outline">
             <LogOut className="mr-2 h-4 w-4" />

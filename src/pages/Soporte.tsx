@@ -81,7 +81,7 @@ export default function Soporte() {
               <img src={lapachoIcon} alt="Lapacho" className="h-8 md:hidden" />
               <img src={lapachoLogo} alt="Lapacho Logo" className="h-10 hidden md:block" />
               <div>
-                <h1 className="text-xl md:text-2xl font-bold md:inline">Lapacho</h1>
+                <h1 className="text-xl md:text-2xl font-bold md:hidden">Lapacho</h1>
                 <p className="text-xs text-muted-foreground capitalize hidden md:block">Rol: {userRole}</p>
               </div>
             </div>
