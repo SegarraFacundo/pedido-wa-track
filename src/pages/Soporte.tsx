@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { LogOut, Headphones } from "lucide-react";
 import SupportPanel from "@/components/admin/SupportPanel";
+import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import lapachoLogo from "@/assets/lapacho-logo.png";
 import lapachoIcon from "@/assets/lapacho-icon.png";
 
@@ -119,6 +120,7 @@ export default function Soporte() {
 
   return (
     <div className="min-h-screen bg-background">
+      <PWAInstallPrompt userType="soporte" />
       <header className="border-b bg-card sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex justify-between items-center">

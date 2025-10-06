@@ -9,6 +9,7 @@ import VendorManagement from "@/components/admin/VendorManagement";
 import CommissionManagement from "@/components/admin/CommissionManagement";
 import CommissionReports from "@/components/admin/CommissionReports";
 import SupportPanel from "@/components/admin/SupportPanel";
+import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import lapachoLogo from "@/assets/lapacho-logo.png";
 import lapachoIcon from "@/assets/lapacho-icon.png";
 
@@ -77,6 +78,7 @@ export default function Admin() {
 
   return (
     <div className="min-h-screen bg-background">
+      <PWAInstallPrompt userType="admin" />
       <header className="border-b bg-card sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3 justify-center md:justify-start flex-1 md:flex-initial">

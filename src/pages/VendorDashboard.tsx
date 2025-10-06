@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Package, Clock, Settings, LayoutDashboard, Tag, Star, MessageCircle } from 'lucide-react';
+import { PWAInstallPrompt } from '@/components/PWAInstallPrompt';
 import lapachoIcon from "@/assets/lapacho-icon.png";
 
 export default function VendorDashboard() {
@@ -99,6 +100,7 @@ export default function VendorDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
+      <PWAInstallPrompt userType="vendor" />
       {/* Mobile-responsive header */}
       <div className="bg-card border-b sticky top-0 z-10">
         <div className="px-4 py-3 flex justify-between items-center">

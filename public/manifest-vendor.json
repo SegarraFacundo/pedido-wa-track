@@ -1,0 +1,35 @@
+{
+  "name": "Lapacho - Vendedor",
+  "short_name": "Vendedor",
+  "description": "Panel de vendedor - Gestiona tus pedidos y productos",
+  "start_url": "/vendor-dashboard?utm_source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#E94E87",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/lapacho-icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/lapacho-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Pedidos",
+      "short_name": "Pedidos",
+      "description": "Ver pedidos activos",
+      "url": "/vendor-dashboard?utm_source=pwa_shortcut",
+      "icons": [{ "src": "/lapacho-icon.png", "sizes": "96x96" }]
+    }
+  ]
+}

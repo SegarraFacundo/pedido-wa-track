@@ -1,0 +1,35 @@
+{
+  "name": "Lapacho - Soporte",
+  "short_name": "Soporte",
+  "description": "Panel de soporte - Gestiona tickets de clientes",
+  "start_url": "/soporte?utm_source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#9b87f5",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/lapacho-icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/lapacho-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Tickets",
+      "short_name": "Tickets",
+      "description": "Ver tickets de soporte",
+      "url": "/soporte?utm_source=pwa_shortcut",
+      "icons": [{ "src": "/lapacho-icon.png", "sizes": "96x96" }]
+    }
+  ]
+}

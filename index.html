@@ -1,13 +1,31 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Lapacho">
+    
     <title>Lapacho - Plataforma de Delivery Local</title>
     <meta name="description" content="Plataforma de delivery local que integra WhatsApp Business. Conectamos tu negocio con tus clientes de forma simple y eficiente." />
     <meta name="author" content="Lapacho" />
 
+    <!-- PWA Manifests (se cargará dinámicamente según el tipo de usuario) -->
+    <link rel="manifest" href="/manifest-vendor.json" id="manifest-placeholder">
+    
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" href="/lapacho-icon.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/lapacho-icon.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/lapacho-icon.png">
+    <link rel="apple-touch-icon" sizes="167x167" href="/lapacho-icon.png">
+
+    <!-- Theme Colors -->
+    <meta name="theme-color" content="#E94E87">
+    <meta name="msapplication-TileColor" content="#E94E87">
+    
     <meta property="og:title" content="Lapacho - Plataforma de Delivery Local" />
     <meta property="og:description" content="Plataforma de delivery local que integra WhatsApp Business. Conectamos tu negocio con tus clientes de forma simple y eficiente." />
     <meta property="og:type" content="website" />
@@ -21,5 +39,41 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+              console.log('Service Worker registrado:', registration.scope);
+            })
+            .catch((error) => {
+              console.log('Error al registrar Service Worker:', error);
+            });
+        });
+      }
+
+      // Cambiar manifest según la ruta
+      function updateManifest() {
+        const path = window.location.pathname;
+        const manifestLink = document.getElementById('manifest-placeholder');
+        const themeColor = document.querySelector('meta[name="theme-color"]');
+        
+        if (path.includes('/vendor') || path.includes('/dashboard')) {
+          manifestLink.href = '/manifest-vendor.json';
+          themeColor.content = '#E94E87';
+        } else if (path.includes('/soporte')) {
+          manifestLink.href = '/manifest-soporte.json';
+          themeColor.content = '#9b87f5';
+        } else if (path.includes('/admin')) {
+          manifestLink.href = '/manifest-admin.json';
+          themeColor.content = '#0EA5E9';
+        }
+      }
+      
+      updateManifest();
+      window.addEventListener('popstate', updateManifest);
+    </script>
   </body>
 </html>

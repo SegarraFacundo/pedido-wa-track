@@ -1,0 +1,42 @@
+{
+  "name": "Lapacho - Admin",
+  "short_name": "Admin",
+  "description": "Panel de administración - Control total de la plataforma",
+  "start_url": "/admin?utm_source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0EA5E9",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/lapacho-icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/lapacho-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "Panel de administración",
+      "url": "/admin?utm_source=pwa_shortcut",
+      "icons": [{ "src": "/lapacho-icon.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Soporte",
+      "short_name": "Soporte",
+      "description": "Sistema de tickets",
+      "url": "/soporte?utm_source=pwa_shortcut",
+      "icons": [{ "src": "/lapacho-icon.png", "sizes": "96x96" }]
+    }
+  ]
+}
