@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { User } from '@supabase/supabase-js';
+import lapachoLogo from '@/assets/lapacho-logo.png';
 
 export default function VendorAuth() {
   const [email, setEmail] = useState('');
@@ -171,6 +172,9 @@ export default function VendorAuth() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
+          <div className="flex justify-center mb-4">
+            <img src={lapachoLogo} alt="Lapacho Logo" className="h-16" />
+          </div>
           <CardTitle>Panel de Vendedor</CardTitle>
           <CardDescription>
             Accede a tu panel para gestionar pedidos

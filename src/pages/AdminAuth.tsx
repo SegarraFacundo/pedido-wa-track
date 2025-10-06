@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Lock } from "lucide-react";
+import lapachoLogo from "@/assets/lapacho-logo.png";
 
 export default function AdminAuth() {
   const [email, setEmail] = useState("");
@@ -115,11 +116,11 @@ export default function AdminAuth() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <div className="flex items-center justify-center mb-4">
-            <Lock className="h-12 w-12 text-primary" />
+            <img src={lapachoLogo} alt="Lapacho Logo" className="h-16" />
           </div>
           <CardTitle className="text-2xl text-center">Panel de Administración</CardTitle>
           <CardDescription className="text-center">
-            Acceso exclusivo para administradores de Lapacho
+            Acceso exclusivo para administradores
           </CardDescription>
         </CardHeader>
         <CardContent>
