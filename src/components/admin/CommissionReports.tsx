@@ -10,7 +10,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DollarSign, TrendingUp, Calendar } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { DollarSign, TrendingUp, Calendar, FileText, Printer, Eye } from "lucide-react";
 import { format, startOfMonth, endOfMonth, startOfDay, endOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -24,8 +30,15 @@ interface Commission {
   order_total: number;
   status: string;
   created_at: string;
+  paid_at: string | null;
   vendors: {
     name: string;
+    phone: string;
+    address: string;
+  };
+  orders: {
+    customer_name: string;
+    items: any;
   };
 }
 
@@ -35,6 +48,8 @@ export default function CommissionReports() {
   const [selectedVendor, setSelectedVendor] = useState<string>("all");
   const [selectedPeriod, setSelectedPeriod] = useState<string>("month");
   const [vendors, setVendors] = useState<any[]>([]);
+  const [selectedCommission, setSelectedCommission] = useState<Commission | null>(null);
+  const [showReceipt, setShowReceipt] = useState(false);
 
   useEffect(() => {
     fetchVendors();
@@ -59,7 +74,8 @@ export default function CommissionReports() {
         .from('vendor_commissions')
         .select(`
           *,
-          vendors:vendor_id (name)
+          vendors:vendor_id (name, phone, address),
+          orders:order_id (customer_name, items)
         `)
         .order('created_at', { ascending: false });
 
@@ -106,6 +122,10 @@ export default function CommissionReports() {
     if (!error) {
       fetchCommissions();
     }
+  };
+
+  const printReceipt = () => {
+    window.print();
   };
 
   return (
@@ -185,16 +205,29 @@ export default function CommissionReports() {
                     {format(new Date(commission.created_at), "d 'de' MMMM, yyyy", { locale: es })}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Pedido: ${commission.order_total} | Comisión: {commission.commission_percentage}%
+                    Pedido: ${commission.order_total.toFixed(2)} | Comisión: {commission.commission_percentage}%
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Tipo: {commission.commission_type === 'percentage' ? 'Porcentaje' : commission.commission_type === 'subscription_overage' ? 'Suscripción (Extra)' : 'Suscripción'}
                   </p>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
                   <div className="text-right">
                     <p className="text-lg font-bold">${commission.commission_amount.toFixed(2)}</p>
                     <Badge variant={commission.status === 'paid' ? 'default' : 'secondary'}>
                       {commission.status === 'paid' ? 'Pagada' : 'Pendiente'}
                     </Badge>
                   </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedCommission(commission);
+                      setShowReceipt(true);
+                    }}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
                   {commission.status === 'pending' && (
                     <Button
                       size="sm"
@@ -209,6 +242,127 @@ export default function CommissionReports() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={showReceipt} onOpenChange={setShowReceipt}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <span>Comprobante de Comisión</span>
+              <Button size="sm" onClick={printReceipt}>
+                <Printer className="h-4 w-4 mr-2" />
+                Imprimir
+              </Button>
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedCommission && (
+            <div className="space-y-6 print:p-8" id="receipt">
+              {/* Header */}
+              <div className="text-center border-b pb-4">
+                <h2 className="text-2xl font-bold">Comprobante de Comisión</h2>
+                <p className="text-sm text-muted-foreground">Tu Pedido - Sistema de Gestión</p>
+              </div>
+
+              {/* Receipt Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Comprobante #</p>
+                  <p className="font-mono">{selectedCommission.id.slice(0, 8).toUpperCase()}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Fecha</p>
+                  <p>{format(new Date(selectedCommission.created_at), "d 'de' MMMM, yyyy", { locale: es })}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Estado</p>
+                  <Badge variant={selectedCommission.status === 'paid' ? 'default' : 'secondary'}>
+                    {selectedCommission.status === 'paid' ? 'Pagada' : 'Pendiente'}
+                  </Badge>
+                </div>
+                {selectedCommission.paid_at && (
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Fecha de Pago</p>
+                    <p>{format(new Date(selectedCommission.paid_at), "d 'de' MMMM, yyyy", { locale: es })}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Vendor Info */}
+              <div className="border rounded-lg p-4">
+                <h3 className="font-semibold mb-2">Información del Negocio</h3>
+                <div className="space-y-1 text-sm">
+                  <p><span className="font-medium">Nombre:</span> {selectedCommission.vendors?.name}</p>
+                  <p><span className="font-medium">Teléfono:</span> {selectedCommission.vendors?.phone}</p>
+                  <p><span className="font-medium">Dirección:</span> {selectedCommission.vendors?.address}</p>
+                </div>
+              </div>
+
+              {/* Commission Details */}
+              <div className="border rounded-lg p-4">
+                <h3 className="font-semibold mb-2">Detalle de la Comisión</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Total del Pedido:</span>
+                    <span>${selectedCommission.order_total.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Tipo de Comisión:</span>
+                    <span>
+                      {selectedCommission.commission_type === 'percentage' 
+                        ? 'Porcentaje por Pedido' 
+                        : selectedCommission.commission_type === 'subscription_overage'
+                        ? 'Suscripción (Pedido Extra)'
+                        : 'Suscripción'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Porcentaje de Comisión:</span>
+                    <span>{selectedCommission.commission_percentage}%</span>
+                  </div>
+                  <div className="flex justify-between text-lg font-bold pt-2 border-t">
+                    <span>Total a Pagar:</span>
+                    <span>${selectedCommission.commission_amount.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Order Info */}
+              {selectedCommission.orders && (
+                <div className="border rounded-lg p-4">
+                  <h3 className="font-semibold mb-2">Información del Pedido</h3>
+                  <div className="space-y-1 text-sm">
+                    <p><span className="font-medium">ID del Pedido:</span> {selectedCommission.order_id.slice(0, 8).toUpperCase()}</p>
+                    <p><span className="font-medium">Cliente:</span> {selectedCommission.orders.customer_name}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Footer */}
+              <div className="text-center text-xs text-muted-foreground pt-4 border-t">
+                <p>Este comprobante es válido para efectos de registro de comisión</p>
+                <p className="mt-1">Generado el {format(new Date(), "d 'de' MMMM, yyyy 'a las' HH:mm", { locale: es })}</p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          #receipt, #receipt * {
+            visibility: visible;
+          }
+          #receipt {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+          }
+        }
+      `}</style>
     </div>
   );
 }
