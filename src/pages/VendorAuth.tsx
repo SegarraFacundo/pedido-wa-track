@@ -173,7 +173,7 @@ export default function VendorAuth() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <div className="flex justify-center mb-6">
-            <img src={lapachoLogo} alt="Lapacho Logo" className="h-32" />
+            <img src={lapachoLogo} alt="Lapacho Logo" className="h-48 w-auto" />
           </div>
           <CardTitle>Panel de Vendedor</CardTitle>
           <CardDescription>
