@@ -1,0 +1,118 @@
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { TreePine, LogOut, Headphones } from "lucide-react";
+import SupportPanel from "@/components/admin/SupportPanel";
+
+export default function Soporte() {
+  const [loading, setLoading] = useState(true);
+  const [hasAccess, setHasAccess] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    checkSoporteAccess();
+  }, []);
+
+  const checkSoporteAccess = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        navigate('/admin-auth');
+        return;
+      }
+
+      const { data: roles, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', session.user.id)
+        .in('role', ['admin', 'soporte']);
+
+      if (error || !roles || roles.length === 0) {
+        toast({
+          title: "Acceso denegado",
+          description: "No tienes permisos para acceder al panel de soporte",
+          variant: "destructive",
+        });
+        navigate('/');
+        return;
+      }
+
+      setUserRole(roles[0].role);
+      setHasAccess(true);
+    } catch (error) {
+      console.error('Error checking soporte access:', error);
+      navigate('/admin-auth');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    navigate('/');
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Verificando acceso...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!hasAccess) return null;
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="border-b bg-card sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-primary rounded-lg flex items-center justify-center">
+                <TreePine className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold">Panel de Soporte</h1>
+                <p className="text-xs text-muted-foreground capitalize">Rol: {userRole}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <Button variant="ghost" onClick={() => navigate('/')}>
+                Inicio
+              </Button>
+              {userRole === 'admin' && (
+                <Button variant="ghost" onClick={() => navigate('/admin')}>
+                  Panel Admin
+                </Button>
+              )}
+              <Button onClick={handleSignOut} variant="outline">
+                <LogOut className="mr-2 h-4 w-4" />
+                Cerrar Sesión
+              </Button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="container mx-auto px-4 py-8">
+        <div className="mb-6 text-center">
+          <Headphones className="h-12 w-12 text-primary mx-auto mb-4" />
+          <h2 className="text-2xl font-semibold mb-2">Sistema de Tickets de Soporte</h2>
+          <p className="text-muted-foreground">
+            Gestiona las consultas y problemas reportados por clientes y vendedores
+          </p>
+        </div>
+        
+        <SupportPanel />
+      </main>
+    </div>
+  );
+}

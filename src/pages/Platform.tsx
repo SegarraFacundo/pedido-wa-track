@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useRealtimeOrders } from "@/hooks/useRealtimeOrders";
 
-const Index = () => {
+const Platform = () => {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [loadingVendors, setLoadingVendors] = useState(true);
@@ -241,4 +241,4 @@ const Index = () => {
   );
 };
 
-export default Index;
+export default Platform;
