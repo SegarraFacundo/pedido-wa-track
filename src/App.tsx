@@ -12,6 +12,7 @@ import Ayuda from "./pages/Ayuda";
 import AdminAuth from "./pages/AdminAuth";
 import Admin from "./pages/Admin";
 import Soporte from "./pages/Soporte";
+import SubdomainRouter from "./components/SubdomainRouter";
 
 const queryClient = new QueryClient();
 
@@ -21,18 +22,20 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/plataforma" element={<Platform />} />
-          <Route path="/vendor-auth" element={<VendorAuth />} />
-          <Route path="/vendor-dashboard" element={<VendorDashboard />} />
-          <Route path="/ayuda" element={<Ayuda />} />
-          <Route path="/admin-auth" element={<AdminAuth />} />
-          <Route path="/admin" element={<Admin />} />
-          <Route path="/soporte" element={<Soporte />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <SubdomainRouter>
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/plataforma" element={<Platform />} />
+            <Route path="/vendor-auth" element={<VendorAuth />} />
+            <Route path="/vendor-dashboard" element={<VendorDashboard />} />
+            <Route path="/ayuda" element={<Ayuda />} />
+            <Route path="/admin-auth" element={<AdminAuth />} />
+            <Route path="/admin" element={<Admin />} />
+            <Route path="/soporte" element={<Soporte />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </SubdomainRouter>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
