@@ -134,15 +134,52 @@ export async function handleVendorBot(
     return addHelpFooter(welcomeMsg, false);
   }
 
-  // Soporte de Lapacho
-  if (lowerMessage === 'soporte' || lowerMessage === 'ayuda lapacho') {
-    const supportMsg = `🆘 *SOPORTE LAPACHO*\n\n` +
-           `¿Tienes problemas con el bot?\n\n` +
-           `📧 Email: soporte@lapacho.com\n` +
-           `📱 WhatsApp: +51 999 999 999\n` +
-           `🌐 Web: https://tu-sitio.lovable.app/ayuda\n\n` +
-           `Horario: Lun-Dom 8am-10pm`;
-    return addHelpFooter(supportMsg, false);
+  // Soporte de Lapacho - Crear ticket
+  if (lowerMessage === 'soporte' || lowerMessage === 'ayuda lapacho' || lowerMessage === 'ayuda sistema') {
+    try {
+      // Crear ticket de soporte
+      const { data: ticket, error: ticketError } = await supabase
+        .from('support_tickets')
+        .insert({
+          customer_phone: phone,
+          customer_name: null,
+          subject: 'Solicitud de soporte desde WhatsApp',
+          status: 'open',
+          priority: 'normal'
+        })
+        .select()
+        .single();
+
+      if (ticketError) {
+        console.error('Error creando ticket:', ticketError);
+        return `❌ Error al crear ticket de soporte.\n\n` +
+               `Intenta más tarde o contacta directamente:\n` +
+               `📧 Email: soporte@lapacho.com\n` +
+               `📱 WhatsApp: +51 999 999 999`;
+      }
+
+      // Crear mensaje inicial del ticket
+      await supabase
+        .from('support_messages')
+        .insert({
+          ticket_id: ticket.id,
+          sender_type: 'customer',
+          sender_id: null,
+          message: message
+        });
+
+      return `🎫 *TICKET DE SOPORTE CREADO*\n\n` +
+             `✅ Tu solicitud ha sido registrada.\n` +
+             `📋 Ticket #${ticket.id.substring(0, 8)}\n\n` +
+             `Un agente de soporte de Lapacho te contactará pronto.\n\n` +
+             `📧 Email: soporte@lapacho.com\n` +
+             `📱 WhatsApp: +51 999 999 999\n` +
+             `🌐 Web: https://tu-sitio.lovable.app/ayuda\n\n` +
+             `Horario: Lun-Dom 8am-10pm`;
+    } catch (e) {
+      console.error('Error en creación de ticket:', e);
+      return `❌ Error al crear ticket.\n\nContacta: soporte@lapacho.com`;
+    }
   }
 
   if (lowerMessage === 'ayuda' || lowerMessage === 'help') {
