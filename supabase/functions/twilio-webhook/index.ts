@@ -195,7 +195,64 @@ function getQuickCommand(text: string): string | null {
     return 'HELP';
   }
   
+  // Comandos para cerrar ticket de soporte
+  if (/\b(cerrar ticket|ticket cerrado|resolver ticket|ticket resuelto|ya esta|problema resuelto)\b/.test(t)) {
+    return 'CLOSE_TICKET';
+  }
+  
   return null;
+}
+
+// Cerrar ticket de soporte del cliente
+async function closeCustomerTicket(phoneNumber: string): Promise<string> {
+  try {
+    // Buscar ticket abierto del cliente
+    const { data: ticket, error: findError } = await supabase
+      .from('support_tickets')
+      .select('id, subject')
+      .eq('customer_phone', phoneNumber)
+      .in('status', ['open', 'in_progress'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (findError) {
+      console.error('Error buscando ticket:', findError);
+      return '❌ Hubo un error al buscar tu ticket de soporte.';
+    }
+
+    if (!ticket) {
+      return '📋 No tienes ningún ticket de soporte abierto.\n\nSi necesitas ayuda, escribe "soporte" para abrir uno nuevo.';
+    }
+
+    // Cerrar el ticket
+    const { error: updateError } = await supabase
+      .from('support_tickets')
+      .update({ 
+        status: 'resolved',
+        resolved_at: new Date().toISOString()
+      })
+      .eq('id', ticket.id);
+
+    if (updateError) {
+      console.error('Error cerrando ticket:', updateError);
+      return '❌ Hubo un error al cerrar tu ticket.';
+    }
+
+    // Registrar mensaje de cierre
+    await supabase
+      .from('support_messages')
+      .insert({
+        ticket_id: ticket.id,
+        sender_type: 'customer',
+        message: 'El cliente cerró el ticket',
+      });
+
+    return `✅ *Ticket cerrado exitosamente*\n\nTu ticket "${ticket.subject}" ha sido marcado como resuelto.\n\n¿Necesitas algo más? Escribe "menu" para ver las opciones.`;
+  } catch (error) {
+    console.error('Error en closeCustomerTicket:', error);
+    return '❌ Hubo un error al procesar tu solicitud.';
+  }
 }
 
 serve(async (req) => {
@@ -297,7 +354,13 @@ serve(async (req) => {
       );
     }
 
-    // CASO 4: Cliente está en chat con vendedor - no responder
+    // CASO 4: Cliente quiere cerrar su ticket de soporte
+    if (quickCommand === 'CLOSE_TICKET') {
+      const closeMsg = await closeCustomerTicket(phoneNumber);
+      return createTwiMLResponse(closeMsg);
+    }
+
+    // CASO 5: Cliente está en chat con vendedor - no responder
     if (session.in_vendor_chat) {
       // El mensaje queda registrado en la conversación pero el bot no responde
       console.log('Cliente en chat con vendedor, bot silenciado');
@@ -321,7 +384,7 @@ serve(async (req) => {
       return new Response('', { headers: corsHeaders, status: 200 });
     }
 
-    // CASO 5: Comandos rápidos adicionales
+    // CASO 6: Comandos rápidos adicionales
     if (quickCommand === 'STATUS') {
       // handleVendorBot YA guarda la sesión
       const statusMsg = await handleVendorBot('estado', phoneNumber, supabase);
@@ -335,12 +398,14 @@ serve(async (req) => {
         `• "menu" - Ver menú principal\n` +
         `• "estado" - Ver tus pedidos\n` +
         `• "vendedor" - Hablar con alguien\n` +
+        `• "soporte" - Solicitar soporte\n` +
+        `• "cerrar ticket" - Cerrar ticket de soporte\n` +
         `• "ofertas" - Ver promociones\n\n` +
         `🔗 Documentación completa: lovable.app/ayuda`
       );
     }
 
-    // CASO 6: Flujo normal del bot
+    // CASO 7: Flujo normal del bot
     try {
       console.log('🤖 Procesando con handleVendorBot...');
       // handleVendorBot YA guarda la sesión con el estado correcto
