@@ -24,7 +24,7 @@ export default function Soporte() {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
-        navigate('/admin-auth');
+        setLoading(false);
         return;
       }
 
@@ -40,7 +40,8 @@ export default function Soporte() {
           description: "No tienes permisos para acceder al panel de soporte",
           variant: "destructive",
         });
-        navigate('/');
+        setHasAccess(false);
+        setLoading(false);
         return;
       }
 
@@ -48,7 +49,6 @@ export default function Soporte() {
       setHasAccess(true);
     } catch (error) {
       console.error('Error checking soporte access:', error);
-      navigate('/admin-auth');
     } finally {
       setLoading(false);
     }
@@ -70,7 +70,52 @@ export default function Soporte() {
     );
   }
 
-  if (!hasAccess) return null;
+  if (!hasAccess && !loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="border-b bg-card sticky top-0 z-50">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-3 justify-center md:justify-start flex-1 md:flex-initial">
+                <img src={lapachoIcon} alt="Lapacho" className="h-8 md:hidden" />
+                <img src={lapachoLogo} alt="Lapacho Logo" className="h-10 hidden md:block" />
+                <span className="text-xl font-bold md:hidden">Lapacho</span>
+              </div>
+              <Button variant="ghost" onClick={() => navigate('/')}>
+                Inicio
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        <main className="container mx-auto px-4 py-8">
+          <div className="max-w-md mx-auto text-center">
+            <Headphones className="h-16 w-16 text-primary mx-auto mb-6" />
+            <h2 className="text-2xl font-bold mb-4">Panel de Soporte</h2>
+            <p className="text-muted-foreground mb-6">
+              Para acceder al panel de soporte necesitas iniciar sesión con una cuenta autorizada.
+            </p>
+            <div className="space-y-3">
+              <Button 
+                onClick={() => navigate('/admin-auth')} 
+                className="w-full"
+                size="lg"
+              >
+                Iniciar Sesión
+              </Button>
+              <Button 
+                onClick={() => navigate('/')} 
+                variant="outline"
+                className="w-full"
+              >
+                Volver al Inicio
+              </Button>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
