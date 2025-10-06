@@ -18,22 +18,29 @@ const SubdomainRouter = ({ children }: { children: React.ReactNode }) => {
       subdomain = parts[0];
     }
 
-    // Solo redirigir si estamos en la ruta raíz
-    if (location.pathname === '/') {
-      switch (subdomain) {
-        case 'admin':
+    // Redirigir según el subdominio
+    switch (subdomain) {
+      case 'admin':
+        // Si no está en /admin-auth o /admin, redirigir
+        if (location.pathname !== '/admin-auth' && location.pathname !== '/admin') {
           navigate('/admin-auth');
-          break;
-        case 'soporte':
+        }
+        break;
+      case 'soporte':
+        // Si no está en /soporte, redirigir
+        if (location.pathname !== '/soporte') {
           navigate('/soporte');
-          break;
-        case 'plataforma':
+        }
+        break;
+      case 'plataforma':
+        // Si no está en /vendor-auth o /vendor-dashboard, redirigir
+        if (location.pathname !== '/vendor-auth' && location.pathname !== '/vendor-dashboard') {
           navigate('/vendor-auth');
-          break;
-        // lapacho.ar (sin subdominio) se queda en /
-        default:
-          break;
-      }
+        }
+        break;
+      // lapacho.ar (sin subdominio) - sin restricciones
+      default:
+        break;
     }
   }, [navigate, location]);
 
