@@ -1473,6 +1473,10 @@ export type Database = {
         Args: { user_email: string }
         Returns: string
       }
+      make_user_soporte: {
+        Args: { user_email: string }
+        Returns: string
+      }
     }
     Enums: {
       app_role: "admin" | "vendor" | "customer" | "soporte"
