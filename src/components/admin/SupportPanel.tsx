@@ -141,10 +141,26 @@ export default function SupportPanel() {
 
       if (error) throw error;
 
+      // Enviar notificación por WhatsApp al cliente
+      try {
+        const { error: whatsappError } = await supabase.functions.invoke('send-whatsapp-notification', {
+          body: {
+            phoneNumber: selectedTicket.customer_phone,
+            message: `📩 Respuesta de soporte:\n\n${newMessage.trim()}\n\n---\nTicket: ${selectedTicket.subject}`
+          }
+        });
+
+        if (whatsappError) {
+          console.error('Error sending WhatsApp:', whatsappError);
+        }
+      } catch (whatsappError) {
+        console.error('WhatsApp notification failed:', whatsappError);
+      }
+
       setNewMessage("");
       toast({
         title: "Mensaje enviado",
-        description: "El cliente recibirá tu respuesta",
+        description: "El cliente recibirá tu respuesta por WhatsApp",
       });
     } catch (error: any) {
       toast({
