@@ -130,16 +130,23 @@ export default function SupportPanel() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('support_messages')
         .insert({
           ticket_id: selectedTicket.id,
           sender_type: 'support',
           sender_id: user?.id,
           message: newMessage.trim(),
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Actualizar la lista de mensajes inmediatamente
+      if (data) {
+        setMessages(prev => [...prev, data]);
+      }
 
       // Enviar notificación por WhatsApp al cliente
       try {
