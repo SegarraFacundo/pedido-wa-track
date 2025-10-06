@@ -32,7 +32,7 @@ export default function Soporte() {
         .from('user_roles')
         .select('role')
         .eq('user_id', session.user.id)
-        .in('role', ['admin', 'soporte']);
+        .eq('role', 'admin');
 
       if (error || !roles || roles.length === 0) {
         toast({
