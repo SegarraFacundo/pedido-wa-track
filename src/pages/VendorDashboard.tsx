@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Package, Clock, Settings, LayoutDashboard, Tag, Star, MessageCircle } from 'lucide-react';
+import lapachoIcon from "@/assets/lapacho-icon.png";
 
 export default function VendorDashboard() {
   const [user, setUser] = useState<User | null>(null);
@@ -101,9 +102,13 @@ export default function VendorDashboard() {
       {/* Mobile-responsive header */}
       <div className="bg-card border-b sticky top-0 z-10">
         <div className="px-4 py-3 flex justify-between items-center">
-          <h1 className="text-lg sm:text-xl font-bold truncate">
-            {vendor.name}
-          </h1>
+          <div className="flex items-center gap-3 justify-center md:justify-start flex-1 md:flex-initial">
+            <img src={lapachoIcon} alt="Lapacho" className="h-8 md:hidden" />
+            <h1 className="text-lg sm:text-xl font-bold truncate md:inline">
+              <span className="md:hidden">Lapacho</span>
+              <span className="hidden md:inline">{vendor.name}</span>
+            </h1>
+          </div>
           <Button 
             onClick={handleSignOut} 
             variant="outline" 

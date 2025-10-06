@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Store, Headphones, Shield, Zap, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import lapachoLogo from "@/assets/lapacho-logo.png";
+import lapachoIcon from "@/assets/lapacho-icon.png";
 
 export default function Landing() {
   const navigate = useNavigate();
@@ -13,8 +14,10 @@ export default function Landing() {
       <header className="bg-white/80 backdrop-blur-sm shadow-sm border-b sticky top-0 z-40">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <img src={lapachoLogo} alt="Lapacho Logo" className="h-12" />
+            <div className="flex items-center gap-3 justify-center md:justify-start flex-1 md:flex-initial">
+              <img src={lapachoIcon} alt="Lapacho" className="h-8 md:hidden" />
+              <img src={lapachoLogo} alt="Lapacho Logo" className="h-12 hidden md:block" />
+              <span className="text-xl font-bold md:hidden">Lapacho</span>
             </div>
             <div className="flex items-center gap-4">
               <Button variant="ghost" onClick={() => navigate('/soporte')}>

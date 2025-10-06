@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { LogOut, Headphones } from "lucide-react";
 import SupportPanel from "@/components/admin/SupportPanel";
 import lapachoLogo from "@/assets/lapacho-logo.png";
+import lapachoIcon from "@/assets/lapacho-icon.png";
 
 export default function Soporte() {
   const [loading, setLoading] = useState(true);
@@ -76,11 +77,12 @@ export default function Soporte() {
       <header className="border-b bg-card sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <img src={lapachoLogo} alt="Lapacho Logo" className="h-10" />
+            <div className="flex items-center gap-3 justify-center md:justify-start flex-1 md:flex-initial">
+              <img src={lapachoIcon} alt="Lapacho" className="h-8 md:hidden" />
+              <img src={lapachoLogo} alt="Lapacho Logo" className="h-10 hidden md:block" />
               <div>
-                <h1 className="text-2xl font-bold">Panel de Soporte</h1>
-                <p className="text-xs text-muted-foreground capitalize">Rol: {userRole}</p>
+                <h1 className="text-xl md:text-2xl font-bold md:inline">Lapacho</h1>
+                <p className="text-xs text-muted-foreground capitalize hidden md:block">Rol: {userRole}</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
