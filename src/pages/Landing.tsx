@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { TreePine, Store, Headphones, Shield, Zap, Users } from "lucide-react";
+import { Store, Headphones, Shield, Zap, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import lapachoLogo from "@/assets/lapacho-logo.png";
 
 export default function Landing() {
   const navigate = useNavigate();
@@ -13,15 +14,7 @@ export default function Landing() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-primary rounded-lg flex items-center justify-center">
-                <TreePine className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                  Lapacho
-                </h1>
-                <p className="text-xs text-muted-foreground">Plataforma de Delivery Local</p>
-              </div>
+              <img src={lapachoLogo} alt="Lapacho Logo" className="h-12" />
             </div>
             <div className="flex items-center gap-4">
               <Button variant="ghost" onClick={() => navigate('/soporte')}>
@@ -39,7 +32,7 @@ export default function Landing() {
       {/* Hero Section */}
       <section className="container mx-auto px-4 py-20 text-center">
         <div className="max-w-4xl mx-auto">
-          <TreePine className="h-20 w-20 text-primary mx-auto mb-6 animate-pulse" />
+          <img src={lapachoLogo} alt="Lapacho" className="h-32 mx-auto mb-6" />
           <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-primary bg-clip-text text-transparent">
             Conectamos tu negocio con tus clientes
           </h1>
@@ -172,10 +165,7 @@ export default function Landing() {
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-4 gap-8">
             <div>
-              <div className="flex items-center gap-2 mb-4">
-                <TreePine className="h-6 w-6 text-primary" />
-                <span className="font-bold">Lapacho</span>
-              </div>
+              <img src={lapachoLogo} alt="Lapacho" className="h-10 mb-4" />
               <p className="text-sm text-muted-foreground">
                 Plataforma de delivery local que conecta negocios con clientes
               </p>

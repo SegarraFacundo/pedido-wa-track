@@ -7,10 +7,11 @@ import { OrderTracking } from "@/components/OrderTracking";
 import { AdminPanel } from "@/components/AdminPanel";
 import { TwilioConfig } from "@/components/TwilioConfig";
 import { Vendor } from "@/types/order";
-import { TreePine, Store } from "lucide-react";
+import { Store } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useRealtimeOrders } from "@/hooks/useRealtimeOrders";
+import lapachoLogo from "@/assets/lapacho-logo.png";
 
 const Platform = () => {
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -160,15 +161,7 @@ const Platform = () => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-primary rounded-lg flex items-center justify-center">
-                <TreePine className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                  Lapacho
-                </h1>
-                <p className="text-xs text-muted-foreground">Plataforma de Delivery Local</p>
-              </div>
+              <img src={lapachoLogo} alt="Lapacho Logo" className="h-12" />
             </div>
             <div className="flex items-center gap-4">
               <a 
@@ -239,12 +232,12 @@ const Platform = () => {
           <TabsContent value="about" className="space-y-6">
             <div className="text-center max-w-3xl mx-auto">
               <div className="mb-8">
-                <TreePine className="h-16 w-16 text-primary mx-auto mb-4" />
+                <img src={lapachoLogo} alt="Lapacho" className="h-24 mx-auto mb-4" />
                 <h2 className="text-3xl font-bold mb-4 bg-gradient-primary bg-clip-text text-transparent">
-                  Lapacho - Tu Delivery Local
+                  Tu Delivery Local
                 </h2>
                 <p className="text-muted-foreground mb-4">
-                  Inspirado en el árbol Lapacho rosa, símbolo de belleza y fortaleza en nuestra región.
+                  Conectamos vendedores locales con clientes de forma simple y eficiente.
                 </p>
                 <p className="text-muted-foreground">
                   Conectamos vendedores locales con clientes a través de WhatsApp Business, 
