@@ -536,15 +536,26 @@ async function getWelcomeMessage(supabase: any): Promise<string> {
 
 async function showVendorSelection(supabase: any): Promise<string> {
   try {
-    const { data: vendors } = await supabase
+    console.log('📋 Consultando negocios disponibles...');
+    
+    const { data: vendors, error } = await supabase
       .from('vendors')
       .select('id, name, category, average_rating')
       .eq('is_active', true)
+      .eq('payment_status', 'active')
       .order('average_rating', { ascending: false })
       .limit(10);
 
+    console.log('📊 Resultado consulta:', { vendorsCount: vendors?.length, error });
+
+    if (error) {
+      console.error('❌ Error DB:', error);
+      return `❌ Error al consultar negocios.\n\nEscribe *soporte* para ayuda.`;
+    }
+
     if (!vendors || vendors.length === 0) {
-      return `😕 No hay negocios disponibles ahora.\n\nIntenta más tarde.`;
+      console.warn('⚠️ No hay vendors activos');
+      return `😕 No hay negocios disponibles en este momento.\n\nIntenta más tarde o escribe *soporte* para ayuda.`;
     }
 
     let message = `🏪 *¿De dónde quieres pedir?*\n\n`;
@@ -558,10 +569,11 @@ async function showVendorSelection(supabase: any): Promise<string> {
     });
     message += `💬 Escribe el número del negocio (ej: "1", "2")`;
 
+    console.log('✅ Mensaje generado exitosamente, vendors:', vendors.length);
     return message;
   } catch (e) {
-    console.error('Error en showVendorSelection:', e);
-    return `❌ Error al cargar negocios. Escribe *menu* para intentar de nuevo.`;
+    console.error('💥 Error crítico en showVendorSelection:', e);
+    return `❌ Error del sistema.\n\nEscribe *soporte* para reportar este problema.`;
   }
 }
 

@@ -199,11 +199,12 @@ function getQuickCommand(text: string): string | null {
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+    if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    console.log('📥 Nueva solicitud recibida');
     // Parse incoming data
     const contentType = req.headers.get('content-type') || '';
     let phoneNumber = '';
@@ -222,10 +223,11 @@ serve(async (req) => {
     }
 
     if (!phoneNumber) {
+      console.error('❌ Número de teléfono vacío');
       return createTwiMLResponse('Error: número de teléfono no proporcionado');
     }
 
-    console.log('Mensaje recibido:', { phoneNumber, message: message.substring(0, 50) });
+    console.log('📨 Mensaje recibido:', { phoneNumber, message });
 
     const senderIsVendor = await isVendor(phoneNumber);
     const session = await getOrCreateSession(phoneNumber);
@@ -340,11 +342,13 @@ serve(async (req) => {
 
     // CASO 6: Flujo normal del bot
     try {
+      console.log('🤖 Procesando con handleVendorBot...');
       // handleVendorBot YA guarda la sesión con el estado correcto
       const botReply = await handleVendorBot(message, phoneNumber, supabase);
+      console.log('✅ Respuesta del bot:', botReply.substring(0, 100));
       return createTwiMLResponse(botReply);
     } catch (botError) {
-      console.error('Error en handleVendorBot:', botError);
+      console.error('❌ Error en handleVendorBot:', botError);
       
       return createTwiMLResponse(
         `😕 Hubo un problema procesando tu mensaje.\n\n` +
