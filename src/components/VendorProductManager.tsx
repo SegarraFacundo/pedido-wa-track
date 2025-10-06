@@ -9,7 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit2, Trash2, Save, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, Upload } from 'lucide-react';
 
 interface Product {
   id: string;
@@ -18,6 +18,7 @@ interface Product {
   description: string | null;
   price: number;
   is_available: boolean;
+  image: string | null;
 }
 
 interface VendorProductManagerProps {
@@ -31,6 +32,9 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const { toast } = useToast();
 
   // Form state
@@ -39,7 +43,8 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
     category: '',
     description: '',
     price: '',
-    is_available: true
+    is_available: true,
+    image: null as string | null
   });
 
   useEffect(() => {
@@ -74,6 +79,56 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
     }
   };
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleImageUpload = async () => {
+    if (!imageFile) return formData.image;
+
+    setUploading(true);
+    try {
+      const fileExt = imageFile.name.split('.').pop();
+      const fileName = `${vendorId}/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(fileName, imageFile, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(fileName);
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo subir la imagen',
+        variant: 'destructive'
+      });
+      return formData.image;
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    setFormData({ ...formData, image: null });
+  };
+
   const handleSaveProduct = async () => {
     if (!formData.name || !formData.category || !formData.price) {
       toast({
@@ -85,6 +140,9 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
     }
 
     try {
+      // Upload image if selected
+      const imageUrl = await handleImageUpload();
+
       if (editingProduct) {
         // Update existing product
         const { error } = await supabase
@@ -94,7 +152,8 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
             category: formData.category,
             description: formData.description || null,
             price: parseFloat(formData.price),
-            is_available: formData.is_available
+            is_available: formData.is_available,
+            image: imageUrl
           })
           .eq('id', editingProduct.id);
 
@@ -114,7 +173,8 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
             category: formData.category,
             description: formData.description || null,
             price: parseFloat(formData.price),
-            is_available: formData.is_available
+            is_available: formData.is_available,
+            image: imageUrl
           });
 
         if (error) throw error;
@@ -131,8 +191,11 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
         category: '',
         description: '',
         price: '',
-        is_available: true
+        is_available: true,
+        image: null
       });
+      setImageFile(null);
+      setImagePreview(null);
       setIsAddingProduct(false);
       setEditingProduct(null);
       fetchProducts();
@@ -199,8 +262,10 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
       category: product.category,
       description: product.description || '',
       price: product.price.toString(),
-      is_available: product.is_available
+      is_available: product.is_available,
+      image: product.image
     });
+    setImagePreview(product.image);
     setIsAddingProduct(true);
   };
 
@@ -243,7 +308,14 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
             {filteredProducts.map(product => (
               <Card key={product.id} className={!product.is_available ? 'opacity-60' : ''}>
                 <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between gap-4">
+                    {product.image && (
+                      <img 
+                        src={product.image} 
+                        alt={product.name}
+                        className="w-20 h-20 object-cover rounded-lg"
+                      />
+                    )}
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-semibold">{product.name}</h3>
@@ -354,6 +426,38 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
                 step="0.01"
               />
             </div>
+
+            <div>
+              <Label htmlFor="product-image">Imagen del Producto (opcional)</Label>
+              {(imagePreview || formData.image) && (
+                <div className="relative w-32 h-32 mb-2">
+                  <img 
+                    src={imagePreview || formData.image!} 
+                    alt="Preview" 
+                    className="w-full h-full object-cover rounded-lg border"
+                  />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    className="absolute -top-2 -right-2 h-6 w-6"
+                    onClick={handleRemoveImage}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+              <Input
+                id="product-image"
+                type="file"
+                accept="image/*"
+                onChange={handleImageSelect}
+                disabled={uploading}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Formatos aceptados: JPG, PNG, WEBP (máx 5MB)
+              </p>
+            </div>
             
             <div className="flex items-center space-x-2">
               <Switch
@@ -371,12 +475,15 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
               onClick={() => {
                 setIsAddingProduct(false);
                 setEditingProduct(null);
+                setImageFile(null);
+                setImagePreview(null);
                 setFormData({
                   name: '',
                   category: '',
                   description: '',
                   price: '',
-                  is_available: true
+                  is_available: true,
+                  image: null
                 });
               }}
             >

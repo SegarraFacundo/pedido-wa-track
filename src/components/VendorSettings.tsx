@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Building2, Save } from 'lucide-react';
+import { Building2, Save, Upload, X } from 'lucide-react';
 
 interface VendorData {
   id: string;
@@ -29,6 +29,9 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
   const [vendorData, setVendorData] = useState<VendorData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -57,11 +60,71 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
     }
   };
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleImageUpload = async () => {
+    if (!imageFile) return null;
+
+    setUploading(true);
+    try {
+      const fileExt = imageFile.name.split('.').pop();
+      const fileName = `${vendorId}/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('vendor-images')
+        .upload(fileName, imageFile, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('vendor-images')
+        .getPublicUrl(fileName);
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo subir la imagen',
+        variant: 'destructive'
+      });
+      return null;
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    setVendorData({ ...vendorData!, image: null });
+  };
+
   const handleSave = async () => {
     if (!vendorData) return;
 
     setSaving(true);
     try {
+      let imageUrl = vendorData.image;
+
+      // Upload new image if selected
+      if (imageFile) {
+        const uploadedUrl = await handleImageUpload();
+        if (uploadedUrl) {
+          imageUrl = uploadedUrl;
+        }
+      }
+
       const { error } = await supabase
         .from('vendors')
         .update({
@@ -71,7 +134,7 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
           whatsapp_number: vendorData.whatsapp_number,
           address: vendorData.address,
           is_active: vendorData.is_active,
-          image: vendorData.image
+          image: imageUrl
         })
         .eq('id', vendorId);
 
@@ -81,6 +144,10 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
         title: 'Éxito',
         description: 'Información actualizada correctamente'
       });
+
+      setImageFile(null);
+      setImagePreview(null);
+      fetchVendorData();
     } catch (error) {
       console.error('Error saving vendor data:', error);
       toast({
@@ -174,14 +241,35 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="image">URL de Imagen (opcional)</Label>
+          <Label htmlFor="image">Imagen del Negocio (opcional)</Label>
+          {(imagePreview || vendorData.image) && (
+            <div className="relative w-32 h-32 mb-2">
+              <img 
+                src={imagePreview || vendorData.image!} 
+                alt="Preview" 
+                className="w-full h-full object-cover rounded-lg border"
+              />
+              <Button
+                type="button"
+                variant="destructive"
+                size="icon"
+                className="absolute -top-2 -right-2 h-6 w-6"
+                onClick={handleRemoveImage}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
           <Input
             id="image"
-            type="url"
-            value={vendorData.image || ''}
-            onChange={(e) => setVendorData({ ...vendorData, image: e.target.value || null })}
-            placeholder="https://ejemplo.com/imagen.jpg"
+            type="file"
+            accept="image/*"
+            onChange={handleImageSelect}
+            disabled={uploading}
           />
+          <p className="text-xs text-muted-foreground">
+            Formatos aceptados: JPG, PNG, WEBP (máx 5MB)
+          </p>
         </div>
 
         <div className="flex items-center space-x-2">
