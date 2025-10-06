@@ -7,19 +7,28 @@ const SubdomainRouter = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const hostname = window.location.hostname;
-    const subdomain = hostname.split('.')[0];
+    const parts = hostname.split('.');
+    
+    // Detectar subdominio (debe tener al menos 3 partes: subdominio.dominio.tld)
+    let subdomain = '';
+    if (parts.length >= 3) {
+      subdomain = parts[0];
+    } else if (parts.length === 2 && parts[0] !== 'lapacho') {
+      // Para desarrollo local como plataforma.localhost
+      subdomain = parts[0];
+    }
 
     // Solo redirigir si estamos en la ruta raíz
     if (location.pathname === '/') {
       switch (subdomain) {
         case 'admin':
-          navigate('/admin');
+          navigate('/admin-auth');
           break;
         case 'soporte':
           navigate('/soporte');
           break;
         case 'plataforma':
-          navigate('/plataforma');
+          navigate('/vendor-auth');
           break;
         // lapacho.ar (sin subdominio) se queda en /
         default:

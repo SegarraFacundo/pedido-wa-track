@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VendorDashboardWithRealtime } from "@/components/VendorDashboardWithRealtime";
 import { VendorCatalog } from "@/components/VendorCatalog";
@@ -15,8 +16,48 @@ const Platform = () => {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [loadingVendors, setLoadingVendors] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
   const { toast } = useToast();
   const { orders } = useRealtimeOrders();
+
+  // Check authentication
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        navigate('/vendor-auth');
+        return;
+      }
+
+      // Verify vendor profile exists
+      const { data: vendor, error } = await supabase
+        .from('vendors')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .single();
+
+      if (error || !vendor) {
+        toast({
+          title: "Acceso denegado",
+          description: "No tienes un perfil de vendedor asociado",
+          variant: "destructive",
+        });
+        navigate('/vendor-auth');
+        return;
+      }
+
+      setLoading(false);
+    } catch (error) {
+      console.error('Error checking auth:', error);
+      navigate('/vendor-auth');
+    }
+  };
 
   // Fetch vendors from Supabase
   useEffect(() => {
@@ -101,10 +142,13 @@ const Platform = () => {
     }
   };
 
-  if (loadingVendors) {
+  if (loading || loadingVendors) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Cargando plataforma...</p>
+        </div>
       </div>
     );
   }
