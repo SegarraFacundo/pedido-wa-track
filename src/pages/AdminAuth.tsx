@@ -115,8 +115,8 @@ export default function AdminAuth() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <div className="flex items-center justify-center mb-4">
-            <img src={lapachoLogo} alt="Lapacho Logo" className="h-16" />
+          <div className="flex items-center justify-center mb-6">
+            <img src={lapachoLogo} alt="Lapacho Logo" className="h-32" />
           </div>
           <CardTitle className="text-2xl text-center">Panel de Administración</CardTitle>
           <CardDescription className="text-center">
