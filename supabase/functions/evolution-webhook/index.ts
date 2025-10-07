@@ -259,7 +259,7 @@ serve(async (req) => {
             'apikey': evolutionApiKey!,
           },
           body: JSON.stringify({
-            number: formattedPhone,
+            number: chatId,
             text: responseMessage,
           }),
         });
