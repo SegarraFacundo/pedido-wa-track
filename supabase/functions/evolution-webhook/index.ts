@@ -99,21 +99,32 @@ async function jidToPhoneWithAR9(remoteJid: string | undefined): Promise<string 
   const jid = String(remoteJid || "");
   const base = jid.replace(/@(s\.whatsapp\.net|g\.us)$/i, "");
 
+  console.log('🔍 jidToPhoneWithAR9 - Input:', remoteJid, '| Base:', base, '| Length:', base.length);
+
   // Si es grupo, no hay número directo
-  if (/@g\.us$/i.test(jid)) return null;
+  if (/@g\.us$/i.test(jid)) {
+    console.log('⛔ Es un grupo, retornando null');
+    return null;
+  }
 
   // Ya viene con 549 -> devolver tal cual
-  if (base.startsWith("549")) return base;
+  if (base.startsWith("549")) {
+    console.log('✅ Ya tiene 549, retornando:', base);
+    return base;
+  }
 
   // Si viene como 54... (sin 9) y parece móvil, insertamos el 9
   if (base.startsWith("54") && !base.startsWith("549")) {
-    // Heurística simple: largo >= 11 suele indicar línea móvil/área + número
-    if (base.length >= 11) {
-      return "549" + base.slice(2);
+    // Heurística: largo >= 10 para números argentinos (54 + área + número)
+    if (base.length >= 10) {
+      const formatted = "549" + base.slice(2);
+      console.log('✏️ Agregando 9:', base, '->', formatted);
+      return formatted;
     }
   }
 
   // Otros países o casos raros
+  console.log('⚠️ Número sin modificar:', base);
   return base;
 }
 
@@ -201,11 +212,7 @@ serve(async (req) => {
       const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
       const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
 
-      // Ensure the number has the correct format for Argentina (add 9 after 54 if missing)
-      let formattedNumber = fromNumber;
-      if (fromNumber.startsWith('54') && fromNumber.length >= 12 && !fromNumber.startsWith('549')) {
-        formattedNumber = '549' + fromNumber.substring(2);
-      }
+      console.log('📤 Enviando mensaje a:', fromNumber);
 
       await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
         method: 'POST',
@@ -214,7 +221,7 @@ serve(async (req) => {
           'apikey': evolutionApiKey!,
         },
         body: JSON.stringify({
-          number: formattedNumber,
+          number: fromNumber,
           text: responseMessage,
         }),
       });
