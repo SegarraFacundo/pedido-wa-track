@@ -234,7 +234,9 @@ export async function handleVendorBot(
     return addHelpFooter(helpMsg);
   }
 
-  if (lowerMessage === 'cancelar' || lowerMessage === 'salir') {
+  if (lowerMessage === 'cancelar' || lowerMessage === 'salir' || 
+      lowerMessage.includes('cancelar pedido') || lowerMessage.includes('cancelar orden') ||
+      lowerMessage === 'cancelar todo') {
     // Cerrar chat activo si existe
     await supabase
       .from('vendor_chats')
