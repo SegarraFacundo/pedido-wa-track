@@ -173,15 +173,19 @@ serve(async (req) => {
 
     console.log('Processing message from:', fromNumber, 'Message:', messageText);
 
-    const vendorStatus = await isVendor(fromNumber);
-    const session = await getOrCreateSession(fromNumber);
+    // Limpiar el número de teléfono para pasarlo al bot
+    const cleanPhone = fromNumber.replace(/@s\.whatsapp\.net$/i, '');
+    console.log('Clean phone for bot:', cleanPhone);
+
+    const vendorStatus = await isVendor(cleanPhone);
+    const session = await getOrCreateSession(cleanPhone);
 
     let responseMessage = '';
 
     if (vendorStatus) {
-      console.log('Message from vendor:', fromNumber);
+      console.log('Message from vendor:', cleanPhone);
       // Vendor messages - could be handled differently
-      responseMessage = await handleVendorBot(fromNumber, messageText);
+      responseMessage = await handleVendorBot(cleanPhone, messageText);
     } else {
       // Customer message
       if (session.in_vendor_chat && session.assigned_vendor) {
@@ -193,7 +197,7 @@ serve(async (req) => {
         });
       } else {
         // Process with bot
-        responseMessage = await handleVendorBot(fromNumber, messageText);
+        responseMessage = await handleVendorBot(cleanPhone, messageText);
       }
     }
 
