@@ -15,36 +15,30 @@ serve(async (req) => {
     
     console.log('Received WhatsApp notification request:', { orderId, phoneNumber, message });
     
-    const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
-    const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
-    let fromNumber = Deno.env.get('TWILIO_WHATSAPP_NUMBER');
+    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL');
+    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
+    const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
     
-    // Use Twilio Sandbox number if not configured
-    if (!fromNumber || fromNumber === '') {
-      fromNumber = '+14155238886';
-      console.log('Using Twilio Sandbox WhatsApp number');
-    }
-    
-    if (!accountSid || !authToken) {
-      console.error('Missing Twilio credentials:', {
-        hasAccountSid: !!accountSid,
-        hasAuthToken: !!authToken
+    if (!evolutionApiUrl || !evolutionApiKey || !instanceName) {
+      console.error('Missing Evolution API credentials:', {
+        hasUrl: !!evolutionApiUrl,
+        hasApiKey: !!evolutionApiKey,
+        hasInstance: !!instanceName
       });
-      throw new Error('Twilio credentials not configured');
+      throw new Error('Evolution API credentials not configured');
     }
     
-    console.log('Using Twilio WhatsApp number:', fromNumber);
+    console.log('Using Evolution API instance:', instanceName);
     
-    // Normalize phone number: strip prefixes/spaces, ensure E.164
+    // Normalize phone number to international format
     let formattedPhone = (phoneNumber ?? '').toString().trim();
-    if (formattedPhone.startsWith('whatsapp:')) {
-      formattedPhone = formattedPhone.slice('whatsapp:'.length);
-    }
-    // Remove spaces and any non-digits except +
+    
+    // Remove any non-digits except +
     formattedPhone = formattedPhone.replace(/[^\d+]/g, '');
-    // If it doesn't start with +, default to Argentina (+54). Adjust for your region.
+    
+    // Ensure it starts with +
     if (!formattedPhone.startsWith('+')) {
-      // For Argentina mobile numbers, use +549
+      // Default to Argentina (+54) if no country code
       if (formattedPhone.startsWith('54')) {
         formattedPhone = '+' + formattedPhone;
       } else if (formattedPhone.startsWith('9')) {
@@ -54,40 +48,38 @@ serve(async (req) => {
       }
     }
 
-    // Format the From number correctly - always include whatsapp: prefix
-    const formattedFromNumber = 'whatsapp:' + fromNumber.replace('whatsapp:', '');
-
-    const toParam = `whatsapp:${formattedPhone}`;
-    console.log('Sending from:', formattedFromNumber, 'to:', toParam);
+    console.log('Sending to:', formattedPhone);
     
-    // Send WhatsApp message via Twilio
+    // Send WhatsApp message via Evolution API
     const response = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+      `${evolutionApiUrl}/message/sendText/${instanceName}`,
       {
         method: 'POST',
         headers: {
-          'Authorization': 'Basic ' + btoa(`${accountSid}:${authToken}`),
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
+          'apikey': evolutionApiKey,
         },
-        body: new URLSearchParams({
-          From: formattedFromNumber,
-          To: toParam,
-          Body: message,
+        body: JSON.stringify({
+          number: formattedPhone,
+          text: message,
         }),
       }
     );
 
-    const twilioResponse = await response.json();
+    const evolutionResponse = await response.json();
     
     if (!response.ok) {
-      console.error('Twilio API error:', {
+      console.error('Evolution API error:', {
         status: response.status,
         statusText: response.statusText,
-        error: twilioResponse,
+        error: evolutionResponse,
       });
-      // Return 200 with success:false so frontend can show Twilio message instead of generic 4xx
       return new Response(
-        JSON.stringify({ success: false, error: twilioResponse.message || twilioResponse.error_message || 'No se pudo enviar por WhatsApp', twilio: twilioResponse }),
+        JSON.stringify({ 
+          success: false, 
+          error: evolutionResponse.message || 'No se pudo enviar por WhatsApp', 
+          details: evolutionResponse 
+        }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,
@@ -95,10 +87,10 @@ serve(async (req) => {
       );
     }
     
-    console.log('WhatsApp message sent successfully:', twilioResponse.sid);
+    console.log('WhatsApp message sent successfully:', evolutionResponse.key?.id);
 
     return new Response(
-      JSON.stringify({ success: true, data: twilioResponse }),
+      JSON.stringify({ success: true, data: evolutionResponse }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200 

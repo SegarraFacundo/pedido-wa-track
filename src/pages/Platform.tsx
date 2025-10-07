@@ -5,7 +5,7 @@ import { VendorDashboardWithRealtime } from "@/components/VendorDashboardWithRea
 import { VendorCatalog } from "@/components/VendorCatalog";
 import { OrderTracking } from "@/components/OrderTracking";
 import { AdminPanel } from "@/components/AdminPanel";
-import { TwilioConfig } from "@/components/TwilioConfig";
+import { EvolutionConfig } from "@/components/EvolutionConfig";
 import { Vendor } from "@/types/order";
 import { Store } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -229,7 +229,7 @@ const Platform = () => {
           </TabsContent>
 
           <TabsContent value="whatsapp">
-            <TwilioConfig />
+            <EvolutionConfig />
           </TabsContent>
 
           <TabsContent value="about" className="space-y-6">

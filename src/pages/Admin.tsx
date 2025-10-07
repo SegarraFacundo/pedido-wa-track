@@ -10,7 +10,7 @@ import CommissionManagement from "@/components/admin/CommissionManagement";
 import CommissionReports from "@/components/admin/CommissionReports";
 import SupportPanel from "@/components/admin/SupportPanel";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
-import { TwilioConfig } from "@/components/TwilioConfig";
+import { EvolutionConfig } from "@/components/EvolutionConfig";
 import lapachoLogo from "@/assets/lapacho-logo.png";
 import lapachoIcon from "@/assets/lapacho-icon.png";
 
@@ -136,7 +136,7 @@ export default function Admin() {
           </TabsContent>
 
           <TabsContent value="ai">
-            <TwilioConfig />
+            <EvolutionConfig />
           </TabsContent>
         </Tabs>
       </main>

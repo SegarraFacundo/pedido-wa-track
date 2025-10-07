@@ -2,3 +2,6 @@ project_id = "ilhpiarkmwdjvrfqhyhi"
 
 [functions.twilio-webhook]
 verify_jwt = false
+
+[functions.evolution-webhook]
+verify_jwt = false

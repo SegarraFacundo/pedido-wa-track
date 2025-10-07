@@ -6,18 +6,20 @@ import { useState } from "react";
 import { Phone, MessageSquare, Bot, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-export function TwilioConfig() {
-  const [webhookUrl, setWebhookUrl] = useState("");
+export function EvolutionConfig() {
+  const [apiUrl, setApiUrl] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [instanceName, setInstanceName] = useState("");
   const [isConfiguring, setIsConfiguring] = useState(false);
   const { toast } = useToast();
 
-  const handleConfigureTwilio = async () => {
+  const handleConfigureEvolution = async () => {
     setIsConfiguring(true);
     
     // This would typically save the configuration to your backend
     toast({
       title: "Configuración guardada",
-      description: "Tu webhook de Twilio ha sido configurado correctamente.",
+      description: "Evolution API ha sido configurado correctamente.",
     });
     
     setIsConfiguring(false);
@@ -28,24 +30,47 @@ export function TwilioConfig() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Phone className="h-5 w-5" />
-          Configuración de Twilio WhatsApp
+          Configuración de Evolution API
         </CardTitle>
         <CardDescription>
-          Conecta tu número de WhatsApp Business a través de Twilio
+          Conecta tu WhatsApp Business usando Evolution API
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="webhook">Webhook URL de tu Edge Function</Label>
+          <Label htmlFor="apiUrl">URL de Evolution API</Label>
           <Input
-            id="webhook"
-            placeholder="https://tu-proyecto.supabase.co/functions/v1/twilio-webhook"
-            value={webhookUrl}
-            onChange={(e) => setWebhookUrl(e.target.value)}
+            id="apiUrl"
+            placeholder="https://tu-servidor.com"
+            value={apiUrl}
+            onChange={(e) => setApiUrl(e.target.value)}
+            className="font-mono text-sm"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="apiKey">API Key</Label>
+          <Input
+            id="apiKey"
+            type="password"
+            placeholder="Tu API Key de Evolution"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            className="font-mono text-sm"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="instance">Nombre de Instancia</Label>
+          <Input
+            id="instance"
+            placeholder="mi-instancia"
+            value={instanceName}
+            onChange={(e) => setInstanceName(e.target.value)}
             className="font-mono text-sm"
           />
           <p className="text-xs text-muted-foreground">
-            Copia esta URL en la configuración de tu número de WhatsApp en Twilio
+            El nombre de tu instancia de WhatsApp en Evolution API
           </p>
         </div>
 
@@ -78,9 +103,9 @@ export function TwilioConfig() {
         </div>
 
         <Button 
-          onClick={handleConfigureTwilio}
+          onClick={handleConfigureEvolution}
           className="w-full"
-          disabled={!webhookUrl || isConfiguring}
+          disabled={!apiUrl || !apiKey || !instanceName || isConfiguring}
         >
           {isConfiguring ? (
             <>
@@ -90,7 +115,7 @@ export function TwilioConfig() {
           ) : (
             <>
               <Phone className="mr-2 h-4 w-4" />
-              Configurar Twilio
+              Configurar Evolution API
             </>
           )}
         </Button>
@@ -98,10 +123,10 @@ export function TwilioConfig() {
         <div className="text-xs text-muted-foreground space-y-1">
           <p>Necesitarás configurar estas variables en Supabase:</p>
           <ul className="ml-4 space-y-1 font-mono">
-            <li>• TWILIO_ACCOUNT_SID</li>
-            <li>• TWILIO_AUTH_TOKEN</li>
-            <li>• TWILIO_WHATSAPP_NUMBER</li>
-            <li>• OPENAI_API_KEY</li>
+            <li>• EVOLUTION_API_URL</li>
+            <li>• EVOLUTION_API_KEY</li>
+            <li>• EVOLUTION_INSTANCE_NAME</li>
+            <li>• OPENAI_API_KEY (para el agente IA)</li>
           </ul>
         </div>
       </CardContent>
