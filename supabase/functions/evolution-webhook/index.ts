@@ -179,6 +179,12 @@ serve(async (req) => {
       const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
       const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
 
+      // Ensure the number has the correct format for Argentina (add 9 after 54 if missing)
+      let formattedNumber = fromNumber;
+      if (fromNumber.startsWith('54') && fromNumber.length >= 12 && !fromNumber.startsWith('549')) {
+        formattedNumber = '549' + fromNumber.substring(2);
+      }
+
       await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
         method: 'POST',
         headers: {
@@ -186,7 +192,7 @@ serve(async (req) => {
           'apikey': evolutionApiKey!,
         },
         body: JSON.stringify({
-          number: fromNumber,
+          number: formattedNumber,
           text: responseMessage,
         }),
       });
