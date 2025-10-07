@@ -102,6 +102,45 @@ async function saveSession(session: UserSession, supabase: any): Promise<void> {
   }
 }
 
+// === FUNCIONES DE INTERPRETACIÓN INTELIGENTE ===
+
+function detectNegation(message: string): boolean {
+  const negativePatterns = [
+    'no', 'nope', 'nah', 'ninguno', 'ninguna', 'no quiero',
+    'no lo quiero', 'no eso', 'mejor no', 'dejalo', 'déjalo',
+    'cancelar', 'quitar', 'eliminar', 'borrar', 'sacar'
+  ];
+  const lowerMsg = message.toLowerCase().trim();
+  return negativePatterns.some(pattern => lowerMsg.includes(pattern));
+}
+
+function detectAffirmation(message: string): boolean {
+  const affirmativePatterns = [
+    'si', 'sí', 'sep', 'dale', 'ok', 'okay', 'confirmar',
+    'confirmo', 'correcto', 'exacto', 'va', 'claro'
+  ];
+  const lowerMsg = message.toLowerCase().trim();
+  return affirmativePatterns.some(pattern => lowerMsg === pattern || lowerMsg.startsWith(pattern + ' '));
+}
+
+function detectBackCommand(message: string): boolean {
+  const backPatterns = [
+    'volver', 'atras', 'atrás', 'regresar', 'anterior'
+  ];
+  const lowerMsg = message.toLowerCase().trim();
+  return backPatterns.some(pattern => lowerMsg.includes(pattern));
+}
+
+function detectRemoveLast(message: string): boolean {
+  const removePatterns = [
+    'quitar ultimo', 'quitar último', 'borrar ultimo', 'borrar último',
+    'eliminar ultimo', 'eliminar último', 'sacar ultimo', 'sacar último',
+    'quita el ultimo', 'quita el último'
+  ];
+  const lowerMsg = message.toLowerCase().trim();
+  return removePatterns.some(pattern => lowerMsg.includes(pattern));
+}
+
 export async function handleVendorBot(
   message: string,
   phone: string,
@@ -303,7 +342,7 @@ export async function handleVendorBot(
       return await startVendorChatForOrder(phone, session.context?.selected_vendor_id!, supabase);
     }
 
-    // Buscar producto
+    // Buscar producto con interpretación inteligente
     const product = await findProductFromMessage(lowerMessage, session.context?.selected_vendor_id!, supabase);
     if (product) {
       session.state = 'ADDING_ITEMS';
@@ -312,7 +351,14 @@ export async function handleVendorBot(
       await saveSession(session, supabase);
       return `🛒 *${product.name}* - $${product.price}\n\n` +
              `¿Cuántas unidades quieres? (ej: "2", "tres")\n\n` +
-             `_Escribe *cancelar* para volver._`;
+             `_Escribe *no* si no quieres este producto._`;
+    }
+    
+    // Si no encontró producto, intentar interpretar mejor el mensaje
+    if (lowerMessage.length > 3) {
+      return `🤔 No encontré *"${message}"* en el menú.\n\n` +
+             `¿Podrías escribir el nombre del producto que buscas?\n` +
+             `O escribe *menu* para ver otros negocios.`;
     }
     
     return `🤔 No encontré ese producto.\n\n` +
@@ -321,6 +367,38 @@ export async function handleVendorBot(
 
   // Estado: AGREGANDO CANTIDAD
   if (session.state === 'ADDING_ITEMS') {
+    // Detectar si el usuario dice "no" o quiere cancelar este producto
+    if (detectNegation(lowerMessage) || detectBackCommand(lowerMessage)) {
+      delete session.context?.pending_product;
+      
+      // Si tiene items en el carrito, volver a CONFIRMING_ITEMS
+      if (session.context?.cart && session.context.cart.length > 0) {
+        session.state = 'CONFIRMING_ITEMS';
+        await saveSession(session, supabase);
+        
+        const cart = session.context.cart;
+        const total = cart.reduce((sum: number, item: CartItem) => sum + (item.price * item.quantity), 0);
+        
+        let cartSummary = `🔙 *Producto cancelado*\n\n`;
+        cartSummary += `📦 *Tu pedido actual:*\n`;
+        cart.forEach((item: CartItem) => {
+          cartSummary += `• ${item.quantity}x ${item.product_name} - $${(item.price * item.quantity).toFixed(2)}\n`;
+        });
+        cartSummary += `\n💰 *Total: $${total.toFixed(2)}*\n\n`;
+        cartSummary += `¿Quieres agregar algo más?\n`;
+        cartSummary += `• Escribe el producto para agregar\n`;
+        cartSummary += `• Escribe *confirmar* para continuar`;
+        
+        return cartSummary;
+      } else {
+        // Si no hay items, volver a BROWSING_PRODUCTS
+        session.state = 'BROWSING_PRODUCTS';
+        await saveSession(session, supabase);
+        return `🔙 Producto cancelado.\n\n` +
+               `Escribe el nombre del producto que quieres agregar.`;
+      }
+    }
+
     const quantity = parseQuantity(lowerMessage);
     if (quantity > 0) {
       const product = session.context?.pending_product;
@@ -354,12 +432,45 @@ export async function handleVendorBot(
         return cartSummary;
       }
     }
-    return `❌ Por favor escribe una cantidad válida (ej: "2", "tres")`;
+    return `❌ Por favor escribe una cantidad válida (ej: "2", "tres")\n\n_O escribe *no* para cancelar este producto._`;
   }
 
   // Estado: CONFIRMANDO ITEMS
   if (session.state === 'CONFIRMING_ITEMS') {
-    if (lowerMessage === 'confirmar' || lowerMessage.includes('continuar') || lowerMessage.includes('siguiente')) {
+    // Detectar si quiere quitar el último producto agregado
+    if (detectRemoveLast(lowerMessage)) {
+      if (session.context?.cart && session.context.cart.length > 0) {
+        const removedItem = session.context.cart.pop();
+        await saveSession(session, supabase);
+        
+        if (session.context.cart.length === 0) {
+          // Si no quedan items, volver a BROWSING_PRODUCTS
+          session.state = 'BROWSING_PRODUCTS';
+          await saveSession(session, supabase);
+          return `🗑️ *${removedItem?.product_name}* eliminado del carrito.\n\n` +
+                 `Tu carrito está vacío.\n` +
+                 `Escribe el nombre del producto que quieres agregar.`;
+        }
+        
+        const cart = session.context.cart;
+        const total = cart.reduce((sum: number, item: CartItem) => sum + (item.price * item.quantity), 0);
+        
+        let cartSummary = `🗑️ *${removedItem?.product_name}* eliminado del carrito.\n\n`;
+        cartSummary += `📦 *Tu pedido actualizado:*\n`;
+        cart.forEach((item: CartItem) => {
+          cartSummary += `• ${item.quantity}x ${item.product_name} - $${(item.price * item.quantity).toFixed(2)}\n`;
+        });
+        cartSummary += `\n💰 *Total: $${total.toFixed(2)}*\n\n`;
+        cartSummary += `¿Quieres agregar algo más o confirmar?\n`;
+        cartSummary += `• Escribe el producto para agregar\n`;
+        cartSummary += `• Escribe *confirmar* para continuar`;
+        
+        return cartSummary;
+      }
+      return `❌ No hay productos en el carrito para eliminar.`;
+    }
+
+    if (detectAffirmation(lowerMessage) || lowerMessage === 'confirmar' || lowerMessage.includes('continuar') || lowerMessage.includes('siguiente')) {
       session.state = 'COLLECTING_ADDRESS';
       await saveSession(session, supabase);
       return `📍 *Perfecto! Ahora necesito tu dirección de entrega*\n\n` +
@@ -376,7 +487,8 @@ export async function handleVendorBot(
       session.context.pending_product = product;
       await saveSession(session, supabase);
       return `🛒 *${product.name}* - $${product.price}\n\n` +
-             `¿Cuántas unidades? (ej: "2", "tres")`;
+             `¿Cuántas unidades? (ej: "2", "tres")\n\n` +
+             `_Escribe *no* si no quieres este producto._`;
     }
 
     return `💡 Escribe el nombre del producto para agregar más, o *confirmar* para continuar.`;
@@ -670,31 +782,59 @@ async function showVendorProducts(vendorId: string, vendorName: string, supabase
 }
 
 async function findProductFromMessage(message: string, vendorId: string, supabase: any): Promise<any | null> {
-  // Buscar por número
-  const number = parseInt(message);
-  if (number > 0) {
+  const lowerMessage = message.toLowerCase().trim();
+  
+  // Intentar número primero
+  const number = parseInt(lowerMessage);
+  if (!isNaN(number) && number > 0) {
     const { data: products } = await supabase
       .from('products')
       .select('*')
       .eq('vendor_id', vendorId)
       .eq('is_available', true)
-      .order('category');
+      .order('category')
+      .order('name');
     
     if (products && products[number - 1]) {
       return products[number - 1];
     }
   }
-
-  // Buscar por nombre
-  const { data: product } = await supabase
+  
+  // Buscar por nombre exacto o similar
+  const { data: products } = await supabase
     .from('products')
     .select('*')
     .eq('vendor_id', vendorId)
-    .eq('is_available', true)
-    .ilike('name', `%${message}%`)
-    .maybeSingle();
-
-  return product;
+    .eq('is_available', true);
+  
+  if (!products || products.length === 0) return null;
+  
+  // Intentar coincidencia exacta primero
+  const exactMatch = products.find((p: any) => 
+    p.name.toLowerCase() === lowerMessage
+  );
+  if (exactMatch) return exactMatch;
+  
+  // Intentar coincidencia parcial (contiene)
+  const partialMatch = products.find((p: any) => 
+    p.name.toLowerCase().includes(lowerMessage) || 
+    lowerMessage.includes(p.name.toLowerCase())
+  );
+  if (partialMatch) return partialMatch;
+  
+  // Intentar coincidencia por palabras clave
+  const words = lowerMessage.split(' ').filter((w: string) => w.length > 2);
+  if (words.length > 0) {
+    const keywordMatch = products.find((p: any) => {
+      const productWords = p.name.toLowerCase().split(' ');
+      return words.some((word: string) => 
+        productWords.some((pw: string) => pw.includes(word) || word.includes(pw))
+      );
+    });
+    if (keywordMatch) return keywordMatch;
+  }
+  
+  return null;
 }
 
 function parseQuantity(message: string): number {
