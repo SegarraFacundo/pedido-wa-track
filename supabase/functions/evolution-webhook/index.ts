@@ -69,6 +69,8 @@ async function saveSession(session: UserSession): Promise<void> {
     }, { onConflict: 'phone' });
 }
 
+
+
 async function handleVendorBot(
   fromNumber: string, 
   messageText: string
@@ -95,7 +97,7 @@ async function handleVendorBot(
   }
 }
 
-async function jidToPhoneWithAR9(remoteJid: string | undefined): Promise<string | null> {
+function jidToPhoneWithAR9(remoteJid: string | undefined): string | null {
   const jid = String(remoteJid || "");
   const base = jid.replace(/@(s\.whatsapp\.net|g\.us)$/i, "");
 
@@ -157,7 +159,7 @@ serve(async (req) => {
       });
     }
 
-    const fromNumber = await jidToPhoneWithAR9(data.key?.remoteJid);
+    const fromNumber = data.key?.remoteJid;
     const messageText = data.message?.conversation || 
                        data.message?.extendedTextMessage?.text || '';
 
@@ -201,11 +203,6 @@ serve(async (req) => {
       const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
       const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
 
-      // Ensure the number has the correct format for Argentina (add 9 after 54 if missing)
-      let formattedNumber = fromNumber;
-      if (fromNumber.startsWith('54') && fromNumber.length >= 12 && !fromNumber.startsWith('549')) {
-        formattedNumber = '549' + fromNumber.substring(2);
-      }
 
       await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
         method: 'POST',
@@ -214,7 +211,7 @@ serve(async (req) => {
           'apikey': evolutionApiKey!,
         },
         body: JSON.stringify({
-          number: formattedNumber,
+          chatId: data.key.remoteJid,
           text: responseMessage,
         }),
       });
