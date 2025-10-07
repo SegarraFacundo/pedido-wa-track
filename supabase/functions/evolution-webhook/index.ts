@@ -249,18 +249,30 @@ serve(async (req) => {
       console.log('📤 Original JID:', data.key.remoteJid);
       console.log('📤 Formatted phone:', formattedPhone);
       console.log('📤 Final chatId:', chatId);
+      console.log('📤 Sending message to Evolution API...');
 
-      await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': evolutionApiKey!,
-        },
-        body: JSON.stringify({
-          chatId: chatId,
-          text: responseMessage,
-        }),
-      });
+      try {
+        const evolutionResponse = await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': evolutionApiKey!,
+          },
+          body: JSON.stringify({
+            number: formattedPhone,
+            text: responseMessage,
+          }),
+        });
+
+        const responseData = await evolutionResponse.json();
+        console.log('✅ Evolution API response:', JSON.stringify(responseData));
+        
+        if (!evolutionResponse.ok) {
+          console.error('❌ Evolution API error:', evolutionResponse.status, responseData);
+        }
+      } catch (error) {
+        console.error('❌ Error sending message to Evolution API:', error);
+      }
     }
 
     return new Response(JSON.stringify({ status: 'success' }), {
