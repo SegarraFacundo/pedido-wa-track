@@ -7,6 +7,13 @@ import lapachoIcon from "@/assets/lapacho-icon.png";
 
 export default function Landing() {
   const navigate = useNavigate();
+  
+  const handleOrderClick = () => {
+    // Número de WhatsApp del bot (formato internacional sin + ni espacios)
+    const whatsappNumber = '5493464448309';
+    const message = encodeURIComponent('Hola, quiero hacer un pedido');
+    window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');
+  };
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
@@ -47,7 +54,7 @@ export default function Landing() {
             <Button size="lg" className="text-lg px-8" onClick={() => navigate('/vendor-auth')}>
               Registrar mi Negocio
             </Button>
-            <Button size="lg" variant="outline" className="text-lg px-8">
+            <Button size="lg" variant="outline" className="text-lg px-8" onClick={handleOrderClick}>
               Hacer un Pedido
             </Button>
           </div>
