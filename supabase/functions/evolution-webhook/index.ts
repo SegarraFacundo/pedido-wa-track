@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
+import { handleVendorBot } from '../twilio-webhook/vendor-bot.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -71,28 +72,18 @@ async function saveSession(session: UserSession): Promise<void> {
 
 
 
-async function handleVendorBot(
+async function processWithVendorBot(
   fromNumber: string, 
   messageText: string
 ): Promise<string> {
   console.log('Processing with vendor bot:', { fromNumber, messageText });
   
   try {
-    const { data, error } = await supabase.functions.invoke('twilio-webhook/vendor-bot', {
-      body: { 
-        phone: fromNumber,
-        message: messageText 
-      }
-    });
-
-    if (error) {
-      console.error('Error calling vendor bot:', error);
-      return 'Lo siento, hubo un error procesando tu mensaje. Por favor intenta nuevamente.';
-    }
-
-    return data?.response || 'Gracias por tu mensaje. ¿En qué puedo ayudarte?';
+    const response = await handleVendorBot(messageText, fromNumber, supabase);
+    console.log('✅ Bot response:', response.substring(0, 100));
+    return response;
   } catch (error) {
-    console.error('Exception calling vendor bot:', error);
+    console.error('❌ Exception calling vendor bot:', error);
     return 'Gracias por contactarnos. Un agente te responderá pronto.';
   }
 }
@@ -185,7 +176,7 @@ serve(async (req) => {
     if (vendorStatus) {
       console.log('Message from vendor:', cleanPhone);
       // Vendor messages - could be handled differently
-      responseMessage = await handleVendorBot(cleanPhone, messageText);
+      responseMessage = await processWithVendorBot(cleanPhone, messageText);
     } else {
       // Customer message
       if (session.in_vendor_chat && session.assigned_vendor) {
@@ -197,7 +188,7 @@ serve(async (req) => {
         });
       } else {
         // Process with bot
-        responseMessage = await handleVendorBot(cleanPhone, messageText);
+        responseMessage = await processWithVendorBot(cleanPhone, messageText);
       }
     }
 
