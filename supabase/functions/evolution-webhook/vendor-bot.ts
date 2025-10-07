@@ -454,7 +454,7 @@ export async function handleVendorBot(
         return successMsg;
       }
       
-      return `❌ Hubo un problema al crear tu pedido. Escribe *vendedor* para ayuda.`;
+      return `❌ Hubo un problema al crear tu pedido. Intenta nuevamente.`;
     }
     
     return `💡 Escribe *confirmar* para realizar el pedido o *cancelar* para empezar de nuevo.`;
@@ -526,16 +526,14 @@ export async function handleVendorBot(
   // Por defecto - Si no entendió nada, dar ayuda según el estado actual
   if (session.state === 'SELECTING_VENDOR') {
     const defaultMsg = `🤔 No entendí.\n\n` + await showVendorSelection(supabase);
-    return addHelpFooter(defaultMsg, false);
+    return defaultMsg;
   }
   
   if (session.state === 'BROWSING_PRODUCTS' && session.context?.selected_vendor_name) {
-    const defaultMsg = `🤔 No encontré ese producto en ${session.context.selected_vendor_name}.\n\nEscribe el número o nombre del producto, o *menu* para volver.`;
-    return addHelpFooter(defaultMsg, true);
+    return `🤔 No encontré ese producto en ${session.context.selected_vendor_name}.\n\nEscribe el número o nombre del producto.`;
   }
 
-  const defaultMsg = `🤔 No entendí tu mensaje.\n\nEscribe *menu* para empezar o *vendedor* para ayuda.`;
-  return addHelpFooter(defaultMsg, session.context?.selected_vendor_id ? true : false);
+  return `🤔 No entendí tu mensaje.\n\nEscribe *menu* para empezar.`;
 }
 
 // === FUNCIONES DE APOYO ===
@@ -663,8 +661,7 @@ async function showVendorProducts(vendorId: string, vendorName: string, supabase
     });
 
     message += `\n💡 *¿Qué quieres ordenar?*\n`;
-    message += `Escribe el número o nombre del producto.\n\n`;
-    message += `_Escribe *vendedor* si necesitas ayuda._`;
+    message += `Escribe el número o nombre del producto.`;
 
     return message;
   } catch (e) {
@@ -847,11 +844,9 @@ async function getOrderStatus(phone: string, supabase: any): Promise<string> {
       message += `   📅 ${new Date(order.created_at).toLocaleString('es-AR')}\n\n`;
     });
 
-    message += `💬 ¿Necesitas ayuda? Escribe *vendedor*`;
-
     return message;
   } catch (e) {
-    return `❌ Error al consultar pedidos.\n\nEscribe *menu* para volver.`;
+    return `❌ Error al consultar pedidos.`;
   }
 }
 
