@@ -117,18 +117,17 @@ serve(async (req) => {
       });
     }
 
-    // Extract message details
-    const messageData = data?.message;
-    if (!messageData) {
-      console.log('No message data found');
-      return new Response(JSON.stringify({ status: 'no_message' }), {
+    // Extract message details - data already contains key and message
+    if (!data) {
+      console.log('No data found');
+      return new Response(JSON.stringify({ status: 'no_data' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200
       });
     }
 
     // Skip messages sent by the bot itself
-    if (messageData.key?.fromMe) {
+    if (data.key?.fromMe) {
       console.log('Ignoring message from bot');
       return new Response(JSON.stringify({ status: 'ignored_own_message' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -136,9 +135,9 @@ serve(async (req) => {
       });
     }
 
-    const fromNumber = messageData.key?.remoteJid?.replace('@s.whatsapp.net', '');
-    const messageText = messageData.message?.conversation || 
-                       messageData.message?.extendedTextMessage?.text || '';
+    const fromNumber = data.key?.remoteJid?.replace('@s.whatsapp.net', '');
+    const messageText = data.message?.conversation || 
+                       data.message?.extendedTextMessage?.text || '';
 
     if (!fromNumber || !messageText) {
       console.log('Missing phone number or message text');
