@@ -97,6 +97,28 @@ async function handleVendorBot(
   }
 }
 
+async function jidToPhoneWithAR9(remoteJid: string | undefined): Promise<string | null> {
+  const jid = String(remoteJid || "");
+  const base = jid.replace(/@(s\.whatsapp\.net|g\.us)$/i, "");
+
+  // Si es grupo, no hay número directo
+  if (/@g\.us$/i.test(jid)) return null;
+
+  // Ya viene con 549 -> devolver tal cual
+  if (base.startsWith("549")) return base;
+
+  // Si viene como 54... (sin 9) y parece móvil, insertamos el 9
+  if (base.startsWith("54") && !base.startsWith("549")) {
+    // Heurística simple: largo >= 10 suele indicar línea móvil/área + número
+    if (base.length >= 10) {
+      return "549" + base.slice(2);
+    }
+  }
+
+  // Otros países o casos raros
+  return base;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -181,7 +203,13 @@ serve(async (req) => {
       const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
       const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
 
-      console.log('📤 Enviando mensaje a:', fromNumber);
+      // Formatear el número con el 9 de Argentina si es necesario
+      const formattedPhone = await jidToPhoneWithAR9(data.key.remoteJid);
+      const chatId = formattedPhone ? `${formattedPhone}@s.whatsapp.net` : data.key.remoteJid;
+
+      console.log('📤 Original JID:', data.key.remoteJid);
+      console.log('📤 Formatted phone:', formattedPhone);
+      console.log('📤 Final chatId:', chatId);
 
       await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
         method: 'POST',
@@ -190,7 +218,7 @@ serve(async (req) => {
           'apikey': evolutionApiKey!,
         },
         body: JSON.stringify({
-          chatId: data.key.remoteJid,
+          chatId: chatId,
           text: responseMessage,
         }),
       });
