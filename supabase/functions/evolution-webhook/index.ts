@@ -95,6 +95,28 @@ async function handleVendorBot(
   }
 }
 
+async function jidToPhoneWithAR9(remoteJid: string | undefined): Promise<string | null> {
+  const jid = String(remoteJid || "");
+  const base = jid.replace(/@(s\.whatsapp\.net|g\.us)$/i, "");
+
+  // Si es grupo, no hay número directo
+  if (/@g\.us$/i.test(jid)) return null;
+
+  // Ya viene con 549 -> devolver tal cual
+  if (base.startsWith("549")) return base;
+
+  // Si viene como 54... (sin 9) y parece móvil, insertamos el 9
+  if (base.startsWith("54") && !base.startsWith("549")) {
+    // Heurística simple: largo >= 11 suele indicar línea móvil/área + número
+    if (base.length >= 11) {
+      return "549" + base.slice(2);
+    }
+  }
+
+  // Otros países o casos raros
+  return base;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -135,7 +157,7 @@ serve(async (req) => {
       });
     }
 
-    const fromNumber = data.key?.remoteJid?.replace('@s.whatsapp.net', '');
+    const fromNumber = await jidToPhoneWithAR9(data.key?.remoteJid);
     const messageText = data.message?.conversation || 
                        data.message?.extendedTextMessage?.text || '';
 
