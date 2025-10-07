@@ -151,11 +151,55 @@ serve(async (req) => {
     }
 
     const fromNumber = data.key?.remoteJid;
+    
+    // Extract message text from different message types
     const messageText = data.message?.conversation || 
-                       data.message?.extendedTextMessage?.text || '';
+                       data.message?.extendedTextMessage?.text ||
+                       data.message?.imageMessage?.caption ||
+                       data.message?.videoMessage?.caption ||
+                       '';
 
-    if (!fromNumber || !messageText) {
-      console.log('Missing phone number or message text');
+    if (!fromNumber) {
+      console.log('Missing phone number');
+      return new Response(JSON.stringify({ status: 'invalid_data' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
+      });
+    }
+
+    // If it's a media message without text, send a default response
+    if (!messageText && (data.message?.audioMessage || data.message?.imageMessage || data.message?.videoMessage)) {
+      console.log('Media message received without text, responding with default message');
+      const cleanPhone = fromNumber.replace(/@s\.whatsapp\.net$/i, '');
+      const defaultResponse = 'Recibí tu mensaje multimedia. Por favor envía un mensaje de texto para continuar.';
+      
+      const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL');
+      const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
+      const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
+      
+      const formattedPhone = await jidToPhoneWithAR9(data.key.remoteJid);
+      const chatId = formattedPhone ? `${formattedPhone}@s.whatsapp.net` : data.key.remoteJid;
+      
+      await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': evolutionApiKey!,
+        },
+        body: JSON.stringify({
+          chatId: chatId,
+          text: defaultResponse,
+        }),
+      });
+      
+      return new Response(JSON.stringify({ status: 'media_handled' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
+      });
+    }
+
+    if (!messageText) {
+      console.log('Missing message text');
       return new Response(JSON.stringify({ status: 'invalid_data' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200
