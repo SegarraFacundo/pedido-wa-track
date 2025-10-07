@@ -4,12 +4,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Store, DollarSign, BarChart3, LogOut, Headphones } from "lucide-react";
+import { Store, DollarSign, BarChart3, LogOut, Headphones, Bot } from "lucide-react";
 import VendorManagement from "@/components/admin/VendorManagement";
 import CommissionManagement from "@/components/admin/CommissionManagement";
 import CommissionReports from "@/components/admin/CommissionReports";
 import SupportPanel from "@/components/admin/SupportPanel";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
+import { TwilioConfig } from "@/components/TwilioConfig";
 import lapachoLogo from "@/assets/lapacho-logo.png";
 import lapachoIcon from "@/assets/lapacho-icon.png";
 
@@ -95,7 +96,7 @@ export default function Admin() {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue="vendors" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-8">
+          <TabsList className="grid w-full grid-cols-5 mb-8">
             <TabsTrigger value="vendors">
               <Store className="mr-2 h-4 w-4" />
               Negocios
@@ -111,6 +112,10 @@ export default function Admin() {
             <TabsTrigger value="support">
               <Headphones className="mr-2 h-4 w-4" />
               Soporte
+            </TabsTrigger>
+            <TabsTrigger value="ai">
+              <Bot className="mr-2 h-4 w-4" />
+              Agente IA
             </TabsTrigger>
           </TabsList>
 
@@ -128,6 +133,10 @@ export default function Admin() {
 
           <TabsContent value="support">
             <SupportPanel />
+          </TabsContent>
+
+          <TabsContent value="ai">
+            <TwilioConfig />
           </TabsContent>
         </Tabs>
       </main>
