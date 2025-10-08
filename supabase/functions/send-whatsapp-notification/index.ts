@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 // Función para normalizar números de teléfono argentinos
-// WhatsApp Argentina requiere: +549 + código de área + número (13 dígitos)
+// Evolution API requiere formato SIN + para Argentina: 549XXXXXXXXXX
 function normalizeArgentinePhone(phone: string): string {
   let cleaned = phone.replace(/[\s\-\(\)\+]/g, '');
   
@@ -17,29 +17,31 @@ function normalizeArgentinePhone(phone: string): string {
     console.log('⚠️ Detected double 9, corrected:', phone, '->', cleaned);
   }
   
-  // Si ya tiene formato correcto 549XXXXXXXXXX (13 dígitos) -> agregar +
+  // Si ya tiene formato correcto 549XXXXXXXXXX (13 dígitos) -> retornar SIN +
   if (cleaned.startsWith('549') && cleaned.length === 13) {
-    console.log('✅ Correct format 549:', cleaned, '-> +' + cleaned);
-    return '+' + cleaned;
+    console.log('✅ Correct format 549:', cleaned);
+    return cleaned;
   }
   
   // Si tiene 54 sin el 9: 54XXXXXXXXXX (12 dígitos) -> agregar el 9
   if (cleaned.startsWith('54') && !cleaned.startsWith('549') && cleaned.length === 12) {
     const withNine = '549' + cleaned.substring(2);
     console.log('➕ Adding 9 for mobile:', cleaned, '->', withNine);
-    return '+' + withNine;
+    return withNine;
   }
   
   // Si empieza con 9: 9XXXXXXXXXX (11 dígitos) -> agregar 54
   if (cleaned.startsWith('9') && cleaned.length === 11) {
-    console.log('➕ Adding 54:', cleaned, '-> +54' + cleaned);
-    return '+54' + cleaned;
+    const formatted = '54' + cleaned;
+    console.log('➕ Adding 54:', cleaned, '->', formatted);
+    return formatted;
   }
   
   // Si es número local sin código: XXXXXXXXXX (10 dígitos) -> agregar 549
   if (!cleaned.startsWith('54') && cleaned.length === 10) {
-    console.log('➕ Adding 549:', cleaned, '-> +549' + cleaned);
-    return '+549' + cleaned;
+    const formatted = '549' + cleaned;
+    console.log('➕ Adding 549:', cleaned, '->', formatted);
+    return formatted;
   }
   
   // Si ya tiene +, limpiar y reprocesar
@@ -47,9 +49,9 @@ function normalizeArgentinePhone(phone: string): string {
     return normalizeArgentinePhone(cleaned);
   }
   
-  // Si nada coincide, agregar + y retornar
-  console.log('⚠️ Unknown format, returning:', '+' + cleaned);
-  return '+' + cleaned;
+  // Si nada coincide, retornar
+  console.log('⚠️ Unknown format, returning:', cleaned);
+  return cleaned;
 }
 
 serve(async (req) => {
