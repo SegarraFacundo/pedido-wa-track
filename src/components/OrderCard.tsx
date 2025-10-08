@@ -80,17 +80,41 @@ export function OrderCard({ order, onStatusChange, onOpenChat, isVendorView = fa
         </div>
         
         <div className="border-t pt-3">
-          <div className="space-y-1">
-            {order.items.map((item) => (
-              <div key={item.id} className="flex justify-between text-sm">
-                <span>{item.quantity}x {item.name}</span>
-                <span className="font-medium">${(item.price * item.quantity).toFixed(2)}</span>
-              </div>
-            ))}
+          <div className="mb-2">
+            <h4 className="font-semibold text-sm text-muted-foreground mb-2">Productos:</h4>
+            <div className="space-y-2">
+              {order.items && order.items.length > 0 ? (
+                order.items.map((item, index) => (
+                  <div key={item.id || index} className="bg-muted/30 p-2 rounded-md">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <p className="font-medium">{item.name}</p>
+                        {item.notes && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Nota: {item.notes}
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right ml-2">
+                        <p className="text-sm font-medium">{item.quantity}x</p>
+                        <p className="text-sm text-muted-foreground">${item.price.toFixed(2)}</p>
+                      </div>
+                    </div>
+                    <div className="text-right mt-1">
+                      <p className="font-semibold text-sm">${(item.price * item.quantity).toFixed(2)}</p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-sm text-muted-foreground p-2 bg-muted/30 rounded-md">
+                  {order.items && order.items.length}x - Detalles no disponibles
+                </div>
+              )}
+            </div>
           </div>
-          <div className="flex justify-between mt-2 pt-2 border-t font-semibold">
+          <div className="flex justify-between pt-2 border-t font-semibold">
             <span>Total</span>
-            <span className="text-primary">${order.total.toFixed(2)}</span>
+            <span className="text-primary text-lg">${order.total.toFixed(2)}</span>
           </div>
         </div>
         
