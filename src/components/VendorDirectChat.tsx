@@ -37,9 +37,11 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [vendorName, setVendorName] = useState<string>('');
   const { toast } = useToast();
 
   useEffect(() => {
+    fetchVendorInfo();
     fetchActiveChats();
     setupRealtimeSubscription();
   }, [vendorId]);
@@ -106,6 +108,23 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
     return () => {
       supabase.removeChannel(channel);
     };
+  };
+
+  const fetchVendorInfo = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('vendors')
+        .select('name')
+        .eq('id', vendorId)
+        .single();
+
+      if (error) throw error;
+
+      setVendorName(data?.name || 'el vendedor');
+    } catch (error) {
+      console.error('Error fetching vendor info:', error);
+      setVendorName('el vendedor');
+    }
   };
 
   const fetchActiveChats = async () => {
@@ -176,11 +195,11 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
       
       console.log('Sending message to customer:', phoneToSend);
 
-      // Enviar mensaje por WhatsApp al cliente
+      // Enviar mensaje por WhatsApp al cliente con el nombre del negocio
       await supabase.functions.invoke('send-whatsapp-notification', {
         body: {
           phoneNumber: phoneToSend,
-          message: `💬 Mensaje del vendedor:\n${newMessage}`,
+          message: `📩 Mensaje de *${vendorName}*:\n${newMessage}`,
           orderId: selectedChat.id // Para logging
         }
       });
