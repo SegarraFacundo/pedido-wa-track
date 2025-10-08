@@ -38,6 +38,10 @@ const getNextStatus = (currentStatus: OrderStatus): OrderStatus | null => {
 export function OrderCard({ order, onStatusChange, onOpenChat, isVendorView = false }: OrderCardProps) {
   const nextStatus = getNextStatus(order.status);
   
+  // Debug logging
+  console.log('OrderCard - order.items:', order.items);
+  console.log('OrderCard - items length:', order.items?.length);
+  
   return (
     <Card className="hover:shadow-lg transition-shadow duration-200">
       <CardHeader className="pb-3">
