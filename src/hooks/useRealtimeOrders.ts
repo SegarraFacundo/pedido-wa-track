@@ -239,17 +239,10 @@ export function useRealtimeOrders(vendorId?: string) {
           }, { onConflict: 'phone' });
       }
 
-      // Formatear el número de teléfono correctamente para WhatsApp
-      let formattedPhone = currentOrder.customerPhone;
-      if (formattedPhone.startsWith('549') && formattedPhone.length === 13) {
-        // Agregar el 9 después del 549: 5493412699024 -> 54993412699024
-        formattedPhone = '549' + '9' + formattedPhone.substring(3);
-      }
-
       await supabase.functions.invoke('send-whatsapp-notification', {
         body: {
           orderId,
-          phoneNumber: formattedPhone,
+          phoneNumber: currentOrder.customerPhone,
           message: notificationMessage
         }
       });
