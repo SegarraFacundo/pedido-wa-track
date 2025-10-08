@@ -35,7 +35,13 @@ export function useRealtimeOrders(vendorId?: string) {
           customerPhone: order.customer_phone,
           vendorId: order.vendor_id,
           vendorName: order.vendor?.name || '',
-          items: order.items || [],
+          items: (order.items || []).map((item: any) => ({
+            id: item.product_id || item.id,
+            name: item.product_name || item.name,
+            quantity: item.quantity,
+            price: Number(item.price),
+            notes: item.notes
+          })),
           total: Number(order.total),
           status: order.status as OrderStatus,
           address: order.address,
@@ -91,13 +97,20 @@ export function useRealtimeOrders(vendorId?: string) {
                 .single();
 
               if (data) {
+                const items = Array.isArray(data.items) ? data.items : [];
                 const newOrder: Order = {
                   id: data.id,
                   customerName: data.customer_name,
                   customerPhone: data.customer_phone,
                   vendorId: data.vendor_id,
                   vendorName: data.vendor?.name || '',
-                  items: (data.items as any[]) || [],
+                  items: items.map((item: any) => ({
+                    id: item.product_id || item.id,
+                    name: item.product_name || item.name,
+                    quantity: item.quantity,
+                    price: Number(item.price),
+                    notes: item.notes
+                  })),
                   total: Number(data.total),
                   status: data.status as OrderStatus,
                   address: data.address,
