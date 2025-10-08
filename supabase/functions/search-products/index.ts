@@ -24,7 +24,8 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Usar IA para extraer palabras clave de búsqueda
+    // Usar IA para extraer y normalizar palabras clave de búsqueda
+    // La IA también corrige errores ortográficos y genera variaciones
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -36,11 +37,21 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: "Eres un asistente que extrae palabras clave de búsqueda de productos de comida. Responde solo con las palabras clave separadas por comas, sin explicaciones."
+            content: "Eres un asistente que normaliza búsquedas de comida. Corrige errores ortográficos y extrae las palabras clave correctas. Responde SOLO con las palabras clave corregidas separadas por comas."
           },
           {
             role: "user",
-            content: `Del texto "${searchQuery}", extrae las palabras clave para buscar productos de comida. Por ejemplo, si dice "quiero una pizza con pepperoni", responde "pizza, pepperoni". Si dice "hamburguesa completa", responde "hamburguesa". Solo palabras clave, sin artículos ni palabras innecesarias.`
+            content: `Normaliza esta búsqueda y corrige errores: "${searchQuery}". 
+            
+Ejemplos:
+- "piza" → "pizza"
+- "pizzas" → "pizza"
+- "pzzas" → "pizza"
+- "hamburgueza" → "hamburguesa"
+- "suchi" → "sushi"
+- "quiero pedir 4 pizzas" → "pizza"
+
+Responde solo con las palabras clave corregidas, sin explicación ni ejemplos.`
           }
         ],
       }),
@@ -48,44 +59,69 @@ serve(async (req) => {
 
     const aiData = await aiResponse.json();
     const keywords = aiData.choices[0].message.content.trim().toLowerCase();
-    console.log("Keywords extraídas:", keywords);
+    console.log("Keywords normalizadas:", keywords, "desde búsqueda original:", searchQuery);
 
-    // Buscar productos que coincidan con las keywords
-    const keywordArray = keywords.split(",").map((k: string) => k.trim());
+    // Buscar productos que coincidan con las keywords (con búsqueda flexible)
+    const keywordArray = keywords.split(",").map((k: string) => k.trim()).filter(k => k.length > 0);
+    
+    if (keywordArray.length === 0) {
+      return new Response(
+        JSON.stringify({ 
+          found: false, 
+          message: `No pude entender qué buscas. Intenta con algo como "pizza" o "hamburguesa"` 
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     
     // Obtener hora actual y día de la semana
     const now = new Date();
     const dayOfWeek = now.toLocaleDateString('en-US', { weekday: 'lowercase' });
     const currentTime = now.toTimeString().split(' ')[0];
 
-    // Buscar productos y vendors abiertos
-    let productsQuery = supabase
-      .from('products')
-      .select(`
-        id,
-        name,
-        description,
-        price,
-        category,
-        vendor:vendors(
+    // Buscar productos con búsqueda flexible
+    // Para cada keyword, buscar con wildcards generosos
+    let allProducts: any[] = [];
+    
+    for (const keyword of keywordArray) {
+      // Buscar en nombre, descripción y categoría
+      // Usar % en ambos lados para buscar la palabra en cualquier parte
+      const { data: products } = await supabase
+        .from('products')
+        .select(`
           id,
           name,
+          description,
+          price,
           category,
-          average_rating,
-          is_active,
-          payment_status,
-          days_open,
-          opening_time,
-          closing_time
-        )
-      `)
-      .eq('is_available', true);
+          image,
+          vendor:vendors(
+            id,
+            name,
+            category,
+            average_rating,
+            is_active,
+            payment_status,
+            days_open,
+            opening_time,
+            closing_time
+          )
+        `)
+        .eq('is_available', true)
+        .or(`name.ilike.%${keyword}%,description.ilike.%${keyword}%,category.ilike.%${keyword}%`);
+      
+      if (products && products.length > 0) {
+        allProducts = [...allProducts, ...products];
+      }
+    }
 
-    // Filtrar por palabras clave
-    const orConditions = keywordArray.map(kw => `name.ilike.%${kw}%,description.ilike.%${kw}%,category.ilike.%${kw}%`).join(',');
-    productsQuery = productsQuery.or(orConditions);
+    // Eliminar duplicados por ID de producto
+    const uniqueProducts = Array.from(
+      new Map(allProducts.map(p => [p.id, p])).values()
+    );
 
-    const { data: products, error } = await productsQuery;
+    const products = uniqueProducts;
+    const error = null;
 
     if (error) {
       console.error("Error buscando productos:", error);
