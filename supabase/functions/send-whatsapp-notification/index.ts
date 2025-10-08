@@ -79,10 +79,12 @@ serve(async (req) => {
     
     console.log('Using Evolution API instance:', instanceName);
     
-    // Normalizar el número de teléfono
+    // Normalizar el número de teléfono y agregar @s.whatsapp.net para evitar normalización
     const formattedPhone = normalizeArgentinePhone(phoneNumber ?? '');
+    // Agregar el sufijo de WhatsApp para que Evolution API no normalice el número
+    const whatsappJid = formattedPhone + '@s.whatsapp.net';
     console.log('Phone normalization:', phoneNumber, '->', formattedPhone);
-    console.log('Sending to:', formattedPhone);
+    console.log('WhatsApp JID:', whatsappJid);
     
     // Send WhatsApp message via Evolution API
     const response = await fetch(
@@ -94,7 +96,7 @@ serve(async (req) => {
           'apikey': evolutionApiKey,
         },
         body: JSON.stringify({
-          number: formattedPhone,
+          number: whatsappJid,
           text: message,
         }),
       }
