@@ -102,10 +102,10 @@ export function useRealtimeMessages(orderId: string) {
 
       // If vendor is sending, notify customer via WhatsApp
       if (sender === 'vendor') {
-        console.log('Vendor sending message, fetching order data...');
+        console.log('Vendor sending message, fetching order and vendor data...');
         const { data: orderData, error: orderError } = await supabase
           .from('orders')
-          .select('customer_phone')
+          .select('customer_phone, vendor:vendors(name)')
           .eq('id', orderId)
           .single();
 
@@ -115,13 +115,14 @@ export function useRealtimeMessages(orderId: string) {
         }
 
         if (orderData && orderData.customer_phone) {
+          const vendorName = orderData.vendor?.name || 'el vendedor';
           console.log('Sending WhatsApp notification to:', orderData.customer_phone);
           
           const { data: whatsappResponse, error: whatsappError } = await supabase.functions.invoke('send-whatsapp-notification', {
             body: {
               orderId,
               phoneNumber: orderData.customer_phone,
-              message: `📩 Mensaje del vendedor: ${content}`
+              message: `📩 Mensaje de *${vendorName}*: ${content}`
             }
           });
 
