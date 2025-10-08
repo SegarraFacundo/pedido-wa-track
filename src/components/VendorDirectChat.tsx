@@ -170,11 +170,18 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
 
       if (error) throw error;
 
+      // Normalizar el número de teléfono antes de enviar
+      // La edge function send-whatsapp-notification se encargará del formateo final
+      const phoneToSend = selectedChat.customer_phone;
+      
+      console.log('Sending message to customer:', phoneToSend);
+
       // Enviar mensaje por WhatsApp al cliente
       await supabase.functions.invoke('send-whatsapp-notification', {
         body: {
-          phoneNumber: selectedChat.customer_phone,
-          message: `💬 Mensaje del vendedor:\n${newMessage}`
+          phoneNumber: phoneToSend,
+          message: `💬 Mensaje del vendedor:\n${newMessage}`,
+          orderId: selectedChat.id // Para logging
         }
       });
 
