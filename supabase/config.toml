@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.create-vendor-user]
 verify_jwt = false
+
+[functions.search-products]
+verify_jwt = false
+
+[functions.send-whatsapp-notification]
+verify_jwt = false

@@ -39,6 +39,8 @@ function normalizeArgentinePhone(phone: string): string {
 // Estados posibles del bot - flujo de pedido completo
 type BotState = 
   | 'WELCOME'
+  | 'SEARCHING_PRODUCTS'  // Nuevo estado para búsqueda
+  | 'VIEWING_SEARCH_RESULTS'  // Nuevo estado para resultados
   | 'SELECTING_VENDOR'
   | 'BROWSING_PRODUCTS'
   | 'ADDING_ITEMS'
@@ -62,6 +64,8 @@ interface UserSession {
   phone: string;
   state: BotState;
   context?: {
+    search_query?: string;  // Nuevo campo para la búsqueda
+    search_results?: any[];  // Nuevo campo para resultados
     selected_vendor_id?: string;
     selected_vendor_name?: string;
     cart?: CartItem[];
@@ -92,7 +96,7 @@ async function getSession(phone: string, supabase: any): Promise<UserSession> {
       context = { cart: [] };
     }
 
-    const state = (data.previous_state as BotState) || 'SELECTING_VENDOR';
+    const state = (data.previous_state as BotState) || 'SEARCHING_PRODUCTS';  // Actualizado
     console.log('Sesión recuperada:', phone, 'Estado:', state);
 
     return {
@@ -106,7 +110,7 @@ async function getSession(phone: string, supabase: any): Promise<UserSession> {
   console.log('Creando nueva sesión para:', phone);
   const newSession: UserSession = {
     phone,
-    state: 'SELECTING_VENDOR',
+    state: 'SEARCHING_PRODUCTS',  // Nuevo estado inicial
     context: { cart: [] }
   };
   
@@ -114,7 +118,7 @@ async function getSession(phone: string, supabase: any): Promise<UserSession> {
     .from('user_sessions')
     .upsert({
       phone,
-      previous_state: 'SELECTING_VENDOR',
+      previous_state: 'SEARCHING_PRODUCTS',  // Actualizado
       last_bot_message: JSON.stringify({ cart: [] }),
       updated_at: new Date().toISOString()
     }, { onConflict: 'phone' });
@@ -188,7 +192,7 @@ export async function handleVendorBot(
 
   // COMANDOS GLOBALES - Verificar PRIMERO antes que cualquier otra cosa
   
-  // Menu/Inicio/Hola - Cierra cualquier chat activo y va DIRECTO a selección de vendedores
+  // Menu/Inicio/Hola - Cierra cualquier chat activo y va DIRECTO a búsqueda de productos
   if (lowerMessage === 'menu' || lowerMessage === 'inicio' || lowerMessage === 'empezar' || lowerMessage === 'hola' || lowerMessage === 'hi' || lowerMessage === 'buenos dias' || lowerMessage === 'buenas tardes' || lowerMessage === 'buenas noches') {
     // Cerrar chat activo si existe
     await supabase
@@ -197,17 +201,23 @@ export async function handleVendorBot(
       .eq('customer_phone', phone)
       .eq('is_active', true);
 
-    // Crear sesión nueva
+    // Crear sesión nueva con estado de búsqueda
     const newSession: UserSession = {
       phone,
-      state: 'SELECTING_VENDOR',
+      state: 'SEARCHING_PRODUCTS',
       context: { cart: [] }
     };
     await saveSession(newSession, supabase);
     
     const welcomeMsg = `👋 *¡Bienvenido a Lapacho!*\n\n` +
            `Tu plataforma de pedidos y entregas.\n\n` +
-           await showVendorSelection(supabase);
+           `🔍 *¿Qué estás buscando?*\n\n` +
+           `Escribe lo que quieres pedir, por ejemplo:\n` +
+           `• Pizza\n` +
+           `• Hamburguesa\n` +
+           `• Sushi\n` +
+           `• Empanadas\n\n` +
+           `Te mostraré los negocios abiertos que lo tienen 😊`;
     return welcomeMsg;
   }
 
@@ -283,10 +293,10 @@ export async function handleVendorBot(
       .eq('is_active', true);
 
     const session = await getSession(phone, supabase);
-    session.state = 'SELECTING_VENDOR';
+    session.state = 'SEARCHING_PRODUCTS';
     session.context = { cart: [] };
     await saveSession(session, supabase);
-    return `❌ Pedido cancelado.\n\n` + await showVendorSelection(supabase);
+    return `❌ Pedido cancelado.\n\n🔍 ¿Qué estás buscando?\n\nEscribe lo que quieres pedir (ej: pizza, hamburguesa)`;
   }
 
   // Obtener sesión
@@ -327,9 +337,86 @@ export async function handleVendorBot(
 
   // FLUJO PRINCIPAL DEL BOT VENDEDOR
   
-  // Ya no necesitamos el estado WELCOME porque "menu" y "hola" van directo a SELECTING_VENDOR
+  // Estado: BUSCANDO PRODUCTOS
+  if (session.state === 'SEARCHING_PRODUCTS') {
+    console.log('Estado SEARCHING_PRODUCTS, procesando búsqueda:', message);
+    
+    // Llamar a la función de búsqueda
+    const { data: searchData, error: searchError } = await supabase.functions.invoke('search-products', {
+      body: { searchQuery: message }
+    });
+
+    if (searchError) {
+      console.error('Error en búsqueda:', searchError);
+      return `❌ Error al buscar productos.\n\n🔍 Intenta de nuevo, escribe lo que buscas (ej: pizza, sushi)`;
+    }
+
+    if (!searchData.found || searchData.results.length === 0) {
+      return `🤔 ${searchData.message || 'No encontré lo que buscas'}\n\n` +
+             `Intenta con otro producto o escribe *menu* para buscar de nuevo.`;
+    }
+
+    // Guardar resultados en sesión
+    session.context = session.context || {};
+    session.context.search_query = message;
+    session.context.search_results = searchData.results;
+    session.state = 'VIEWING_SEARCH_RESULTS';
+    await saveSession(session, supabase);
+
+    // Mostrar resultados
+    let response = `🎉 *Encontré ${searchData.totalProducts} productos en ${searchData.totalVendors} negocios*\n\n`;
+    response += `📍 *Negocios abiertos con "${message}":*\n\n`;
+    
+    searchData.results.forEach((result: any, index: number) => {
+      response += `${index + 1}. *${result.vendor.name}*\n`;
+      response += `   📍 ${result.vendor.category}\n`;
+      if (result.vendor.average_rating > 0) {
+        response += `   ⭐ ${result.vendor.average_rating.toFixed(1)}\n`;
+      }
+      response += `   🛒 ${result.products.length} productos disponibles\n`;
+      response += `\n`;
+    });
+    
+    response += `💬 Escribe el número del negocio para ver su menú`;
+    
+    return response;
+  }
+
+  // Estado: VIENDO RESULTADOS DE BÚSQUEDA
+  if (session.state === 'VIEWING_SEARCH_RESULTS') {
+    const number = parseInt(lowerMessage);
+    
+    if (!isNaN(number) && number > 0 && session.context?.search_results) {
+      const selectedResult = session.context.search_results[number - 1];
+      
+      if (selectedResult) {
+        const vendor = selectedResult.vendor;
+        session.context.selected_vendor_id = vendor.id;
+        session.context.selected_vendor_name = vendor.name;
+        session.state = 'BROWSING_PRODUCTS';
+        await saveSession(session, supabase);
+        
+        return await showVendorProducts(vendor.id, vendor.name, supabase);
+      }
+    }
+    
+    // Nueva búsqueda
+    if (lowerMessage.length > 2) {
+      session.state = 'SEARCHING_PRODUCTS';
+      await saveSession(session, supabase);
+      
+      // Recursivamente procesar como nueva búsqueda
+      return await handleVendorBot(message, phone, supabase);
+    }
+    
+    return `🤔 Opción inválida.\n\n` +
+           `Escribe el número del negocio (1-${session.context?.search_results?.length || 0})\n` +
+           `O escribe otro producto para buscar`;
+  }
   
-  // Estado: SELECCIONANDO VENDEDOR/NEGOCIO
+  // Ya no necesitamos el estado WELCOME porque "menu" y "hola" van directo a SEARCHING_PRODUCTS
+  
+  // Estado: SELECCIONANDO VENDEDOR/NEGOCIO (mantenido para compatibilidad)
   if (session.state === 'SELECTING_VENDOR') {
     // Primero intentar parsear como número
     const number = parseInt(lowerMessage);
