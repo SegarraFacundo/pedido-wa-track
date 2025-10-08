@@ -74,10 +74,13 @@ Responde solo con las palabras clave corregidas, sin explicación ni ejemplos.`
       );
     }
     
-    // Obtener hora actual y día de la semana
+    // Obtener día de la semana actual en formato correcto (monday, tuesday, etc.)
     const now = new Date();
-    const dayOfWeek = now.toLocaleDateString('en-US', { weekday: 'lowercase' });
-    const currentTime = now.toTimeString().split(' ')[0];
+    const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayOfWeek = daysOfWeek[now.getDay()];
+    const currentTime = now.toTimeString().split(' ')[0].substring(0, 5); // HH:MM format
+    
+    console.log("Día actual:", dayOfWeek, "Hora actual:", currentTime);
 
     // Buscar productos con búsqueda flexible
     // Para cada keyword, buscar con wildcards generosos
@@ -142,29 +145,47 @@ Responde solo con las palabras clave corregidas, sin explicación ni ejemplos.`
     const openProducts = products.filter((p: any) => {
       const vendor = p.vendor;
       if (!vendor || !vendor.is_active || vendor.payment_status !== 'active') {
+        console.log(`Vendor ${vendor?.name} filtrado: is_active=${vendor?.is_active}, payment_status=${vendor?.payment_status}`);
         return false;
       }
 
       // Verificar si está abierto hoy
       if (!vendor.days_open || !vendor.days_open.includes(dayOfWeek)) {
+        console.log(`Vendor ${vendor.name} cerrado hoy. days_open:`, vendor.days_open, "día actual:", dayOfWeek);
         return false;
       }
 
-      // Verificar horario
+      // Verificar horario (si tiene horarios definidos)
       if (vendor.opening_time && vendor.closing_time) {
-        if (currentTime < vendor.opening_time || currentTime > vendor.closing_time) {
+        const openingTime = vendor.opening_time.substring(0, 5); // HH:MM
+        const closingTime = vendor.closing_time.substring(0, 5); // HH:MM
+        
+        if (currentTime < openingTime || currentTime > closingTime) {
+          console.log(`Vendor ${vendor.name} fuera de horario. Horario: ${openingTime}-${closingTime}, Actual: ${currentTime}`);
           return false;
         }
       }
 
+      console.log(`Vendor ${vendor.name} está abierto y disponible`);
       return true;
     });
 
     if (openProducts.length === 0) {
+      // Verificar si había productos pero ningún vendor está abierto
+      if (products.length > 0) {
+        return new Response(
+          JSON.stringify({ 
+            found: false, 
+            message: `Encontré productos de "${searchQuery}", pero ningún negocio está abierto ahora. Intenta más tarde o busca otra cosa.` 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
       return new Response(
         JSON.stringify({ 
           found: false, 
-          message: `Encontré productos, pero ningún negocio está abierto en este momento` 
+          message: `No encontré productos relacionados con "${searchQuery}". Intenta con: pizza, hamburguesa, sushi, empanadas, etc.` 
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
