@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.evolution-webhook]
 verify_jwt = false
+
+[functions.create-vendor-user]
+verify_jwt = false

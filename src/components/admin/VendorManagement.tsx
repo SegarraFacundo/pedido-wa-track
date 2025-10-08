@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pause, Play, Edit } from "lucide-react";
+import { Plus, Pause, Play, Edit, UserPlus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -31,13 +31,21 @@ interface Vendor {
   payment_status: string;
   suspended_reason: string | null;
   total_orders: number;
+  user_id: string | null;
 }
 
 export default function VendorManagement() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [linkUserDialogOpen, setLinkUserDialogOpen] = useState(false);
+  const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const { toast } = useToast();
+
+  const [linkUserData, setLinkUserData] = useState({
+    email: "",
+    password: "",
+  });
 
   const [formData, setFormData] = useState({
     name: "",
@@ -159,6 +167,38 @@ export default function VendorManagement() {
     }
   };
 
+  const createUserForVendor = async () => {
+    if (!selectedVendor) return;
+
+    try {
+      const { data, error } = await supabase.functions.invoke('create-vendor-user', {
+        body: {
+          email: linkUserData.email,
+          password: linkUserData.password,
+          vendorId: selectedVendor.id
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Usuario creado",
+        description: `Usuario creado y vinculado exitosamente al negocio ${selectedVendor.name}`,
+      });
+
+      setLinkUserDialogOpen(false);
+      setLinkUserData({ email: "", password: "" });
+      setSelectedVendor(null);
+      fetchVendors();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return <div>Cargando negocios...</div>;
   }
@@ -237,6 +277,11 @@ export default function VendorManagement() {
               <p className="text-sm font-semibold">
                 Total pedidos: {vendor.total_orders}
               </p>
+              {!vendor.user_id && (
+                <Badge variant="outline" className="text-yellow-600">
+                  Sin usuario
+                </Badge>
+              )}
               {vendor.suspended_reason && (
                 <p className="text-sm text-destructive">{vendor.suspended_reason}</p>
               )}
@@ -259,11 +304,48 @@ export default function VendorManagement() {
                     </>
                   )}
                 </Button>
+                {!vendor.user_id && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedVendor(vendor);
+                      setLinkUserDialogOpen(true);
+                    }}
+                  >
+                    <UserPlus className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
+
+      <Dialog open={linkUserDialogOpen} onOpenChange={setLinkUserDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Crear Usuario para {selectedVendor?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Input
+              type="email"
+              placeholder="Email"
+              value={linkUserData.email}
+              onChange={(e) => setLinkUserData({ ...linkUserData, email: e.target.value })}
+            />
+            <Input
+              type="password"
+              placeholder="Contraseña"
+              value={linkUserData.password}
+              onChange={(e) => setLinkUserData({ ...linkUserData, password: e.target.value })}
+            />
+            <Button onClick={createUserForVendor} className="w-full">
+              Crear Usuario
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

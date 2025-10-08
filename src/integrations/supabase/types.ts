@@ -1469,6 +1469,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      link_vendor_to_user: {
+        Args: { vendor_email: string }
+        Returns: string
+      }
       make_user_admin: {
         Args: { user_email: string }
         Returns: string
