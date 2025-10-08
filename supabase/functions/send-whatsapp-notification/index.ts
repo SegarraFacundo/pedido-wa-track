@@ -5,7 +5,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Función para normalizar números de teléfono argentinos
+// Función para normalizar números de teléfono argentinos para Evolution API
+// IMPORTANTE: WhatsApp NO usa el 9 en el JID, solo el código de país + área + número
 function normalizeArgentinePhone(phone: string): string {
   let cleaned = phone.replace(/[\s\-\(\)\+]/g, '');
   
@@ -17,24 +18,27 @@ function normalizeArgentinePhone(phone: string): string {
     console.log('⚠️ Detected double 9, corrected:', phone, '->', cleaned);
   }
   
-  // Si ya tiene formato correcto 549XXXXXXXXXX (13 dígitos)
+  // Si tiene formato 549XXXXXXXXXX (13 dígitos) -> REMOVER el 9 para WhatsApp
   if (cleaned.startsWith('549') && cleaned.length === 13) {
-    return '+' + cleaned;
+    // WhatsApp usa 54 + área + número (sin el 9)
+    const withoutNine = '54' + cleaned.substring(3);
+    console.log('📱 Removing 9 for WhatsApp JID:', cleaned, '->', withoutNine);
+    return withoutNine;
   }
   
-  // Si tiene 54 sin el 9: 54XXXXXXXXXX (12 dígitos) -> agregar el 9
+  // Si tiene 54 sin el 9: 54XXXXXXXXXX (12 dígitos) -> ya está correcto para WhatsApp
   if (cleaned.startsWith('54') && !cleaned.startsWith('549') && cleaned.length === 12) {
-    return '+549' + cleaned.substring(2);
+    return cleaned;
   }
   
-  // Si empieza con 9: 9XXXXXXXXXX (11 dígitos) -> agregar 54
+  // Si empieza con 9: 9XXXXXXXXXX (11 dígitos) -> agregar 54 (sin el 9 extra)
   if (cleaned.startsWith('9') && cleaned.length === 11) {
-    return '+54' + cleaned;
+    return '54' + cleaned.substring(1);
   }
   
-  // Si es número local sin código de país: XXXXXXXXXX (10 dígitos) -> agregar 549
+  // Si es número local sin código de país: XXXXXXXXXX (10 dígitos) -> agregar 54
   if (!cleaned.startsWith('54') && cleaned.length === 10) {
-    return '+549' + cleaned;
+    return '54' + cleaned;
   }
   
   // Si ya tiene +, limpiar y reprocesar
@@ -42,8 +46,8 @@ function normalizeArgentinePhone(phone: string): string {
     return normalizeArgentinePhone(cleaned);
   }
   
-  // Si nada coincide, agregar + y retornar
-  return '+' + cleaned;
+  // Si nada coincide, retornar tal cual
+  return cleaned;
 }
 
 serve(async (req) => {
