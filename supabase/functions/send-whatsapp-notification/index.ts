@@ -5,40 +5,41 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Función para normalizar números de teléfono argentinos para Evolution API
-// IMPORTANTE: WhatsApp NO usa el 9 en el JID, solo el código de país + área + número
+// Función para normalizar números de teléfono argentinos
+// WhatsApp Argentina requiere: +549 + código de área + número (13 dígitos)
 function normalizeArgentinePhone(phone: string): string {
   let cleaned = phone.replace(/[\s\-\(\)\+]/g, '');
   
   // CRÍTICO: Detectar y corregir números con doble 9
-  // Si tiene formato 54993... (14 dígitos) o 549 seguido de otro 9 -> es un error, remover el 9 extra
+  // Si tiene formato 54993... (14 dígitos) -> remover el 9 extra
   if (cleaned.match(/^54993/) && cleaned.length === 14) {
-    // Remover el primer 9 después del 549: 54993412699024 -> 5493412699024
     cleaned = '549' + cleaned.substring(4);
     console.log('⚠️ Detected double 9, corrected:', phone, '->', cleaned);
   }
   
-  // Si tiene formato 549XXXXXXXXXX (13 dígitos) -> REMOVER el 9 para WhatsApp
+  // Si ya tiene formato correcto 549XXXXXXXXXX (13 dígitos) -> agregar +
   if (cleaned.startsWith('549') && cleaned.length === 13) {
-    // WhatsApp usa 54 + área + número (sin el 9)
-    const withoutNine = '54' + cleaned.substring(3);
-    console.log('📱 Removing 9 for WhatsApp JID:', cleaned, '->', withoutNine);
-    return withoutNine;
+    console.log('✅ Correct format 549:', cleaned, '-> +' + cleaned);
+    return '+' + cleaned;
   }
   
-  // Si tiene 54 sin el 9: 54XXXXXXXXXX (12 dígitos) -> ya está correcto para WhatsApp
+  // Si tiene 54 sin el 9: 54XXXXXXXXXX (12 dígitos) -> agregar el 9
   if (cleaned.startsWith('54') && !cleaned.startsWith('549') && cleaned.length === 12) {
-    return cleaned;
+    const withNine = '549' + cleaned.substring(2);
+    console.log('➕ Adding 9 for mobile:', cleaned, '->', withNine);
+    return '+' + withNine;
   }
   
-  // Si empieza con 9: 9XXXXXXXXXX (11 dígitos) -> agregar 54 (sin el 9 extra)
+  // Si empieza con 9: 9XXXXXXXXXX (11 dígitos) -> agregar 54
   if (cleaned.startsWith('9') && cleaned.length === 11) {
-    return '54' + cleaned.substring(1);
+    console.log('➕ Adding 54:', cleaned, '-> +54' + cleaned);
+    return '+54' + cleaned;
   }
   
-  // Si es número local sin código de país: XXXXXXXXXX (10 dígitos) -> agregar 54
+  // Si es número local sin código: XXXXXXXXXX (10 dígitos) -> agregar 549
   if (!cleaned.startsWith('54') && cleaned.length === 10) {
-    return '54' + cleaned;
+    console.log('➕ Adding 549:', cleaned, '-> +549' + cleaned);
+    return '+549' + cleaned;
   }
   
   // Si ya tiene +, limpiar y reprocesar
@@ -46,8 +47,9 @@ function normalizeArgentinePhone(phone: string): string {
     return normalizeArgentinePhone(cleaned);
   }
   
-  // Si nada coincide, retornar tal cual
-  return cleaned;
+  // Si nada coincide, agregar + y retornar
+  console.log('⚠️ Unknown format, returning:', '+' + cleaned);
+  return '+' + cleaned;
 }
 
 serve(async (req) => {
