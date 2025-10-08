@@ -1,3 +1,41 @@
+// Función para normalizar números de teléfono argentinos
+// Garantiza formato consistente: 549 + código de área + número (sin espacios ni caracteres especiales)
+function normalizeArgentinePhone(phone: string): string {
+  // Limpiar el número: remover espacios, guiones, paréntesis, etc.
+  let cleaned = phone.replace(/[\s\-\(\)\+]/g, '');
+  
+  // Si ya tiene formato correcto 549XXXXXXXXXX (13 dígitos), retornar
+  if (cleaned.startsWith('549') && cleaned.length === 13) {
+    return cleaned;
+  }
+  
+  // Si tiene 54 sin el 9: 54XXXXXXXXXX (12 dígitos) -> agregar el 9
+  if (cleaned.startsWith('54') && !cleaned.startsWith('549') && cleaned.length === 12) {
+    return '549' + cleaned.substring(2);
+  }
+  
+  // Si empieza con 9: 9XXXXXXXXXX (11 dígitos) -> agregar 54
+  if (cleaned.startsWith('9') && cleaned.length === 11) {
+    return '54' + cleaned;
+  }
+  
+  // Si es número local sin código de país: XXXXXXXXXX (10 dígitos) -> agregar 549
+  if (!cleaned.startsWith('54') && cleaned.length === 10) {
+    return '549' + cleaned;
+  }
+  
+  // Si tiene otros formatos, intentar extraer los últimos dígitos relevantes
+  // y construir el formato correcto
+  if (cleaned.length > 13) {
+    // Probablemente tiene caracteres extra, tomar los últimos 13 o 12 dígitos
+    const relevant = cleaned.slice(-13);
+    return normalizeArgentinePhone(relevant);
+  }
+  
+  // Si nada coincide, retornar tal cual (edge case)
+  return cleaned;
+}
+
 // Estados posibles del bot - flujo de pedido completo
 type BotState = 
   | 'WELCOME'
@@ -877,13 +915,17 @@ async function createOrder(phone: string, session: UserSession, supabase: any): 
   try {
     const cart = session.context?.cart || [];
     const total = cart.reduce((sum: number, item: CartItem) => sum + (item.price * item.quantity), 0);
+    
+    // Normalizar el número de teléfono antes de guardarlo
+    const normalizedPhone = normalizeArgentinePhone(phone);
+    console.log('Creating order - Original phone:', phone, '-> Normalized:', normalizedPhone);
 
     const { data: order, error } = await supabase
       .from('orders')
       .insert({
         vendor_id: session.context?.selected_vendor_id,
-        customer_phone: phone,
-        customer_name: phone,
+        customer_phone: normalizedPhone,
+        customer_name: normalizedPhone,
         address: session.context?.delivery_address,
         payment_method: session.context?.payment_method,
         items: cart,

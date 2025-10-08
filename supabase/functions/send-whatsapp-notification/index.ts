@@ -5,6 +5,39 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Función para normalizar números de teléfono argentinos
+function normalizeArgentinePhone(phone: string): string {
+  let cleaned = phone.replace(/[\s\-\(\)\+]/g, '');
+  
+  // Si ya tiene formato correcto 549XXXXXXXXXX (13 dígitos)
+  if (cleaned.startsWith('549') && cleaned.length === 13) {
+    return '+' + cleaned;
+  }
+  
+  // Si tiene 54 sin el 9: 54XXXXXXXXXX (12 dígitos) -> agregar el 9
+  if (cleaned.startsWith('54') && !cleaned.startsWith('549') && cleaned.length === 12) {
+    return '+549' + cleaned.substring(2);
+  }
+  
+  // Si empieza con 9: 9XXXXXXXXXX (11 dígitos) -> agregar 54
+  if (cleaned.startsWith('9') && cleaned.length === 11) {
+    return '+54' + cleaned;
+  }
+  
+  // Si es número local sin código de país: XXXXXXXXXX (10 dígitos) -> agregar 549
+  if (!cleaned.startsWith('54') && cleaned.length === 10) {
+    return '+549' + cleaned;
+  }
+  
+  // Si ya tiene +, retornar tal cual
+  if (phone.startsWith('+')) {
+    return phone;
+  }
+  
+  // Si nada coincide, agregar + y retornar
+  return '+' + cleaned;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -30,24 +63,9 @@ serve(async (req) => {
     
     console.log('Using Evolution API instance:', instanceName);
     
-    // Normalize phone number to international format
-    let formattedPhone = (phoneNumber ?? '').toString().trim();
-    
-    // Remove any non-digits except +
-    formattedPhone = formattedPhone.replace(/[^\d+]/g, '');
-    
-    // Ensure it starts with +
-    if (!formattedPhone.startsWith('+')) {
-      // Default to Argentina (+54) if no country code
-      if (formattedPhone.startsWith('54')) {
-        formattedPhone = '+' + formattedPhone;
-      } else if (formattedPhone.startsWith('9')) {
-        formattedPhone = '+54' + formattedPhone;
-      } else {
-        formattedPhone = '+549' + formattedPhone;
-      }
-    }
-
+    // Normalizar el número de teléfono
+    const formattedPhone = normalizeArgentinePhone(phoneNumber ?? '');
+    console.log('Phone normalization:', phoneNumber, '->', formattedPhone);
     console.log('Sending to:', formattedPhone);
     
     // Send WhatsApp message via Evolution API

@@ -7,6 +7,42 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Función para normalizar números de teléfono argentinos
+// Garantiza formato consistente: 549 + código de área + número (sin espacios ni caracteres especiales)
+function normalizeArgentinePhone(phone: string): string {
+  // Limpiar el número: remover espacios, guiones, paréntesis, @s.whatsapp.net, etc.
+  let cleaned = phone.replace(/[\s\-\(\)\+@s\.whatsapp\.net]/g, '');
+  
+  // Si ya tiene formato correcto 549XXXXXXXXXX (13 dígitos), retornar
+  if (cleaned.startsWith('549') && cleaned.length === 13) {
+    return cleaned;
+  }
+  
+  // Si tiene 54 sin el 9: 54XXXXXXXXXX (12 dígitos) -> agregar el 9
+  if (cleaned.startsWith('54') && !cleaned.startsWith('549') && cleaned.length === 12) {
+    return '549' + cleaned.substring(2);
+  }
+  
+  // Si empieza con 9: 9XXXXXXXXXX (11 dígitos) -> agregar 54
+  if (cleaned.startsWith('9') && cleaned.length === 11) {
+    return '54' + cleaned;
+  }
+  
+  // Si es número local sin código de país: XXXXXXXXXX (10 dígitos) -> agregar 549
+  if (!cleaned.startsWith('54') && cleaned.length === 10) {
+    return '549' + cleaned;
+  }
+  
+  // Si tiene otros formatos, intentar extraer los últimos dígitos relevantes
+  if (cleaned.length > 13) {
+    const relevant = cleaned.slice(-13);
+    return normalizeArgentinePhone(relevant);
+  }
+  
+  // Si nada coincide, retornar tal cual (edge case)
+  return cleaned;
+}
+
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -88,28 +124,6 @@ async function processWithVendorBot(
   }
 }
 
-async function jidToPhoneWithAR9(remoteJid: string | undefined): Promise<string | null> {
-  const jid = String(remoteJid || "");
-  const base = jid.replace(/@(s\.whatsapp\.net|g\.us)$/i, "");
-
-  // Si es grupo, no hay número directo
-  if (/@g\.us$/i.test(jid)) return null;
-
-  // Ya viene con 549 -> devolver tal cual
-  if (base.startsWith("549")) return base;
-
-  // Si viene como 54... (sin 9) y parece móvil, insertamos el 9
-  if (base.startsWith("54") && !base.startsWith("549")) {
-    // Heurística simple: largo >= 10 suele indicar línea móvil/área + número
-    if (base.length >= 10) {
-      return "549" + base.slice(2);
-    }
-  }
-
-  // Otros países o casos raros
-  return base;
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -170,15 +184,16 @@ serve(async (req) => {
     // If it's a media message without text, send a default response
     if (!messageText && (data.message?.audioMessage || data.message?.imageMessage || data.message?.videoMessage)) {
       console.log('Media message received without text, responding with default message');
-      const cleanPhone = fromNumber.replace(/@s\.whatsapp\.net$/i, '');
       const defaultResponse = 'Recibí tu mensaje multimedia. Por favor envía un mensaje de texto para continuar.';
       
       const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL');
       const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
       const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
       
-      const formattedPhone = await jidToPhoneWithAR9(data.key.remoteJid);
-      const chatId = formattedPhone ? `${formattedPhone}@s.whatsapp.net` : data.key.remoteJid;
+      // Normalizar número para WhatsApp
+      const cleanPhone = fromNumber.replace(/@s\.whatsapp\.net$/i, '');
+      const normalizedPhone = normalizeArgentinePhone(cleanPhone);
+      const chatId = `${normalizedPhone}@s.whatsapp.net`;
       
       await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
         method: 'POST',
@@ -208,19 +223,20 @@ serve(async (req) => {
 
     console.log('Processing message from:', fromNumber, 'Message:', messageText);
 
-    // Limpiar el número de teléfono para pasarlo al bot
+    // Limpiar y normalizar el número de teléfono
     const cleanPhone = fromNumber.replace(/@s\.whatsapp\.net$/i, '');
-    console.log('Clean phone for bot:', cleanPhone);
+    const normalizedPhone = normalizeArgentinePhone(cleanPhone);
+    console.log('Phone normalization:', cleanPhone, '->', normalizedPhone);
 
-    const vendorStatus = await isVendor(cleanPhone);
-    const session = await getOrCreateSession(cleanPhone);
+    const vendorStatus = await isVendor(normalizedPhone);
+    const session = await getOrCreateSession(normalizedPhone);
 
     let responseMessage = '';
 
     if (vendorStatus) {
-      console.log('Message from vendor:', cleanPhone);
+      console.log('Message from vendor:', normalizedPhone);
       // Vendor messages - could be handled differently
-      responseMessage = await processWithVendorBot(cleanPhone, messageText);
+      responseMessage = await processWithVendorBot(normalizedPhone, messageText);
     } else {
       // Customer message
       if (session.in_vendor_chat && session.assigned_vendor) {
@@ -232,7 +248,7 @@ serve(async (req) => {
         });
       } else {
         // Process with bot
-        responseMessage = await processWithVendorBot(cleanPhone, messageText);
+        responseMessage = await processWithVendorBot(normalizedPhone, messageText);
       }
     }
 
@@ -242,12 +258,11 @@ serve(async (req) => {
       const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
       const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
 
-      // Formatear el número con el 9 de Argentina si es necesario
-      const formattedPhone = await jidToPhoneWithAR9(data.key.remoteJid);
-      const chatId = formattedPhone ? `${formattedPhone}@s.whatsapp.net` : data.key.remoteJid;
+      // Usar el número normalizado para enviar respuesta
+      const chatId = `${normalizedPhone}@s.whatsapp.net`;
 
       console.log('📤 Original JID:', data.key.remoteJid);
-      console.log('📤 Formatted phone:', formattedPhone);
+      console.log('📤 Normalized phone:', normalizedPhone);
       console.log('📤 Final chatId:', chatId);
       console.log('📤 Sending message to Evolution API...');
 
