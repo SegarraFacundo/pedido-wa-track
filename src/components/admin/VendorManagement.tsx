@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pause, Play, Edit, UserPlus } from "lucide-react";
+import { Plus, Pause, Play, Edit, UserPlus, UserMinus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -199,6 +199,30 @@ export default function VendorManagement() {
     }
   };
 
+  const unlinkUserFromVendor = async (vendorId: string, vendorName: string) => {
+    try {
+      const { error } = await supabase
+        .from('vendors')
+        .update({ user_id: null })
+        .eq('id', vendorId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Usuario desvinculado",
+        description: `Usuario desvinculado exitosamente del negocio ${vendorName}`,
+      });
+
+      fetchVendors();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return <div>Cargando negocios...</div>;
   }
@@ -304,7 +328,7 @@ export default function VendorManagement() {
                     </>
                   )}
                 </Button>
-                {!vendor.user_id && (
+                {!vendor.user_id ? (
                   <Button
                     size="sm"
                     variant="outline"
@@ -312,8 +336,18 @@ export default function VendorManagement() {
                       setSelectedVendor(vendor);
                       setLinkUserDialogOpen(true);
                     }}
+                    title="Crear usuario"
                   >
                     <UserPlus className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => unlinkUserFromVendor(vendor.id, vendor.name)}
+                    title="Desvincular usuario"
+                  >
+                    <UserMinus className="h-4 w-4" />
                   </Button>
                 )}
               </div>
