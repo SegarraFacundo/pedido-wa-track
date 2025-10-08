@@ -688,9 +688,8 @@ export async function handleVendorBot(
       
       return `💳 *¿Cómo vas a pagar?*\n\n` +
              `1️⃣ Efectivo\n` +
-             `2️⃣ Yape\n` +
-             `3️⃣ Plin\n` +
-             `4️⃣ Tarjeta\n\n` +
+             `2️⃣ Transferencia\n` +
+             `3️⃣ Tarjeta\n\n` +
              `Escribe el número o nombre del método de pago.`;
     }
     return `❌ Por favor escribe una dirección válida (mínimo 10 caracteres).`;
@@ -723,7 +722,7 @@ export async function handleVendorBot(
       
       return confirmation;
     }
-    return `❌ Por favor elige un método de pago válido (1-4 o el nombre).`;
+    return `❌ Por favor elige un método de pago válido (1-3 o el nombre).`;
   }
 
   // Estado: CONFIRMACIÓN FINAL
@@ -1052,9 +1051,8 @@ function parsePaymentMethod(message: string): string | null {
   const lower = message.toLowerCase();
   
   if (lower === '1' || lower.includes('efectivo') || lower.includes('cash')) return 'Efectivo';
-  if (lower === '2' || lower.includes('yape')) return 'Yape';
-  if (lower === '3' || lower.includes('plin')) return 'Plin';
-  if (lower === '4' || lower.includes('tarjeta') || lower.includes('card')) return 'Tarjeta';
+  if (lower === '2' || lower.includes('transferencia') || lower.includes('transfer')) return 'Transferencia';
+  if (lower === '3' || lower.includes('tarjeta') || lower.includes('card')) return 'Tarjeta';
   
   return null;
 }
