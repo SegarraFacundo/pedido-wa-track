@@ -9,6 +9,14 @@ const corsHeaders = {
 function normalizeArgentinePhone(phone: string): string {
   let cleaned = phone.replace(/[\s\-\(\)\+]/g, '');
   
+  // CRÍTICO: Detectar y corregir números con doble 9
+  // Si tiene formato 54993... (14 dígitos) o 549 seguido de otro 9 -> es un error, remover el 9 extra
+  if (cleaned.match(/^54993/) && cleaned.length === 14) {
+    // Remover el primer 9 después del 549: 54993412699024 -> 5493412699024
+    cleaned = '549' + cleaned.substring(4);
+    console.log('⚠️ Detected double 9, corrected:', phone, '->', cleaned);
+  }
+  
   // Si ya tiene formato correcto 549XXXXXXXXXX (13 dígitos)
   if (cleaned.startsWith('549') && cleaned.length === 13) {
     return '+' + cleaned;
@@ -29,9 +37,9 @@ function normalizeArgentinePhone(phone: string): string {
     return '+549' + cleaned;
   }
   
-  // Si ya tiene +, retornar tal cual
+  // Si ya tiene +, limpiar y reprocesar
   if (phone.startsWith('+')) {
-    return phone;
+    return normalizeArgentinePhone(cleaned);
   }
   
   // Si nada coincide, agregar + y retornar
