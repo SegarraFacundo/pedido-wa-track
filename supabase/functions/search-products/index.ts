@@ -75,12 +75,16 @@ Responde solo con las palabras clave corregidas, sin explicación ni ejemplos.`
     }
     
     // Obtener día de la semana actual en formato correcto (monday, tuesday, etc.)
+    // Usar zona horaria de Argentina
     const now = new Date();
+    const argentinaTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' }));
     const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-    const dayOfWeek = daysOfWeek[now.getDay()];
-    const currentTime = now.toTimeString().split(' ')[0].substring(0, 5); // HH:MM format
+    const dayOfWeek = daysOfWeek[argentinaTime.getDay()];
+    const hours = String(argentinaTime.getHours()).padStart(2, '0');
+    const minutes = String(argentinaTime.getMinutes()).padStart(2, '0');
+    const currentTime = `${hours}:${minutes}`; // HH:MM format
     
-    console.log("Día actual:", dayOfWeek, "Hora actual:", currentTime);
+    console.log("Día actual (Argentina):", dayOfWeek, "Hora actual (Argentina):", currentTime);
 
     // Buscar productos con búsqueda flexible
     // Para cada keyword, buscar con wildcards generosos
@@ -107,7 +111,8 @@ Responde solo con las palabras clave corregidas, sin explicación ni ejemplos.`
             payment_status,
             days_open,
             opening_time,
-            closing_time
+            closing_time,
+            vendor_hours(is_open_24_hours)
           )
         `)
         .eq('is_available', true)
@@ -155,13 +160,21 @@ Responde solo con las palabras clave corregidas, sin explicación ni ejemplos.`
         return false;
       }
 
+      // Verificar si está abierto 24 horas
+      const isOpen24Hours = vendor.vendor_hours?.some((h: any) => h.is_open_24_hours);
+      
+      if (isOpen24Hours) {
+        console.log(`Vendor ${vendor.name} está abierto 24 horas`);
+        return true;
+      }
+
       // Verificar horario (si tiene horarios definidos)
       if (vendor.opening_time && vendor.closing_time) {
         const openingTime = vendor.opening_time.substring(0, 5); // HH:MM
         const closingTime = vendor.closing_time.substring(0, 5); // HH:MM
         
         if (currentTime < openingTime || currentTime > closingTime) {
-          console.log(`Vendor ${vendor.name} fuera de horario. Horario: ${openingTime}-${closingTime}, Actual: ${currentTime}`);
+          console.log(`Vendor ${vendor.name} fuera de horario. Horario: ${openingTime}-${closingTime}, Actual (Argentina): ${currentTime}`);
           return false;
         }
       }

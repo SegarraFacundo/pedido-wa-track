@@ -843,6 +843,7 @@ export type Database = {
           day_of_week: string
           id: string
           is_closed: boolean | null
+          is_open_24_hours: boolean | null
           opening_time: string
           updated_at: string | null
           vendor_id: string
@@ -853,6 +854,7 @@ export type Database = {
           day_of_week: string
           id?: string
           is_closed?: boolean | null
+          is_open_24_hours?: boolean | null
           opening_time: string
           updated_at?: string | null
           vendor_id: string
@@ -863,6 +865,7 @@ export type Database = {
           day_of_week?: string
           id?: string
           is_closed?: boolean | null
+          is_open_24_hours?: boolean | null
           opening_time?: string
           updated_at?: string | null
           vendor_id?: string

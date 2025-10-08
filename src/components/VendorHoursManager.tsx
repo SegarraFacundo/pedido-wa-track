@@ -14,6 +14,7 @@ interface VendorHours {
   opening_time: string;
   closing_time: string;
   is_closed: boolean;
+  is_open_24_hours: boolean;
 }
 
 interface VendorHoursManagerProps {
@@ -56,7 +57,8 @@ export function VendorHoursManager({ vendorId }: VendorHoursManagerProps) {
           day_of_week: day.value,
           opening_time: '09:00',
           closing_time: '21:00',
-          is_closed: false
+          is_closed: false,
+          is_open_24_hours: false
         }));
         setHours(defaultHours);
       } else {
@@ -90,7 +92,8 @@ export function VendorHoursManager({ vendorId }: VendorHoursManagerProps) {
         day_of_week: h.day_of_week,
         opening_time: h.opening_time,
         closing_time: h.closing_time,
-        is_closed: h.is_closed
+        is_closed: h.is_closed,
+        is_open_24_hours: h.is_open_24_hours
       }));
 
       const { error } = await supabase
@@ -159,26 +162,43 @@ export function VendorHoursManager({ vendorId }: VendorHoursManagerProps) {
             day_of_week: day.value,
             opening_time: '09:00',
             closing_time: '21:00',
-            is_closed: false
+            is_closed: false,
+            is_open_24_hours: false
           };
 
           return (
-            <div key={day.value} className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-center p-3 bg-secondary/10 rounded-lg">
-              <div className="font-medium">{day.label}</div>
-              
-              <div className="flex items-center gap-2">
-                <Label htmlFor={`${day.value}-closed`} className="text-sm">
-                  Cerrado
-                </Label>
-                <Switch
-                  id={`${day.value}-closed`}
-                  checked={hourData.is_closed}
-                  onCheckedChange={(checked) => updateHour(day.value, 'is_closed', checked)}
-                />
+            <div key={day.value} className="space-y-2 p-3 bg-secondary/10 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="font-medium">{day.label}</div>
+                
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor={`${day.value}-24h`} className="text-sm">
+                      24 horas
+                    </Label>
+                    <Switch
+                      id={`${day.value}-24h`}
+                      checked={hourData.is_open_24_hours}
+                      onCheckedChange={(checked) => updateHour(day.value, 'is_open_24_hours', checked)}
+                      disabled={hourData.is_closed}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor={`${day.value}-closed`} className="text-sm">
+                      Cerrado
+                    </Label>
+                    <Switch
+                      id={`${day.value}-closed`}
+                      checked={hourData.is_closed}
+                      onCheckedChange={(checked) => updateHour(day.value, 'is_closed', checked)}
+                    />
+                  </div>
+                </div>
               </div>
               
-              {!hourData.is_closed && (
-                <>
+              {!hourData.is_closed && !hourData.is_open_24_hours && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="flex items-center gap-2">
                     <Label htmlFor={`${day.value}-open`} className="text-xs">
                       Abre:
@@ -222,7 +242,7 @@ export function VendorHoursManager({ vendorId }: VendorHoursManagerProps) {
                       ↓
                     </Button>
                   </div>
-                </>
+                </div>
               )}
             </div>
           );
