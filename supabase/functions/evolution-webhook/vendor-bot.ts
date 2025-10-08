@@ -875,7 +875,7 @@ async function showVendorProducts(vendorId: string, vendorName: string, supabase
   try {
     const { data: products } = await supabase
       .from('products')
-      .select('id, name, description, price, category')
+      .select('id, name, description, price, category, image')
       .eq('vendor_id', vendorId)
       .eq('is_available', true)
       .order('category', { ascending: true });
@@ -896,6 +896,9 @@ async function showVendorProducts(vendorId: string, vendorName: string, supabase
       message += `${index + 1}. *${p.name}* - $${p.price}\n`;
       if (p.description) {
         message += `   ${p.description}\n`;
+      }
+      if (p.image) {
+        message += `   🖼️ ${p.image}\n`;
       }
     });
 
