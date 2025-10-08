@@ -96,19 +96,6 @@ serve(async (req) => {
 
     console.log('User created:', userData.user.id);
 
-    // Create profile manually to avoid trigger issues
-    const { error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .insert({
-        id: userData.user.id,
-        email: email,
-        role: 'vendor'
-      });
-
-    if (profileError && profileError.code !== '23505') {
-      console.error('Error creating profile:', profileError);
-    }
-
     // Link vendor to user
     const { error: vendorUpdateError } = await supabaseAdmin
       .from('vendors')
