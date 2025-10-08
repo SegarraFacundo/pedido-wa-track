@@ -84,7 +84,7 @@ serve(async (req) => {
       console.log('Cleaned up orphaned profile');
     }
 
-    // Create user in Auth without triggering auto-profile creation
+    // Create user in Auth
     const { data: userData, error: userError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
@@ -108,6 +108,22 @@ serve(async (req) => {
     }
 
     console.log('User created:', userData.user.id);
+
+    // Manually create profile (trigger is disabled)
+    const { error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .insert({
+        id: userData.user.id,
+        email: email,
+        role: 'vendor'
+      });
+
+    if (profileError) {
+      console.error('Error creating profile:', profileError);
+      // Don't fail the whole operation, just log it
+    } else {
+      console.log('Profile created successfully');
+    }
 
     // Link vendor to user
     const { error: vendorUpdateError } = await supabaseAdmin
