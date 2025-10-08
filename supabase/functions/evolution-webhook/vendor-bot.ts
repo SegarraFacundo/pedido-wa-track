@@ -469,6 +469,36 @@ export async function handleVendorBot(
       return await startVendorChatForOrder(phone, session.context?.selected_vendor_id!, supabase);
     }
 
+    // Detectar múltiples productos (ej: "4 y 6", "1, 3, 5", "2 y 4")
+    const multiplePattern = /(\d+)\s*(?:y|,|and)\s*(\d+)/gi;
+    const matches = message.match(multiplePattern);
+    
+    if (matches) {
+      // Extraer todos los números del mensaje
+      const numbers = message.match(/\d+/g)?.map(n => parseInt(n)) || [];
+      
+      if (numbers.length > 1) {
+        // Guardar los números pendientes para procesar
+        session.context = session.context || {};
+        session.context.pending_product_numbers = numbers;
+        session.context.current_product_index = 0;
+        await saveSession(session, supabase);
+        
+        // Buscar el primer producto
+        const firstProduct = await findProductFromMessage(numbers[0].toString(), session.context?.selected_vendor_id!, supabase);
+        if (firstProduct) {
+          session.state = 'ADDING_ITEMS';
+          session.context.pending_product = firstProduct;
+          await saveSession(session, supabase);
+          
+          return `🛒 *Producto ${numbers[0]}/${numbers.length}*\n\n` +
+                 `*${firstProduct.name}* - $${firstProduct.price}\n\n` +
+                 `¿Cuántas unidades quieres? (ej: "2", "tres")\n\n` +
+                 `_Luego te preguntaré por los demás productos._`;
+        }
+      }
+    }
+
     // Buscar producto con interpretación inteligente
     const product = await findProductFromMessage(lowerMessage, session.context?.selected_vendor_id!, supabase);
     if (product) {
@@ -539,6 +569,33 @@ export async function handleVendorBot(
           price: product.price
         });
         delete session.context.pending_product;
+
+        // Verificar si hay más productos pendientes de la selección múltiple
+        if (session.context.pending_product_numbers && 
+            session.context.current_product_index !== undefined &&
+            session.context.current_product_index < session.context.pending_product_numbers.length - 1) {
+          
+          // Pasar al siguiente producto
+          session.context.current_product_index++;
+          const nextProductNumber = session.context.pending_product_numbers[session.context.current_product_index];
+          const nextProduct = await findProductFromMessage(nextProductNumber.toString(), session.context?.selected_vendor_id!, supabase);
+          
+          if (nextProduct) {
+            session.state = 'ADDING_ITEMS';
+            session.context.pending_product = nextProduct;
+            await saveSession(session, supabase);
+            
+            return `✅ Agregado!\n\n` +
+                   `🛒 *Producto ${session.context.current_product_index + 1}/${session.context.pending_product_numbers.length}*\n\n` +
+                   `*${nextProduct.name}* - $${nextProduct.price}\n\n` +
+                   `¿Cuántas unidades quieres? (ej: "2", "tres")`;
+          }
+        }
+        
+        // No hay más productos pendientes, mostrar resumen del carrito
+        delete session.context.pending_product_numbers;
+        delete session.context.current_product_index;
+
         session.state = 'CONFIRMING_ITEMS';
         await saveSession(session, supabase);
         
@@ -878,7 +935,8 @@ async function showVendorProducts(vendorId: string, vendorName: string, supabase
       .select('id, name, description, price, category, image')
       .eq('vendor_id', vendorId)
       .eq('is_available', true)
-      .order('category', { ascending: true });
+      .order('category', { ascending: true })
+      .order('name', { ascending: true });
 
     if (!products || products.length === 0) {
       return `😕 ${vendorName} no tiene productos disponibles ahora.\n\nEscribe *menu* para elegir otro negocio.`;
@@ -914,7 +972,7 @@ async function showVendorProducts(vendorId: string, vendorName: string, supabase
 async function findProductFromMessage(message: string, vendorId: string, supabase: any): Promise<any | null> {
   const lowerMessage = message.toLowerCase().trim();
   
-  // Intentar número primero
+  // Intentar número primero (DEBE coincidir con el orden de showVendorProducts)
   const number = parseInt(lowerMessage);
   if (!isNaN(number) && number > 0) {
     const { data: products } = await supabase
@@ -922,8 +980,8 @@ async function findProductFromMessage(message: string, vendorId: string, supabas
       .select('*')
       .eq('vendor_id', vendorId)
       .eq('is_available', true)
-      .order('category')
-      .order('name');
+      .order('category', { ascending: true })
+      .order('name', { ascending: true });
     
     if (products && products[number - 1]) {
       return products[number - 1];
