@@ -71,6 +71,19 @@ serve(async (req) => {
       );
     }
 
+    // Clean up any orphaned profile before creating new user
+    console.log('Checking for orphaned profiles...');
+    const { error: profileDeleteError } = await supabaseAdmin
+      .from('profiles')
+      .delete()
+      .eq('email', email);
+    
+    if (profileDeleteError) {
+      console.log('No orphaned profile or error deleting:', profileDeleteError);
+    } else {
+      console.log('Cleaned up orphaned profile');
+    }
+
     // Create user in Auth without triggering auto-profile creation
     const { data: userData, error: userError } = await supabaseAdmin.auth.admin.createUser({
       email,
