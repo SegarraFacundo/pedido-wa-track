@@ -47,6 +47,7 @@ type BotState =
   | 'CONFIRMING_ITEMS'
   | 'COLLECTING_ADDRESS'
   | 'COLLECTING_PAYMENT'
+  | 'AWAITING_RECEIPT'  // Nuevo estado para esperar comprobante
   | 'CONFIRMING_ORDER'
   | 'ORDER_PLACED'
   | 'VENDOR_CHAT'
@@ -71,6 +72,7 @@ interface UserSession {
     cart?: CartItem[];
     delivery_address?: string;
     payment_method?: string;
+    payment_receipt_url?: string;  // Nuevo campo para comprobante
     last_interaction?: string;
     pending_order_id?: string;
   };
@@ -186,7 +188,8 @@ function detectRemoveLast(message: string): boolean {
 export async function handleVendorBot(
   message: string,
   phone: string,
-  supabase: any
+  supabase: any,
+  receiptUrl?: string
 ): Promise<string> {
   const lowerMessage = message.toLowerCase().trim();
 
@@ -699,6 +702,18 @@ export async function handleVendorBot(
     if (paymentMethod) {
       session.context = session.context || {};
       session.context.payment_method = paymentMethod;
+      
+      // Si es transferencia, pedir comprobante
+      if (paymentMethod === 'Transferencia') {
+        session.state = 'AWAITING_RECEIPT';
+        await saveSession(session, supabase);
+        
+        return `📸 *Perfecto, pago por Transferencia*\n\n` +
+               `Por favor, envía el comprobante de transferencia para que el vendedor pueda verificar tu pago.\n\n` +
+               `_Adjunta la imagen del comprobante._`;
+      }
+      
+      // Para otros métodos, ir directo a confirmación
       session.state = 'CONFIRMING_ORDER';
       await saveSession(session, supabase);
       
@@ -721,6 +736,36 @@ export async function handleVendorBot(
       return confirmation;
     }
     return `❌ Por favor elige un método de pago válido (1-3 o el nombre).`;
+  }
+
+  // Estado: ESPERANDO COMPROBANTE
+  if (session.state === 'AWAITING_RECEIPT') {
+    // Si recibió una URL del comprobante (desde el webhook)
+    if (receiptUrl) {
+      session.context = session.context || {};
+      session.context.payment_receipt_url = receiptUrl;
+      session.state = 'CONFIRMING_ORDER';
+      await saveSession(session, supabase);
+      
+      const cart = session.context.cart || [];
+      const total = cart.reduce((sum: number, item: CartItem) => sum + (item.price * item.quantity), 0);
+      
+      let confirmation = `✅ *Comprobante recibido*\n\n`;
+      confirmation += `📦 *Tu pedido:*\n`;
+      cart.forEach((item: CartItem) => {
+        confirmation += `• ${item.quantity}x ${item.product_name} - $${(item.price * item.quantity).toFixed(2)}\n`;
+      });
+      confirmation += `\n💰 *Total: $${total.toFixed(2)}*\n`;
+      confirmation += `🏠 *Entrega:* ${session.context.delivery_address}\n`;
+      confirmation += `💳 *Pago:* ${session.context.payment_method}\n\n`;
+      confirmation += `¿Todo correcto? Escribe *confirmar* para finalizar el pedido`;
+      
+      return confirmation;
+    }
+    
+    // Si no recibió imagen aún
+    return `📸 Por favor, envía la *imagen del comprobante* de transferencia.\n\n` +
+           `_Adjunta la imagen sin texto adicional._`;
   }
 
   // Estado: CONFIRMACIÓN FINAL
@@ -1071,6 +1116,7 @@ async function createOrder(phone: string, session: UserSession, supabase: any): 
         customer_name: normalizedPhone,
         address: session.context?.delivery_address,
         payment_method: session.context?.payment_method,
+        payment_receipt_url: session.context?.payment_receipt_url,  // Agregar comprobante
         items: cart,
         total: total,
         status: 'pending',

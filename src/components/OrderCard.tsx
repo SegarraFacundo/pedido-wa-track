@@ -1,8 +1,8 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Order, OrderStatus } from "@/types/order";
-import { Clock, MapPin, Phone, User, MessageCircle } from "lucide-react";
+import { Order, OrderItem, OrderStatus } from "@/types/order";
+import { Image, FileText, Clock, MapPin, Phone, User, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface OrderCardProps {
@@ -116,6 +116,26 @@ export function OrderCard({ order, onStatusChange, onOpenChat, isVendorView = fa
               )}
             </div>
           </div>
+          
+          {/* Comprobante de pago */}
+          {isVendorView && order.payment_receipt_url && (
+            <div className="mt-3 pt-3 border-t">
+              <h4 className="font-semibold text-sm text-muted-foreground mb-2 flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Comprobante de Pago
+              </h4>
+              <a 
+                href={order.payment_receipt_url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 p-2 bg-primary/10 rounded-md hover:bg-primary/20 transition-colors"
+              >
+                <Image className="h-4 w-4 text-primary" />
+                <span className="text-sm text-primary font-medium">Ver comprobante</span>
+              </a>
+            </div>
+          )}
+          
           <div className="flex justify-between pt-2 border-t font-semibold">
             <span>Total</span>
             <span className="text-primary text-lg">${order.total.toFixed(2)}</span>

@@ -110,12 +110,13 @@ async function saveSession(session: UserSession): Promise<void> {
 
 async function processWithVendorBot(
   fromNumber: string, 
-  messageText: string
+  messageText: string,
+  imageUrl?: string
 ): Promise<string> {
-  console.log('Processing with vendor bot:', { fromNumber, messageText });
+  console.log('Processing with vendor bot:', { fromNumber, messageText, imageUrl });
   
   try {
-    const response = await handleVendorBot(messageText, fromNumber, supabase);
+    const response = await handleVendorBot(messageText, fromNumber, supabase, imageUrl);
     console.log('✅ Bot response:', response.substring(0, 100));
     return response;
   } catch (error) {
@@ -172,6 +173,9 @@ serve(async (req) => {
                        data.message?.imageMessage?.caption ||
                        data.message?.videoMessage?.caption ||
                        '';
+    
+    // Extract image URL if present
+    const imageUrl = data.message?.imageMessage?.url || null;
 
     if (!fromNumber) {
       console.log('Missing phone number');
@@ -179,6 +183,110 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200
       });
+    }
+
+    // Limpiar y normalizar el número de teléfono
+    const cleanPhone = fromNumber.replace(/@s\.whatsapp\.net$/i, '');
+    const normalizedPhone = normalizeArgentinePhone(cleanPhone);
+    console.log('Phone normalization:', cleanPhone, '->', normalizedPhone);
+
+    const vendorStatus = await isVendor(normalizedPhone);
+    const session = await getOrCreateSession(normalizedPhone);
+
+    // Si el usuario está esperando un comprobante y envía una imagen
+    if (imageUrl && !vendorStatus) {
+      const { data: userSession } = await supabase
+        .from('user_sessions')
+        .select('previous_state')
+        .eq('phone', normalizedPhone)
+        .maybeSingle();
+        
+      if (userSession && userSession.previous_state === 'AWAITING_RECEIPT') {
+        console.log('Processing payment receipt image for:', normalizedPhone);
+        
+        try {
+          // Descargar la imagen
+          const imageResponse = await fetch(imageUrl);
+          const imageBlob = await imageResponse.blob();
+          
+          // Generar nombre único para el archivo
+          const fileName = `${normalizedPhone}-${Date.now()}.jpg`;
+          const filePath = `receipts/${fileName}`;
+          
+          // Subir a Supabase Storage
+          const { data: uploadData, error: uploadError } = await supabase
+            .storage
+            .from('payment-receipts')
+            .upload(filePath, imageBlob, {
+              contentType: 'image/jpeg',
+              upsert: false
+            });
+          
+          if (uploadError) {
+            console.error('Error uploading receipt:', uploadError);
+            
+            const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL');
+            const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
+            const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
+            const chatId = `${normalizedPhone}@s.whatsapp.net`;
+            
+            await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': evolutionApiKey!,
+              },
+              body: JSON.stringify({
+                number: chatId,
+                text: '❌ Hubo un error al procesar tu comprobante. Por favor, intenta enviarlo de nuevo.',
+              }),
+            });
+            
+            return new Response(JSON.stringify({ status: 'upload_error' }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 200
+            });
+          }
+          
+          // Obtener URL pública
+          const { data: { publicUrl } } = supabase
+            .storage
+            .from('payment-receipts')
+            .getPublicUrl(filePath);
+          
+          console.log('Receipt uploaded successfully:', publicUrl);
+          
+          // Procesar con el bot pasando la URL del comprobante
+          const responseMessage = await processWithVendorBot(normalizedPhone, messageText || 'comprobante_recibido', publicUrl);
+          
+          if (responseMessage) {
+            const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL');
+            const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
+            const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
+            const chatId = `${normalizedPhone}@s.whatsapp.net`;
+            
+            await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': evolutionApiKey!,
+              },
+              body: JSON.stringify({
+                number: chatId,
+                text: responseMessage,
+              }),
+            });
+          }
+          
+          return new Response(JSON.stringify({ status: 'receipt_processed' }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200
+          });
+          
+        } catch (error) {
+          console.error('Error processing receipt:', error);
+        }
+      }
     }
 
     // If it's a media message without text, send a default response

@@ -35,6 +35,7 @@ export interface Order {
   notes?: string;
   deliveryPersonName?: string;
   deliveryPersonPhone?: string;
+  payment_receipt_url?: string;  // Nuevo campo para comprobante
   // Masked fields for vendor view
   customerNameMasked?: string;
   customerPhoneMasked?: string;

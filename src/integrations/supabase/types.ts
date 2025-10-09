@@ -367,6 +367,7 @@ export type Database = {
           paid_at: string | null
           payment_amount: number | null
           payment_method: string | null
+          payment_receipt_url: string | null
           payment_status: string | null
           status: string | null
           total: number
@@ -388,6 +389,7 @@ export type Database = {
           paid_at?: string | null
           payment_amount?: number | null
           payment_method?: string | null
+          payment_receipt_url?: string | null
           payment_status?: string | null
           status?: string | null
           total: number
@@ -409,6 +411,7 @@ export type Database = {
           paid_at?: string | null
           payment_amount?: number | null
           payment_method?: string | null
+          payment_receipt_url?: string | null
           payment_status?: string | null
           status?: string | null
           total?: number
