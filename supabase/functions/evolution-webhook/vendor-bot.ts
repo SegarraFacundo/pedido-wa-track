@@ -759,6 +759,11 @@ export async function handleVendorBot(
                `Gracias por pedir con nosotros ❤️`;
       }
       
+      // Si hay mensaje, es porque ya tiene pedido activo
+      if (orderResult.message) {
+        return `⚠️ ${orderResult.message}`;
+      }
+      
       return `❌ Hubo un problema al crear tu pedido. Intenta nuevamente.`;
     }
     
@@ -796,6 +801,11 @@ export async function handleVendorBot(
                `💬 Escribe *vendedor* para hablar con el negocio\n\n` +
                `Gracias por pedir con nosotros ❤️`;
         return successMsg;
+      }
+      
+      // Si hay mensaje, es porque ya tiene pedido activo
+      if (orderResult.message) {
+        return `⚠️ ${orderResult.message}`;
       }
       
       return `❌ Hubo un problema al crear tu pedido. Intenta nuevamente.`;
@@ -1113,7 +1123,7 @@ function parsePaymentMethod(message: string): string | null {
   return null;
 }
 
-async function createOrder(phone: string, session: UserSession, supabase: any): Promise<{success: boolean, orderId?: string}> {
+async function createOrder(phone: string, session: UserSession, supabase: any): Promise<{success: boolean, orderId?: string, message?: string}> {
   try {
     const cart = session.context?.cart || [];
     const total = cart.reduce((sum: number, item: CartItem) => sum + (item.price * item.quantity), 0);
@@ -1121,6 +1131,26 @@ async function createOrder(phone: string, session: UserSession, supabase: any): 
     // Normalizar el número de teléfono antes de guardarlo
     const normalizedPhone = normalizeArgentinePhone(phone);
     console.log('Creating order - Original phone:', phone, '-> Normalized:', normalizedPhone);
+
+    // Verificar si ya tiene un pedido activo
+    const { data: activeOrders } = await supabase
+      .from('orders')
+      .select('id, status, created_at')
+      .eq('customer_phone', normalizedPhone)
+      .in('status', ['pending', 'confirmed', 'preparing', 'ready', 'delivering'])
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (activeOrders && activeOrders.length > 0) {
+      const activeOrder = activeOrders[0];
+      console.log('Active order found:', activeOrder.id);
+      return { 
+        success: false, 
+        message: `Ya tienes un pedido activo (#${activeOrder.id.substring(0, 8)}).\n\n` +
+                 `Espera a que se entregue o cancele antes de hacer uno nuevo.\n\n` +
+                 `Escribe *estado* para ver tu pedido actual.`
+      };
+    }
 
     const { data: order, error } = await supabase
       .from('orders')
@@ -1130,7 +1160,7 @@ async function createOrder(phone: string, session: UserSession, supabase: any): 
         customer_name: normalizedPhone,
         address: session.context?.delivery_address,
         payment_method: session.context?.payment_method,
-        payment_receipt_url: session.context?.payment_receipt_url,  // Agregar comprobante
+        payment_receipt_url: session.context?.payment_receipt_url,
         items: cart,
         total: total,
         status: 'pending',

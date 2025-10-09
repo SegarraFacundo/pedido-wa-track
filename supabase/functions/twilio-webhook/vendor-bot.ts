@@ -480,6 +480,12 @@ export async function handleVendorBot(
         return addHelpFooter(successMsg, true);
       }
       
+      // Si hay mensaje, es porque ya tiene pedido activo
+      if (orderResult.message) {
+        const warningMsg = `⚠️ ${orderResult.message}`;
+        return addHelpFooter(warningMsg, true);
+      }
+      
       const errorMsg = `❌ Hubo un problema al crear tu pedido. Escribe *vendedor* para ayuda.`;
       return addHelpFooter(errorMsg, true);
     }
@@ -520,6 +526,12 @@ export async function handleVendorBot(
                `💬 Escribe *vendedor* para hablar con el negocio\n\n` +
                `Gracias por pedir con nosotros ❤️`;
         return addHelpFooter(successMsg, true);
+      }
+      
+      // Si hay mensaje, es porque ya tiene pedido activo
+      if (orderResult.message) {
+        const warningMsg = `⚠️ ${orderResult.message}`;
+        return addHelpFooter(warningMsg, true);
       }
       
       const errorMsg = `❌ Hubo un problema al crear tu pedido. Escribe *vendedor* para ayuda.`;
@@ -827,10 +839,30 @@ function parsePaymentMethod(message: string): string | null {
   return null;
 }
 
-async function createOrder(phone: string, session: UserSession, supabase: any): Promise<{success: boolean, orderId?: string}> {
+async function createOrder(phone: string, session: UserSession, supabase: any): Promise<{success: boolean, orderId?: string, message?: string}> {
   try {
     const cart = session.context?.cart || [];
     const total = cart.reduce((sum: number, item: CartItem) => sum + (item.price * item.quantity), 0);
+
+    // Verificar si ya tiene un pedido activo
+    const { data: activeOrders } = await supabase
+      .from('orders')
+      .select('id, status, created_at')
+      .eq('customer_phone', phone)
+      .in('status', ['pending', 'confirmed', 'preparing', 'ready', 'delivering'])
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (activeOrders && activeOrders.length > 0) {
+      const activeOrder = activeOrders[0];
+      console.log('Active order found:', activeOrder.id);
+      return { 
+        success: false, 
+        message: `Ya tienes un pedido activo (#${activeOrder.id.substring(0, 8)}).\n\n` +
+                 `Espera a que se entregue o cancele antes de hacer uno nuevo.\n\n` +
+                 `Escribe *estado* para ver tu pedido actual.`
+      };
+    }
 
     const { data: order, error } = await supabase
       .from('orders')
@@ -840,7 +872,7 @@ async function createOrder(phone: string, session: UserSession, supabase: any): 
         customer_name: phone,
         address: session.context?.delivery_address,
         payment_method: session.context?.payment_method,
-        payment_receipt_url: session.context?.payment_receipt_url,  // Agregar comprobante
+        payment_receipt_url: session.context?.payment_receipt_url,
         items: cart,
         total: total,
         status: 'pending',
