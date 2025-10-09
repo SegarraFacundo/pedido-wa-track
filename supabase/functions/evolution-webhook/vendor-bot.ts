@@ -847,27 +847,31 @@ export async function handleVendorBot(
   if (session.state === 'AWAITING_RECEIPT') {
     // Si recibió una URL del comprobante (desde el webhook)
     if (receiptUrl) {
-      session.context = session.context || {};
-      session.context.payment_receipt_url = receiptUrl;
+      const orderId = session.context?.pending_order_id;
+      const vendorName = session.context?.selected_vendor_name || 'El vendedor';
       
-      // Crear orden INMEDIATAMENTE después de recibir el comprobante
-      const orderResult = await createOrder(phone, session, supabase);
-      
-      if (orderResult.success) {
-        const vendorName = session.context?.selected_vendor_name || 'El vendedor';
-        session.state = 'ORDER_PLACED';
-        session.context = { cart: [] };
-        await saveSession(session, supabase);
+      if (orderId) {
+        // Actualizar el pedido existente con el comprobante
+        const { error } = await supabase
+          .from('orders')
+          .update({ payment_receipt_url: receiptUrl })
+          .eq('id', orderId);
         
-        return `✅ *Comprobante recibido y pedido confirmado*\n\n` +
-               `📋 Pedido #${orderResult.orderId.substring(0, 8)}\n\n` +
-               `*${vendorName}* verificará tu pago y lo está preparando. Llega en aproximadamente 35 minutos 🚴‍♂️\n\n` +
-               `💬 Escribe *estado* para seguir tu pedido\n` +
-               `💬 Escribe *vendedor* para hablar con el negocio\n\n` +
-               `Gracias por pedir con nosotros ❤️`;
+        if (!error) {
+          session.state = 'ORDER_PLACED';
+          session.context = { cart: [] };
+          await saveSession(session, supabase);
+          
+          return `✅ *Comprobante recibido*\n\n` +
+                 `📋 Pedido #${orderId.substring(0, 8)}\n\n` +
+                 `*${vendorName}* verificará tu pago y lo está preparando. Llega en aproximadamente 35 minutos 🚴‍♂️\n\n` +
+                 `💬 Escribe *estado* para seguir tu pedido\n` +
+                 `💬 Escribe *vendedor* para hablar con el negocio\n\n` +
+                 `Gracias por pedir con nosotros ❤️`;
+        }
       }
       
-      // Si hay mensaje, es porque ya tiene pedido activo
+      // Si no hay orderId o hubo error
       if (orderResult.message) {
         return `⚠️ ${orderResult.message}`;
       }
@@ -883,21 +887,24 @@ export async function handleVendorBot(
   // Estado: CONFIRMACIÓN FINAL
   if (session.state === 'CONFIRMING_ORDER') {
     if (lowerMessage === 'confirmar' || lowerMessage === 'si' || lowerMessage === 'ok') {
-      // Si el método de pago es Transferencia, pedir comprobante AHORA
-      if (session.context?.payment_method === 'Transferencia') {
-        session.state = 'AWAITING_RECEIPT';
-        await saveSession(session, supabase);
-        
-        return `📸 *Perfecto!*\n\n` +
-               `Por favor, envía el comprobante de transferencia para que el vendedor pueda verificar tu pago.\n\n` +
-               `_Adjunta la imagen del comprobante._`;
-      }
-      
-      // Para otros métodos de pago, crear orden inmediatamente
+      // Crear orden SIEMPRE, independiente del método de pago
       const vendorName = session.context?.selected_vendor_name || 'El vendedor';
       const orderResult = await createOrder(phone, session, supabase);
       
       if (orderResult.success) {
+        // Si el método de pago es Transferencia, pedir comprobante DESPUÉS de crear el pedido
+        if (session.context?.payment_method === 'Transferencia') {
+          session.state = 'AWAITING_RECEIPT';
+          session.context = session.context || {};
+          session.context.pending_order_id = orderResult.orderId; // Guardar ID del pedido
+          await saveSession(session, supabase);
+          
+          return `📸 *Perfecto!*\n\n` +
+                 `Por favor, envía el comprobante de transferencia para que el vendedor pueda verificar tu pago.\n\n` +
+                 `_Adjunta la imagen del comprobante._`;
+        }
+        
+        // Para otros métodos de pago, confirmar inmediatamente
         session.state = 'ORDER_PLACED';
         session.context = { cart: [] };
         await saveSession(session, supabase);
