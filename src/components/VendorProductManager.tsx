@@ -394,7 +394,7 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
 
       {/* Add/Edit Product Dialog */}
       <Dialog open={isAddingProduct} onOpenChange={setIsAddingProduct}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingProduct ? 'Editar Producto' : 'Agregar Producto'}
