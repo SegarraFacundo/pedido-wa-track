@@ -58,18 +58,27 @@ interface UserSession {
   created_at: string;
 }
 
-async function isVendor(phoneNumber: string): Promise<boolean> {
+async function getVendorData(phoneNumber: string): Promise<any> {
+  // First check if it's in the hardcoded list
   if (vendorNumbers.includes(phoneNumber)) {
-    return true;
+    // Get vendor data from database using phone or whatsapp_number
+    const { data } = await supabase
+      .from('vendors')
+      .select('*')
+      .or(`phone.eq.${phoneNumber},whatsapp_number.eq.${phoneNumber}`)
+      .single();
+    
+    return data || null;
   }
   
+  // Otherwise check in database
   const { data } = await supabase
     .from('vendors')
-    .select('whatsapp_number')
-    .eq('whatsapp_number', phoneNumber)
+    .select('*')
+    .or(`phone.eq.${phoneNumber},whatsapp_number.eq.${phoneNumber}`)
     .single();
     
-  return !!data;
+  return data || null;
 }
 
 async function getOrCreateSession(phoneNumber: string): Promise<UserSession> {
@@ -190,11 +199,11 @@ serve(async (req) => {
     const normalizedPhone = normalizeArgentinePhone(cleanPhone);
     console.log('Phone normalization:', cleanPhone, '->', normalizedPhone);
 
-    const vendorStatus = await isVendor(normalizedPhone);
+    const vendorData = await getVendorData(normalizedPhone);
     const session = await getOrCreateSession(normalizedPhone);
 
     // Si el usuario está esperando un comprobante y envía una imagen
-    if (imageUrl && !vendorStatus) {
+    if (imageUrl && !vendorData) {
       const { data: userSession } = await supabase
         .from('user_sessions')
         .select('previous_state, last_bot_message')
@@ -353,20 +362,26 @@ serve(async (req) => {
 
     let responseMessage = '';
 
-    if (vendorStatus) {
-      console.log('Message from vendor:', normalizedPhone);
+    if (vendorData) {
+      console.log('Message from vendor:', normalizedPhone, 'Vendor ID:', vendorData.id);
       
       // Verificar si el vendedor quiere cerrar el chat y reactivar el bot
       const lowerMessage = messageText.toLowerCase().trim();
       if (lowerMessage === 'sigue bot' || lowerMessage === 'activar bot' || lowerMessage === 'bot') {
+        console.log('Vendor wants to activate bot, searching for active chats...');
+        
         // Buscar chats activos de este vendedor
-        const { data: activeChats } = await supabase
+        const { data: activeChats, error: chatsError } = await supabase
           .from('vendor_chats')
           .select('id, customer_phone')
-          .eq('vendor_id', vendorStatus.id)
+          .eq('vendor_id', vendorData.id)
           .eq('is_active', true);
         
+        console.log('Active chats found:', activeChats?.length || 0, 'Error:', chatsError);
+        
         if (activeChats && activeChats.length > 0) {
+          console.log('Closing chats:', activeChats.map(c => c.customer_phone));
+          
           // Cerrar todos los chats activos
           for (const chat of activeChats) {
             await supabase
@@ -403,6 +418,7 @@ serve(async (req) => {
             });
           }
           
+          console.log('Bot activated successfully');
           // Notificar al vendedor
           responseMessage = `✅ Chat directo cerrado.\n\n🤖 El bot está activo nuevamente para los clientes.`;
         } else {
@@ -413,7 +429,7 @@ serve(async (req) => {
         const { data: activeChats } = await supabase
           .from('vendor_chats')
           .select('id, customer_phone')
-          .eq('vendor_id', vendorStatus.id)
+          .eq('vendor_id', vendorData.id)
           .eq('is_active', true);
         
         if (activeChats && activeChats.length > 0) {
@@ -442,7 +458,7 @@ serve(async (req) => {
               },
               body: JSON.stringify({
                 number: customerChatId,
-                text: `💬 *${vendorStatus.name}*: ${messageText}`,
+                text: `💬 *${vendorData.name}*: ${messageText}`,
               }),
             });
           }
