@@ -205,6 +205,22 @@ export async function handleVendorBot(
   }
 
   if (lowerMessage === 'cancelar' || lowerMessage === 'salir') {
+    // Cancelar pedidos activos pendientes
+    const { data: activeOrders } = await supabase
+      .from('orders')
+      .select('id')
+      .eq('customer_phone', phone)
+      .in('status', ['pending', 'confirmed'])
+      .limit(5);
+
+    if (activeOrders && activeOrders.length > 0) {
+      await supabase
+        .from('orders')
+        .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+        .eq('customer_phone', phone)
+        .in('status', ['pending', 'confirmed']);
+    }
+
     // Cerrar chat activo si existe
     await supabase
       .from('vendor_chats')
@@ -216,7 +232,12 @@ export async function handleVendorBot(
     session.state = 'SELECTING_VENDOR';
     session.context = { cart: [] };
     await saveSession(session, supabase);
-    return `❌ Pedido cancelado.\n\n` + await showVendorSelection(supabase);
+    
+    const cancelMsg = activeOrders && activeOrders.length > 0
+      ? `❌ Pedido cancelado exitosamente.\n\n` + await showVendorSelection(supabase)
+      : `❌ Pedido cancelado.\n\n` + await showVendorSelection(supabase);
+    
+    return cancelMsg;
   }
 
   // Obtener sesión

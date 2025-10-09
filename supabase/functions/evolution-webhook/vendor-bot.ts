@@ -287,6 +287,22 @@ export async function handleVendorBot(
   if (lowerMessage === 'cancelar' || lowerMessage === 'salir' || 
       lowerMessage.includes('cancelar pedido') || lowerMessage.includes('cancelar orden') ||
       lowerMessage === 'cancelar todo') {
+    // Cancelar pedidos activos pendientes
+    const { data: activeOrders } = await supabase
+      .from('orders')
+      .select('id')
+      .eq('customer_phone', phone)
+      .in('status', ['pending', 'confirmed'])
+      .limit(5);
+
+    if (activeOrders && activeOrders.length > 0) {
+      await supabase
+        .from('orders')
+        .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+        .eq('customer_phone', phone)
+        .in('status', ['pending', 'confirmed']);
+    }
+
     // Cerrar chat activo si existe
     await supabase
       .from('vendor_chats')
@@ -298,7 +314,12 @@ export async function handleVendorBot(
     session.state = 'SEARCHING_PRODUCTS';
     session.context = { cart: [] };
     await saveSession(session, supabase);
-    return `❌ Pedido cancelado.\n\n🔍 ¿Qué estás buscando?\n\nEscribe lo que quieres pedir (ej: pizza, hamburguesa)`;
+    
+    const cancelMsg = activeOrders && activeOrders.length > 0
+      ? `❌ Pedido cancelado exitosamente.\n\n🔍 ¿Qué estás buscando?\n\nEscribe lo que quieres pedir (ej: pizza, hamburguesa)`
+      : `❌ Pedido cancelado.\n\n🔍 ¿Qué estás buscando?\n\nEscribe lo que quieres pedir (ej: pizza, hamburguesa)`;
+    
+    return cancelMsg;
   }
 
   // Obtener sesión
