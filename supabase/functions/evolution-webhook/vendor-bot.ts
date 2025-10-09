@@ -200,6 +200,71 @@ export async function handleVendorBot(
 
   // COMANDOS GLOBALES - Verificar PRIMERO antes que cualquier otra cosa
   
+  // Comando para hablar con vendedor
+  if (lowerMessage.includes('hablar con vendedor') || lowerMessage.includes('hablar con el vendedor') || lowerMessage.includes('quiero hablar con el vendedor') || lowerMessage === 'vendedor') {
+    // Obtener sesión actual para ver si hay un pedido activo
+    const session = await getSession(phone, supabase);
+    
+    // Verificar si hay un pedido activo
+    const { data: activeOrder } = await supabase
+      .from('orders')
+      .select('id, vendor_id, vendor:vendors(name, phone, whatsapp_number)')
+      .eq('customer_phone', phone)
+      .in('status', ['pending', 'confirmed', 'preparing', 'ready', 'delivering'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    if (!activeOrder) {
+      return `⚠️ No tienes pedidos activos en este momento.\n\nPrimero realiza un pedido para poder hablar con el vendedor.\n\nEscribe "menu" para comenzar.`;
+    }
+    
+    // Activar modo chat con vendedor
+    await supabase
+      .from('user_sessions')
+      .upsert({
+        phone,
+        in_vendor_chat: true,
+        assigned_vendor_phone: activeOrder.vendor.whatsapp_number || activeOrder.vendor.phone,
+        previous_state: session.state,
+        last_bot_message: JSON.stringify(session.context || {}),
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'phone' });
+    
+    // Crear o reactivar vendor_chat
+    const { data: existingChat } = await supabase
+      .from('vendor_chats')
+      .select('id')
+      .eq('customer_phone', phone)
+      .eq('vendor_id', activeOrder.vendor_id)
+      .eq('is_active', true)
+      .maybeSingle();
+    
+    if (!existingChat) {
+      await supabase
+        .from('vendor_chats')
+        .insert({
+          vendor_id: activeOrder.vendor_id,
+          customer_phone: phone,
+          is_active: true
+        });
+    }
+    
+    // Notificar al vendedor
+    await supabase
+      .from('customer_messages')
+      .insert({
+        customer_phone: phone,
+        message: `🔔 El cliente quiere hablar contigo directamente.`,
+        read: false
+      });
+    
+    return `✅ Chat directo activado con *${activeOrder.vendor.name}*\n\n` +
+           `El bot está desactivado. Ahora puedes escribir directamente al vendedor.\n\n` +
+           `💬 Escribe tus mensajes y el vendedor los recibirá.\n\n` +
+           `Para volver al bot, escribe *"menu"* o *"inicio"*`;
+  }
+  
   // Menu/Inicio/Hola - Cierra cualquier chat activo y va DIRECTO a búsqueda de productos
   if (lowerMessage === 'menu' || lowerMessage === 'inicio' || lowerMessage === 'empezar' || lowerMessage === 'hola' || lowerMessage === 'hi' || lowerMessage === 'buenos dias' || lowerMessage === 'buenas tardes' || lowerMessage === 'buenas noches') {
     // Cerrar chat activo si existe
@@ -208,6 +273,16 @@ export async function handleVendorBot(
       .update({ is_active: false, ended_at: new Date().toISOString() })
       .eq('customer_phone', phone)
       .eq('is_active', true);
+
+    // Desactivar modo chat con vendedor
+    await supabase
+      .from('user_sessions')
+      .update({ 
+        in_vendor_chat: false, 
+        assigned_vendor_phone: null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('phone', phone);
 
     // Crear sesión nueva con estado de búsqueda
     const newSession: UserSession = {

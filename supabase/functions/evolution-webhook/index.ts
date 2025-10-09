@@ -355,8 +355,104 @@ serve(async (req) => {
 
     if (vendorStatus) {
       console.log('Message from vendor:', normalizedPhone);
-      // Vendor messages - could be handled differently
-      responseMessage = await processWithVendorBot(normalizedPhone, messageText);
+      
+      // Verificar si el vendedor quiere cerrar el chat y reactivar el bot
+      const lowerMessage = messageText.toLowerCase().trim();
+      if (lowerMessage === 'sigue bot' || lowerMessage === 'activar bot' || lowerMessage === 'bot') {
+        // Buscar chats activos de este vendedor
+        const { data: activeChats } = await supabase
+          .from('vendor_chats')
+          .select('id, customer_phone')
+          .eq('vendor_id', vendorStatus.id)
+          .eq('is_active', true);
+        
+        if (activeChats && activeChats.length > 0) {
+          // Cerrar todos los chats activos
+          for (const chat of activeChats) {
+            await supabase
+              .from('vendor_chats')
+              .update({ is_active: false, ended_at: new Date().toISOString() })
+              .eq('id', chat.id);
+            
+            // Desactivar in_vendor_chat en user_sessions
+            await supabase
+              .from('user_sessions')
+              .update({ 
+                in_vendor_chat: false, 
+                assigned_vendor_phone: null,
+                updated_at: new Date().toISOString()
+              })
+              .eq('phone', chat.customer_phone);
+            
+            // Notificar al cliente
+            const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL');
+            const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
+            const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
+            const customerChatId = `${chat.customer_phone}@s.whatsapp.net`;
+            
+            await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': evolutionApiKey!,
+              },
+              body: JSON.stringify({
+                number: customerChatId,
+                text: `✅ El vendedor cerró el chat directo.\n\n🤖 El bot está activo nuevamente.\n\nEscribe "menu" para ver las opciones.`,
+              }),
+            });
+          }
+          
+          // Notificar al vendedor
+          responseMessage = `✅ Chat directo cerrado.\n\n🤖 El bot está activo nuevamente para los clientes.`;
+        } else {
+          responseMessage = `ℹ️ No hay chats directos activos en este momento.`;
+        }
+      } else {
+        // Buscar si hay chats activos para este vendedor
+        const { data: activeChats } = await supabase
+          .from('vendor_chats')
+          .select('id, customer_phone')
+          .eq('vendor_id', vendorStatus.id)
+          .eq('is_active', true);
+        
+        if (activeChats && activeChats.length > 0) {
+          // Enviar mensaje del vendedor a todos los clientes en chat activo
+          const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL');
+          const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
+          const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
+          
+          for (const chat of activeChats) {
+            // Guardar mensaje en chat_messages
+            await supabase
+              .from('chat_messages')
+              .insert({
+                chat_id: chat.id,
+                sender_type: 'vendor',
+                message: messageText
+              });
+            
+            // Enviar mensaje al cliente
+            const customerChatId = `${chat.customer_phone}@s.whatsapp.net`;
+            await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': evolutionApiKey!,
+              },
+              body: JSON.stringify({
+                number: customerChatId,
+                text: `💬 *${vendorStatus.name}*: ${messageText}`,
+              }),
+            });
+          }
+          
+          responseMessage = ''; // No responder al vendedor, solo reenviar
+        } else {
+          // No hay chats activos, procesar con el bot normal
+          responseMessage = await processWithVendorBot(normalizedPhone, messageText);
+        }
+      }
     } else {
       // Customer message
       
