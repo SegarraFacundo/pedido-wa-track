@@ -298,9 +298,7 @@ serve(async (req) => {
       const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
       const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
       
-      // Normalizar número para WhatsApp
-      const cleanPhone = fromNumber.replace(/@s\.whatsapp\.net$/i, '');
-      const normalizedPhone = normalizeArgentinePhone(cleanPhone);
+      // Usar número ya normalizado
       const chatId = `${normalizedPhone}@s.whatsapp.net`;
       
       await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
@@ -331,14 +329,6 @@ serve(async (req) => {
 
     console.log('Processing message from:', fromNumber, 'Message:', messageText);
 
-    // Limpiar y normalizar el número de teléfono
-    const cleanPhone = fromNumber.replace(/@s\.whatsapp\.net$/i, '');
-    const normalizedPhone = normalizeArgentinePhone(cleanPhone);
-    console.log('Phone normalization:', cleanPhone, '->', normalizedPhone);
-
-    const vendorStatus = await isVendor(normalizedPhone);
-    const session = await getOrCreateSession(normalizedPhone);
-
     let responseMessage = '';
 
     if (vendorStatus) {
@@ -347,9 +337,32 @@ serve(async (req) => {
       responseMessage = await processWithVendorBot(normalizedPhone, messageText);
     } else {
       // Customer message
-      if (session.in_vendor_chat && session.assigned_vendor) {
-        // Customer is chatting with vendor - stay silent
-        console.log('Customer in vendor chat, staying silent');
+      if (session.in_vendor_chat && session.assigned_vendor_phone) {
+        // Customer is chatting with vendor - save message for vendor to see
+        console.log('Customer in vendor chat with vendor:', session.assigned_vendor_phone);
+        
+        // Find the active vendor chat
+        const { data: vendorChat } = await supabase
+          .from('vendor_chats')
+          .select('id')
+          .eq('customer_phone', normalizedPhone)
+          .eq('is_active', true)
+          .single();
+        
+        if (vendorChat) {
+          // Save customer message to chat_messages
+          await supabase
+            .from('chat_messages')
+            .insert({
+              chat_id: vendorChat.id,
+              sender_type: 'customer',
+              message: messageText
+            });
+          
+          console.log('Customer message saved to vendor chat');
+        }
+        
+        // Bot stays silent
         return new Response(JSON.stringify({ status: 'vendor_chat_active' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200

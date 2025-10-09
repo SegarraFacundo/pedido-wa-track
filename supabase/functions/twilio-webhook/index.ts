@@ -361,26 +361,36 @@ serve(async (req) => {
     }
 
     // CASO 5: Cliente está en chat con vendedor - no responder
-    if (session.in_vendor_chat) {
+    if (session.in_vendor_chat && session.assigned_vendor_phone) {
       // El mensaje queda registrado en la conversación pero el bot no responde
-      console.log('Cliente en chat con vendedor, bot silenciado');
+      console.log('Cliente en chat con vendedor:', session.assigned_vendor_phone);
       
-      // Registrar mensaje para el vendedor
-      await supabase
-        .from('customer_messages')
-        .insert({
-          customer_phone: phoneNumber,
-          message: message,
-          created_at: new Date().toISOString()
-        })
-        .then(() => {
-          console.log('Mensaje guardado para vendedor');
-        })
-        .catch(e => {
-          console.error('Error guardando mensaje:', e);
-        });
+      // Buscar el chat activo con el vendedor
+      const { data: vendorChat } = await supabase
+        .from('vendor_chats')
+        .select('id')
+        .eq('customer_phone', phoneNumber)
+        .eq('is_active', true)
+        .single();
+      
+      if (vendorChat) {
+        // Guardar mensaje del cliente en chat_messages
+        await supabase
+          .from('chat_messages')
+          .insert({
+            chat_id: vendorChat.id,
+            sender_type: 'customer',
+            message: message
+          })
+          .then(() => {
+            console.log('Mensaje del cliente guardado en vendor chat');
+          })
+          .catch(e => {
+            console.error('Error guardando mensaje en vendor chat:', e);
+          });
+      }
 
-      // Retornar respuesta vacía (no enviar nada al cliente)
+      // Retornar respuesta vacía (no enviar nada al cliente - bot silenciado)
       return new Response('', { headers: corsHeaders, status: 200 });
     }
 

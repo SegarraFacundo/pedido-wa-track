@@ -189,6 +189,16 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
 
       if (error) throw error;
 
+      // Activar modo chat directo para pausar el bot
+      await supabase
+        .from('user_sessions')
+        .upsert({
+          phone: selectedChat.customer_phone,
+          in_vendor_chat: true,
+          assigned_vendor_phone: vendorId,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'phone' });
+
       // Normalizar el número de teléfono antes de enviar
       // La edge function send-whatsapp-notification se encargará del formateo final
       const phoneToSend = selectedChat.customer_phone;
@@ -223,6 +233,9 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
     if (!confirm('¿Estás seguro de finalizar este chat?')) return;
 
     try {
+      // Obtener info del chat antes de cerrarlo
+      const chatToEnd = activeChats.find(c => c.id === chatId);
+      
       const { error } = await supabase
         .from('vendor_chats')
         .update({
@@ -233,6 +246,17 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
 
       if (error) throw error;
 
+      // Desactivar modo chat directo para reactivar el bot
+      if (chatToEnd) {
+        await supabase
+          .from('user_sessions')
+          .update({
+            in_vendor_chat: false,
+            assigned_vendor_phone: null
+          })
+          .eq('phone', chatToEnd.customer_phone);
+      }
+
       setActiveChats(prev => prev.filter(chat => chat.id !== chatId));
       if (selectedChat?.id === chatId) {
         setSelectedChat(null);
@@ -241,7 +265,7 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
 
       toast({
         title: '✅ Chat finalizado',
-        description: 'El chat ha sido cerrado'
+        description: 'El bot se ha reactivado para este cliente'
       });
     } catch (error) {
       console.error('Error ending chat:', error);
