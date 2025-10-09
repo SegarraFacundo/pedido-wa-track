@@ -201,7 +201,12 @@ export async function handleVendorBot(
   // COMANDOS GLOBALES - Verificar PRIMERO antes que cualquier otra cosa
   
   // Comando para hablar con vendedor
-  if (lowerMessage.includes('hablar con vendedor') || lowerMessage.includes('hablar con el vendedor') || lowerMessage.includes('quiero hablar con el vendedor') || lowerMessage === 'vendedor') {
+  if (lowerMessage === 'vendedor' || 
+      lowerMessage.includes('hablar con vendedor') || 
+      lowerMessage.includes('hablar con el vendedor') || 
+      lowerMessage.includes('comunicarse con el vendedor') || 
+      lowerMessage.includes('comunicarme con vendedor') ||
+      lowerMessage.includes('quiero hablar con el vendedor')) {
     // Obtener sesión actual para ver si hay un pedido activo
     const session = await getSession(phone, supabase);
     

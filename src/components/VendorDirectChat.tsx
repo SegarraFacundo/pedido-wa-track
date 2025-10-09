@@ -57,10 +57,13 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
 
   useEffect(() => {
     // Scroll to bottom whenever messages change
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    }, 100);
-  }, [messages]);
+    const timer = setTimeout(() => {
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end', inline: 'nearest' });
+      }
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [messages, selectedChat]);
 
   const setupRealtimeSubscription = () => {
     const channel = supabase
@@ -199,8 +202,8 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
 
     const messageText = newMessage.trim().toLowerCase();
     
-    // Detectar comando "sigue bot" o variaciones - sin necesidad de chat seleccionado
-    if (messageText === 'sigue bot' || messageText === 'activar bot' || messageText === 'bot') {
+    // Detectar comando "activar bot" o variaciones - sin necesidad de chat seleccionado
+    if (messageText === 'activar bot' || messageText === 'bot activo' || messageText === 'reactivar bot') {
       if (activeChats.length === 0) {
         toast({
           title: 'ℹ️ No hay chats activos',
@@ -295,7 +298,7 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
     if (!selectedChat) {
       toast({
         title: 'Atención',
-        description: 'Selecciona un chat o escribe "sigue bot" para reactivar el bot',
+        description: 'Selecciona un chat o escribe "activar bot" para reactivar el bot',
         variant: 'destructive'
       });
       return;
@@ -312,7 +315,7 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
 
       if (error) throw error;
 
-      // Activar modo chat directo para pausar el bot
+      // Desactivar bot automáticamente cuando el vendedor escribe cualquier mensaje
       await supabase
         .from('user_sessions')
         .upsert({
@@ -531,7 +534,7 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
                   <Input
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
-                    placeholder={selectedChat ? "Escribe un mensaje..." : 'Escribe "sigue bot" para reactivar el bot'}
+                    placeholder={selectedChat ? "Escribe un mensaje..." : 'Escribe "activar bot" para reactivar el bot'}
                     onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
                   />
                   <Button onClick={sendMessage}>
@@ -539,7 +542,7 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  💡 Escribe "sigue bot" para cerrar todos los chats y reactivar el bot
+                  💡 Escribe "activar bot" para cerrar todos los chats y reactivar el bot
                 </p>
               </div>
             </CardContent>

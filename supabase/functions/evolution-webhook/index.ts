@@ -367,7 +367,7 @@ serve(async (req) => {
       
       // Verificar si el vendedor quiere cerrar el chat y reactivar el bot
       const lowerMessage = messageText.toLowerCase().trim();
-      if (lowerMessage === 'sigue bot' || lowerMessage === 'activar bot' || lowerMessage === 'bot') {
+      if (lowerMessage === 'activar bot' || lowerMessage === 'bot activo' || lowerMessage === 'reactivar bot') {
         console.log('Vendor wants to activate bot, searching for active chats...');
         
         // Buscar chats activos de este vendedor
