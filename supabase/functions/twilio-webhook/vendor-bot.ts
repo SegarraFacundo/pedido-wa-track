@@ -128,8 +128,9 @@ export async function handleVendorBot(
     };
     await saveSession(newSession, supabase);
     
-    const welcomeMsg = `👋 *¡Bienvenido a Lapacho!*\n\n` +
-           `Tu plataforma de pedidos y entregas.\n\n` +
+    const welcomeMsg = `¡Hola 👋! Soy tu asistente de pedidos.\n\n` +
+           `Puedo ayudarte a pedir comida 🍗, helado 🍦, medicamentos 💊, bebidas 🧃, frutas 🥦 o lo que necesites.\n\n` +
+           `¿Qué te gustaría pedir hoy?\n\n` +
            await showVendorSelection(supabase);
     return addHelpFooter(welcomeMsg, false);
   }
@@ -399,11 +400,12 @@ export async function handleVendorBot(
       session.state = 'COLLECTING_PAYMENT';
       await saveSession(session, supabase);
       
-      const paymentMsg = `💳 *¿Cómo vas a pagar?*\n\n` +
-             `1️⃣ Efectivo\n` +
+      const paymentMsg = `Gracias 🏡\n\n` +
+             `¿Cómo querés pagar?\n\n` +
+             `1️⃣ Efectivo al entregar\n` +
              `2️⃣ Transferencia\n` +
              `3️⃣ Tarjeta\n\n` +
-             `Escribe el número o nombre del método de pago.`;
+             `Escribe el número o nombre del método de pago`;
       return addHelpFooter(paymentMsg, true);
     }
     const errorMsg = `❌ Por favor escribe una dirección válida (mínimo 10 caracteres).`;
@@ -422,18 +424,18 @@ export async function handleVendorBot(
       const cart = session.context.cart || [];
       const total = cart.reduce((sum: number, item: CartItem) => sum + (item.price * item.quantity), 0);
       
-      let confirmation = `📋 *CONFIRMA TU PEDIDO*\n\n`;
-      confirmation += `🏪 *${session.context.selected_vendor_name}*\n\n`;
-      confirmation += `📦 *Productos:*\n`;
+      let confirmation = paymentMethod === 'Efectivo' 
+        ? `Listo 💵, lo pagás al entregar.\n\n`
+        : `Perfecto 💳, pagás con ${paymentMethod}.\n\n`;
+      
+      confirmation += `📦 *Tu pedido:*\n`;
       cart.forEach((item: CartItem) => {
         confirmation += `• ${item.quantity}x ${item.product_name} - $${(item.price * item.quantity).toFixed(2)}\n`;
       });
       confirmation += `\n💰 *Total: $${total.toFixed(2)}*\n`;
-      confirmation += `📍 *Entrega:* ${session.context.delivery_address}\n`;
+      confirmation += `🏠 *Entrega:* ${session.context.delivery_address}\n`;
       confirmation += `💳 *Pago:* ${paymentMethod}\n\n`;
-      confirmation += `¿Todo correcto?\n`;
-      confirmation += `• Escribe *confirmar* para realizar el pedido\n`;
-      confirmation += `• Escribe *cancelar* para empezar de nuevo`;
+      confirmation += `¿Todo correcto? Escribe *confirmar* para finalizar el pedido`;
       
       return addHelpFooter(confirmation, true);
     }
@@ -452,13 +454,12 @@ export async function handleVendorBot(
         session.context = { cart: [] };
         await saveSession(session, supabase);
         
-        const successMsg = `✅ *¡PEDIDO REALIZADO!*\n\n` +
-               `📋 Número de pedido: #${orderResult.orderId.substring(0, 8)}\n\n` +
-               `${session.context.selected_vendor_name} está preparando tu pedido.\n` +
-               `Te notificaremos cuando esté en camino! 🚚\n\n` +
-               `💡 Escribe *estado* para ver tu pedido\n` +
-               `📝 Escribe *calificar* después de recibir tu orden\n\n` +
-               `¡Gracias por tu compra! 😊`;
+        const successMsg = `✅ *Pedido confirmado*\n\n` +
+               `📋 Pedido #${orderResult.orderId.substring(0, 8)}\n\n` +
+               `*${session.context.selected_vendor_name}* lo está preparando y llega en aproximadamente 35 minutos 🚴‍♂️\n\n` +
+               `💬 Escribe *estado* para seguir tu pedido\n` +
+               `💬 Escribe *vendedor* para hablar con el negocio\n\n` +
+               `Gracias por pedir con nosotros ❤️`;
         return addHelpFooter(successMsg, true);
       }
       
