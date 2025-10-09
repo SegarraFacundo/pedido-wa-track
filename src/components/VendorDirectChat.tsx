@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -39,6 +39,8 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
   const [loading, setLoading] = useState(true);
   const [vendorName, setVendorName] = useState<string>('');
   const { toast } = useToast();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchVendorInfo();
@@ -51,6 +53,10 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
       fetchMessages(selectedChat.id);
     }
   }, [selectedChat]);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   const setupRealtimeSubscription = () => {
     const channel = supabase
@@ -108,6 +114,10 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
     return () => {
       supabase.removeChannel(channel);
     };
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const fetchVendorInfo = async () => {
@@ -180,9 +190,23 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
 
     const messageText = newMessage.trim().toLowerCase();
     
-    // Detectar comando "sigue bot" o variaciones
+    // Detectar comando "sigue bot" o variaciones - sin necesidad de chat seleccionado
     if (messageText === 'sigue bot' || messageText === 'activar bot' || messageText === 'bot') {
+      if (activeChats.length === 0) {
+        toast({
+          title: 'ℹ️ No hay chats activos',
+          description: 'No hay ningún chat directo activo en este momento',
+        });
+        setNewMessage('');
+        return;
+      }
+
       try {
+        // Obtener todos los clientes afectados ANTES de cerrar los chats
+        const customerPhones = activeChats.map(chat => chat.customer_phone);
+        
+        console.log('Cerrando chats para clientes:', customerPhones);
+
         // Cerrar todos los chats activos de este vendedor
         const { error: updateError } = await supabase
           .from('vendor_chats')
@@ -195,10 +219,7 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
 
         if (updateError) throw updateError;
 
-        // Obtener todos los clientes afectados
-        const customerPhones = activeChats.map(chat => chat.customer_phone);
-
-        // Desactivar modo chat para todos los clientes
+        // Desactivar modo chat para todos los clientes y notificar
         for (const phone of customerPhones) {
           await supabase
             .from('user_sessions')
@@ -226,7 +247,7 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
 
         toast({
           title: '✅ Bot reactivado',
-          description: `El bot está activo nuevamente para ${customerPhones.length} cliente(s)`,
+          description: `Bot activo nuevamente para ${customerPhones.length} cliente(s)`,
         });
       } catch (error) {
         console.error('Error activating bot:', error);
@@ -243,7 +264,7 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
     if (!selectedChat) {
       toast({
         title: 'Atención',
-        description: 'Selecciona un chat para enviar mensajes',
+        description: 'Selecciona un chat o escribe "sigue bot" para reactivar el bot',
         variant: 'destructive'
       });
       return;
@@ -270,18 +291,12 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
           updated_at: new Date().toISOString()
         }, { onConflict: 'phone' });
 
-      // Normalizar el número de teléfono antes de enviar
-      // La edge function send-whatsapp-notification se encargará del formateo final
-      const phoneToSend = selectedChat.customer_phone;
-      
-      console.log('Sending message to customer:', phoneToSend);
-
       // Enviar mensaje por WhatsApp al cliente con el nombre del negocio
       await supabase.functions.invoke('send-whatsapp-notification', {
         body: {
-          phoneNumber: phoneToSend,
+          phoneNumber: selectedChat.customer_phone,
           message: `📩 Mensaje de *${vendorName}*:\n${newMessage}`,
-          orderId: selectedChat.id // Para logging
+          orderId: selectedChat.id
         }
       });
 
@@ -443,7 +458,7 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <ScrollArea className="h-[420px] p-4">
+              <ScrollArea className="h-[420px] p-4" ref={scrollAreaRef}>
                 <div className="space-y-4">
                   {messages.map((message) => (
                     <div
@@ -473,6 +488,7 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
                       </div>
                     </div>
                   ))}
+                  <div ref={messagesEndRef} />
                 </div>
               </ScrollArea>
               <div className="p-4 border-t">
@@ -480,13 +496,16 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
                   <Input
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
-                    placeholder="Escribe un mensaje..."
+                    placeholder={selectedChat ? "Escribe un mensaje..." : 'Escribe "sigue bot" para reactivar el bot'}
                     onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
                   />
                   <Button onClick={sendMessage}>
                     <Send className="h-4 w-4" />
                   </Button>
                 </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  💡 Escribe "sigue bot" para cerrar todos los chats y reactivar el bot
+                </p>
               </div>
             </CardContent>
           </>
