@@ -176,7 +176,78 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
   };
 
   const sendMessage = async () => {
-    if (!selectedChat || !newMessage.trim()) return;
+    if (!newMessage.trim()) return;
+
+    const messageText = newMessage.trim().toLowerCase();
+    
+    // Detectar comando "sigue bot" o variaciones
+    if (messageText === 'sigue bot' || messageText === 'activar bot' || messageText === 'bot') {
+      try {
+        // Cerrar todos los chats activos de este vendedor
+        const { error: updateError } = await supabase
+          .from('vendor_chats')
+          .update({
+            is_active: false,
+            ended_at: new Date().toISOString()
+          })
+          .eq('vendor_id', vendorId)
+          .eq('is_active', true);
+
+        if (updateError) throw updateError;
+
+        // Obtener todos los clientes afectados
+        const customerPhones = activeChats.map(chat => chat.customer_phone);
+
+        // Desactivar modo chat para todos los clientes
+        for (const phone of customerPhones) {
+          await supabase
+            .from('user_sessions')
+            .update({
+              in_vendor_chat: false,
+              assigned_vendor_phone: null,
+              updated_at: new Date().toISOString()
+            })
+            .eq('phone', phone);
+
+          // Notificar al cliente que el bot está activo
+          await supabase.functions.invoke('send-whatsapp-notification', {
+            body: {
+              phoneNumber: phone,
+              message: `✅ El vendedor cerró el chat directo.\n\n🤖 El bot está activo nuevamente.\n\nEscribe "menu" para ver las opciones.`
+            }
+          });
+        }
+
+        // Limpiar estado local
+        setActiveChats([]);
+        setSelectedChat(null);
+        setMessages([]);
+        setNewMessage('');
+
+        toast({
+          title: '✅ Bot reactivado',
+          description: `El bot está activo nuevamente para ${customerPhones.length} cliente(s)`,
+        });
+      } catch (error) {
+        console.error('Error activating bot:', error);
+        toast({
+          title: 'Error',
+          description: 'No se pudo reactivar el bot',
+          variant: 'destructive'
+        });
+      }
+      return;
+    }
+
+    // Mensaje normal - requiere chat seleccionado
+    if (!selectedChat) {
+      toast({
+        title: 'Atención',
+        description: 'Selecciona un chat para enviar mensajes',
+        variant: 'destructive'
+      });
+      return;
+    }
 
     try {
       const { error } = await supabase
