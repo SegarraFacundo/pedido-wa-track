@@ -489,25 +489,6 @@ export async function handleVendorBot(
            `_Adjunta la imagen sin texto adicional._`;
     return addHelpFooter(receiptMsg, true);
   }
-      
-      let confirmation = paymentMethod === 'Efectivo' 
-        ? `Listo 💵, lo pagás al entregar.\n\n`
-        : `Perfecto 💳, pagás con ${paymentMethod}.\n\n`;
-      
-      confirmation += `📦 *Tu pedido:*\n`;
-      cart.forEach((item: CartItem) => {
-        confirmation += `• ${item.quantity}x ${item.product_name} - $${(item.price * item.quantity).toFixed(2)}\n`;
-      });
-      confirmation += `\n💰 *Total: $${total.toFixed(2)}*\n`;
-      confirmation += `🏠 *Entrega:* ${session.context.delivery_address}\n`;
-      confirmation += `💳 *Pago:* ${paymentMethod}\n\n`;
-      confirmation += `¿Todo correcto? Escribe *confirmar* para finalizar el pedido`;
-      
-      return addHelpFooter(confirmation, true);
-    }
-    const errorMsg = `❌ Por favor elige un método de pago válido (1-3 o el nombre).`;
-    return addHelpFooter(errorMsg, true);
-  }
 
   // Estado: CONFIRMACIÓN FINAL
   if (session.state === 'CONFIRMING_ORDER') {
