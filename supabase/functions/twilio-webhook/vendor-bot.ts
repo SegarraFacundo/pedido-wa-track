@@ -357,12 +357,13 @@ export async function handleVendorBot(
         
         let cartSummary = `✅ *Agregado al carrito*\n\n`;
         cartSummary += `📦 *Tu pedido:*\n`;
-        cart.forEach((item: CartItem) => {
-          cartSummary += `• ${item.quantity}x ${item.product_name} - $${(item.price * item.quantity).toFixed(2)}\n`;
+        cart.forEach((item: CartItem, index: number) => {
+          cartSummary += `${index + 1}. ${item.quantity}x ${item.product_name} - $${(item.price * item.quantity).toFixed(2)}\n`;
         });
         cartSummary += `\n💰 *Total: $${total.toFixed(2)}*\n\n`;
         cartSummary += `¿Quieres agregar algo más?\n`;
         cartSummary += `• Escribe el producto para agregar\n`;
+        cartSummary += `• Escribe *quitar [número]* para eliminar un producto\n`;
         cartSummary += `• Escribe *confirmar* para continuar con el pedido\n`;
         cartSummary += `• Escribe *cancelar* para empezar de nuevo`;
         
@@ -374,6 +375,88 @@ export async function handleVendorBot(
 
   // Estado: CONFIRMANDO ITEMS
   if (session.state === 'CONFIRMING_ITEMS') {
+    // Detectar si quiere eliminar un producto específico por número o nombre
+    const removeMatch = lowerMessage.match(/(?:quitar|eliminar|sacar|borrar)\s+(?:el\s+)?(.+)/i);
+    if (removeMatch) {
+      const itemToRemove = removeMatch[1].trim();
+      const cart = session.context?.cart || [];
+      
+      // Buscar por número (índice en el carrito)
+      const itemNumber = parseInt(itemToRemove);
+      if (!isNaN(itemNumber) && itemNumber > 0 && itemNumber <= cart.length) {
+        const removedItem = cart.splice(itemNumber - 1, 1)[0];
+        session.context = session.context || {};
+        session.context.cart = cart;
+        await saveSession(session, supabase);
+        
+        if (cart.length === 0) {
+          session.state = 'BROWSING_PRODUCTS';
+          await saveSession(session, supabase);
+          const emptyMsg = `🗑️ *${removedItem.product_name}* eliminado del carrito.\n\n` +
+                 `Tu carrito está vacío.\n` +
+                 `Escribe el nombre del producto que quieres agregar.`;
+          return addHelpFooter(emptyMsg, true);
+        }
+        
+        const total = cart.reduce((sum: number, item: CartItem) => sum + (item.price * item.quantity), 0);
+        let cartSummary = `🗑️ *${removedItem.product_name}* eliminado del carrito.\n\n`;
+        cartSummary += `📦 *Tu pedido actualizado:*\n`;
+        cart.forEach((item: CartItem, index: number) => {
+          cartSummary += `${index + 1}. ${item.quantity}x ${item.product_name} - $${(item.price * item.quantity).toFixed(2)}\n`;
+        });
+        cartSummary += `\n💰 *Total: $${total.toFixed(2)}*\n\n`;
+        cartSummary += `¿Quieres agregar algo más o confirmar?\n`;
+        cartSummary += `• Escribe otro producto para agregar\n`;
+        cartSummary += `• Escribe *quitar [número]* para eliminar un producto\n`;
+        cartSummary += `• Escribe *confirmar* para continuar`;
+        return addHelpFooter(cartSummary, true);
+      }
+      
+      // Buscar por nombre del producto
+      function normalizeForSearch(text: string): string {
+        return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      }
+      
+      const normalizedSearch = normalizeForSearch(itemToRemove);
+      const itemIndex = cart.findIndex((item: CartItem) => 
+        normalizeForSearch(item.product_name).includes(normalizedSearch) ||
+        normalizedSearch.includes(normalizeForSearch(item.product_name))
+      );
+      
+      if (itemIndex !== -1) {
+        const removedItem = cart.splice(itemIndex, 1)[0];
+        session.context = session.context || {};
+        session.context.cart = cart;
+        await saveSession(session, supabase);
+        
+        if (cart.length === 0) {
+          session.state = 'BROWSING_PRODUCTS';
+          await saveSession(session, supabase);
+          const emptyMsg = `🗑️ *${removedItem.product_name}* eliminado del carrito.\n\n` +
+                 `Tu carrito está vacío.\n` +
+                 `Escribe el nombre del producto que quieres agregar.`;
+          return addHelpFooter(emptyMsg, true);
+        }
+        
+        const total = cart.reduce((sum: number, item: CartItem) => sum + (item.price * item.quantity), 0);
+        let cartSummary = `🗑️ *${removedItem.product_name}* eliminado del carrito.\n\n`;
+        cartSummary += `📦 *Tu pedido actualizado:*\n`;
+        cart.forEach((item: CartItem, index: number) => {
+          cartSummary += `${index + 1}. ${item.quantity}x ${item.product_name} - $${(item.price * item.quantity).toFixed(2)}\n`;
+        });
+        cartSummary += `\n💰 *Total: $${total.toFixed(2)}*\n\n`;
+        cartSummary += `¿Quieres agregar algo más o confirmar?\n`;
+        cartSummary += `• Escribe otro producto para agregar\n`;
+        cartSummary += `• Escribe *quitar [número]* para eliminar un producto\n`;
+        cartSummary += `• Escribe *confirmar* para continuar`;
+        return addHelpFooter(cartSummary, true);
+      }
+      
+      const notFoundMsg = `❌ No encontré ese producto en tu carrito.\n\n` +
+             `Escribe el número o nombre exacto del producto que quieres eliminar.`;
+      return addHelpFooter(notFoundMsg, true);
+    }
+    
     if (lowerMessage === 'confirmar' || lowerMessage.includes('continuar') || lowerMessage.includes('siguiente')) {
       session.state = 'COLLECTING_ADDRESS';
       await saveSession(session, supabase);
@@ -396,7 +479,8 @@ export async function handleVendorBot(
       return addHelpFooter(productMsg, true);
     }
 
-    const hintMsg = `💡 Escribe el nombre del producto para agregar más, o *confirmar* para continuar.`;
+    const hintMsg = `💡 Escribe el nombre del producto para agregar más, o *confirmar* para continuar.\n\n` +
+           `_También puedes escribir *quitar [número]* para eliminar un producto._`;
     return addHelpFooter(hintMsg, true);
   }
 
