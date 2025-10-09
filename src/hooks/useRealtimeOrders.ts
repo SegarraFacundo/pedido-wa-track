@@ -52,6 +52,7 @@ export function useRealtimeOrders(vendorId?: string) {
           notes: order.notes,
           deliveryPersonName: order.delivery_person_name,
           deliveryPersonPhone: order.delivery_person_phone,
+          payment_receipt_url: order.payment_receipt_url,
           // Masked fields for vendor view
           customerNameMasked: order.customer_name?.substring(0, 3) + '***',
           customerPhoneMasked: '****' + order.customer_phone?.slice(-4),
@@ -121,6 +122,7 @@ export function useRealtimeOrders(vendorId?: string) {
                   notes: data.notes,
                   deliveryPersonName: data.delivery_person_name,
                   deliveryPersonPhone: data.delivery_person_phone,
+                  payment_receipt_url: data.payment_receipt_url,
                   customerNameMasked: data.customer_name?.substring(0, 3) + '***',
                   customerPhoneMasked: '****' + data.customer_phone?.slice(-4),
                   addressSimplified: data.address?.split(',')[0]
@@ -129,8 +131,9 @@ export function useRealtimeOrders(vendorId?: string) {
                 setOrders(prev => [newOrder, ...prev]);
                 
                 toast({
-                  title: '🆕 Nuevo pedido',
-                  description: `Pedido #${newOrder.id.slice(0, 8)} recibido`,
+                  title: '🆕 NUEVO PEDIDO INGRESADO',
+                  description: `Pedido #${newOrder.id.slice(0, 8)} - $${newOrder.total.toFixed(2)}`,
+                  duration: 10000,
                 });
               }
             } else if (payload.eventType === 'UPDATE') {
