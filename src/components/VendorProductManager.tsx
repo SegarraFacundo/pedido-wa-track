@@ -19,6 +19,8 @@ interface Product {
   price: number;
   is_available: boolean;
   image: string | null;
+  stock_enabled: boolean;
+  stock_quantity: number | null;
 }
 
 interface VendorProductManagerProps {
@@ -44,7 +46,9 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
     description: '',
     price: '',
     is_available: true,
-    image: null as string | null
+    image: null as string | null,
+    stock_enabled: false,
+    stock_quantity: ''
   });
 
   useEffect(() => {
@@ -153,7 +157,9 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
             description: formData.description || null,
             price: parseFloat(formData.price),
             is_available: formData.is_available,
-            image: imageUrl
+            image: imageUrl,
+            stock_enabled: formData.stock_enabled,
+            stock_quantity: formData.stock_enabled ? (formData.stock_quantity ? parseInt(formData.stock_quantity) : 0) : null
           })
           .eq('id', editingProduct.id);
 
@@ -174,7 +180,9 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
             description: formData.description || null,
             price: parseFloat(formData.price),
             is_available: formData.is_available,
-            image: imageUrl
+            image: imageUrl,
+            stock_enabled: formData.stock_enabled,
+            stock_quantity: formData.stock_enabled ? (formData.stock_quantity ? parseInt(formData.stock_quantity) : 0) : null
           });
 
         if (error) throw error;
@@ -192,7 +200,9 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
         description: '',
         price: '',
         is_available: true,
-        image: null
+        image: null,
+        stock_enabled: false,
+        stock_quantity: ''
       });
       setImageFile(null);
       setImagePreview(null);
@@ -263,7 +273,9 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
       description: product.description || '',
       price: product.price.toString(),
       is_available: product.is_available,
-      image: product.image
+      image: product.image,
+      stock_enabled: product.stock_enabled,
+      stock_quantity: product.stock_quantity?.toString() || ''
     });
     setImagePreview(product.image);
     setIsAddingProduct(true);
@@ -326,9 +338,22 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
                       {product.description && (
                         <p className="text-sm text-muted-foreground mb-2">{product.description}</p>
                       )}
-                      <p className="text-lg font-bold text-primary">
-                        ${product.price.toLocaleString('es-AR')}
-                      </p>
+                      <div className="flex items-center gap-3">
+                        <p className="text-lg font-bold text-primary">
+                          ${product.price.toLocaleString('es-AR')}
+                        </p>
+                        {product.stock_enabled && (
+                          <span className={`text-xs px-2 py-1 rounded-full ${
+                            (product.stock_quantity || 0) === 0 
+                              ? 'bg-red-100 text-red-700' 
+                              : (product.stock_quantity || 0) < 5
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-green-100 text-green-700'
+                          }`}>
+                            Stock: {product.stock_quantity || 0}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     
                     <div className="flex items-center gap-2">
@@ -467,6 +492,35 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
               />
               <Label htmlFor="available">Disponible</Label>
             </div>
+
+            <div className="space-y-3 p-4 border rounded-lg">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="stock-enabled"
+                  checked={formData.stock_enabled}
+                  onCheckedChange={(checked) => setFormData({ ...formData, stock_enabled: checked })}
+                />
+                <Label htmlFor="stock-enabled">Controlar Stock</Label>
+              </div>
+              
+              {formData.stock_enabled && (
+                <div>
+                  <Label htmlFor="stock-quantity">Cantidad en Stock</Label>
+                  <Input
+                    id="stock-quantity"
+                    type="number"
+                    value={formData.stock_quantity}
+                    onChange={(e) => setFormData({ ...formData, stock_quantity: e.target.value })}
+                    placeholder="0"
+                    min="0"
+                    step="1"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    El producto se deshabilitará automáticamente cuando el stock llegue a 0
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
           
           <DialogFooter>
@@ -483,7 +537,9 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
                   description: '',
                   price: '',
                   is_available: true,
-                  image: null
+                  image: null,
+                  stock_enabled: false,
+                  stock_quantity: ''
                 });
               }}
             >

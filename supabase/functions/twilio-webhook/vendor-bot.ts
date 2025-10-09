@@ -340,6 +340,25 @@ export async function handleVendorBot(
     if (quantity > 0) {
       const product = session.context?.pending_product;
       if (product) {
+        // Verificar si el producto tiene stock sin stock
+        if (product.out_of_stock) {
+          session.state = 'BROWSING_PRODUCTS';
+          delete session.context.pending_product;
+          await saveSession(session, supabase);
+          return addHelpFooter(`😔 Lo siento, *${product.name}* está agotado temporalmente.\n\n` +
+                 `Escribe el nombre de otro producto que quieras agregar.`, false);
+        }
+        
+        // Validar stock si está habilitado
+        if (product.stock_enabled) {
+          const availableStock = product.stock_quantity || 0;
+          if (quantity > availableStock) {
+            return addHelpFooter(`⚠️ Lo siento, solo hay *${availableStock}* ${availableStock === 1 ? 'unidad' : 'unidades'} disponibles de *${product.name}*.\n\n` +
+                   `¿Cuántas unidades quieres? (máximo ${availableStock})\n\n` +
+                   `_O escribe *no* para cancelar._`, false);
+          }
+        }
+        
         session.context = session.context || {};
         session.context.cart = session.context.cart || [];
         session.context.cart.push({
@@ -470,13 +489,23 @@ export async function handleVendorBot(
     // Agregar más productos
     const product = await findProductFromMessage(lowerMessage, session.context?.selected_vendor_id!, supabase);
     if (product) {
+      // Verificar si está sin stock
+      if (product.out_of_stock) {
+        return addHelpFooter(`😔 Lo siento, *${product.name}* está agotado temporalmente.\n\n` +
+               `Prueba con otro producto o escribe *confirmar* para continuar con tu pedido actual.`, false);
+      }
+      
       session.state = 'ADDING_ITEMS';
       session.context = session.context || {};
       session.context.pending_product = product;
       await saveSession(session, supabase);
-      const productMsg = `🛒 *${product.name}* - $${product.price}\n\n` +
-             `¿Cuántas unidades? (ej: "2", "tres")`;
-      return addHelpFooter(productMsg, true);
+      
+      let message = `🛒 *${product.name}* - $${product.price}\n\n`;
+      if (product.stock_enabled && product.stock_quantity) {
+        message += `_Disponibles: ${product.stock_quantity} unidades_\n\n`;
+      }
+      message += `¿Cuántas unidades? (ej: "2", "tres")`;
+      return addHelpFooter(message, true);
     }
 
     const hintMsg = `💡 Escribe el nombre del producto para agregar más, o *confirmar* para continuar.\n\n` +
@@ -857,7 +886,12 @@ async function findProductFromMessage(message: string, vendorId: string, supabas
       .order('category');
     
     if (products && products[number - 1]) {
-      return products[number - 1];
+      const product = products[number - 1];
+      // Verificar stock si está habilitado
+      if (product.stock_enabled && (product.stock_quantity || 0) === 0) {
+        return { ...product, out_of_stock: true };
+      }
+      return product;
     }
   }
 
@@ -875,7 +909,13 @@ async function findProductFromMessage(message: string, vendorId: string, supabas
     const normalizedProductName = p.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
     return p.name.toLowerCase() === lowerMessage || normalizedProductName === normalizedMessage;
   });
-  if (exactMatch) return exactMatch;
+  if (exactMatch) {
+    // Verificar stock
+    if (exactMatch.stock_enabled && (exactMatch.stock_quantity || 0) === 0) {
+      return { ...exactMatch, out_of_stock: true };
+    }
+    return exactMatch;
+  }
 
   // Intentar coincidencia parcial (con y sin acentos)
   const partialMatch = products.find((p: any) => {
@@ -885,7 +925,13 @@ async function findProductFromMessage(message: string, vendorId: string, supabas
            normalizedProductName.includes(normalizedMessage) ||
            normalizedMessage.includes(normalizedProductName);
   });
-  if (partialMatch) return partialMatch;
+  if (partialMatch) {
+    // Verificar stock
+    if (partialMatch.stock_enabled && (partialMatch.stock_quantity || 0) === 0) {
+      return { ...partialMatch, out_of_stock: true };
+    }
+    return partialMatch;
+  }
 
   return null;
 }
@@ -948,6 +994,26 @@ async function createOrder(phone: string, session: UserSession, supabase: any): 
       };
     }
 
+    // Validar stock final antes de crear el pedido
+    for (const item of cart) {
+      const { data: product } = await supabase
+        .from('products')
+        .select('stock_enabled, stock_quantity, name')
+        .eq('id', item.product_id)
+        .single();
+      
+      if (product && product.stock_enabled) {
+        const availableStock = product.stock_quantity || 0;
+        if (item.quantity > availableStock) {
+          return {
+            success: false,
+            message: `⚠️ Lo siento, solo hay ${availableStock} ${availableStock === 1 ? 'unidad' : 'unidades'} disponibles de *${product.name}*.\n\n` +
+                     `Por favor ajusta tu pedido. Escribe *cancelar* para empezar de nuevo.`
+          };
+        }
+      }
+    }
+
     const { data: order, error } = await supabase
       .from('orders')
       .insert({
@@ -968,6 +1034,28 @@ async function createOrder(phone: string, session: UserSession, supabase: any): 
     if (error) {
       console.error('Error creating order:', error);
       return { success: false };
+    }
+
+    // Restar del stock después de crear el pedido exitosamente
+    for (const item of cart) {
+      const { data: product } = await supabase
+        .from('products')
+        .select('stock_enabled, stock_quantity, is_available')
+        .eq('id', item.product_id)
+        .single();
+      
+      if (product && product.stock_enabled) {
+        const newStock = Math.max(0, (product.stock_quantity || 0) - item.quantity);
+        
+        // Actualizar stock y deshabilitar si llegó a 0
+        await supabase
+          .from('products')
+          .update({
+            stock_quantity: newStock,
+            is_available: newStock > 0
+          })
+          .eq('id', item.product_id);
+      }
     }
 
     return { success: true, orderId: order.id };

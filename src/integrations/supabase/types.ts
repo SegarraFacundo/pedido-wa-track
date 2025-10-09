@@ -473,6 +473,8 @@ export type Database = {
           is_available: boolean | null
           name: string
           price: number
+          stock_enabled: boolean | null
+          stock_quantity: number | null
           updated_at: string | null
           vendor_id: string
         }
@@ -485,6 +487,8 @@ export type Database = {
           is_available?: boolean | null
           name: string
           price: number
+          stock_enabled?: boolean | null
+          stock_quantity?: number | null
           updated_at?: string | null
           vendor_id: string
         }
@@ -497,6 +501,8 @@ export type Database = {
           is_available?: boolean | null
           name?: string
           price?: number
+          stock_enabled?: boolean | null
+          stock_quantity?: number | null
           updated_at?: string | null
           vendor_id?: string
         }
