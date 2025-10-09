@@ -133,6 +133,18 @@ export function OrderCard({ order, onStatusChange, onOpenChat, isVendorView = fa
                 <Image className="h-4 w-4 text-primary" />
                 <span className="text-sm text-primary font-medium">Ver comprobante</span>
               </a>
+              {order.status !== 'delivered' && order.status !== 'cancelled' && (
+                <Button
+                  size="sm"
+                  className="w-full mt-2 bg-green-600 hover:bg-green-700 text-white"
+                  onClick={() => {
+                    // TODO: Agregar lógica para marcar como pagado
+                    console.log('Marcar como pagado:', order.id);
+                  }}
+                >
+                  ✓ Confirmar pago recibido
+                </Button>
+              )}
             </div>
           )}
           

@@ -197,11 +197,33 @@ serve(async (req) => {
     if (imageUrl && !vendorStatus) {
       const { data: userSession } = await supabase
         .from('user_sessions')
-        .select('previous_state')
+        .select('previous_state, last_bot_message')
         .eq('phone', normalizedPhone)
         .maybeSingle();
+      
+      // Verificar si el usuario está en estado AWAITING_RECEIPT
+      let isAwaitingReceipt = false;
+      let pendingOrderId = null;
+      
+      if (userSession) {
+        // El estado actual se guarda en previous_state
+        isAwaitingReceipt = userSession.previous_state === 'AWAITING_RECEIPT';
         
-      if (userSession && userSession.previous_state === 'AWAITING_RECEIPT') {
+        // También verificar en el contexto si hay un pending_order_id
+        if (userSession.last_bot_message) {
+          try {
+            const context = JSON.parse(userSession.last_bot_message);
+            pendingOrderId = context.pending_order_id;
+            if (pendingOrderId) {
+              isAwaitingReceipt = true;
+            }
+          } catch (e) {
+            console.log('Could not parse session context');
+          }
+        }
+      }
+        
+      if (isAwaitingReceipt) {
         console.log('Processing payment receipt image for:', normalizedPhone);
         
         try {
@@ -337,6 +359,30 @@ serve(async (req) => {
       responseMessage = await processWithVendorBot(normalizedPhone, messageText);
     } else {
       // Customer message
+      
+      // Primero, verificar si hay un pedido activo para este cliente
+      const { data: activeOrder } = await supabase
+        .from('orders')
+        .select('id, vendor_id')
+        .eq('customer_phone', normalizedPhone)
+        .in('status', ['pending', 'confirmed', 'preparing', 'ready', 'delivering'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      // Guardar mensaje del cliente en la tabla messages si tiene pedido activo
+      if (activeOrder) {
+        console.log('Customer has active order, saving message to messages table');
+        await supabase
+          .from('messages')
+          .insert({
+            order_id: activeOrder.id,
+            sender: 'customer',
+            content: messageText,
+            is_read: false
+          });
+      }
+      
       if (session.in_vendor_chat && session.assigned_vendor_phone) {
         // Customer is chatting with vendor - save message for vendor to see
         console.log('Customer in vendor chat with vendor:', session.assigned_vendor_phone);
