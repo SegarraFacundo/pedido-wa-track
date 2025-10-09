@@ -112,6 +112,11 @@ export async function handleVendorBot(
 ): Promise<string> {
   const lowerMessage = message.toLowerCase().trim();
 
+  // Función para normalizar texto removiendo acentos
+  function normalizeText(text: string): string {
+    return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  }
+
   // COMANDOS GLOBALES - Verificar PRIMERO antes que cualquier otra cosa
   
   // Menu/Inicio/Hola - Cierra cualquier chat activo y va DIRECTO a selección de vendedores
@@ -422,18 +427,7 @@ export async function handleVendorBot(
       session.context = session.context || {};
       session.context.payment_method = paymentMethod;
       
-      // Si es transferencia, pedir comprobante
-      if (paymentMethod === 'Transferencia') {
-        session.state = 'AWAITING_RECEIPT';
-        await saveSession(session, supabase);
-        
-        const receiptMsg = `📸 *Perfecto, pago por Transferencia*\n\n` +
-               `Por favor, envía el comprobante de transferencia para que el vendedor pueda verificar tu pago.\n\n` +
-               `_Adjunta la imagen del comprobante._`;
-        return addHelpFooter(receiptMsg, true);
-      }
-      
-      // Para otros métodos, ir directo a confirmación
+      // Ir a confirmación para TODOS los métodos de pago
       session.state = 'CONFIRMING_ORDER';
       await saveSession(session, supabase);
       
@@ -442,6 +436,8 @@ export async function handleVendorBot(
       
       let confirmation = paymentMethod === 'Efectivo' 
         ? `Listo 💵, lo pagás al entregar.\n\n`
+        : paymentMethod === 'Transferencia'
+        ? `💸 *Perfecto, pago por Transferencia*\n\n`
         : `Perfecto 💳, pagás con ${paymentMethod}.\n\n`;
       
       confirmation += `📦 *Tu pedido:*\n`;
@@ -465,23 +461,27 @@ export async function handleVendorBot(
     if (receiptUrl) {
       session.context = session.context || {};
       session.context.payment_receipt_url = receiptUrl;
-      session.state = 'CONFIRMING_ORDER';
-      await saveSession(session, supabase);
       
-      const cart = session.context.cart || [];
-      const total = cart.reduce((sum: number, item: CartItem) => sum + (item.price * item.quantity), 0);
+      // Crear orden INMEDIATAMENTE después de recibir el comprobante
+      const orderResult = await createOrder(phone, session, supabase);
       
-      let confirmation = `✅ *Comprobante recibido*\n\n`;
-      confirmation += `📦 *Tu pedido:*\n`;
-      cart.forEach((item: CartItem) => {
-        confirmation += `• ${item.quantity}x ${item.product_name} - $${(item.price * item.quantity).toFixed(2)}\n`;
-      });
-      confirmation += `\n💰 *Total: $${total.toFixed(2)}*\n`;
-      confirmation += `🏠 *Entrega:* ${session.context.delivery_address}\n`;
-      confirmation += `💳 *Pago:* ${session.context.payment_method}\n\n`;
-      confirmation += `¿Todo correcto? Escribe *confirmar* para finalizar el pedido`;
+      if (orderResult.success) {
+        const vendorName = session.context?.selected_vendor_name || 'El vendedor';
+        session.state = 'ORDER_PLACED';
+        session.context = { cart: [] };
+        await saveSession(session, supabase);
+        
+        const successMsg = `✅ *Comprobante recibido y pedido confirmado*\n\n` +
+               `📋 Pedido #${orderResult.orderId.substring(0, 8)}\n\n` +
+               `*${vendorName}* verificará tu pago y lo está preparando. Llega en aproximadamente 35 minutos 🚴‍♂️\n\n` +
+               `💬 Escribe *estado* para seguir tu pedido\n` +
+               `💬 Escribe *vendedor* para hablar con el negocio\n\n` +
+               `Gracias por pedir con nosotros ❤️`;
+        return addHelpFooter(successMsg, true);
+      }
       
-      return addHelpFooter(confirmation, true);
+      const errorMsg = `❌ Hubo un problema al crear tu pedido. Escribe *vendedor* para ayuda.`;
+      return addHelpFooter(errorMsg, true);
     }
     
     // Si no recibió imagen aún
@@ -493,7 +493,19 @@ export async function handleVendorBot(
   // Estado: CONFIRMACIÓN FINAL
   if (session.state === 'CONFIRMING_ORDER') {
     if (lowerMessage === 'confirmar' || lowerMessage === 'si' || lowerMessage === 'ok') {
-      // Crear orden en la base de datos
+      // Si el método de pago es Transferencia, pedir comprobante AHORA
+      if (session.context?.payment_method === 'Transferencia') {
+        session.state = 'AWAITING_RECEIPT';
+        await saveSession(session, supabase);
+        
+        const receiptMsg = `📸 *Perfecto!*\n\n` +
+               `Por favor, envía el comprobante de transferencia para que el vendedor pueda verificar tu pago.\n\n` +
+               `_Adjunta la imagen del comprobante._`;
+        return addHelpFooter(receiptMsg, true);
+      }
+      
+      // Para otros métodos de pago, crear orden inmediatamente
+      const vendorName = session.context?.selected_vendor_name || 'El vendedor';
       const orderResult = await createOrder(phone, session, supabase);
       
       if (orderResult.success) {
@@ -503,7 +515,7 @@ export async function handleVendorBot(
         
         const successMsg = `✅ *Pedido confirmado*\n\n` +
                `📋 Pedido #${orderResult.orderId.substring(0, 8)}\n\n` +
-               `*${session.context.selected_vendor_name}* lo está preparando y llega en aproximadamente 35 minutos 🚴‍♂️\n\n` +
+               `*${vendorName}* lo está preparando y llega en aproximadamente 35 minutos 🚴‍♂️\n\n` +
                `💬 Escribe *estado* para seguir tu pedido\n` +
                `💬 Escribe *vendedor* para hablar con el negocio\n\n` +
                `Gracias por pedir con nosotros ❤️`;
@@ -735,6 +747,9 @@ async function showVendorProducts(vendorId: string, vendorName: string, supabase
 }
 
 async function findProductFromMessage(message: string, vendorId: string, supabase: any): Promise<any | null> {
+  const lowerMessage = message.toLowerCase().trim();
+  const normalizedMessage = message.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  
   // Buscar por número
   const number = parseInt(message);
   if (number > 0) {
@@ -750,16 +765,33 @@ async function findProductFromMessage(message: string, vendorId: string, supabas
     }
   }
 
-  // Buscar por nombre
-  const { data: product } = await supabase
+  // Buscar por nombre (con y sin acentos)
+  const { data: products } = await supabase
     .from('products')
     .select('*')
     .eq('vendor_id', vendorId)
-    .eq('is_available', true)
-    .ilike('name', `%${message}%`)
-    .maybeSingle();
+    .eq('is_available', true);
 
-  return product;
+  if (!products || products.length === 0) return null;
+
+  // Intentar coincidencia exacta (con y sin acentos)
+  const exactMatch = products.find((p: any) => {
+    const normalizedProductName = p.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    return p.name.toLowerCase() === lowerMessage || normalizedProductName === normalizedMessage;
+  });
+  if (exactMatch) return exactMatch;
+
+  // Intentar coincidencia parcial (con y sin acentos)
+  const partialMatch = products.find((p: any) => {
+    const normalizedProductName = p.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    return p.name.toLowerCase().includes(lowerMessage) || 
+           lowerMessage.includes(p.name.toLowerCase()) ||
+           normalizedProductName.includes(normalizedMessage) ||
+           normalizedMessage.includes(normalizedProductName);
+  });
+  if (partialMatch) return partialMatch;
+
+  return null;
 }
 
 function parseQuantity(message: string): number {
