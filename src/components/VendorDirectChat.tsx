@@ -57,13 +57,26 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
 
   useEffect(() => {
     // Scroll to bottom whenever messages change
-    const timer = setTimeout(() => {
-      if (messagesEndRef.current) {
-        messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end', inline: 'nearest' });
-      }
-    }, 150);
-    return () => clearTimeout(timer);
-  }, [messages, selectedChat]);
+    if (messages.length > 0) {
+      const timer = setTimeout(() => {
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'end', 
+            inline: 'nearest' 
+          });
+        }
+        // También intentar con el scrollArea directamente
+        if (scrollAreaRef.current) {
+          const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+          if (scrollContainer) {
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+          }
+        }
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [messages]);
 
   const setupRealtimeSubscription = () => {
     const channel = supabase
@@ -99,19 +112,34 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
           table: 'chat_messages'
         },
         (payload) => {
+          console.log('🔔 New message received via realtime:', payload.new);
           const newMessage = {
             ...payload.new,
             created_at: new Date(payload.new.created_at)
           } as ChatMessage;
           
           if (selectedChat && newMessage.chat_id === selectedChat.id) {
+            console.log('✅ Message is for selected chat, adding to messages');
             setMessages(prev => [...prev, newMessage]);
+            
+            // Forzar scroll inmediatamente
+            setTimeout(() => {
+              if (messagesEndRef.current) {
+                messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+              }
+              if (scrollAreaRef.current) {
+                const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+                if (scrollContainer) {
+                  scrollContainer.scrollTop = scrollContainer.scrollHeight;
+                }
+              }
+            }, 100);
           }
           
           if (newMessage.sender_type === 'customer') {
             toast({
               title: '📩 Nuevo mensaje',
-              description: newMessage.message.substring(0, 50) + '...'
+              description: newMessage.message.substring(0, 50) + (newMessage.message.length > 50 ? '...' : '')
             });
           }
         }
@@ -200,10 +228,11 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
   const sendMessage = async () => {
     if (!newMessage.trim()) return;
 
-    const messageText = newMessage.trim().toLowerCase();
+    const messageText = newMessage.trim();
+    const lowerMessageText = messageText.toLowerCase();
     
     // Detectar comando "activar bot" o variaciones - sin necesidad de chat seleccionado
-    if (messageText === 'activar bot' || messageText === 'bot activo' || messageText === 'reactivar bot') {
+    if (lowerMessageText === 'activar bot' || lowerMessageText === 'bot activo' || lowerMessageText === 'reactivar bot') {
       if (activeChats.length === 0) {
         toast({
           title: 'ℹ️ No hay chats activos',
@@ -214,13 +243,13 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
       }
 
       try {
-        console.log('Activating bot, closing all chats for vendor:', vendorId);
-        console.log('Active chats to close:', activeChats);
+        console.log('🔄 Activating bot, closing all chats for vendor:', vendorId);
+        console.log('📋 Active chats to close:', activeChats.length);
         
         // Obtener todos los clientes afectados ANTES de cerrar los chats
         const customerPhones = activeChats.map(chat => chat.customer_phone);
         
-        console.log('Customer phones to notify:', customerPhones);
+        console.log('📱 Customer phones to notify:', customerPhones);
 
         // Cerrar todos los chats activos de este vendedor
         const { error: updateError } = await supabase
@@ -233,15 +262,15 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
           .eq('is_active', true);
 
         if (updateError) {
-          console.error('Error closing chats:', updateError);
+          console.error('❌ Error closing chats:', updateError);
           throw updateError;
         }
 
-        console.log('Chats closed successfully');
+        console.log('✅ Chats closed successfully');
 
         // Desactivar modo chat para todos los clientes y notificar
         for (const phone of customerPhones) {
-          console.log('Updating user_sessions for:', phone);
+          console.log('🔄 Updating user_sessions for:', phone);
           
           const { error: sessionError } = await supabase
             .from('user_sessions')
@@ -253,11 +282,11 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
             .eq('phone', phone);
 
           if (sessionError) {
-            console.error('Error updating user_sessions:', sessionError);
+            console.error('❌ Error updating user_sessions:', sessionError);
           }
 
           // Notificar al cliente que el bot está activo
-          console.log('Sending notification to customer:', phone);
+          console.log('📨 Sending notification to customer:', phone);
           
           const { error: notifyError } = await supabase.functions.invoke('send-whatsapp-notification', {
             body: {
@@ -267,7 +296,7 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
           });
 
           if (notifyError) {
-            console.error('Error sending notification:', notifyError);
+            console.error('❌ Error sending notification:', notifyError);
           }
         }
 
@@ -282,9 +311,9 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
           description: `Bot activo nuevamente para ${customerPhones.length} cliente(s)`,
         });
         
-        console.log('Bot activation completed successfully');
+        console.log('✅ Bot activation completed successfully');
       } catch (error) {
-        console.error('Error activating bot:', error);
+        console.error('❌ Error activating bot:', error);
         toast({
           title: 'Error',
           description: 'No se pudo reactivar el bot',
