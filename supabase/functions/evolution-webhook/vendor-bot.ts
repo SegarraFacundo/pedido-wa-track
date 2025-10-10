@@ -1042,15 +1042,19 @@ export async function handleVendorBot(
 
   // Estado: RATING_ORDER - Calificación después de entrega
   if (session.state === 'RATING_ORDER') {
-    const rating = parseInt(lowerMessage);
-    
-    // Si escriben "no" o "omitir", saltear calificación
-    if (lowerMessage === 'no' || lowerMessage === 'omitir' || lowerMessage === 'skip') {
+    // Permitir salir con comandos comunes
+    if (lowerMessage === 'no' || lowerMessage === 'omitir' || lowerMessage === 'skip' || 
+        lowerMessage === 'menu' || lowerMessage === 'salir' || lowerMessage === 'cancelar') {
       session.state = 'SELECTING_VENDOR';
       session.context = { cart: [] };
       await saveSession(session, supabase);
       return `✅ ¡Gracias por usar nuestro servicio!\n\nEscribe *menu* cuando quieras pedir de nuevo.`;
     }
+    
+    // Parsear rating y comentario opcional: "5 Excelente", "4", "1 Malo", etc.
+    const messageParts = message.trim().split(' ');
+    const rating = parseInt(messageParts[0]);
+    const comment = messageParts.slice(1).join(' ').trim() || null;
     
     // Validar calificación
     if (!rating || rating < 1 || rating > 5) {
@@ -1060,7 +1064,11 @@ export async function handleVendorBot(
              `3️⃣ Regular\n` +
              `4️⃣ Bueno\n` +
              `5️⃣ Excelente\n\n` +
-             `Escribe solo el número (o "omitir" para saltar)`;
+             `Ejemplos:\n` +
+             `• "5 Excelente"\n` +
+             `• "4"\n` +
+             `• "3 Estuvo bien"\n\n` +
+             `O escribe *omitir* para saltar`;
     }
     
     // Guardar calificación
@@ -1071,7 +1079,7 @@ export async function handleVendorBot(
           vendor_id: session.context?.selected_vendor_id,
           customer_phone: phone,
           rating: rating,
-          comment: null
+          comment: comment
         });
       
       if (error) {
@@ -1084,9 +1092,13 @@ export async function handleVendorBot(
       await saveSession(session, supabase);
       
       const stars = '⭐'.repeat(rating);
-      return `${stars}\n\n✅ *¡Gracias por tu calificación!*\n\n` +
-             `Tu opinión nos ayuda a mejorar el servicio.\n\n` +
-             `Escribe *menu* cuando quieras pedir de nuevo.`;
+      let response = `${stars}\n\n✅ *¡Gracias por tu calificación!*\n\n`;
+      if (comment) {
+        response += `_"${comment}"_\n\n`;
+      }
+      response += `Tu opinión nos ayuda a mejorar el servicio.\n\n` +
+                  `Escribe *menu* cuando quieras pedir de nuevo.`;
+      return response;
     } catch (e) {
       console.error('Error al guardar calificación:', e);
       return `❌ Error al guardar tu calificación.\n\nEscribe *menu* para continuar.`;
