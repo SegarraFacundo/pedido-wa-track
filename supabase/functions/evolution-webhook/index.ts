@@ -10,8 +10,16 @@ const corsHeaders = {
 // Función para normalizar números de teléfono argentinos
 // Garantiza formato consistente: 549 + código de área + número (sin espacios ni caracteres especiales)
 function normalizeArgentinePhone(phone: string): string {
-  // Limpiar el número: remover espacios, guiones, paréntesis, @s.whatsapp.net, etc.
-  let cleaned = phone.replace(/[\s\-\(\)\+@s\.whatsapp\.net]/g, '');
+  // IMPORTANTE: Primero eliminar la cadena @s.whatsapp.net completa
+  let cleaned = phone.replace(/@s\.whatsapp\.net$/i, '');
+  
+  // Luego limpiar espacios, guiones, paréntesis, signos +, etc.
+  cleaned = cleaned.replace(/[\s\-\(\)\+]/g, '');
+  
+  // Eliminar cualquier caracter no numérico que pueda quedar
+  cleaned = cleaned.replace(/[^\d]/g, '');
+  
+  console.log(`🔧 Normalizing phone: "${phone}" -> cleaned: "${cleaned}"`);
   
   // Si ya tiene formato correcto 549XXXXXXXXXX (13 dígitos), retornar
   if (cleaned.startsWith('549') && cleaned.length === 13) {
@@ -40,6 +48,7 @@ function normalizeArgentinePhone(phone: string): string {
   }
   
   // Si nada coincide, retornar tal cual (edge case)
+  console.warn(`⚠️ Phone number could not be normalized: "${phone}" -> "${cleaned}"`);
   return cleaned;
 }
 
