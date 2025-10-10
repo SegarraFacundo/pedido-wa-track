@@ -27,6 +27,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { ARGENTINA_TIMEZONE, getCurrentDayInArgentina } from "@/lib/timezone";
 
 interface VendorDashboardWithRealtimeProps {
   vendor: Vendor;
@@ -41,10 +42,10 @@ export function VendorDashboardWithRealtime({ vendor }: VendorDashboardWithRealt
 
   // Today hours (from vendor_hours)
   const [todayHours, setTodayHours] = useState<{ opening_time: string; closing_time: string; is_closed: boolean } | null>(null);
-  const timeZone = 'America/Argentina/Buenos_Aires';
+  const timeZone = ARGENTINA_TIMEZONE;
 
   useEffect(() => {
-    const currentDay = new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone }).toLowerCase();
+    const currentDay = getCurrentDayInArgentina();
     supabase
       .from('vendor_hours')
       .select('opening_time, closing_time, is_closed')

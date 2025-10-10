@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MapPin, Clock, Phone, Star, Store, Pizza, Coffee, Package } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { isVendorOpen, getCurrentDayInArgentina, getCurrentTimeInArgentina } from "@/lib/timezone";
 
 interface Product {
   id?: string;
@@ -74,15 +75,12 @@ export function VendorCatalog() {
   };
 
   const isOpen = (vendor: PublicVendor) => {
-    const now = new Date();
-    const currentTime = now.toTimeString().split(' ')[0];
-    const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-    
-    if (!vendor.days_open?.includes(currentDay)) {
-      return false;
-    }
-    
-    return currentTime >= vendor.opening_time && currentTime <= vendor.closing_time;
+    return isVendorOpen(
+      vendor.days_open,
+      vendor.opening_time,
+      vendor.closing_time,
+      false
+    );
   };
 
   const filteredVendors = selectedCategory === "all" 

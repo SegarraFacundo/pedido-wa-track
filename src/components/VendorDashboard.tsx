@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { isVendorOpen } from "@/lib/timezone";
 
 interface VendorDashboardProps {
   vendor: Vendor;
@@ -68,16 +69,12 @@ export function VendorDashboard({ vendor, orders, onStatusChange, onOpenChat }: 
   ];
   
   const isOpen = () => {
-    if (!vendor.openingTime || !vendor.closingTime) return true;
-    const now = new Date();
-    const currentTime = now.toTimeString().split(' ')[0];
-    const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-    
-    if (vendor.daysOpen && !vendor.daysOpen.includes(currentDay)) {
-      return false;
-    }
-    
-    return currentTime >= vendor.openingTime && currentTime <= vendor.closingTime;
+    return isVendorOpen(
+      vendor.daysOpen,
+      vendor.openingTime,
+      vendor.closingTime,
+      false
+    );
   };
 
   return (
