@@ -317,7 +317,7 @@ serve(async (req) => {
       });
     }
 
-    console.log('Processing message from:', fromNumber, 'Message:', messageText);
+    console.log('Processing message from:', normalizedPhone, 'Message:', messageText);
 
     let responseMessage = '';
 
