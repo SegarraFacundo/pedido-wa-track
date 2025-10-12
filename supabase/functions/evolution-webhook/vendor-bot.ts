@@ -1,3 +1,5 @@
+import OpenAI from "https://esm.sh/openai@4.77.3";
+
 // Función para normalizar números de teléfono argentinos
 // Garantiza formato consistente: 549 + código de área + número (sin espacios ni caracteres especiales)
 function normalizeArgentinePhone(phone: string): string {
@@ -194,6 +196,58 @@ function detectRemoveLast(message: string): boolean {
 // Función para normalizar texto removiendo acentos
 function normalizeText(text: string): string {
   return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+// ===== FUNCIÓN DE IA =====
+async function generateAIResponse(
+  userMessage: string, 
+  context: {
+    state: BotState;
+    cart?: CartItem[];
+    vendor?: string;
+    searchResults?: any[];
+    history?: string;
+  }
+): Promise<string | null> {
+  try {
+    const openai = new OpenAI({ 
+      apiKey: Deno.env.get("OPENAI_API_KEY") 
+    });
+
+    const systemPrompt = `Sos un asistente de pedidos por WhatsApp para Lapacho, una plataforma de delivery.
+
+Tu trabajo es ayudar a los clientes a realizar pedidos de manera amigable y eficiente.
+
+Contexto actual:
+- Estado: ${context.state}
+${context.vendor ? `- Negocio actual: ${context.vendor}` : ''}
+${context.cart && context.cart.length > 0 ? `- Productos en carrito: ${context.cart.map(i => `${i.quantity}x ${i.product_name}`).join(', ')}` : ''}
+
+Reglas importantes:
+- Sé breve, amigable y usa emojis apropiados
+- Nunca inventes información sobre productos, precios o negocios
+- Si no sabés algo, decilo claramente
+- Usa lenguaje argentino informal pero respetuoso
+- Máximo 3 líneas de respuesta
+
+Solo respondé si podés agregar valor conversacional. Si no, devolvé null.`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage }
+      ],
+      temperature: 0.7,
+      max_tokens: 150
+    });
+
+    const response = completion.choices[0].message.content?.trim();
+    return response || null;
+  } catch (error) {
+    console.error('Error llamando a OpenAI:', error);
+    return null;
+  }
 }
 
 export async function handleVendorBot(
@@ -450,6 +504,12 @@ export async function handleVendorBot(
   if (session.state === 'SEARCHING_PRODUCTS') {
     console.log('Estado SEARCHING_PRODUCTS, procesando búsqueda:', message);
     
+    // Intentar respuesta con IA primero para interacciones naturales
+    const aiResponse = await generateAIResponse(message, {
+      state: session.state,
+      cart: session.context?.cart
+    });
+    
     // Llamar a la función de búsqueda
     const { data: searchData, error: searchError } = await supabase.functions.invoke('search-products', {
       body: { searchQuery: message }
@@ -461,9 +521,11 @@ export async function handleVendorBot(
     }
 
     if (!searchData.found || searchData.results.length === 0) {
-      return `😕 No encontré negocios abiertos que tengan *"${message}"*.\n\n` +
-             `¿Querés buscar otra cosa?\n` +
-             `Por ejemplo: pizza, hamburguesa, helado, empanadas...`;
+      const notFoundMsg = aiResponse || 
+        `😕 No encontré negocios abiertos que tengan *"${message}"*.\n\n` +
+        `¿Querés buscar otra cosa?\n` +
+        `Por ejemplo: pizza, hamburguesa, helado, empanadas...`;
+      return notFoundMsg;
     }
 
     // Guardar resultados en sesión
@@ -473,9 +535,9 @@ export async function handleVendorBot(
     session.state = 'VIEWING_SEARCH_RESULTS';
     await saveSession(session, supabase);
 
-    // Mostrar resultados
-    let response = `Perfecto 😊, estoy buscando negocios abiertos que tengan *${message}*...\n\n`;
-    response += `Te muestro lo que encontré 👇\n\n`;
+    // Mostrar resultados con toque de IA
+    const intro = aiResponse || `Perfecto 😊, encontré negocios que tienen *${message}*!`;
+    let response = `${intro}\n\n`;
     
     searchData.results.forEach((result: any, index: number) => {
       response += `${index + 1}. *${result.vendor.name}*\n`;
