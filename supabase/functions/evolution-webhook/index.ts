@@ -9,8 +9,14 @@ const corsHeaders = {
 
 // ✅ Normaliza números argentinos: siempre 549XXXXXXXXX
 function normalizeArgentinePhone(phone: string): string {
-  let cleaned = phone.replace(/@[\w.]+$/i, ''); // quitar sufijo tipo @s.whatsapp.net o @c.us
-  cleaned = cleaned.replace(/[\s\-\(\)\+]/g, '').replace(/[^\d]/g, '');
+  // Primero quitar sufijos como @s.whatsapp.net o @c.us
+  let cleaned = phone.replace(/@s\.whatsapp\.net$/i, '').replace(/@c\.us$/i, '');
+  
+  // Luego quitar espacios, guiones, paréntesis y signos más
+  cleaned = cleaned.replace(/[\s\-\(\)\+]/g, '');
+  
+  // Finalmente quitar cualquier carácter no numérico
+  cleaned = cleaned.replace(/[^\d]/g, '');
 
   console.log(`🔧 Normalizing: "${phone}" -> "${cleaned}"`);
 
