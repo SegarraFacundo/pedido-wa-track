@@ -506,7 +506,7 @@ serve(async (req) => {
             'apikey': evolutionApiKey!,
           },
           body: JSON.stringify({
-            chatId, // ✅ usar chatId, no number
+            number: `${normalizedPhone}@s.whatsapp.net`,
             text: responseMessage,
           }),
         });
