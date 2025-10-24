@@ -443,24 +443,31 @@ export async function handleVendorBot(
   supabase: any
 ): Promise<string> {
   const normalizedPhone = normalizeArgentinePhone(phone);
-  console.log('Bot AI conversacional - Teléfono:', normalizedPhone, 'Mensaje:', message);
+  console.log('🤖 AI Bot START - Phone:', normalizedPhone, 'Message:', message);
 
-  // Cargar contexto
-  const context = await getContext(normalizedPhone, supabase);
+  try {
+    // Cargar contexto
+    const context = await getContext(normalizedPhone, supabase);
+    console.log('📋 Context loaded:', {
+      phone: context.phone,
+      cartItems: context.cart.length,
+      vendor: context.selected_vendor_name,
+      historyLength: context.conversation_history.length
+    });
 
-  // Agregar mensaje del usuario al historial
-  context.conversation_history.push({
-    role: "user",
-    content: message
-  });
+    // Agregar mensaje del usuario al historial
+    context.conversation_history.push({
+      role: "user",
+      content: message
+    });
 
-  // Inicializar OpenAI
-  const openai = new OpenAI({
-    apiKey: Deno.env.get("OPENAI_API_KEY")
-  });
+    // Inicializar OpenAI
+    const openai = new OpenAI({
+      apiKey: Deno.env.get("OPENAI_API_KEY")
+    });
 
-  // Prompt del sistema
-  const systemPrompt = `Sos un vendedor de Lapacho, una plataforma de delivery por WhatsApp en Argentina.
+    // Prompt del sistema
+    const systemPrompt = `Sos un vendedor de Lapacho, una plataforma de delivery por WhatsApp en Argentina.
 
 Tu trabajo es ayudar a los clientes a hacer pedidos de forma natural y amigable.
 
@@ -493,62 +500,93 @@ FLUJO TÍPICO:
 
 IMPORTANTE: Siempre confirmá antes de crear un pedido. Preguntá dirección y método de pago solo cuando el cliente esté listo para finalizar.`;
 
-  // Preparar mensajes para la API
-  const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-    { role: "system", content: systemPrompt },
-    ...context.conversation_history.slice(-15) // Últimos 15 mensajes para no saturar
-  ];
+    // Preparar mensajes para la API
+    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+      { role: "system", content: systemPrompt },
+      ...context.conversation_history.slice(-15) // Últimos 15 mensajes para no saturar
+    ];
 
-  let continueLoop = true;
-  let finalResponse = '';
+    console.log('🔄 Calling OpenAI with', messages.length, 'messages...');
 
-  // Loop de conversación con tool calling
-  while (continueLoop) {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: messages,
-      tools: tools,
-      temperature: 0.7,
-      max_tokens: 500
-    });
+    let continueLoop = true;
+    let finalResponse = '';
+    let iterationCount = 0;
+    const MAX_ITERATIONS = 5; // Prevenir loops infinitos
 
-    const assistantMessage = completion.choices[0].message;
+    // Loop de conversación con tool calling
+    while (continueLoop && iterationCount < MAX_ITERATIONS) {
+      iterationCount++;
+      console.log(`🔁 Iteration ${iterationCount}...`);
 
-    // Si hay tool calls, ejecutarlos
-    if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
-      messages.push(assistantMessage);
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: messages,
+        tools: tools,
+        temperature: 0.7,
+        max_tokens: 500
+      });
 
-      for (const toolCall of assistantMessage.tool_calls) {
-        const toolName = toolCall.function.name;
-        const toolArgs = JSON.parse(toolCall.function.arguments);
+      const assistantMessage = completion.choices[0].message;
+      console.log('🤖 AI response:', {
+        hasContent: !!assistantMessage.content,
+        hasToolCalls: !!assistantMessage.tool_calls,
+        toolCallsCount: assistantMessage.tool_calls?.length || 0
+      });
 
-        const toolResult = await ejecutarHerramienta(toolName, toolArgs, context, supabase);
+      // Si hay tool calls, ejecutarlos
+      if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
+        messages.push(assistantMessage);
 
-        messages.push({
-          role: "tool",
-          tool_call_id: toolCall.id,
-          content: toolResult
-        });
+        for (const toolCall of assistantMessage.tool_calls) {
+          const toolName = toolCall.function.name;
+          const toolArgs = JSON.parse(toolCall.function.arguments);
+          console.log(`🔧 Executing tool: ${toolName}`, toolArgs);
+
+          const toolResult = await ejecutarHerramienta(toolName, toolArgs, context, supabase);
+          console.log(`✅ Tool result preview:`, toolResult.slice(0, 100));
+
+          messages.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            content: toolResult
+          });
+        }
+
+        // Continuar el loop para que la IA procese los resultados
+        continue;
       }
 
-      // Continuar el loop para que la IA procese los resultados
-      continue;
+      // Si no hay tool calls, es la respuesta final
+      finalResponse = assistantMessage.content || 'Perdón, no entendí. ¿Podés repetir?';
+      console.log('✅ Final response ready:', finalResponse.slice(0, 100));
+      continueLoop = false;
     }
 
-    // Si no hay tool calls, es la respuesta final
-    finalResponse = assistantMessage.content || 'Perdón, no entendí. ¿Podés repetir?';
-    continueLoop = false;
+    if (iterationCount >= MAX_ITERATIONS) {
+      console.warn('⚠️ Max iterations reached, forcing response');
+      finalResponse = 'Disculpá, tuve un problema procesando tu mensaje. ¿Podés intentar de nuevo?';
+    }
+
+    // Agregar respuesta del asistente al historial
+    context.conversation_history.push({
+      role: "assistant",
+      content: finalResponse
+    });
+
+    // Guardar contexto actualizado
+    await saveContext(context, supabase);
+    console.log('💾 Context saved successfully');
+
+    console.log('🤖 AI Bot END - Returning response');
+    return finalResponse;
+
+  } catch (error) {
+    console.error('❌ AI Bot ERROR:', error);
+    console.error('Error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
+    return 'Disculpá, tuve un problema técnico. Por favor intentá de nuevo en un momento.';
   }
-
-  // Agregar respuesta del asistente al historial
-  context.conversation_history.push({
-    role: "assistant",
-    content: finalResponse
-  });
-
-  // Guardar contexto actualizado
-  await saveContext(context, supabase);
-
-  console.log('Respuesta del bot:', finalResponse);
-  return finalResponse;
 }

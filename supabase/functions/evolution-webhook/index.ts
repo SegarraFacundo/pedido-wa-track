@@ -104,7 +104,7 @@ async function processWithVendorBot(
 ): Promise<string> {
   console.log('🤖 Bot input:', { fromNumber, messageText, imageUrl });
   try {
-    const response = await handleVendorBot(messageText, fromNumber, supabase, imageUrl);
+    const response = await handleVendorBot(messageText, fromNumber, supabase);
     console.log('✅ Bot response (preview):', response?.slice(0, 100));
     return response;
   } catch (err) {
@@ -149,8 +149,7 @@ serve(async (req) => {
     }
 
     const normalizedPhone = normalizeArgentinePhone(rawJid);
-    const chatId = `${normalizedPhone}@c.us`;
-    console.log('📞 Normalized:', { rawJid, normalizedPhone, chatId });
+    console.log('📞 Normalized:', { rawJid, normalizedPhone });
 
     const messageText = data.message?.conversation ||
       data.message?.extendedTextMessage?.text ||
@@ -288,8 +287,7 @@ serve(async (req) => {
       const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
       const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
       
-      // Usar número ya normalizado
-      const chatId = `${normalizedPhone}@s.whatsapp.net`;
+      const recipientNumber = `${normalizedPhone}@s.whatsapp.net`;
       
       await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
         method: 'POST',
@@ -298,7 +296,7 @@ serve(async (req) => {
           'apikey': evolutionApiKey!,
         },
         body: JSON.stringify({
-          chatId: chatId,
+          number: recipientNumber,
           text: defaultResponse,
         }),
       });
@@ -496,7 +494,8 @@ serve(async (req) => {
       const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
       const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
 
-      console.log('📤 Sending to Evolution API:', { chatId, responseMessage });
+      const recipientNumber = `${normalizedPhone}@s.whatsapp.net`;
+      console.log('📤 Sending to Evolution API:', { normalizedPhone, recipientNumber, messagePreview: responseMessage.slice(0, 100) });
 
       try {
         const resp = await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
@@ -506,13 +505,17 @@ serve(async (req) => {
             'apikey': evolutionApiKey!,
           },
           body: JSON.stringify({
-            number: `${normalizedPhone}@s.whatsapp.net`,
+            number: recipientNumber,
             text: responseMessage,
           }),
         });
 
-        const data = await resp.json();
-        console.log('✅ Evolution response:', data);
+        const respData = await resp.json();
+        console.log('✅ Evolution API response:', respData);
+        
+        if (!resp.ok) {
+          console.error('❌ Evolution API error response:', respData);
+        }
       } catch (err) {
         console.error('❌ Evolution send error:', err);
       }
