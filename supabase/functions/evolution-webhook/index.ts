@@ -116,10 +116,14 @@ async function processWithVendorBot(
 // --- MAIN SERVER ---
 
 serve(async (req) => {
+  console.log('🎯 Webhook called - Method:', req.method, 'URL:', req.url);
+  
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
     const body = await req.json();
+    console.log('📦 Webhook body received:', JSON.stringify(body, null, 2));
+    
     const event = body.event;
     const data = body.data;
 
