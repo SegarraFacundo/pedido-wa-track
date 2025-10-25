@@ -251,17 +251,24 @@ async function ejecutarHerramienta(
           body: { searchQuery: args.consulta }
         });
 
-        if (error || !data.found) {
+        console.log('Search products result:', JSON.stringify(data, null, 2));
+
+        if (error || !data?.found) {
           return `No encontré negocios abiertos con "${args.consulta}". Podés buscar otra cosa.`;
         }
 
-        // Formatear resultados para la IA
-        let resultado = `Encontré ${data.results.length} negocios:\n\n`;
+        // Formatear resultados para la IA (ahora agrupados por vendor)
+        let resultado = `Encontré ${data.totalVendors} negocios con ${data.totalProducts} productos:\n\n`;
         data.results.forEach((r: any, i: number) => {
           resultado += `${i + 1}. ${r.vendor.name}\n`;
           resultado += `   ID: ${r.vendor.id}\n`;
-          resultado += `   Producto: ${r.product.name} - $${r.product.price}\n`;
-          resultado += `   Rating: ${r.vendor.rating || 'N/A'}⭐\n\n`;
+          resultado += `   Rating: ${r.vendor.average_rating || 'N/A'}⭐\n`;
+          resultado += `   Productos disponibles:\n`;
+          r.products.forEach((p: any, j: number) => {
+            resultado += `     ${j + 1}. ${p.name} - $${p.price}\n`;
+            resultado += `        ID: ${p.id}\n`;
+          });
+          resultado += `\n`;
         });
 
         return resultado;
