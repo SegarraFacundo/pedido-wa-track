@@ -122,6 +122,23 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
     type: "function",
     function: {
+      name: "ver_locales_abiertos",
+      description: "Muestra todos los negocios que están actualmente abiertos según sus horarios de operación. Usa esto cuando el cliente quiera ver qué locales están disponibles ahora.",
+      parameters: {
+        type: "object",
+        properties: {
+          categoria: {
+            type: "string",
+            description: "Categoría opcional para filtrar (ej: 'restaurant', 'pharmacy', 'market'). Si no se especifica, muestra todos."
+          }
+        },
+        required: []
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "ver_menu_negocio",
       description: "Obtiene el menú completo de un negocio específico con todos sus productos y precios",
       parameters: {
@@ -272,6 +289,73 @@ async function ejecutarHerramienta(
             resultado += `     ${j + 1}. ${p.name} - $${p.price}\n`;
             resultado += `        ID: ${p.id}\n`;
           });
+          resultado += `\n`;
+        });
+
+        return resultado;
+      }
+
+      case "ver_locales_abiertos": {
+        // Obtener hora actual en Argentina
+        const now = new Date();
+        const argentinaTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' }));
+        const currentDay = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][argentinaTime.getDay()];
+        const currentTime = argentinaTime.toTimeString().slice(0, 5); // HH:MM formato
+
+        console.log(`🕒 Buscando locales abiertos - Día: ${currentDay}, Hora: ${currentTime}`);
+
+        // Construir query
+        let query = supabase
+          .from('vendors')
+          .select('id, name, category, address, opening_time, closing_time, days_open, average_rating, total_reviews')
+          .eq('is_active', true)
+          .eq('payment_status', 'active');
+
+        // Filtrar por categoría si se especifica
+        if (args.categoria) {
+          query = query.eq('category', args.categoria);
+        }
+
+        const { data: vendors, error } = await query;
+
+        if (error || !vendors || vendors.length === 0) {
+          return args.categoria 
+            ? `No encontré negocios de tipo "${args.categoria}" disponibles.`
+            : 'No hay negocios disponibles en este momento.';
+        }
+
+        // Filtrar locales que están abiertos ahora
+        const openVendors = vendors.filter(vendor => {
+          // Verificar si el día actual está en los días abiertos
+          if (!vendor.days_open || !vendor.days_open.includes(currentDay)) {
+            return false;
+          }
+
+          // Verificar horario
+          if (!vendor.opening_time || !vendor.closing_time) {
+            return false;
+          }
+
+          // Comparar horarios
+          return currentTime >= vendor.opening_time && currentTime <= vendor.closing_time;
+        });
+
+        if (openVendors.length === 0) {
+          return args.categoria
+            ? `No hay negocios de tipo "${args.categoria}" abiertos en este momento. 😔`
+            : 'No hay negocios abiertos en este momento. 😔';
+        }
+
+        // Formatear resultados
+        let resultado = `🟢 Encontré ${openVendors.length} ${openVendors.length === 1 ? 'negocio abierto' : 'negocios abiertos'}:\n\n`;
+        openVendors.forEach((v: any, i: number) => {
+          resultado += `${i + 1}. ${v.name} (${v.category})\n`;
+          resultado += `   ID: ${v.id}\n`;
+          resultado += `   📍 ${v.address}\n`;
+          resultado += `   ⏰ Horario: ${v.opening_time} - ${v.closing_time}\n`;
+          if (v.average_rating) {
+            resultado += `   ⭐ Rating: ${v.average_rating} (${v.total_reviews || 0} reseñas)\n`;
+          }
           resultado += `\n`;
         });
 
