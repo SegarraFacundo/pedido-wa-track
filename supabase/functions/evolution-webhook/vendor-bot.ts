@@ -140,10 +140,14 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "agregar_al_carrito",
-      description: "Agrega uno o más productos al carrito del cliente",
+      description: "Agrega uno o más productos al carrito del cliente. IMPORTANTE: Si el cliente pide productos de un negocio diferente al actual, primero notificale que se vaciará el carrito anterior.",
       parameters: {
         type: "object",
         properties: {
+          vendor_id: {
+            type: "string",
+            description: "ID del negocio del que son los productos"
+          },
           items: {
             type: "array",
             items: {
@@ -158,7 +162,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
             }
           }
         },
-        required: ["items"]
+        required: ["vendor_id", "items"]
       }
     }
   },
@@ -310,6 +314,13 @@ async function ejecutarHerramienta(
 
       case "agregar_al_carrito": {
         const items = args.items as CartItem[];
+        
+        // Si hay items en el carrito pero son de otro negocio, vaciar el carrito
+        if (context.cart.length > 0 && context.selected_vendor_id && args.vendor_id !== context.selected_vendor_id) {
+          context.cart = [];
+          console.log('🗑️ Carrito vaciado porque cambiaste de negocio');
+        }
+        
         items.forEach(item => {
           const existing = context.cart.find(c => c.product_id === item.product_id);
           if (existing) {
@@ -371,6 +382,7 @@ async function ejecutarHerramienta(
           .from('orders')
           .insert({
             vendor_id: context.selected_vendor_id,
+            customer_name: context.phone, // Usar teléfono como nombre por defecto
             customer_phone: context.phone,
             items: context.cart,
             total,
