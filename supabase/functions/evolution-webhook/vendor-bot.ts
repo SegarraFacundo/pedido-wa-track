@@ -252,6 +252,23 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
         required: ["order_id"]
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "ver_ofertas",
+      description: "Muestra las ofertas y promociones activas. Opcionalmente filtrar por negocio específico.",
+      parameters: {
+        type: "object",
+        properties: {
+          vendor_id: {
+            type: "string",
+            description: "ID del negocio (opcional). Si no se especifica, muestra todas las ofertas activas."
+          }
+        },
+        required: []
+      }
+    }
   }
 ];
 
@@ -527,6 +544,49 @@ async function ejecutarHerramienta(
         estado += `💰 Total: $${order.total}\n`;
 
         return estado;
+      }
+
+      case "ver_ofertas": {
+        let query = supabase
+          .from('vendor_offers')
+          .select('*, vendors(id, name, category)')
+          .eq('is_active', true)
+          .gte('valid_until', new Date().toISOString());
+
+        // Filtrar por vendor si se especifica
+        if (args.vendor_id) {
+          query = query.eq('vendor_id', args.vendor_id);
+        }
+
+        const { data: offers, error } = await query;
+
+        if (error || !offers || offers.length === 0) {
+          return args.vendor_id
+            ? 'Este negocio no tiene ofertas activas en este momento.'
+            : 'No hay ofertas disponibles en este momento. 😔';
+        }
+
+        let resultado = `🎁 ${offers.length === 1 ? 'Oferta disponible' : `${offers.length} ofertas disponibles`}:\n\n`;
+        
+        offers.forEach((offer: any, i: number) => {
+          resultado += `${i + 1}. ${offer.title}\n`;
+          resultado += `   🏪 ${offer.vendors.name}\n`;
+          resultado += `   📝 ${offer.description}\n`;
+          
+          if (offer.discount_percentage) {
+            resultado += `   💰 ${offer.discount_percentage}% OFF\n`;
+          }
+          if (offer.original_price && offer.offer_price) {
+            resultado += `   💵 Antes: $${offer.original_price} → Ahora: $${offer.offer_price}\n`;
+          }
+          
+          const validUntil = new Date(offer.valid_until);
+          resultado += `   ⏰ Válido hasta: ${validUntil.toLocaleDateString('es-AR')}\n`;
+          resultado += `   ID Negocio: ${offer.vendor_id}\n`;
+          resultado += `\n`;
+        });
+
+        return resultado;
       }
 
       default:
