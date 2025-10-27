@@ -380,27 +380,48 @@ async function ejecutarHerramienta(
       }
 
       case "ver_menu_negocio": {
+        // Primero intentar obtener el vendor (puede ser por ID o por nombre)
+        let vendorId = args.vendor_id;
+        let vendor: any = null;
+
+        // Si parece un UUID, buscar directamente
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(args.vendor_id)) {
+          const { data } = await supabase
+            .from('vendors')
+            .select('id, name')
+            .eq('id', args.vendor_id)
+            .maybeSingle();
+          vendor = data;
+        } else {
+          // Si no es UUID, buscar por nombre (case insensitive)
+          const { data } = await supabase
+            .from('vendors')
+            .select('id, name')
+            .ilike('name', `%${args.vendor_id}%`)
+            .maybeSingle();
+          vendor = data;
+          if (vendor) vendorId = vendor.id;
+        }
+
+        if (!vendor) {
+          return 'No encontré ese negocio. Por favor usa el ID exacto que te mostré en la lista de locales abiertos.';
+        }
+
+        // Ahora buscar productos con el vendor_id correcto
         const { data: products, error } = await supabase
           .from('products')
           .select('*')
-          .eq('vendor_id', args.vendor_id)
+          .eq('vendor_id', vendorId)
           .eq('is_available', true);
 
         if (error || !products || products.length === 0) {
-          return 'No encontré productos disponibles para este negocio.';
+          return `No encontré productos disponibles para "${vendor.name}" en este momento.`;
         }
 
         // Guardar vendor seleccionado
-        const { data: vendor } = await supabase
-          .from('vendors')
-          .select('name')
-          .eq('id', args.vendor_id)
-          .single();
-
-        if (vendor) {
-          context.selected_vendor_id = args.vendor_id;
-          context.selected_vendor_name = vendor.name;
-        }
+        context.selected_vendor_id = vendorId;
+        context.selected_vendor_name = vendor.name;
 
         let menu = `📋 Menú completo:\n\n`;
         products.forEach((p: any, i: number) => {
