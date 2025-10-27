@@ -282,11 +282,10 @@ serve(async (req) => {
     }
 
     console.log('Processing message from:', normalizedPhone, 'Message:', messageText);
-    let responseMessage = '';
-
-    // --- Lógica de vendedores y clientes (igual a tu versión anterior) ---
-    // [ ... código existente ... ]
-
+    
+    // Procesar mensaje con el bot de IA
+    let responseMessage = await processWithVendorBot(normalizedPhone, messageText);
+    
     // --- ENVÍO FINAL ---
     if (responseMessage) {
       const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL');

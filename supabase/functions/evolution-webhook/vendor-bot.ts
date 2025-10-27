@@ -252,6 +252,23 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
         required: ["order_id"]
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "ver_ofertas",
+      description: "Muestra las ofertas y promociones activas. Opcionalmente filtrar por negocio específico.",
+      parameters: {
+        type: "object",
+        properties: {
+          vendor_id: {
+            type: "string",
+            description: "ID del negocio (opcional). Si no se especifica, muestra todas las ofertas activas."
+          }
+        },
+        required: []
+      }
+    }
   }
 ];
 
@@ -363,27 +380,73 @@ async function ejecutarHerramienta(
       }
 
       case "ver_menu_negocio": {
+        console.log(`🔍 ver_menu_negocio called with vendor_id: "${args.vendor_id}"`);
+        
+        // Primero intentar obtener el vendor (puede ser por ID o por nombre)
+        let vendorId = args.vendor_id;
+        let vendor: any = null;
+
+        // Si parece un UUID, buscar directamente
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(args.vendor_id)) {
+          console.log(`✅ Detected UUID format, searching by ID`);
+          const { data, error: vendorError } = await supabase
+            .from('vendors')
+            .select('id, name')
+            .eq('id', args.vendor_id)
+            .maybeSingle();
+          
+          if (vendorError) console.error('Error fetching vendor by ID:', vendorError);
+          vendor = data;
+          console.log(`Vendor found by ID:`, vendor);
+        } else {
+          // Si no es UUID, buscar por nombre (case insensitive)
+          // Limpiar el input: convertir guiones a espacios, remover caracteres especiales
+          const cleanedName = args.vendor_id
+            .replace(/-/g, ' ')  // guiones a espacios
+            .replace(/_/g, ' ')  // guiones bajos a espacios
+            .trim();
+          
+          console.log(`🔤 Not UUID, searching by name. Original: "${args.vendor_id}", Cleaned: "${cleanedName}"`);
+          
+          const { data, error: vendorError } = await supabase
+            .from('vendors')
+            .select('id, name')
+            .ilike('name', `%${cleanedName}%`)
+            .maybeSingle();
+          
+          if (vendorError) console.error('Error fetching vendor by name:', vendorError);
+          vendor = data;
+          console.log(`Vendor found by name:`, vendor);
+          if (vendor) vendorId = vendor.id;
+        }
+
+        if (!vendor) {
+          console.log(`❌ Vendor not found for: "${args.vendor_id}"`);
+          return 'No encontré ese negocio. Por favor usa el ID exacto que te mostré en la lista de locales abiertos.';
+        }
+
+        console.log(`✅ Using vendor_id: ${vendorId} (${vendor.name})`);
+
+        // Ahora buscar productos con el vendor_id correcto
         const { data: products, error } = await supabase
           .from('products')
           .select('*')
-          .eq('vendor_id', args.vendor_id)
+          .eq('vendor_id', vendorId)
           .eq('is_available', true);
 
+        console.log(`📦 Products query result:`, { count: products?.length || 0, error, vendorId });
+
         if (error || !products || products.length === 0) {
-          return 'No encontré productos disponibles para este negocio.';
+          console.log(`❌ No products found for vendor ${vendorId}`);
+          return `No encontré productos disponibles para "${vendor.name}" en este momento.`;
         }
 
         // Guardar vendor seleccionado
-        const { data: vendor } = await supabase
-          .from('vendors')
-          .select('name')
-          .eq('id', args.vendor_id)
-          .single();
-
-        if (vendor) {
-          context.selected_vendor_id = args.vendor_id;
-          context.selected_vendor_name = vendor.name;
-        }
+        context.selected_vendor_id = vendorId;
+        context.selected_vendor_name = vendor.name;
+        
+        console.log(`✅ Found ${products.length} products for ${vendor.name}`);
 
         let menu = `📋 Menú completo:\n\n`;
         products.forEach((p: any, i: number) => {
@@ -527,6 +590,49 @@ async function ejecutarHerramienta(
         estado += `💰 Total: $${order.total}\n`;
 
         return estado;
+      }
+
+      case "ver_ofertas": {
+        let query = supabase
+          .from('vendor_offers')
+          .select('*, vendors(id, name, category)')
+          .eq('is_active', true)
+          .gte('valid_until', new Date().toISOString());
+
+        // Filtrar por vendor si se especifica
+        if (args.vendor_id) {
+          query = query.eq('vendor_id', args.vendor_id);
+        }
+
+        const { data: offers, error } = await query;
+
+        if (error || !offers || offers.length === 0) {
+          return args.vendor_id
+            ? 'Este negocio no tiene ofertas activas en este momento.'
+            : 'No hay ofertas disponibles en este momento. 😔';
+        }
+
+        let resultado = `🎁 ${offers.length === 1 ? 'Oferta disponible' : `${offers.length} ofertas disponibles`}:\n\n`;
+        
+        offers.forEach((offer: any, i: number) => {
+          resultado += `${i + 1}. ${offer.title}\n`;
+          resultado += `   🏪 ${offer.vendors.name}\n`;
+          resultado += `   📝 ${offer.description}\n`;
+          
+          if (offer.discount_percentage) {
+            resultado += `   💰 ${offer.discount_percentage}% OFF\n`;
+          }
+          if (offer.original_price && offer.offer_price) {
+            resultado += `   💵 Antes: $${offer.original_price} → Ahora: $${offer.offer_price}\n`;
+          }
+          
+          const validUntil = new Date(offer.valid_until);
+          resultado += `   ⏰ Válido hasta: ${validUntil.toLocaleDateString('es-AR')}\n`;
+          resultado += `   ID Negocio: ${offer.vendor_id}\n`;
+          resultado += `\n`;
+        });
+
+        return resultado;
       }
 
       default:
