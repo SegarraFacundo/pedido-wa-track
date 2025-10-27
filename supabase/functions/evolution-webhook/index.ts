@@ -284,7 +284,7 @@ serve(async (req) => {
     console.log('Processing message from:', normalizedPhone, 'Message:', messageText);
     
     // Procesar mensaje con el bot de IA
-    responseMessage = await processWithVendorBot(normalizedPhone, messageText);
+    let responseMessage = await processWithVendorBot(normalizedPhone, messageText);
     
     // --- ENVÍO FINAL ---
     if (responseMessage) {
