@@ -401,11 +401,18 @@ async function ejecutarHerramienta(
           console.log(`Vendor found by ID:`, vendor);
         } else {
           // Si no es UUID, buscar por nombre (case insensitive)
-          console.log(`🔤 Not UUID, searching by name with ILIKE: "%${args.vendor_id}%"`);
+          // Limpiar el input: convertir guiones a espacios, remover caracteres especiales
+          const cleanedName = args.vendor_id
+            .replace(/-/g, ' ')  // guiones a espacios
+            .replace(/_/g, ' ')  // guiones bajos a espacios
+            .trim();
+          
+          console.log(`🔤 Not UUID, searching by name. Original: "${args.vendor_id}", Cleaned: "${cleanedName}"`);
+          
           const { data, error: vendorError } = await supabase
             .from('vendors')
             .select('id, name')
-            .ilike('name', `%${args.vendor_id}%`)
+            .ilike('name', `%${cleanedName}%`)
             .maybeSingle();
           
           if (vendorError) console.error('Error fetching vendor by name:', vendorError);
