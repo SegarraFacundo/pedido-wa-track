@@ -380,6 +380,8 @@ async function ejecutarHerramienta(
       }
 
       case "ver_menu_negocio": {
+        console.log(`🔍 ver_menu_negocio called with vendor_id: "${args.vendor_id}"`);
+        
         // Primero intentar obtener el vendor (puede ser por ID o por nombre)
         let vendorId = args.vendor_id;
         let vendor: any = null;
@@ -387,26 +389,37 @@ async function ejecutarHerramienta(
         // Si parece un UUID, buscar directamente
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (uuidRegex.test(args.vendor_id)) {
-          const { data } = await supabase
+          console.log(`✅ Detected UUID format, searching by ID`);
+          const { data, error: vendorError } = await supabase
             .from('vendors')
             .select('id, name')
             .eq('id', args.vendor_id)
             .maybeSingle();
+          
+          if (vendorError) console.error('Error fetching vendor by ID:', vendorError);
           vendor = data;
+          console.log(`Vendor found by ID:`, vendor);
         } else {
           // Si no es UUID, buscar por nombre (case insensitive)
-          const { data } = await supabase
+          console.log(`🔤 Not UUID, searching by name with ILIKE: "%${args.vendor_id}%"`);
+          const { data, error: vendorError } = await supabase
             .from('vendors')
             .select('id, name')
             .ilike('name', `%${args.vendor_id}%`)
             .maybeSingle();
+          
+          if (vendorError) console.error('Error fetching vendor by name:', vendorError);
           vendor = data;
+          console.log(`Vendor found by name:`, vendor);
           if (vendor) vendorId = vendor.id;
         }
 
         if (!vendor) {
+          console.log(`❌ Vendor not found for: "${args.vendor_id}"`);
           return 'No encontré ese negocio. Por favor usa el ID exacto que te mostré en la lista de locales abiertos.';
         }
+
+        console.log(`✅ Using vendor_id: ${vendorId} (${vendor.name})`);
 
         // Ahora buscar productos con el vendor_id correcto
         const { data: products, error } = await supabase
@@ -415,13 +428,18 @@ async function ejecutarHerramienta(
           .eq('vendor_id', vendorId)
           .eq('is_available', true);
 
+        console.log(`📦 Products query result:`, { count: products?.length || 0, error, vendorId });
+
         if (error || !products || products.length === 0) {
+          console.log(`❌ No products found for vendor ${vendorId}`);
           return `No encontré productos disponibles para "${vendor.name}" en este momento.`;
         }
 
         // Guardar vendor seleccionado
         context.selected_vendor_id = vendorId;
         context.selected_vendor_name = vendor.name;
+        
+        console.log(`✅ Found ${products.length} products for ${vendor.name}`);
 
         let menu = `📋 Menú completo:\n\n`;
         products.forEach((p: any, i: number) => {
