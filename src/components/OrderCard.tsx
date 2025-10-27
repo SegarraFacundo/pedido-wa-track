@@ -175,15 +175,13 @@ export function OrderCard({ order, onStatusChange, onOpenChat, isVendorView = fa
             </Button>
           )}
           
-          {order.status === 'pending' && (
-            <Button
+          <Button
               size="sm"
               variant="destructive"
               onClick={() => onStatusChange?.(order.id, 'cancelled')}
             >
               Cancelar
-            </Button>
-          )}
+          </Button>
         </div>
       </CardContent>
     </Card>
