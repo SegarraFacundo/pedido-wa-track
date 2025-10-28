@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Order, OrderItem, OrderStatus } from "@/types/order";
 import { Image, FileText, Clock, MapPin, Phone, User, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
+import { OrderCancellationDialog } from "./OrderCancellationDialog";
 
 interface OrderCardProps {
   order: Order;
@@ -36,6 +38,7 @@ const getNextStatus = (currentStatus: OrderStatus): OrderStatus | null => {
 };
 
 export function OrderCard({ order, onStatusChange, onOpenChat, isVendorView = false }: OrderCardProps) {
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
   const nextStatus = getNextStatus(order.status);
   
   // Debug logging
@@ -175,15 +178,25 @@ export function OrderCard({ order, onStatusChange, onOpenChat, isVendorView = fa
             </Button>
           )}
           
-          <Button
+          {order.status !== 'delivered' && order.status !== 'cancelled' && (
+            <Button
               size="sm"
               variant="destructive"
-              onClick={() => onStatusChange?.(order.id, 'cancelled')}
+              onClick={() => setShowCancelDialog(true)}
             >
               Cancelar
-          </Button>
+            </Button>
+          )}
         </div>
       </CardContent>
+
+      <OrderCancellationDialog
+        orderId={order.id}
+        isOpen={showCancelDialog}
+        onClose={() => setShowCancelDialog(false)}
+        onSuccess={() => window.location.reload()}
+        isVendor={isVendorView}
+      />
     </Card>
   );
 }

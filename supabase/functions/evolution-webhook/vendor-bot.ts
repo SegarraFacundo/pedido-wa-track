@@ -269,6 +269,70 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
         required: []
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "cancelar_pedido",
+      description: "Cancela un pedido. SIEMPRE requerir y registrar el motivo de cancelación.",
+      parameters: {
+        type: "object",
+        properties: {
+          order_id: {
+            type: "string",
+            description: "ID del pedido a cancelar"
+          },
+          motivo: {
+            type: "string",
+            description: "Motivo detallado de la cancelación (OBLIGATORIO)"
+          }
+        },
+        required: ["order_id", "motivo"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "hablar_con_vendedor",
+      description: "Permite al cliente hablar directamente con el vendedor, cortando la interacción con el bot.",
+      parameters: {
+        type: "object",
+        properties: {
+          order_id: {
+            type: "string",
+            description: "ID del pedido relacionado (opcional)"
+          }
+        },
+        required: []
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "crear_ticket_soporte",
+      description: "Crea un ticket de soporte para problemas técnicos o consultas que el bot no puede resolver.",
+      parameters: {
+        type: "object",
+        properties: {
+          asunto: {
+            type: "string",
+            description: "Asunto o título del problema"
+          },
+          descripcion: {
+            type: "string",
+            description: "Descripción detallada del problema"
+          },
+          prioridad: {
+            type: "string",
+            enum: ["baja", "normal", "alta", "urgente"],
+            description: "Nivel de prioridad del ticket"
+          }
+        },
+        required: ["asunto", "descripcion"]
+      }
+    }
   }
 ];
 
@@ -448,13 +512,35 @@ async function ejecutarHerramienta(
         
         console.log(`✅ Found ${products.length} products for ${vendor.name}`);
 
-        let menu = `📋 Menú completo:\n\n`;
+        let menu = `📋 *Menú de ${vendor.name}*\n\n`;
         products.forEach((p: any, i: number) => {
-          menu += `${i + 1}. ${p.name} - $${p.price}\n`;
+          menu += `${i + 1}. *${p.name}* - $${p.price}\n`;
           menu += `   ID: ${p.id}\n`;
-          if (p.description) menu += `   ${p.description}\n`;
+          if (p.description) menu += `   📝 ${p.description}\n`;
+          if (p.image) menu += `   🖼️ ${p.image}\n`;
           menu += `\n`;
         });
+        
+        // Mostrar ofertas del negocio si hay
+        const { data: offers } = await supabase
+          .from('vendor_offers')
+          .select('*')
+          .eq('vendor_id', vendorId)
+          .eq('is_active', true)
+          .gte('valid_until', new Date().toISOString());
+        
+        if (offers && offers.length > 0) {
+          menu += `\n🎁 *Ofertas especiales:*\n\n`;
+          offers.forEach((offer: any, i: number) => {
+            menu += `${i + 1}. ${offer.title}\n`;
+            menu += `   📝 ${offer.description}\n`;
+            if (offer.discount_percentage) menu += `   💰 ${offer.discount_percentage}% OFF\n`;
+            if (offer.original_price && offer.offer_price) {
+              menu += `   💵 Antes: $${offer.original_price} → Ahora: $${offer.offer_price}\n`;
+            }
+            menu += `\n`;
+          });
+        }
 
         return menu;
       }
@@ -466,6 +552,21 @@ async function ejecutarHerramienta(
         if (context.cart.length > 0 && context.selected_vendor_id && args.vendor_id !== context.selected_vendor_id) {
           context.cart = [];
           console.log('🗑️ Carrito vaciado porque cambiaste de negocio');
+        }
+        
+        // CRITICAL: Actualizar el vendor seleccionado cuando se agrega al carrito
+        if (args.vendor_id) {
+          context.selected_vendor_id = args.vendor_id;
+          
+          // Obtener nombre del vendor si no lo tenemos
+          if (!context.selected_vendor_name || context.selected_vendor_id !== args.vendor_id) {
+            const { data: vendor } = await supabase
+              .from('vendors')
+              .select('name')
+              .eq('id', args.vendor_id)
+              .single();
+            if (vendor) context.selected_vendor_name = vendor.name;
+          }
         }
         
         items.forEach(item => {
@@ -633,6 +734,104 @@ async function ejecutarHerramienta(
         });
 
         return resultado;
+      }
+
+      case "cancelar_pedido": {
+        if (!args.motivo || args.motivo.trim().length < 10) {
+          return 'Por favor proporciona un motivo detallado para la cancelación (mínimo 10 caracteres).';
+        }
+
+        const { data: order, error: fetchError } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('id', args.order_id)
+          .single();
+
+        if (fetchError || !order) {
+          return 'No encontré ese pedido.';
+        }
+
+        if (order.status === 'cancelled') {
+          return 'Este pedido ya está cancelado.';
+        }
+
+        if (['delivered', 'ready'].includes(order.status)) {
+          return 'No se puede cancelar un pedido que ya está listo o entregado. Contacta con soporte si necesitas ayuda.';
+        }
+
+        const { error: updateError } = await supabase
+          .from('orders')
+          .update({ status: 'cancelled' })
+          .eq('id', args.order_id);
+
+        if (updateError) {
+          return 'Hubo un error al cancelar el pedido. Intenta de nuevo.';
+        }
+
+        // Registrar historial
+        await supabase
+          .from('order_status_history')
+          .insert({
+            order_id: args.order_id,
+            status: 'cancelled',
+            changed_by: 'customer',
+            reason: args.motivo
+          });
+
+        return `✅ Pedido #${args.order_id.substring(0, 8)} cancelado.\n📝 Motivo: ${args.motivo}\n\nEl vendedor ha sido notificado.`;
+      }
+
+      case "hablar_con_vendedor": {
+        // Marcar sesión como en chat directo con vendedor
+        const { error } = await supabase
+          .from('user_sessions')
+          .update({ 
+            in_vendor_chat: true,
+            updated_at: new Date().toISOString()
+          })
+          .eq('phone', context.phone);
+
+        if (error) {
+          console.error('Error updating session:', error);
+        }
+
+        let mensaje = '👤 *Conectando con el vendedor*\n\n';
+        mensaje += 'Un representante humano te atenderá en breve. Los mensajes que envíes ahora irán directamente al vendedor.\n\n';
+        mensaje += 'Para volver al bot automático, el vendedor puede reactivarlo desde su panel.';
+        
+        return mensaje;
+      }
+
+      case "crear_ticket_soporte": {
+        const prioridad = args.prioridad || 'normal';
+        
+        const { data: ticket, error } = await supabase
+          .from('support_tickets')
+          .insert({
+            customer_phone: context.phone,
+            customer_name: context.phone,
+            subject: args.asunto,
+            priority: prioridad === 'baja' ? 'low' : prioridad === 'alta' ? 'high' : prioridad === 'urgente' ? 'urgent' : 'normal',
+            status: 'open'
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Error creating ticket:', error);
+          return 'Hubo un error al crear el ticket. Intenta de nuevo o contacta directamente con soporte.';
+        }
+
+        // Crear mensaje inicial en el ticket
+        await supabase
+          .from('support_messages')
+          .insert({
+            ticket_id: ticket.id,
+            sender_type: 'customer',
+            message: args.descripcion
+          });
+
+        return `✅ *Ticket de soporte creado*\n\n📋 ID: #${ticket.id.substring(0, 8)}\n🏷️ Asunto: ${args.asunto}\n⚡ Prioridad: ${prioridad}\n\nNuestro equipo de soporte te contactará pronto. Recibirás actualizaciones por WhatsApp.`;
       }
 
       default:
