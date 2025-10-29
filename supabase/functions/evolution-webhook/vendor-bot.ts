@@ -295,16 +295,20 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "hablar_con_vendedor",
-      description: "Permite al cliente hablar directamente con el vendedor, cortando la interacción con el bot.",
+      description: "Permite al cliente hablar directamente con el vendedor. SOLO usar si el cliente ya tiene un negocio seleccionado en el contexto. Si no hay negocio seleccionado, primero ayudá al cliente a elegir uno.",
       parameters: {
         type: "object",
         properties: {
+          vendor_id: {
+            type: "string",
+            description: "ID del negocio con el que quiere hablar (REQUERIDO)"
+          },
           order_id: {
             type: "string",
             description: "ID del pedido relacionado (opcional)"
           }
         },
-        required: []
+        required: ["vendor_id"]
       }
     }
   },
@@ -793,21 +797,47 @@ async function ejecutarHerramienta(
       }
 
       case "hablar_con_vendedor": {
-        // Marcar sesión como en chat directo con vendedor
+        console.log('🔄 Switching to vendor chat mode');
+        
+        // Verificar que tengamos un vendor_id
+        if (!args.vendor_id) {
+          return 'Necesito saber con qué negocio querés hablar. Por favor, decime el nombre o buscá un negocio primero.';
+        }
+        
+        // Obtener información del vendedor
+        const { data: vendor, error: vendorError } = await supabase
+          .from('vendors')
+          .select('phone, whatsapp_number, name')
+          .eq('id', args.vendor_id)
+          .single();
+        
+        if (vendorError || !vendor) {
+          console.error('Error getting vendor:', vendorError);
+          return 'No pude encontrar ese negocio. Por favor verificá el negocio e intentá de nuevo.';
+        }
+        
+        const vendorPhone = vendor.whatsapp_number || vendor.phone;
+        
+        // Actualizar contexto con el vendor seleccionado
+        context.selected_vendor_id = args.vendor_id;
+        context.selected_vendor_name = vendor.name;
+        
+        // Actualizar sesión del usuario
         const { error } = await supabase
           .from('user_sessions')
-          .update({ 
+          .upsert({
+            phone: context.phone,
+            assigned_vendor_phone: vendorPhone,
             in_vendor_chat: true,
             updated_at: new Date().toISOString()
-          })
-          .eq('phone', context.phone);
+          }, { onConflict: 'phone' });
 
         if (error) {
           console.error('Error updating session:', error);
         }
 
-        let mensaje = '👤 *Conectando con el vendedor*\n\n';
-        mensaje += 'Un representante humano te atenderá en breve. Los mensajes que envíes ahora irán directamente al vendedor.\n\n';
+        let mensaje = `👤 *Conectando con ${vendor.name}*\n\n`;
+        mensaje += 'Un representante del negocio te atenderá en breve. Los mensajes que envíes ahora irán directamente al vendedor.\n\n';
         mensaje += 'Para volver al bot automático, el vendedor puede reactivarlo desde su panel.';
         
         return mensaje;
@@ -938,6 +968,7 @@ REGLAS IMPORTANTES:
 9. Solo creá el pedido cuando el cliente CONFIRME explícitamente que quiere finalizar
 10. Si el cliente pregunta por el estado de un pedido, usá ver_estado_pedido
 11. Si el cliente pide ayuda o pregunta qué puede hacer, usá mostrar_menu_ayuda
+12. IMPORTANTE: Solo ofrecé "hablar con un vendedor" si el cliente YA tiene un negocio seleccionado. Si no hay negocio seleccionado, primero ayudalo a elegir uno.
 
 FLUJO TÍPICO:
 1. Cliente busca algo (pizza, hamburguesa, etc) → buscar_productos
