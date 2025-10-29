@@ -7,7 +7,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, MessageSquare } from 'lucide-react';
+import { Plus, MessageSquare, Send, ArrowLeft } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface Ticket {
   id: string;
@@ -18,6 +19,14 @@ interface Ticket {
   updated_at: string;
 }
 
+interface Message {
+  id: string;
+  ticket_id: string;
+  sender_type: 'customer' | 'support';
+  message: string;
+  created_at: string;
+}
+
 export function VendorSupportTickets({ vendorId }: { vendorId: string }) {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,11 +34,48 @@ export function VendorSupportTickets({ vendorId }: { vendorId: string }) {
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('normal');
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchTickets();
+    setupRealtimeSubscription();
   }, [vendorId]);
+
+  useEffect(() => {
+    if (selectedTicket) {
+      fetchMessages(selectedTicket.id);
+    }
+  }, [selectedTicket]);
+
+  const setupRealtimeSubscription = () => {
+    const ticketsChannel = supabase
+      .channel('vendor-tickets-changes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'support_tickets'
+      }, () => {
+        fetchTickets();
+      })
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'support_messages',
+        filter: selectedTicket ? `ticket_id=eq.${selectedTicket.id}` : undefined
+      }, (payload) => {
+        const newMsg = payload.new as Message;
+        setMessages(prev => [...prev, newMsg]);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(ticketsChannel);
+    };
+  };
 
   const fetchTickets = async () => {
     try {
@@ -118,6 +164,53 @@ export function VendorSupportTickets({ vendorId }: { vendorId: string }) {
     }
   };
 
+  const fetchMessages = async (ticketId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('support_messages')
+        .select('*')
+        .eq('ticket_id', ticketId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      setMessages((data as Message[]) || []);
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !selectedTicket) return;
+
+    setSendingMessage(true);
+    try {
+      const { error } = await supabase
+        .from('support_messages')
+        .insert({
+          ticket_id: selectedTicket.id,
+          sender_type: 'customer',
+          message: newMessage.trim()
+        });
+
+      if (error) throw error;
+
+      setNewMessage('');
+      toast({
+        title: 'Mensaje enviado',
+        description: 'Tu mensaje ha sido enviado al equipo de soporte'
+      });
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo enviar el mensaje',
+        variant: 'destructive'
+      });
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
   const statusLabels: Record<string, string> = {
     open: 'Abierto',
     in_progress: 'En progreso',
@@ -136,6 +229,78 @@ export function VendorSupportTickets({ vendorId }: { vendorId: string }) {
     return <div>Cargando tickets...</div>;
   }
 
+  // Vista de detalle del ticket
+  if (selectedTicket) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" onClick={() => setSelectedTicket(null)}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Volver
+          </Button>
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold">{selectedTicket.subject}</h2>
+            <p className="text-sm text-muted-foreground">
+              ID: #{selectedTicket.id.substring(0, 8)} • {statusLabels[selectedTicket.status]} • {priorityLabels[selectedTicket.priority]}
+            </p>
+          </div>
+        </div>
+
+        <Card className="flex flex-col h-[600px]">
+          <ScrollArea className="flex-1 p-4">
+            <div className="space-y-4">
+              {messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`flex ${msg.sender_type === 'customer' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div
+                    className={`max-w-[70%] rounded-lg p-3 ${
+                      msg.sender_type === 'customer'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted'
+                    }`}
+                  >
+                    <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
+                    <p className="text-xs opacity-70 mt-1">
+                      {new Date(msg.created_at).toLocaleString('es-AR')}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+
+          <div className="border-t p-4">
+            <div className="flex gap-2">
+              <Textarea
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Escribe tu mensaje..."
+                className="min-h-[80px]"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+              />
+              <Button
+                onClick={handleSendMessage}
+                disabled={!newMessage.trim() || sendingMessage}
+                size="icon"
+                className="self-end"
+              >
+                <Send className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  // Vista de lista de tickets
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -204,7 +369,11 @@ export function VendorSupportTickets({ vendorId }: { vendorId: string }) {
       ) : (
         <div className="grid gap-4">
           {tickets.map((ticket) => (
-            <Card key={ticket.id} className="p-4">
+            <Card
+              key={ticket.id}
+              className="p-4 cursor-pointer hover:bg-accent transition-colors"
+              onClick={() => setSelectedTicket(ticket)}
+            >
               <div className="flex justify-between items-start">
                 <div>
                   <h3 className="font-semibold">{ticket.subject}</h3>
