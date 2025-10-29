@@ -134,10 +134,10 @@ export function useRealtimeMessages(orderId: string) {
               variant: 'destructive'
             });
           } else if (whatsappResponse && whatsappResponse.success === false) {
-            console.error('Twilio reported failure:', whatsappResponse);
+            console.error('WhatsApp API reported failure:', whatsappResponse);
             toast({
               title: 'Advertencia',
-              description: `No se pudo enviar por WhatsApp: ${whatsappResponse.error || 'verifica el número o la configuración de Twilio'}`,
+              description: `No se pudo enviar por WhatsApp: ${whatsappResponse.error || 'verifica el número o la configuración'}`,
               variant: 'destructive'
             });
           } else {

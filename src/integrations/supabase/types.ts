@@ -1439,14 +1439,8 @@ export type Database = {
         }
         Returns: boolean
       }
-      cleanup_old_sessions: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      get_masked_phone: {
-        Args: { phone: string }
-        Returns: string
-      }
+      cleanup_old_sessions: { Args: never; Returns: number }
+      get_masked_phone: { Args: { phone: string }; Returns: string }
       get_order_customer_details: {
         Args: { order_id_param: string }
         Returns: {
@@ -1481,18 +1475,9 @@ export type Database = {
         }
         Returns: boolean
       }
-      link_vendor_to_user: {
-        Args: { vendor_email: string }
-        Returns: string
-      }
-      make_user_admin: {
-        Args: { user_email: string }
-        Returns: string
-      }
-      make_user_soporte: {
-        Args: { user_email: string }
-        Returns: string
-      }
+      link_vendor_to_user: { Args: { vendor_email: string }; Returns: string }
+      make_user_admin: { Args: { user_email: string }; Returns: string }
+      make_user_soporte: { Args: { user_email: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "vendor" | "customer" | "soporte"
