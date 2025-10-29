@@ -592,12 +592,16 @@ async function ejecutarHerramienta(
         return estado;
       }
 
+      
       case "ver_ofertas": {
+        const nowIso: string = new Date().toISOString();
+      
         let query = supabase
           .from('vendor_offers')
           .select('*, vendors(id, name, category)')
           .eq('is_active', true)
-          .gte('valid_until', new Date().toISOString());
+          .lte('valid_from', nowIso)
+          .or(`valid_until.gte.${nowIso},valid_until.is.null`);
 
         // Filtrar por vendor si se especifica
         if (args.vendor_id) {
