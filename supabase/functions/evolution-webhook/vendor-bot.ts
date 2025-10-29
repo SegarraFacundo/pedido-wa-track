@@ -333,6 +333,13 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
         required: ["asunto", "descripcion"]
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "mostrar_menu_ayuda",
+      description: "Muestra un menú con todas las opciones y funcionalidades disponibles para el cliente. Usa esto cuando el cliente pida ayuda o quiera saber qué puede hacer."
+    }
   }
 ];
 
@@ -838,6 +845,35 @@ async function ejecutarHerramienta(
         return `✅ *Ticket de soporte creado*\n\n📋 ID: #${ticket.id.substring(0, 8)}\n🏷️ Asunto: ${args.asunto}\n⚡ Prioridad: ${prioridad}\n\nNuestro equipo de soporte te contactará pronto. Recibirás actualizaciones por WhatsApp.`;
       }
 
+      case "mostrar_menu_ayuda": {
+        return `🤖 *MENÚ DE AYUDA - LAPACHO DELIVERY*
+
+¿Qué podés hacer?
+
+🔍 *BUSCAR Y PEDIR*
+• Buscar productos (ej: "Quiero pizza")
+• Ver locales abiertos ahora
+• Ver ofertas y promociones
+• Ver el menú de un negocio
+• Hacer un pedido
+
+🛒 *MI CARRITO*
+• Ver mi carrito actual
+• Agregar productos al carrito
+• Quitar productos del carrito
+• Vaciar el carrito
+
+📦 *MIS PEDIDOS*
+• Ver el estado de mi pedido
+• Cancelar un pedido
+
+💬 *SOPORTE*
+• Hablar con un vendedor
+• Crear un ticket de soporte
+
+Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
+      }
+
       default:
         return `Herramienta ${toolName} no implementada`;
     }
@@ -901,6 +937,7 @@ REGLAS IMPORTANTES:
 8. Cuando el cliente quiera agregar algo al carrito, usá agregar_al_carrito
 9. Solo creá el pedido cuando el cliente CONFIRME explícitamente que quiere finalizar
 10. Si el cliente pregunta por el estado de un pedido, usá ver_estado_pedido
+11. Si el cliente pide ayuda o pregunta qué puede hacer, usá mostrar_menu_ayuda
 
 FLUJO TÍPICO:
 1. Cliente busca algo (pizza, hamburguesa, etc) → buscar_productos
