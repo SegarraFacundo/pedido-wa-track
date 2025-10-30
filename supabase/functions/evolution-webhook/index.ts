@@ -250,8 +250,139 @@ serve(async (req) => {
       }
     }
 
-    // --- Mensajes multimedia sin texto ---
-    if (!messageText && (data.message?.audioMessage || data.message?.imageMessage || data.message?.videoMessage)) {
+    // --- Mensajes de audio: transcribir automáticamente ---
+    if (data.message?.audioMessage && !messageText) {
+      console.log('🎤 Audio message received, attempting transcription');
+      
+      const chatId = data.key?.remoteJid?.includes('@lid') || data.key?.remoteJid?.includes(':')
+        ? data.key.remoteJid.replace(/(:\d+)?@lid$/, '@s.whatsapp.net')
+        : `${normalizedPhone}@s.whatsapp.net`;
+
+      const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL');
+      const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
+      const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
+
+      try {
+        // Obtener el mensaje completo con la URL del audio
+        const messageId = data.key?.id;
+        console.log('📥 Fetching audio from Evolution API:', messageId);
+        
+        const audioDetailsResp = await fetch(
+          `${evolutionApiUrl}/chat/findMessages/${instanceName}`,
+          {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json', 
+              'apikey': evolutionApiKey! 
+            },
+            body: JSON.stringify({
+              where: {
+                key: {
+                  id: messageId
+                }
+              }
+            })
+          }
+        );
+
+        const audioDetails = await audioDetailsResp.json();
+        console.log('🔍 Audio details response:', JSON.stringify(audioDetails).slice(0, 200));
+        
+        // Intentar obtener base64 directamente o URL
+        let audioBase64 = null;
+        let audioUrl = null;
+        
+        if (audioDetails?.message?.audioMessage) {
+          const audioMsg = audioDetails.message.audioMessage;
+          audioBase64 = audioMsg.ptt || audioMsg.audio;
+          audioUrl = audioMsg.url;
+        } else if (Array.isArray(audioDetails) && audioDetails[0]?.message?.audioMessage) {
+          const audioMsg = audioDetails[0].message.audioMessage;
+          audioBase64 = audioMsg.ptt || audioMsg.audio;
+          audioUrl = audioMsg.url;
+        }
+
+        if (!audioBase64 && audioUrl) {
+          console.log('📥 Downloading audio from URL:', audioUrl);
+          const audioResponse = await fetch(audioUrl);
+          const audioBlob = await audioResponse.blob();
+          const audioArrayBuffer = await audioBlob.arrayBuffer();
+          const audioBytes = new Uint8Array(audioArrayBuffer);
+          
+          // Convert to base64
+          let binary = '';
+          const chunkSize = 0x8000;
+          for (let i = 0; i < audioBytes.length; i += chunkSize) {
+            const chunk = audioBytes.subarray(i, Math.min(i + chunkSize, audioBytes.length));
+            binary += String.fromCharCode.apply(null, Array.from(chunk));
+          }
+          audioBase64 = btoa(binary);
+        }
+
+        if (!audioBase64) {
+          throw new Error('No se pudo obtener el audio');
+        }
+
+        console.log('🎯 Audio base64 length:', audioBase64.length);
+        
+        // Transcribir el audio
+        const transcriptionResp = await fetch(`${supabaseUrl}/functions/v1/transcribe-audio`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseServiceKey}`
+          },
+          body: JSON.stringify({
+            audio: audioBase64,
+            mimeType: 'audio/ogg'
+          })
+        });
+
+        const transcriptionData = await transcriptionResp.json();
+        console.log('📝 Transcription result:', transcriptionData);
+
+        if (transcriptionData.text) {
+          // Procesar el texto transcrito con el bot
+          const responseMessage = await processWithVendorBot(normalizedPhone, transcriptionData.text);
+          
+          if (responseMessage) {
+            await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey! },
+              body: JSON.stringify({ number: chatId, text: responseMessage }),
+            });
+          }
+
+          return new Response(JSON.stringify({ status: 'audio_transcribed', text: transcriptionData.text }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200
+          });
+        } else {
+          throw new Error('No se pudo transcribir el audio');
+        }
+
+      } catch (error) {
+        console.error('❌ Error transcribing audio:', error);
+        
+        // Enviar mensaje de error al usuario
+        await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey! },
+          body: JSON.stringify({ 
+            number: chatId, 
+            text: 'Lo siento, no pude entender tu mensaje de voz. Por favor, intenta enviarlo de nuevo o escribe tu mensaje.' 
+          }),
+        });
+
+        return new Response(JSON.stringify({ status: 'transcription_error', error: error.message }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200
+        });
+      }
+    }
+
+    // --- Otros mensajes multimedia sin texto ---
+    if (!messageText && (data.message?.imageMessage || data.message?.videoMessage)) {
       const defaultResponse = 'Recibí tu mensaje multimedia. Por favor envía un mensaje de texto para continuar.';
       const chatId = data.key?.remoteJid?.includes('@lid') || data.key?.remoteJid?.includes(':')
         ? data.key.remoteJid.replace(/(:\d+)?@lid$/, '@s.whatsapp.net')
