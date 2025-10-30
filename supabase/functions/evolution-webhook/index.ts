@@ -276,7 +276,7 @@ serve(async (req) => {
             },
             body: JSON.stringify({
               message: {
-                key: data.key,
+                key: data.key.remoteJid,
                 message: data.message
               },
               convertToMp4: false
