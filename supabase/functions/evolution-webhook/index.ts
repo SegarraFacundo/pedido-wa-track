@@ -263,12 +263,11 @@ serve(async (req) => {
       const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
 
       try {
-        // Obtener el mensaje completo con la URL del audio
-        const messageId = data.key?.id;
-        console.log('📥 Fetching audio from Evolution API:', messageId);
+        // Usar el endpoint específico de Evolution para obtener base64 del audio
+        console.log('📥 Fetching audio base64 from Evolution API');
         
-        const audioDetailsResp = await fetch(
-          `${evolutionApiUrl}/chat/findMessages/${instanceName}`,
+        const audioBase64Resp = await fetch(
+          `${evolutionApiUrl}/chat/getBase64FromMediaMessage/${instanceName}`,
           {
             method: 'POST',
             headers: { 
@@ -276,53 +275,24 @@ serve(async (req) => {
               'apikey': evolutionApiKey! 
             },
             body: JSON.stringify({
-              where: {
-                key: {
-                  id: messageId
-                }
-              }
+              message: {
+                key: data.key,
+                message: data.message
+              },
+              convertToMp4: false
             })
           }
         );
 
-        const audioDetails = await audioDetailsResp.json();
-        console.log('🔍 Audio details response:', JSON.stringify(audioDetails).slice(0, 200));
+        const audioResult = await audioBase64Resp.json();
+        console.log('🔍 Audio base64 response status:', audioBase64Resp.status);
         
-        // Intentar obtener base64 directamente o URL
-        let audioBase64 = null;
-        let audioUrl = null;
-        
-        if (audioDetails?.message?.audioMessage) {
-          const audioMsg = audioDetails.message.audioMessage;
-          audioBase64 = audioMsg.ptt || audioMsg.audio;
-          audioUrl = audioMsg.url;
-        } else if (Array.isArray(audioDetails) && audioDetails[0]?.message?.audioMessage) {
-          const audioMsg = audioDetails[0].message.audioMessage;
-          audioBase64 = audioMsg.ptt || audioMsg.audio;
-          audioUrl = audioMsg.url;
+        if (!audioBase64Resp.ok || !audioResult?.base64) {
+          console.error('❌ Failed to get audio base64:', audioResult);
+          throw new Error('No se pudo obtener el audio desde Evolution API');
         }
 
-        if (!audioBase64 && audioUrl) {
-          console.log('📥 Downloading audio from URL:', audioUrl);
-          const audioResponse = await fetch(audioUrl);
-          const audioBlob = await audioResponse.blob();
-          const audioArrayBuffer = await audioBlob.arrayBuffer();
-          const audioBytes = new Uint8Array(audioArrayBuffer);
-          
-          // Convert to base64
-          let binary = '';
-          const chunkSize = 0x8000;
-          for (let i = 0; i < audioBytes.length; i += chunkSize) {
-            const chunk = audioBytes.subarray(i, Math.min(i + chunkSize, audioBytes.length));
-            binary += String.fromCharCode.apply(null, Array.from(chunk));
-          }
-          audioBase64 = btoa(binary);
-        }
-
-        if (!audioBase64) {
-          throw new Error('No se pudo obtener el audio');
-        }
-
+        const audioBase64 = audioResult.base64;
         console.log('🎯 Audio base64 length:', audioBase64.length);
         
         // Transcribir el audio
