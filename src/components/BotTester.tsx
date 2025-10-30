@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Send, Bot, User, Store, ShoppingCart, MapPin, CreditCard, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { AudioRecorder } from "./AudioRecorder";
 
 interface Message {
   role: "user" | "assistant";
@@ -235,11 +236,16 @@ export function BotTester() {
 
           <div className="border-t p-4 flex-shrink-0">
             <div className="flex gap-2">
+              <AudioRecorder 
+                onTranscription={(text) => {
+                  setNewMessage(text);
+                }} 
+              />
               <Input
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Escribe un mensaje..."
+                placeholder="Escribe un mensaje o usa el micrófono..."
                 disabled={isLoading}
                 className="flex-1"
               />
