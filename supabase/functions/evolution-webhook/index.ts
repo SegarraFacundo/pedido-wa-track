@@ -263,48 +263,17 @@ serve(async (req) => {
       const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
 
       try {
-        // Primero obtener el mensaje completo con findMessages
-        console.log('📥 Step 1: Fetching full message from Evolution API');
-        console.log('Message ID:', data.key.id);
+        // Intentar obtener el base64 directamente usando el mensaje del webhook
+        console.log('📥 Attempting to get audio base64 from webhook message');
+        console.log('Full data structure:', JSON.stringify(data, null, 2));
         
-        const findResp = await fetch(
-          `${evolutionApiUrl}/chat/findMessages/${instanceName}`,
-          {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json', 
-              'apikey': evolutionApiKey! 
-            },
-            body: JSON.stringify({
-              where: {
-                key: {
-                  id: data.key.id,
-                  remoteJid: data.key.remoteJid,
-                  fromMe: data.key.fromMe
-                }
-              },
-              limit: 1
-            })
-          }
-        );
-
-        if (!findResp.ok) {
-          const errorText = await findResp.text();
-          console.error('❌ Failed to find message:', errorText);
-          throw new Error('No se pudo encontrar el mensaje');
-        }
-
-        const findResult = await findResp.json();
-        console.log('📄 Found messages:', JSON.stringify(findResult, null, 2));
+        // Construir el mensaje completo con la estructura mínima necesaria
+        const messageForDownload = {
+          key: data.key,
+          message: data.message
+        };
         
-        if (!findResult || !Array.isArray(findResult) || findResult.length === 0) {
-          throw new Error('No se encontró el mensaje de audio');
-        }
-
-        const fullMessage = findResult[0];
-        
-        // Ahora obtener el base64 con el mensaje completo
-        console.log('📥 Step 2: Getting base64 from full message');
+        console.log('Message payload:', JSON.stringify(messageForDownload, null, 2));
         
         const audioBase64Resp = await fetch(
           `${evolutionApiUrl}/chat/getBase64FromMediaMessage/${instanceName}`,
@@ -315,7 +284,7 @@ serve(async (req) => {
               'apikey': evolutionApiKey! 
             },
             body: JSON.stringify({
-              message: fullMessage,
+              message: messageForDownload,
               convertToMp4: false
             })
           }
@@ -326,13 +295,25 @@ serve(async (req) => {
         if (!audioBase64Resp.ok) {
           const errorText = await audioBase64Resp.text();
           console.error('❌ Failed to get audio base64:', errorText);
+          
+          // Si falla, enviar mensaje al usuario
+          await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey! },
+            body: JSON.stringify({ 
+              number: chatId, 
+              text: 'Lo siento, no pude procesar tu mensaje de voz. Por favor, intenta escribir tu mensaje.' 
+            }),
+          });
+          
           throw new Error('No se pudo obtener el audio en base64');
         }
 
         const audioResult = await audioBase64Resp.json();
+        console.log('📦 Audio result keys:', Object.keys(audioResult));
         
         if (!audioResult?.base64) {
-          console.error('❌ No base64 in result:', audioResult);
+          console.error('❌ No base64 in result:', JSON.stringify(audioResult, null, 2));
           throw new Error('No se recibió el audio en formato base64');
         }
 
