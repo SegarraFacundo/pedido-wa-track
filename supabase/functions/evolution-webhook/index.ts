@@ -284,6 +284,8 @@ serve(async (req) => {
           }
         );
 
+        console.log('Audio message structure:', JSON.stringify(data.message, null, 2));
+        
         const audioResult = await audioBase64Resp.json();
         console.log('🔍 Audio base64 response status:', audioBase64Resp.status);
         
@@ -304,7 +306,7 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             audio: audioBase64,
-            mimeType: 'audio/ogg'
+            mimeType: data.message?.audioMessage?.mimetype || 'audio/ogg'
           })
         });
 
