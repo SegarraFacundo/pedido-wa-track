@@ -317,7 +317,8 @@ serve(async (req) => {
           throw new Error('No se recibió el audio en formato base64');
         }
 
-        const audioBase64 = audioResult.base64;
+        const audioBase64 = data.message.audioMessage.data;
+        const mimeType = data.message.audioMessage.mimetype || 'audio/ogg';
         console.log('✅ Audio base64 length:', audioBase64.length);
         
         // Transcribir el audio
@@ -329,7 +330,7 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             audio: audioBase64,
-            mimeType: data.message?.audioMessage?.mimetype || 'audio/ogg'
+            mimeType: mimeType
           })
         });
 
