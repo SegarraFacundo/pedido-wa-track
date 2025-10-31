@@ -263,11 +263,12 @@ serve(async (req) => {
       const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
 
       try {
-        // Usar el endpoint específico de Evolution para obtener base64 del audio
-        console.log('📥 Fetching audio base64 from Evolution API');
+        // Descargar el audio usando el endpoint correcto de Evolution
+        console.log('📥 Downloading audio from Evolution API');
+        console.log('Audio message ID:', data.key.id);
         
-        const audioBase64Resp = await fetch(
-          `${evolutionApiUrl}/chat/getBase64FromMediaMessage/${instanceName}`,
+        const downloadResp = await fetch(
+          `${evolutionApiUrl}/chat/downloadMediaMessage/${instanceName}`,
           {
             method: 'POST',
             headers: { 
@@ -275,27 +276,32 @@ serve(async (req) => {
               'apikey': evolutionApiKey! 
             },
             body: JSON.stringify({
-              message: {
-                key: data.key.remoteJid,
-                message: data.message
+              key: {
+                remoteJid: data.key.remoteJid,
+                fromMe: data.key.fromMe,
+                id: data.key.id
               },
-              convertToMp4: false
+              message: data.message
             })
           }
         );
 
-        console.log('Audio message structure:', JSON.stringify(data.message, null, 2));
+        console.log('🔍 Download response status:', downloadResp.status);
         
-        const audioResult = await audioBase64Resp.json();
-        console.log('🔍 Audio base64 response status:', audioBase64Resp.status);
-        
-        if (!audioBase64Resp.ok || !audioResult?.base64) {
-          console.error('❌ Failed to get audio base64:', audioResult);
-          throw new Error('No se pudo obtener el audio desde Evolution API');
+        if (!downloadResp.ok) {
+          const errorText = await downloadResp.text();
+          console.error('❌ Failed to download audio:', errorText);
+          throw new Error('No se pudo descargar el audio desde Evolution API');
         }
 
-        const audioBase64 = audioResult.base64;
-        console.log('🎯 Audio base64 length:', audioBase64.length);
+        const downloadResult = await downloadResp.json();
+        console.log('🎯 Downloaded audio, base64 length:', downloadResult.base64?.length);
+        
+        if (!downloadResult.base64) {
+          throw new Error('No se recibió el audio en formato base64');
+        }
+
+        const audioBase64 = downloadResult.base64;
         
         // Transcribir el audio
         const transcriptionResp = await fetch(`${supabaseUrl}/functions/v1/transcribe-audio`, {
