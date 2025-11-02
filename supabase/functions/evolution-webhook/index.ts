@@ -201,7 +201,7 @@ serve(async (req) => {
             const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
             const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
             
-            await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
+            await fetch(`${evolutionApiUrl}/api/message/sendText/${instanceName}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey! },
               body: JSON.stringify({
@@ -232,7 +232,7 @@ serve(async (req) => {
             const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
             const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
             
-            await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
+            await fetch(`${evolutionApiUrl}/api/message/sendText/${instanceName}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey! },
               body: JSON.stringify({ number: chatId, text: responseMessage }),
@@ -336,7 +336,7 @@ serve(async (req) => {
           const responseMessage = await processWithVendorBot(normalizedPhone, transcriptionData.text);
           
           if (responseMessage) {
-            await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
+            await fetch(`${evolutionApiUrl}/api/message/sendText/${instanceName}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey! },
               body: JSON.stringify({ number: chatId, text: responseMessage }),
@@ -355,7 +355,7 @@ serve(async (req) => {
         console.error('❌ Error transcribing audio:', error);
         
         // Enviar mensaje de error al usuario
-        await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
+        await fetch(`${evolutionApiUrl}/api/message/sendText/${instanceName}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey! },
           body: JSON.stringify({ 
@@ -382,7 +382,7 @@ serve(async (req) => {
       const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
       const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
 
-      await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
+      await fetch(`${evolutionApiUrl}/api/message/sendText/${instanceName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey! },
         body: JSON.stringify({ number: chatId, text: defaultResponse }),
@@ -422,7 +422,7 @@ serve(async (req) => {
       console.log('📤 Sending to Evolution API:', { normalizedPhone, chatId, messagePreview: responseMessage.slice(0, 100) });
 
       try {
-        const resp = await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
+        const resp = await fetch(`${evolutionApiUrl}/api/message/sendText/${instanceName}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey! },
           body: JSON.stringify({ number: chatId, text: responseMessage }),

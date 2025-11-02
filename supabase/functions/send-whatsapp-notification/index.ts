@@ -84,7 +84,7 @@ serve(async (req) => {
     console.log("💬 chatId to send:", chatId);
 
     // Enviar mensaje a Evolution API
-    const response = await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
+    const response = await fetch(`${evolutionApiUrl}/api/message/sendText/${instanceName}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
