@@ -102,13 +102,13 @@ async function processWithVendorBot(
 
 serve(async (req) => {
   console.log('🎯 Webhook called - Method:', req.method, 'URL:', req.url);
-  
+
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
     const body = await req.json();
     console.log('📦 Webhook body received:', JSON.stringify(body, null, 2));
-    
+
     const event = body.event;
     const data = body.data;
 
@@ -157,10 +157,10 @@ serve(async (req) => {
         .select('previous_state, last_bot_message')
         .eq('phone', normalizedPhone)
         .maybeSingle();
-      
+
       let isAwaitingReceipt = false;
       let pendingOrderId = null;
-      
+
       if (userSession) {
         isAwaitingReceipt = userSession.previous_state === 'AWAITING_RECEIPT';
         if (userSession.last_bot_message) {
@@ -173,16 +173,16 @@ serve(async (req) => {
           }
         }
       }
-        
+
       if (isAwaitingReceipt) {
         console.log('Processing payment receipt image for:', normalizedPhone);
-        
+
         try {
           const imageResponse = await fetch(imageUrl);
           const imageBlob = await imageResponse.blob();
           const fileName = `${normalizedPhone}-${Date.now()}.jpg`;
           const filePath = `receipts/${fileName}`;
-          
+
           const { error: uploadError } = await supabase
             .storage
             .from('payment-receipts')
@@ -190,7 +190,7 @@ serve(async (req) => {
               contentType: 'image/jpeg',
               upsert: false
             });
-          
+
           if (uploadError) {
             console.error('Error uploading receipt:', uploadError);
             const chatId = data.key?.remoteJid?.includes('@lid') || data.key?.remoteJid?.includes(':')
@@ -200,29 +200,32 @@ serve(async (req) => {
             const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL');
             const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
             const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
-            
+
             await fetch(`${evolutionApiUrl}/api/message/sendText/${instanceName}`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey! },
+              headers: {
+                'Content-Type': 'application/json', 'apikey': evolutionApiKey!,
+                "ngrok-skip-browser-warning": "true"
+              },
               body: JSON.stringify({
                 number: chatId,
                 text: '❌ Hubo un error al procesar tu comprobante. Por favor, intenta enviarlo de nuevo.',
               }),
             });
-            
+
             return new Response(JSON.stringify({ status: 'upload_error' }), {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 200
             });
           }
-          
+
           const { data: { publicUrl } } = supabase
             .storage
             .from('payment-receipts')
             .getPublicUrl(filePath);
-          
+
           const responseMessage = await processWithVendorBot(normalizedPhone, messageText || 'comprobante_recibido', publicUrl);
-          
+
           if (responseMessage) {
             const chatId = data.key?.remoteJid?.includes('@lid') || data.key?.remoteJid?.includes(':')
               ? data.key.remoteJid.replace(/(:\d+)?@lid$/, '@s.whatsapp.net')
@@ -231,19 +234,22 @@ serve(async (req) => {
             const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL');
             const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
             const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
-            
+
             await fetch(`${evolutionApiUrl}/api/message/sendText/${instanceName}`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey! },
+              headers: {
+                'Content-Type': 'application/json', 'apikey': evolutionApiKey!,
+                "ngrok-skip-browser-warning": "true"
+              },
               body: JSON.stringify({ number: chatId, text: responseMessage }),
             });
           }
-          
+
           return new Response(JSON.stringify({ status: 'receipt_processed' }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200
           });
-          
+
         } catch (error) {
           console.error('Error processing receipt:', error);
         }
@@ -254,7 +260,7 @@ serve(async (req) => {
     if (data.message?.audioMessage && !messageText) {
       console.log('🎤 Audio message received (Baileys), attempting transcription');
       console.log('Audio message structure:', JSON.stringify(data.message.audioMessage, null, 2));
-      
+
       const chatId = data.key?.remoteJid?.includes('@lid') || data.key?.remoteJid?.includes(':')
         ? data.key.remoteJid.replace(/(:\d+)?@lid$/, '@s.whatsapp.net')
         : `${normalizedPhone}@s.whatsapp.net`;
@@ -271,18 +277,18 @@ serve(async (req) => {
         if (data.message.audioMessage.base64) {
           console.log('✅ Using base64 directly from webhook');
           audioBase64 = data.message.audioMessage.base64;
-        } 
+        }
         // 2. Si no está en el webhook, usar el endpoint de Evolution API
         else {
           console.log('📥 Getting audio base64 from Evolution API endpoint');
-          
+
           const audioBase64Resp = await fetch(
             `${evolutionApiUrl}/chat/getBase64FromMediaMessage/${instanceName}`,
             {
               method: 'POST',
-              headers: { 
-                'Content-Type': 'application/json', 
-                'apikey': evolutionApiKey! 
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': evolutionApiKey!
               },
               body: JSON.stringify({
                 message: {
@@ -295,7 +301,7 @@ serve(async (req) => {
           );
 
           console.log('🔍 Audio base64 response status:', audioBase64Resp.status);
-          
+
           if (!audioBase64Resp.ok) {
             const errorText = await audioBase64Resp.text();
             console.error('❌ Failed to get audio base64:', errorText);
@@ -304,7 +310,7 @@ serve(async (req) => {
 
           const audioResult = await audioBase64Resp.json();
           console.log('📦 Audio result structure:', JSON.stringify(audioResult, null, 2));
-          
+
           if (!audioResult?.base64) {
             console.error('❌ No base64 in result');
             throw new Error('No se recibió el audio en formato base64');
@@ -314,7 +320,7 @@ serve(async (req) => {
         }
 
         console.log('✅ Audio base64 length:', audioBase64.length);
-        
+
         // Transcribir el audio
         const transcriptionResp = await fetch(`${supabaseUrl}/functions/v1/transcribe-audio`, {
           method: 'POST',
@@ -334,11 +340,14 @@ serve(async (req) => {
         if (transcriptionData.text) {
           // Procesar el texto transcrito con el bot
           const responseMessage = await processWithVendorBot(normalizedPhone, transcriptionData.text);
-          
+
           if (responseMessage) {
             await fetch(`${evolutionApiUrl}/api/message/sendText/${instanceName}`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey! },
+              headers: {
+                'Content-Type': 'application/json', 'apikey': evolutionApiKey!,
+                "ngrok-skip-browser-warning": "true"
+              },
               body: JSON.stringify({ number: chatId, text: responseMessage }),
             });
           }
@@ -353,14 +362,17 @@ serve(async (req) => {
 
       } catch (error) {
         console.error('❌ Error transcribing audio:', error);
-        
+
         // Enviar mensaje de error al usuario
         await fetch(`${evolutionApiUrl}/api/message/sendText/${instanceName}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey! },
-          body: JSON.stringify({ 
-            number: chatId, 
-            text: 'Lo siento, no pude entender tu mensaje de voz. Por favor, intenta enviarlo de nuevo o escribe tu mensaje.' 
+          headers: {
+            'Content-Type': 'application/json', 'apikey': evolutionApiKey!,
+            "ngrok-skip-browser-warning": "true"
+          },
+          body: JSON.stringify({
+            number: chatId,
+            text: 'Lo siento, no pude entender tu mensaje de voz. Por favor, intenta enviarlo de nuevo o escribe tu mensaje.'
           }),
         });
 
@@ -384,7 +396,10 @@ serve(async (req) => {
 
       await fetch(`${evolutionApiUrl}/api/message/sendText/${instanceName}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey! },
+        headers: {
+          'Content-Type': 'application/json', 'apikey': evolutionApiKey!,
+          "ngrok-skip-browser-warning": "true"
+        },
         body: JSON.stringify({ number: chatId, text: defaultResponse }),
       });
 
@@ -403,10 +418,10 @@ serve(async (req) => {
     }
 
     console.log('Processing message from:', normalizedPhone, 'Message:', messageText);
-    
+
     // Procesar mensaje con el bot de IA
     let responseMessage = await processWithVendorBot(normalizedPhone, messageText);
-    
+
     // --- ENVÍO FINAL ---
     if (responseMessage) {
       const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL');
@@ -424,7 +439,10 @@ serve(async (req) => {
       try {
         const resp = await fetch(`${evolutionApiUrl}/api/message/sendText/${instanceName}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey! },
+          headers: {
+            'Content-Type': 'application/json', 'apikey': evolutionApiKey!,
+            "ngrok-skip-browser-warning": "true"
+          },
           body: JSON.stringify({ number: chatId, text: responseMessage }),
         });
 

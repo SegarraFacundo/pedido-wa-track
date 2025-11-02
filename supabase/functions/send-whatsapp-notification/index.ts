@@ -89,6 +89,7 @@ serve(async (req) => {
       headers: {
         "Content-Type": "application/json",
         apikey: evolutionApiKey,
+        "ngrok-skip-browser-warning": "true"
       },
       body: JSON.stringify({
         number: chatId, // ✅ usar siempre "number" con formato correcto
