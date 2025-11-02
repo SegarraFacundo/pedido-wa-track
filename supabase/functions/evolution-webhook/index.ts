@@ -250,9 +250,10 @@ serve(async (req) => {
       }
     }
 
-    // --- Mensajes de audio: transcribir automáticamente ---
+    // --- Mensajes de audio: transcribir automáticamente con Baileys ---
     if (data.message?.audioMessage && !messageText) {
-      console.log('🎤 Audio message received, attempting transcription');
+      console.log('🎤 Audio message received (Baileys), attempting transcription');
+      console.log('Audio message structure:', JSON.stringify(data.message.audioMessage, null, 2));
       
       const chatId = data.key?.remoteJid?.includes('@lid') || data.key?.remoteJid?.includes(':')
         ? data.key.remoteJid.replace(/(:\d+)?@lid$/, '@s.whatsapp.net')
@@ -263,62 +264,55 @@ serve(async (req) => {
       const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
 
       try {
-        // Intentar obtener el base64 directamente usando el mensaje del webhook
-        console.log('📥 Attempting to get audio base64 from webhook message');
-        console.log('Full data structure:', JSON.stringify(data, null, 2));
-        
-        // Construir el mensaje completo con la estructura mínima necesaria
-        const messageForDownload = {
-          key: data.key,
-          message: data.message
-        };
-        
-        console.log('Message payload:', JSON.stringify(messageForDownload, null, 2));
-        
-        const audioBase64Resp = await fetch(
-          `${evolutionApiUrl}/chat/getBase64FromMediaMessage/${instanceName}`,
-          {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json', 
-              'apikey': evolutionApiKey! 
-            },
-            body: JSON.stringify({
-              message: messageForDownload,
-              convertToMp4: false
-            })
+        let audioBase64: string;
+        let mimeType = data.message.audioMessage.mimetype || 'audio/ogg';
+
+        // 1. Intentar obtener base64 directamente del webhook (si webhook_base64: true)
+        if (data.message.audioMessage.base64) {
+          console.log('✅ Using base64 directly from webhook');
+          audioBase64 = data.message.audioMessage.base64;
+        } 
+        // 2. Si no está en el webhook, usar el endpoint de Evolution API
+        else {
+          console.log('📥 Getting audio base64 from Evolution API endpoint');
+          
+          const audioBase64Resp = await fetch(
+            `${evolutionApiUrl}/chat/getBase64FromMediaMessage/${instanceName}`,
+            {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json', 
+                'apikey': evolutionApiKey! 
+              },
+              body: JSON.stringify({
+                message: {
+                  key: data.key,
+                  message: data.message
+                },
+                convertToMp4: false
+              })
+            }
+          );
+
+          console.log('🔍 Audio base64 response status:', audioBase64Resp.status);
+          
+          if (!audioBase64Resp.ok) {
+            const errorText = await audioBase64Resp.text();
+            console.error('❌ Failed to get audio base64:', errorText);
+            throw new Error('No se pudo obtener el audio en base64');
           }
-        );
 
-        console.log('🔍 Audio base64 response status:', audioBase64Resp.status);
-        
-        if (!audioBase64Resp.ok) {
-          const errorText = await audioBase64Resp.text();
-          console.error('❌ Failed to get audio base64:', errorText);
+          const audioResult = await audioBase64Resp.json();
+          console.log('📦 Audio result structure:', JSON.stringify(audioResult, null, 2));
           
-          // Si falla, enviar mensaje al usuario
-          await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey! },
-            body: JSON.stringify({ 
-              number: chatId, 
-              text: 'Lo siento, no pude procesar tu mensaje de voz. Por favor, intenta escribir tu mensaje.' 
-            }),
-          });
-          
-          throw new Error('No se pudo obtener el audio en base64');
+          if (!audioResult?.base64) {
+            console.error('❌ No base64 in result');
+            throw new Error('No se recibió el audio en formato base64');
+          }
+
+          audioBase64 = audioResult.base64;
         }
 
-        const audioResult = await audioBase64Resp.json();
-        console.log('📦 Audio result keys:', Object.keys(audioResult));
-        
-        if (!audioResult?.base64) {
-          console.error('❌ No base64 in result:', JSON.stringify(audioResult, null, 2));
-          throw new Error('No se recibió el audio en formato base64');
-        }
-
-        const audioBase64 = data.message.audioMessage.data;
-        const mimeType = data.message.audioMessage.mimetype || 'audio/ogg';
         console.log('✅ Audio base64 length:', audioBase64.length);
         
         // Transcribir el audio
