@@ -796,10 +796,31 @@ async function ejecutarHerramienta(
         console.log('🔄 Switching to vendor chat mode');
         
         // Usar vendor_id del contexto si está disponible
-        const vendorId = context.selected_vendor_id;
+        let vendorId = context.selected_vendor_id;
         
         if (!vendorId) {
           return 'Primero necesito que selecciones un negocio. Podés buscar productos o locales para elegir con quién querés hablar.';
+        }
+        
+        // Validar que sea un UUID válido
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(vendorId)) {
+          console.log(`⚠️ Invalid vendor_id format: "${vendorId}", attempting to find by name`);
+          
+          // Intentar buscar por nombre si no es UUID
+          const { data: foundVendor } = await supabase
+            .from('vendors')
+            .select('id, name')
+            .ilike('name', `%${vendorId}%`)
+            .maybeSingle();
+          
+          if (foundVendor) {
+            vendorId = foundVendor.id;
+            context.selected_vendor_id = foundVendor.id; // Actualizar contexto con UUID correcto
+            console.log(`✅ Found vendor by name: ${foundVendor.name} (${foundVendor.id})`);
+          } else {
+            return 'No pude encontrar el negocio seleccionado. Por favor buscá locales o productos de nuevo.';
+          }
         }
         
         // Obtener información del vendedor
