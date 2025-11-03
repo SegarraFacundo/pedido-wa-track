@@ -732,6 +732,26 @@ async function ejecutarHerramienta(
           return 'Error: No hay negocio seleccionado. Por favor elegí un negocio antes de hacer el pedido.';
         }
 
+        // 🚫 Verificar si el usuario ya tiene un pedido activo
+        const { data: activeOrder } = await supabase
+          .from('orders')
+          .select('id, status, vendor_id')
+          .eq('customer_phone', context.phone)
+          .in('status', ['pending', 'confirmed', 'preparing', 'ready', 'delivering'])
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (activeOrder) {
+          const { data: vendor } = await supabase
+            .from('vendors')
+            .select('name')
+            .eq('id', activeOrder.vendor_id)
+            .single();
+          
+          return `⚠️ Ya tenés un pedido en curso (#${activeOrder.id.substring(0, 8)}) con ${vendor?.name || 'un negocio'} en estado "${activeOrder.status}".\n\nPor favor esperá a que se complete o cancele ese pedido antes de hacer uno nuevo.`;
+        }
+
         // Validar que la dirección y método de pago estén presentes
         if (!args.direccion || args.direccion.trim() === '') {
           return 'Por favor indicá tu dirección de entrega.';
