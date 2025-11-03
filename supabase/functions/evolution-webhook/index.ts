@@ -182,7 +182,31 @@ serve(async (req) => {
       
       console.log(`✅ Location saved for ${normalizedPhone}: (${latitude}, ${longitude})`);
       
-      // Responder al usuario confirmando la ubicación
+      // Actualizar contexto del bot para marcar que hay decisión pendiente
+      const { data: sessionData } = await supabase
+        .from('user_sessions')
+        .select('last_bot_message')
+        .eq('phone', normalizedPhone)
+        .maybeSingle();
+      
+      if (sessionData?.last_bot_message) {
+        try {
+          const context = JSON.parse(sessionData.last_bot_message);
+          context.pending_location_decision = true;
+          context.delivery_address = locationAddress || locationName || 'Ubicación compartida';
+          
+          await supabase
+            .from('user_sessions')
+            .update({
+              last_bot_message: JSON.stringify(context)
+            })
+            .eq('phone', normalizedPhone);
+        } catch (e) {
+          console.error('Error updating context with location decision:', e);
+        }
+      }
+      
+      // Responder al usuario preguntando si quiere guardar o usar temporal
       const chatId = data.key?.remoteJid?.includes('@lid')
         ? data.key.remoteJid
         : `${normalizedPhone}@s.whatsapp.net`;
@@ -191,7 +215,16 @@ serve(async (req) => {
       const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
       const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
       
-      const confirmMessage = `📍 ¡Perfecto! Ubicación recibida${locationName ? ` en ${locationName}` : ''}.\n\nAhora podré mostrarte solo los negocios que hacen delivery a tu zona. ¿Qué te gustaría pedir? 🛵`;
+      const addressText = locationAddress || locationName || 'tu ubicación';
+      const confirmMessage = `📍 Recibí tu ubicación: *${addressText}*
+
+¿Querés usarla solo para este pedido o guardarla para la próxima?
+
+Escribí:
+• *TEMP* — usar solo para este pedido (se eliminará automáticamente ⏰)
+• *GUARDAR Casa* — guardarla con el nombre 'Casa' para usarla en el futuro 🏠
+
+_Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Oficina", etc._`;
       
       await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
         method: 'POST',

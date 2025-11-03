@@ -38,6 +38,7 @@ interface ConversationContext {
   pending_order_id?: string;
   user_latitude?: number;
   user_longitude?: number;
+  pending_location_decision?: boolean;  // Nueva: indica si hay ubicación pendiente de decisión
   conversation_history: Array<{role: "user" | "assistant" | "system"; content: string}>;
 }
 
@@ -68,6 +69,7 @@ async function getContext(phone: string, supabase: any): Promise<ConversationCon
         pending_order_id: saved.pending_order_id,
         user_latitude: userLatitude,
         user_longitude: userLongitude,
+        pending_location_decision: saved.pending_location_decision || false,
         conversation_history: saved.conversation_history || []
       };
     } catch (e) {
@@ -80,6 +82,7 @@ async function getContext(phone: string, supabase: any): Promise<ConversationCon
     cart: [],
     user_latitude: userLatitude,
     user_longitude: userLongitude,
+    pending_location_decision: false,
     conversation_history: []
   };
 }
@@ -98,6 +101,7 @@ async function saveContext(context: ConversationContext, supabase: any): Promise
     payment_method: context.payment_method,
     payment_receipt_url: context.payment_receipt_url,
     pending_order_id: context.pending_order_id,
+    pending_location_decision: context.pending_location_decision || false,
     conversation_history: context.conversation_history
   };
 
@@ -391,6 +395,99 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
         },
         required: []
       }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "guardar_direccion",
+      description: "Guarda la ubicación actual del usuario con un nombre específico para usarla en futuros pedidos.",
+      parameters: {
+        type: "object",
+        properties: {
+          nombre: {
+            type: "string",
+            description: "Nombre para identificar la dirección (ej: 'Casa', 'Trabajo', 'Oficina')"
+          }
+        },
+        required: ["nombre"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "usar_direccion_temporal",
+      description: "Marca la ubicación actual como temporal. Se usará solo para este pedido y se eliminará automáticamente al finalizar."
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "listar_direcciones",
+      description: "Muestra todas las direcciones guardadas por el cliente."
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "borrar_direccion",
+      description: "Elimina una dirección guardada específica.",
+      parameters: {
+        type: "object",
+        properties: {
+          nombre: {
+            type: "string",
+            description: "Nombre de la dirección a borrar (ej: 'Casa')"
+          }
+        },
+        required: ["nombre"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "renombrar_direccion",
+      description: "Cambia el nombre de una dirección guardada.",
+      parameters: {
+        type: "object",
+        properties: {
+          nombre_viejo: {
+            type: "string",
+            description: "Nombre actual de la dirección"
+          },
+          nombre_nuevo: {
+            type: "string",
+            description: "Nuevo nombre para la dirección"
+          }
+        },
+        required: ["nombre_viejo", "nombre_nuevo"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "usar_direccion_guardada",
+      description: "Carga una dirección guardada para usarla en el pedido actual.",
+      parameters: {
+        type: "object",
+        properties: {
+          nombre: {
+            type: "string",
+            description: "Nombre de la dirección guardada (ej: 'Casa')"
+          }
+        },
+        required: ["nombre"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "eliminar_todas_direcciones",
+      description: "Elimina todas las direcciones guardadas del cliente."
     }
   }
 ];
@@ -1019,6 +1116,23 @@ async function ejecutarHerramienta(
 
         context.pending_order_id = order.id;
         
+        // 🗑️ Eliminar direcciones temporales después de crear el pedido
+        try {
+          const { error: deleteError } = await supabase
+            .from('saved_addresses')
+            .delete()
+            .eq('phone', context.phone)
+            .eq('is_temporary', true);
+          
+          if (deleteError) {
+            console.error('Error deleting temporary addresses:', deleteError);
+          } else {
+            console.log('🧹 Temporary addresses cleaned up');
+          }
+        } catch (cleanupError) {
+          console.error('Error in cleanup process:', cleanupError);
+        }
+        
         let confirmacion = `✅ ¡Pedido creado exitosamente!\n\n`;
         confirmacion += `📦 Pedido #${order.id.substring(0, 8)}\n`;
         confirmacion += `🏪 Negocio: ${context.selected_vendor_name}\n`;
@@ -1337,11 +1451,222 @@ async function ejecutarHerramienta(
 • Ver el estado de mi pedido
 • Cancelar un pedido
 
+📍 *MIS DIRECCIONES*
+• Guardar direcciones para pedidos futuros
+• Ver mis direcciones guardadas
+• Usar una dirección guardada
+• Borrar o renombrar direcciones
+
 💬 *SOPORTE*
 • Hablar con un vendedor
 • Crear un ticket de soporte
 
 Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
+      }
+
+      case "guardar_direccion": {
+        if (!context.user_latitude || !context.user_longitude) {
+          return '⚠️ No tengo tu ubicación guardada. Por favor compartí tu ubicación usando el botón 📍 de WhatsApp primero.';
+        }
+
+        // Validar nombre
+        const nombre = args.nombre.trim();
+        if (!nombre || nombre.length < 2) {
+          return 'Por favor elegí un nombre más descriptivo para tu dirección (mínimo 2 caracteres).';
+        }
+
+        // Buscar si ya existe una dirección con ese nombre
+        const { data: existing } = await supabase
+          .from('saved_addresses')
+          .select('id')
+          .eq('phone', context.phone)
+          .eq('name', nombre)
+          .maybeSingle();
+
+        if (existing) {
+          return `Ya tenés una dirección guardada con el nombre "${nombre}". Podés borrarla primero o usar otro nombre.`;
+        }
+
+        // Guardar dirección
+        const { error } = await supabase
+          .from('saved_addresses')
+          .insert({
+            phone: context.phone,
+            name: nombre,
+            address: context.delivery_address || 'Ubicación guardada',
+            latitude: context.user_latitude,
+            longitude: context.user_longitude,
+            is_temporary: false
+          });
+
+        if (error) {
+          console.error('Error saving address:', error);
+          return 'Hubo un problema al guardar tu dirección. Intentá de nuevo.';
+        }
+
+        return `✅ Listo, guardé tu dirección como "${nombre}" 📍\n\nLa próxima vez podés decir *"Enviar a ${nombre}"* para usarla rápido. 😊`;
+      }
+
+      case "usar_direccion_temporal": {
+        if (!context.user_latitude || !context.user_longitude) {
+          return '⚠️ No tengo tu ubicación guardada. Por favor compartí tu ubicación usando el botón 📍 de WhatsApp primero.';
+        }
+
+        // Marcar como temporal
+        context.pending_location_decision = false;
+        
+        return `Perfecto 👍 Usaré esta ubicación solo para este pedido.\n\n⚠️ *Importante:* Esta dirección se eliminará automáticamente al finalizar el pedido.\n\n¿Qué te gustaría pedir? 😊`;
+      }
+
+      case "listar_direcciones": {
+        const { data: addresses, error } = await supabase
+          .from('saved_addresses')
+          .select('*')
+          .eq('phone', context.phone)
+          .eq('is_temporary', false)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching addresses:', error);
+          return 'Hubo un problema al obtener tus direcciones. Intentá de nuevo.';
+        }
+
+        if (!addresses || addresses.length === 0) {
+          return '📍 No tenés direcciones guardadas todavía.\n\nPodés compartir tu ubicación 📍 y guardarla con un nombre (ej: "Casa", "Trabajo") para usarla en futuros pedidos. 😊';
+        }
+
+        let resultado = `📍 *Tus direcciones guardadas:*\n\n`;
+        addresses.forEach((addr: any, i: number) => {
+          resultado += `${i + 1}. 🏠 *${addr.name}*\n`;
+          resultado += `   ${addr.address}\n`;
+          resultado += `   _Guardada el ${new Date(addr.created_at).toLocaleDateString('es-AR')}_\n\n`;
+        });
+        resultado += `💡 Podés decir *"Enviar a ${addresses[0].name}"* para usar una dirección o *"Borrar ${addresses[0].name}"* para eliminarla.`;
+
+        return resultado;
+      }
+
+      case "borrar_direccion": {
+        const nombre = args.nombre.trim();
+        
+        const { data: address } = await supabase
+          .from('saved_addresses')
+          .select('id')
+          .eq('phone', context.phone)
+          .eq('name', nombre)
+          .eq('is_temporary', false)
+          .maybeSingle();
+
+        if (!address) {
+          return `No encontré una dirección llamada "${nombre}".\n\nPodés ver tus direcciones diciendo "Mis direcciones". 📍`;
+        }
+
+        const { error } = await supabase
+          .from('saved_addresses')
+          .delete()
+          .eq('id', address.id);
+
+        if (error) {
+          console.error('Error deleting address:', error);
+          return 'Hubo un problema al borrar la dirección. Intentá de nuevo.';
+        }
+
+        return `✅ Listo, eliminé la dirección "${nombre}". 🗑️`;
+      }
+
+      case "renombrar_direccion": {
+        const nombreViejo = args.nombre_viejo.trim();
+        const nombreNuevo = args.nombre_nuevo.trim();
+
+        if (!nombreNuevo || nombreNuevo.length < 2) {
+          return 'Por favor elegí un nombre más descriptivo (mínimo 2 caracteres).';
+        }
+
+        // Buscar dirección a renombrar
+        const { data: address } = await supabase
+          .from('saved_addresses')
+          .select('id')
+          .eq('phone', context.phone)
+          .eq('name', nombreViejo)
+          .eq('is_temporary', false)
+          .maybeSingle();
+
+        if (!address) {
+          return `No encontré una dirección llamada "${nombreViejo}".\n\nPodés ver tus direcciones diciendo "Mis direcciones". 📍`;
+        }
+
+        // Verificar que el nuevo nombre no exista
+        const { data: existing } = await supabase
+          .from('saved_addresses')
+          .select('id')
+          .eq('phone', context.phone)
+          .eq('name', nombreNuevo)
+          .maybeSingle();
+
+        if (existing) {
+          return `Ya tenés una dirección con el nombre "${nombreNuevo}". Elegí otro nombre. 😊`;
+        }
+
+        // Renombrar
+        const { error } = await supabase
+          .from('saved_addresses')
+          .update({ name: nombreNuevo })
+          .eq('id', address.id);
+
+        if (error) {
+          console.error('Error renaming address:', error);
+          return 'Hubo un problema al renombrar la dirección. Intentá de nuevo.';
+        }
+
+        return `✅ Listo, renombré "${nombreViejo}" a "${nombreNuevo}". 📝`;
+      }
+
+      case "usar_direccion_guardada": {
+        const nombre = args.nombre.trim();
+        
+        const { data: address, error } = await supabase
+          .from('saved_addresses')
+          .select('*')
+          .eq('phone', context.phone)
+          .eq('name', nombre)
+          .eq('is_temporary', false)
+          .maybeSingle();
+
+        if (error || !address) {
+          return `No encontré una dirección llamada "${nombre}".\n\nPodés ver tus direcciones diciendo "Mis direcciones" 📍 o compartir una nueva ubicación.`;
+        }
+
+        // Actualizar contexto con la dirección guardada
+        context.user_latitude = parseFloat(address.latitude);
+        context.user_longitude = parseFloat(address.longitude);
+        context.delivery_address = address.address;
+
+        // Actualizar en user_sessions
+        await supabase
+          .from('user_sessions')
+          .upsert({
+            phone: context.phone,
+            user_latitude: context.user_latitude,
+            user_longitude: context.user_longitude,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'phone' });
+
+        return `📍 Perfecto, voy a usar tu dirección "${nombre}".\n\n${address.address}\n\n¿Qué te gustaría pedir? 😊`;
+      }
+
+      case "eliminar_todas_direcciones": {
+        const { error } = await supabase
+          .from('saved_addresses')
+          .delete()
+          .eq('phone', context.phone)
+          .eq('is_temporary', false);
+
+        if (error) {
+          console.error('Error deleting all addresses:', error);
+          return 'Hubo un problema al eliminar tus direcciones. Intentá de nuevo.';
+        }
+
+        return `✅ Listo, eliminé todas tus ubicaciones guardadas. 💬\n\nPodés compartir tu ubicación 📍 cuando quieras hacer un nuevo pedido.`;
       }
 
       default:
@@ -1456,6 +1781,25 @@ ${context.user_latitude && context.user_longitude
 }
 - Una vez que tengas ubicación, crear_pedido validará si el negocio hace delivery a su zona
 - Si está fuera de cobertura, el sistema le avisará automáticamente
+
+📍 GESTIÓN DE DIRECCIONES GUARDADAS (NUEVO):
+- Cuando el usuario comparta una ubicación 📍, preguntale SIEMPRE:
+  "Recibí tu ubicación 📍 [dirección si está disponible]
+   ¿Querés usarla solo para este pedido o guardarla para la próxima?
+   
+   Escribí:
+   • TEMP — usar solo para este pedido (se eliminará automáticamente)
+   • GUARDAR [nombre] — guardarla con un nombre (ej: Casa, Trabajo)"
+
+- El cliente puede decir cosas como:
+  • "Enviar a Casa" → usar_direccion_guardada
+  • "Mis direcciones" → listar_direcciones
+  • "Borrar Casa" → borrar_direccion
+  • "Renombrar Casa Oficina" → renombrar_direccion
+  • "Eliminar mis direcciones" → eliminar_todas_direcciones
+
+- Siempre confirmar acciones de forma natural y amigable
+- Recordar que las ubicaciones temporales se eliminan automáticamente
 
 CALIFICACIONES:
 - Cuando un cliente quiera calificar, preguntale por separado:

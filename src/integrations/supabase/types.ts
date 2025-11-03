@@ -560,6 +560,39 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_addresses: {
+        Row: {
+          address: string
+          created_at: string
+          id: string
+          is_temporary: boolean
+          latitude: number
+          longitude: number
+          name: string
+          phone: string
+        }
+        Insert: {
+          address: string
+          created_at?: string
+          id?: string
+          is_temporary?: boolean
+          latitude: number
+          longitude: number
+          name: string
+          phone: string
+        }
+        Update: {
+          address?: string
+          created_at?: string
+          id?: string
+          is_temporary?: boolean
+          latitude?: number
+          longitude?: number
+          name?: string
+          phone?: string
+        }
+        Relationships: []
+      }
       subscription_plans: {
         Row: {
           commission_after_limit: number
