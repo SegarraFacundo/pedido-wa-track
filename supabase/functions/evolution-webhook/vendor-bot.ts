@@ -146,7 +146,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "ver_locales_abiertos",
-      description: "Muestra todos los negocios que están actualmente abiertos según sus horarios de operación. Usa esto cuando el cliente quiera ver qué locales están disponibles ahora.",
+      description: "Muestra la lista completa de negocios/locales disponibles. USA ESTA HERRAMIENTA cuando el cliente diga: 'mostrame los negocios', 'qué negocios hay', 'ver locales', 'locales disponibles', 'que locales hacen delivery', etc. Filtra por ubicación automáticamente si el usuario tiene coordenadas guardadas.",
       parameters: {
         type: "object",
         properties: {
