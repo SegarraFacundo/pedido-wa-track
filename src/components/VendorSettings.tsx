@@ -19,6 +19,9 @@ interface VendorData {
   address: string;
   is_active: boolean;
   image: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  delivery_radius_km: number;
 }
 
 interface VendorSettingsProps {
@@ -238,6 +241,74 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
             onChange={(e) => setVendorData({ ...vendorData, address: e.target.value })}
             rows={2}
           />
+        </div>
+
+        <div className="border-t pt-4 mt-4">
+          <h3 className="text-lg font-semibold mb-4">📍 Ubicación y Radio de Cobertura</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Configurá tu ubicación y radio para que los clientes vean si estás en su zona de delivery.
+          </p>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="latitude">Latitud</Label>
+              <Input
+                id="latitude"
+                type="number"
+                step="0.000001"
+                value={vendorData.latitude || ''}
+                onChange={(e) => setVendorData({ ...vendorData, latitude: e.target.value ? parseFloat(e.target.value) : null })}
+                placeholder="-27.123456"
+              />
+              <p className="text-xs text-muted-foreground">
+                Ej: -27.451944
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="longitude">Longitud</Label>
+              <Input
+                id="longitude"
+                type="number"
+                step="0.000001"
+                value={vendorData.longitude || ''}
+                onChange={(e) => setVendorData({ ...vendorData, longitude: e.target.value ? parseFloat(e.target.value) : null })}
+                placeholder="-58.987654"
+              />
+              <p className="text-xs text-muted-foreground">
+                Ej: -58.983194
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="delivery_radius">Radio de Cobertura (km)</Label>
+              <Input
+                id="delivery_radius"
+                type="number"
+                step="0.5"
+                min="0.5"
+                max="50"
+                value={vendorData.delivery_radius_km}
+                onChange={(e) => setVendorData({ ...vendorData, delivery_radius_km: parseFloat(e.target.value) || 5.0 })}
+              />
+              <p className="text-xs text-muted-foreground">
+                Distancia máxima: {vendorData.delivery_radius_km} km
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3 p-3 bg-muted rounded-lg">
+            <p className="text-sm">
+              💡 <strong>Cómo obtener tus coordenadas:</strong>
+            </p>
+            <ol className="text-sm list-decimal list-inside mt-2 space-y-1 text-muted-foreground">
+              <li>Abrí Google Maps en tu navegador</li>
+              <li>Buscá la dirección de tu negocio</li>
+              <li>Hacé clic derecho en el marcador</li>
+              <li>Seleccioná las coordenadas que aparecen (formato: -27.123456, -58.987654)</li>
+              <li>Pegá el primer número en Latitud y el segundo en Longitud</li>
+            </ol>
+          </div>
         </div>
 
         <div className="space-y-2">

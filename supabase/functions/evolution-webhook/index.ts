@@ -159,6 +159,60 @@ serve(async (req) => {
 
     const imageUrl = data.message?.imageMessage?.url || null;
 
+    // 📍 Detectar si el usuario envió su ubicación
+    const locationMessage = data.message?.locationMessage;
+    if (locationMessage && !vendorData) {
+      console.log('📍 Location received:', locationMessage);
+      
+      const latitude = locationMessage.degreesLatitude;
+      const longitude = locationMessage.degreesLongitude;
+      const locationName = locationMessage.name || '';
+      const locationAddress = locationMessage.address || '';
+      
+      // Guardar ubicación en user_sessions
+      await supabase
+        .from('user_sessions')
+        .upsert({
+          phone: normalizedPhone,
+          user_latitude: latitude,
+          user_longitude: longitude,
+          location_updated_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'phone' });
+      
+      console.log(`✅ Location saved for ${normalizedPhone}: (${latitude}, ${longitude})`);
+      
+      // Responder al usuario confirmando la ubicación
+      const chatId = data.key?.remoteJid?.includes('@lid')
+        ? data.key.remoteJid
+        : `${normalizedPhone}@s.whatsapp.net`;
+      
+      const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL');
+      const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
+      const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
+      
+      const confirmMessage = `📍 ¡Perfecto! Ubicación recibida${locationName ? ` en ${locationName}` : ''}.\n\nAhora podré mostrarte solo los negocios que hacen delivery a tu zona. ¿Qué te gustaría pedir? 🛵`;
+      
+      await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': evolutionApiKey!,
+          "ngrok-skip-browser-warning": "true",
+          "User-Agent": "SupabaseFunction/1.0"
+        },
+        body: JSON.stringify({
+          number: chatId,
+          text: confirmMessage,
+        }),
+      });
+      
+      return new Response(JSON.stringify({ status: 'location_saved' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
+      });
+    }
+
     const vendorData = await getVendorData(normalizedPhone);
     const session = await getOrCreateSession(normalizedPhone);
 

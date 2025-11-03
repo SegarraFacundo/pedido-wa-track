@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { searchQuery } = await req.json();
+    const { searchQuery, vendorIds } = await req.json();
     
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -93,7 +93,7 @@ Responde solo con las palabras clave corregidas, sin explicación ni ejemplos.`
     for (const keyword of keywordArray) {
       // Buscar en nombre, descripción y categoría
       // Usar % en ambos lados para buscar la palabra en cualquier parte
-      const { data: products } = await supabase
+      let query = supabase
         .from('products')
         .select(`
           id,
@@ -117,6 +117,13 @@ Responde solo con las palabras clave corregidas, sin explicación ni ejemplos.`
         `)
         .eq('is_available', true)
         .or(`name.ilike.%${keyword}%,description.ilike.%${keyword}%,category.ilike.%${keyword}%`);
+      
+      // Si se proporcionan vendorIds, filtrar solo esos vendors
+      if (vendorIds && Array.isArray(vendorIds) && vendorIds.length > 0) {
+        query = query.in('vendor_id', vendorIds);
+      }
+      
+      const { data: products } = await query;
       
       if (products && products.length > 0) {
         allProducts = [...allProducts, ...products];
