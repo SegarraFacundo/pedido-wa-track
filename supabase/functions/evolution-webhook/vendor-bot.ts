@@ -645,12 +645,20 @@ async function ejecutarHerramienta(
           
           // Obtener detalles completos de vendors
           const vendorIds = filteredVendors.map((v: any) => v.vendor_id);
-          const { data: fullVendors } = await supabase
+          console.log('📝 Getting details for vendor IDs:', vendorIds);
+          
+          const { data: fullVendors, error: vendorError } = await supabase
             .from('vendors')
             .select('id, name, category, address, opening_time, closing_time, average_rating, total_reviews')
             .in('id', vendorIds);
           
+          console.log('📊 Full vendors retrieved:', fullVendors?.length || 0, 'vendors');
+          if (vendorError) {
+            console.error('Error getting vendor details:', vendorError);
+          }
+          
           const vendorMap = new Map(fullVendors?.map((v: any) => [v.id, v]) || []);
+          console.log('🗺️ Vendor map size:', vendorMap.size);
           
           // Formatear resultados - PRIMERO abiertos, DESPUÉS cerrados
           let resultado = `¡Aquí tenés ${filteredVendors.length} ${filteredVendors.length === 1 ? 'negocio' : 'negocios'} que hacen delivery a tu zona! 🚗\n\n`;
@@ -659,9 +667,18 @@ async function ejecutarHerramienta(
             resultado += `🟢 *ABIERTOS AHORA* (${openVendors.length}):\n\n`;
             openVendors.forEach((v: any, i: number) => {
               const vendor = vendorMap.get(v.vendor_id);
-              if (!vendor) return;
+              console.log(`Vendor ${i + 1}:`, v.vendor_id, vendor ? `found: ${vendor.name}` : 'NOT FOUND');
               
-              resultado += `${i + 1}. ${vendor.name} 🍕\n`;
+              if (!vendor) {
+                console.warn(`⚠️ Vendor not found in map: ${v.vendor_id} (${v.vendor_name})`);
+                // Mostrar aunque no tengamos todos los detalles
+                resultado += `${i + 1}. ${v.vendor_name}\n`;
+                resultado += `   📍 (${v.distance_km.toFixed(1)} km)\n`;
+                resultado += `   ID: ${v.vendor_id}\n\n`;
+                return;
+              }
+              
+              resultado += `${i + 1}. ${vendor.name}\n`;
               resultado += `   📍 ${vendor.address} (${v.distance_km.toFixed(1)} km)\n`;
               resultado += `   ID: ${vendor.id}\n`;
               if (vendor.opening_time && vendor.closing_time) {
@@ -678,7 +695,15 @@ async function ejecutarHerramienta(
             resultado += `🔴 *CERRADOS* (${closedVendors.length}):\n\n`;
             closedVendors.forEach((v: any, i: number) => {
               const vendor = vendorMap.get(v.vendor_id);
-              if (!vendor) return;
+              
+              if (!vendor) {
+                console.warn(`⚠️ Closed vendor not found in map: ${v.vendor_id} (${v.vendor_name})`);
+                // Mostrar aunque no tengamos todos los detalles
+                resultado += `${i + 1}. ${v.vendor_name}\n`;
+                resultado += `   📍 (${v.distance_km.toFixed(1)} km)\n`;
+                resultado += `   ID: ${v.vendor_id}\n\n`;
+                return;
+              }
               
               resultado += `${i + 1}. ${vendor.name}\n`;
               resultado += `   📍 ${vendor.address} (${v.distance_km.toFixed(1)} km)\n`;
