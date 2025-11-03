@@ -636,7 +636,41 @@ async function ejecutarHerramienta(
             console.log(`✅ Vendor set: ${vendor.name} (${vendorId})`);
           }
         }
+
+        // ⚠️ VALIDACIÓN CRÍTICA: Verificar que TODOS los productos existan en la BD
+        const productIds = items.map(item => item.product_id);
+        const { data: existingProducts, error: productError } = await supabase
+          .from('products')
+          .select('id, name, price, vendor_id')
+          .eq('vendor_id', vendorId)
+          .eq('is_available', true)
+          .in('id', productIds);
+
+        if (productError) {
+          console.error('Error validating products:', productError);
+          return 'Hubo un error al validar los productos. Intentá de nuevo.';
+        }
+
+        // Verificar que todos los productos existan
+        const invalidItems = items.filter(item => 
+          !existingProducts?.some(p => p.id === item.product_id)
+        );
+
+        if (invalidItems.length > 0) {
+          const invalidNames = invalidItems.map(i => i.product_name).join(', ');
+          return `❌ Los siguientes productos NO existen en el menú de ${context.selected_vendor_name}: ${invalidNames}.\n\nPor favor, primero mirá el menú con "ver menú de ${context.selected_vendor_name}" y elegí productos que realmente existen.`;
+        }
+
+        // Verificar precios correctos
+        for (const item of items) {
+          const dbProduct = existingProducts?.find(p => p.id === item.product_id);
+          if (dbProduct && Math.abs(Number(dbProduct.price) - item.price) > 0.01) {
+            console.warn(`Price mismatch for ${item.product_name}: expected ${dbProduct.price}, got ${item.price}`);
+            item.price = Number(dbProduct.price); // Corregir precio
+          }
+        }
         
+        // Agregar productos validados al carrito
         items.forEach(item => {
           const existing = context.cart.find(c => c.product_id === item.product_id);
           if (existing) {
@@ -1127,16 +1161,25 @@ REGLAS IMPORTANTES:
 1. Hablá en argentino informal pero respetuoso (vos, querés, podés, etc)
 2. Usá emojis para hacer la conversación más amigable
 3. Sé breve y directo - máximo 4 líneas por mensaje
-4. NUNCA inventes información sobre productos, precios o negocios
+4. ⚠️ NUNCA JAMÁS inventes productos, precios o información que no existe en la base de datos
 5. Si no sabés algo, decilo y preguntá
 6. Cuando el cliente busque algo, usá la herramienta buscar_productos
 7. Cuando el cliente quiera ver un menú completo, usá ver_menu_negocio UNA SOLA VEZ
-8. Cuando el cliente quiera agregar algo al carrito, usá agregar_al_carrito
-9. Cuando agregues productos al carrito, SIEMPRE usá el ID del vendor actual del contexto
-10. Si el cliente pregunta por el estado de un pedido, usá ver_estado_pedido
-11. Si el cliente pide ayuda o pregunta qué puede hacer, usá mostrar_menu_ayuda
-12. Cuando el cliente quiera calificar su experiencia, usá registrar_calificacion
-13. NUNCA muestres múltiples menús en una sola respuesta - solo UN menú a la vez
+8. SOLO podés agregar productos que aparecen en el menú que mostraste
+9. Si el cliente pregunta por el estado de un pedido, usá ver_estado_pedido
+10. Si el cliente pide ayuda o pregunta qué puede hacer, usá mostrar_menu_ayuda
+11. Cuando el cliente quiera calificar su experiencia, usá registrar_calificacion
+12. NUNCA muestres múltiples menús en una sola respuesta - solo UN menú a la vez
+
+⚠️ PRODUCTOS Y CARRITO (CRÍTICO):
+- NUNCA agregues productos inventados o que no existen en el menú
+- Si el cliente pide algo que NO está en el menú → Decile que NO lo tenés y mostrá alternativas del menú
+- Ejemplos de lo que NO hacer:
+  ❌ Cliente: "quiero cerveza" → NO agregues "cerveza artesanal" si no está en el menú
+  ❌ Cliente: "quiero whisky" → NO agregues "whisky" si no está en el menú
+  ✅ Cliente: "quiero cerveza" → "Lamentablemente no tenemos whisky/cerveza en este momento. ¿Te puedo mostrar lo que sí tenemos?"
+- SIEMPRE mostrá el menú antes de agregar productos al carrito
+- Los product_id que uses en agregar_al_carrito DEBEN ser los mismos que mostraste en ver_menu_negocio
 
 ⚠️ CREAR PEDIDO vs HABLAR CON VENDEDOR:
 - CREAR PEDIDO (crear_pedido): cuando el cliente confirma que TODO está correcto (carrito, dirección, pago)
@@ -1146,14 +1189,13 @@ REGLAS IMPORTANTES:
   
 ⚠️ IMPORTANTE: Si el carrito tiene productos, dirección y método de pago, y el cliente confirma → SIEMPRE usar crear_pedido
 
-FLUJO TÍPICO:
-1. Cliente busca algo (pizza, hamburguesa, etc) → buscar_productos
-2. Mostrás resultados y preguntás si quiere ver el menú de algún negocio
-3. Cliente elige negocio → ver_menu_negocio (SOLO UNO)
-4. Cliente elige productos → agregar_al_carrito (del MISMO negocio del menú)
-5. Preguntás dirección y forma de pago si no las tenés
-6. Confirmás los datos con el cliente y preguntás si todo está correcto
-7. Cliente confirma → crear_pedido (NO hablar_con_vendedor)
+FLUJO OBLIGATORIO:
+1. Cliente busca algo → buscar_productos
+2. Mostrás resultados → Cliente elige negocio
+3. ver_menu_negocio (OBLIGATORIO antes de agregar productos)
+4. Cliente elige productos DEL MENÚ → agregar_al_carrito (SOLO productos que mostraste)
+5. Preguntás dirección y método de pago
+6. Confirmás datos → crear_pedido
 
 CALIFICACIONES:
 - Cuando un cliente quiera calificar, preguntale por separado:
