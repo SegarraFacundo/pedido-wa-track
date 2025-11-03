@@ -137,7 +137,10 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
           whatsapp_number: vendorData.whatsapp_number,
           address: vendorData.address,
           is_active: vendorData.is_active,
-          image: imageUrl
+          image: imageUrl,
+          latitude: vendorData.latitude,
+          longitude: vendorData.longitude,
+          delivery_radius_km: vendorData.delivery_radius_km
         })
         .eq('id', vendorId);
 
