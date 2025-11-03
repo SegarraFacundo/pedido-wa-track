@@ -1774,6 +1774,7 @@ ${context.user_latitude && context.user_longitude
 - Si el usuario pregunta por delivery o zona: explicale que puede compartir su ubicación usando el botón 📍 de WhatsApp
 - Cuando el usuario busque locales o productos, automáticamente se filtrarán por su ubicación si la compartió
 - Si el usuario está buscando y no tiene ubicación, sugerile compartirla para ver solo lo que está a su alcance
+- ⚠️ CRÍTICO: Cuando muestres negocios, SIEMPRE incluí la distancia si la herramienta la proporciona. No la elimines ni la omitas al reformular el mensaje.
 
 REGLAS IMPORTANTES:
 1. Hablá en argentino informal pero respetuoso (vos, querés, podés, etc)
