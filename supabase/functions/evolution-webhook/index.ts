@@ -161,7 +161,7 @@ serve(async (req) => {
 
     // 📍 Detectar si el usuario envió su ubicación
     const locationMessage = data.message?.locationMessage;
-    if (locationMessage && !vendorData) {
+    if (locationMessage) {
       console.log('📍 Location received:', locationMessage);
       
       const latitude = locationMessage.degreesLatitude;
