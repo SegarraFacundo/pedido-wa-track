@@ -854,6 +854,7 @@ export type Database = {
           is_closed: boolean | null
           is_open_24_hours: boolean | null
           opening_time: string
+          slot_number: number | null
           updated_at: string | null
           vendor_id: string
         }
@@ -865,6 +866,7 @@ export type Database = {
           is_closed?: boolean | null
           is_open_24_hours?: boolean | null
           opening_time: string
+          slot_number?: number | null
           updated_at?: string | null
           vendor_id: string
         }
@@ -876,6 +878,7 @@ export type Database = {
           is_closed?: boolean | null
           is_open_24_hours?: boolean | null
           opening_time?: string
+          slot_number?: number | null
           updated_at?: string | null
           vendor_id?: string
         }
