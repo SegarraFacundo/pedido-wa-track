@@ -588,24 +588,52 @@ async function ejecutarHerramienta(
       case "agregar_al_carrito": {
         const items = args.items as CartItem[];
         
+        // CRITICAL: Resolver vendor_id si no es un UUID válido
+        let vendorId = args.vendor_id;
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        
+        if (!uuidRegex.test(vendorId)) {
+          console.log(`⚠️ Invalid vendor_id format: "${vendorId}", attempting to find by name`);
+          
+          // Limpiar el input
+          const cleanedName = vendorId
+            .replace(/-/g, ' ')
+            .replace(/_/g, ' ')
+            .trim();
+          
+          const { data: vendor } = await supabase
+            .from('vendors')
+            .select('id, name')
+            .ilike('name', `%${cleanedName}%`)
+            .maybeSingle();
+          
+          if (vendor) {
+            vendorId = vendor.id;
+            console.log(`✅ Found vendor by name: ${vendor.name} (${vendorId})`);
+          } else {
+            return `No encontré el negocio "${args.vendor_id}". Por favor usá el ID correcto del menú.`;
+          }
+        }
+        
         // Si hay items en el carrito pero son de otro negocio, vaciar el carrito
-        if (context.cart.length > 0 && context.selected_vendor_id && args.vendor_id !== context.selected_vendor_id) {
+        if (context.cart.length > 0 && context.selected_vendor_id && vendorId !== context.selected_vendor_id) {
           context.cart = [];
           console.log('🗑️ Carrito vaciado porque cambiaste de negocio');
         }
         
-        // CRITICAL: Actualizar el vendor seleccionado cuando se agrega al carrito
-        if (args.vendor_id) {
-          context.selected_vendor_id = args.vendor_id;
-          
-          // Obtener nombre del vendor si no lo tenemos
-          if (!context.selected_vendor_name || context.selected_vendor_id !== args.vendor_id) {
-            const { data: vendor } = await supabase
-              .from('vendors')
-              .select('name')
-              .eq('id', args.vendor_id)
-              .single();
-            if (vendor) context.selected_vendor_name = vendor.name;
+        // Actualizar el vendor seleccionado con el UUID correcto
+        context.selected_vendor_id = vendorId;
+        
+        // Obtener nombre del vendor
+        if (!context.selected_vendor_name || context.selected_vendor_id !== vendorId) {
+          const { data: vendor } = await supabase
+            .from('vendors')
+            .select('name')
+            .eq('id', vendorId)
+            .single();
+          if (vendor) {
+            context.selected_vendor_name = vendor.name;
+            console.log(`✅ Vendor set: ${vendor.name} (${vendorId})`);
           }
         }
         
@@ -1102,19 +1130,21 @@ REGLAS IMPORTANTES:
 4. NUNCA inventes información sobre productos, precios o negocios
 5. Si no sabés algo, decilo y preguntá
 6. Cuando el cliente busque algo, usá la herramienta buscar_productos
-7. Cuando el cliente quiera ver un menú completo, usá ver_menu_negocio
+7. Cuando el cliente quiera ver un menú completo, usá ver_menu_negocio UNA SOLA VEZ
 8. Cuando el cliente quiera agregar algo al carrito, usá agregar_al_carrito
 9. Solo creá el pedido cuando el cliente CONFIRME explícitamente que quiere finalizar
 10. Si el cliente pregunta por el estado de un pedido, usá ver_estado_pedido
 11. Si el cliente pide ayuda o pregunta qué puede hacer, usá mostrar_menu_ayuda
 12. Para "hablar con un vendedor", usá el negocio que el cliente tiene en el contexto actual
 13. Cuando el cliente quiera calificar su experiencia, usá registrar_calificacion
+14. NUNCA muestres múltiples menús en una sola respuesta - solo UN menú a la vez
+15. Cuando agregues productos al carrito, SIEMPRE usá el ID del vendor actual del contexto
 
 FLUJO TÍPICO:
 1. Cliente busca algo (pizza, hamburguesa, etc) → buscar_productos
 2. Mostrás resultados y preguntás si quiere ver el menú de algún negocio
-3. Cliente elige negocio → ver_menu_negocio
-4. Cliente elige productos → agregar_al_carrito
+3. Cliente elige negocio → ver_menu_negocio (SOLO UNO)
+4. Cliente elige productos → agregar_al_carrito (del MISMO negocio del menú)
 5. Cuando el cliente quiera finalizar, preguntás dirección y forma de pago
 6. Con toda la info confirmada → crear_pedido
 
