@@ -47,6 +47,10 @@ export default function VendorManagement() {
     password: "",
   });
 
+  const [assignMode, setAssignMode] = useState<'create' | 'existing'>('create');
+  const [existingUsers, setExistingUsers] = useState<any[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
+
   const [formData, setFormData] = useState({
     name: "",
     category: "",
@@ -59,6 +63,24 @@ export default function VendorManagement() {
   useEffect(() => {
     fetchVendors();
   }, []);
+
+  const fetchExistingUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, email, full_name')
+        .order('email', { ascending: true });
+
+      if (error) throw error;
+      setExistingUsers(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   const fetchVendors = async () => {
     try {
@@ -189,6 +211,50 @@ export default function VendorManagement() {
       setLinkUserDialogOpen(false);
       setLinkUserData({ email: "", password: "" });
       setSelectedVendor(null);
+      setAssignMode('create');
+      setSelectedUserId('');
+      fetchVendors();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const assignExistingUser = async () => {
+    if (!selectedVendor || !selectedUserId) return;
+
+    try {
+      // Update vendor with user_id
+      const { error: vendorError } = await supabase
+        .from('vendors')
+        .update({ user_id: selectedUserId })
+        .eq('id', selectedVendor.id);
+
+      if (vendorError) throw vendorError;
+
+      // Assign vendor role
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .insert({
+          user_id: selectedUserId,
+          role: 'vendor',
+        });
+
+      // Ignore error if role already exists (code 23505 = duplicate key)
+      if (roleError && roleError.code !== '23505') throw roleError;
+
+      toast({
+        title: "Usuario asignado",
+        description: `Usuario vinculado exitosamente al negocio ${selectedVendor.name}`,
+      });
+
+      setLinkUserDialogOpen(false);
+      setSelectedUserId('');
+      setSelectedVendor(null);
+      setAssignMode('create');
       fetchVendors();
     } catch (error: any) {
       toast({
@@ -335,8 +401,9 @@ export default function VendorManagement() {
                     onClick={() => {
                       setSelectedVendor(vendor);
                       setLinkUserDialogOpen(true);
+                      fetchExistingUsers();
                     }}
-                    title="Crear usuario"
+                    title="Asignar usuario"
                   >
                     <UserPlus className="h-4 w-4" />
                   </Button>
@@ -359,24 +426,60 @@ export default function VendorManagement() {
       <Dialog open={linkUserDialogOpen} onOpenChange={setLinkUserDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Crear Usuario para {selectedVendor?.name}</DialogTitle>
+            <DialogTitle>Asignar Usuario para {selectedVendor?.name}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <Input
-              type="email"
-              placeholder="Email"
-              value={linkUserData.email}
-              onChange={(e) => setLinkUserData({ ...linkUserData, email: e.target.value })}
-            />
-            <Input
-              type="password"
-              placeholder="Contraseña"
-              value={linkUserData.password}
-              onChange={(e) => setLinkUserData({ ...linkUserData, password: e.target.value })}
-            />
-            <Button onClick={createUserForVendor} className="w-full">
-              Crear Usuario
-            </Button>
+            <Select value={assignMode} onValueChange={(value: 'create' | 'existing') => setAssignMode(value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccionar tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="create">Crear nuevo usuario</SelectItem>
+                <SelectItem value="existing">Asignar usuario existente</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {assignMode === 'create' ? (
+              <>
+                <Input
+                  type="email"
+                  placeholder="Email"
+                  value={linkUserData.email}
+                  onChange={(e) => setLinkUserData({ ...linkUserData, email: e.target.value })}
+                />
+                <Input
+                  type="password"
+                  placeholder="Contraseña"
+                  value={linkUserData.password}
+                  onChange={(e) => setLinkUserData({ ...linkUserData, password: e.target.value })}
+                />
+                <Button onClick={createUserForVendor} className="w-full">
+                  Crear Usuario
+                </Button>
+              </>
+            ) : (
+              <>
+                <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar usuario" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {existingUsers.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.email} {user.full_name ? `(${user.full_name})` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button 
+                  onClick={assignExistingUser} 
+                  className="w-full"
+                  disabled={!selectedUserId}
+                >
+                  Asignar Usuario
+                </Button>
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>
