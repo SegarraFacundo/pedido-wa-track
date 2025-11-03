@@ -691,27 +691,36 @@ export type Database = {
           created_at: string | null
           in_vendor_chat: boolean | null
           last_bot_message: string | null
+          location_updated_at: string | null
           phone: string
           previous_state: string | null
           updated_at: string | null
+          user_latitude: number | null
+          user_longitude: number | null
         }
         Insert: {
           assigned_vendor_phone?: string | null
           created_at?: string | null
           in_vendor_chat?: boolean | null
           last_bot_message?: string | null
+          location_updated_at?: string | null
           phone: string
           previous_state?: string | null
           updated_at?: string | null
+          user_latitude?: number | null
+          user_longitude?: number | null
         }
         Update: {
           assigned_vendor_phone?: string | null
           created_at?: string | null
           in_vendor_chat?: boolean | null
           last_bot_message?: string | null
+          location_updated_at?: string | null
           phone?: string
           previous_state?: string | null
           updated_at?: string | null
+          user_latitude?: number | null
+          user_longitude?: number | null
         }
         Relationships: []
       }
@@ -1126,11 +1135,14 @@ export type Database = {
           closing_time: string | null
           created_at: string | null
           days_open: string[] | null
+          delivery_radius_km: number | null
           id: string
           image: string | null
           is_active: boolean | null
           joined_at: string | null
           last_payment_date: string | null
+          latitude: number | null
+          longitude: number | null
           name: string
           next_payment_due: string | null
           opening_time: string | null
@@ -1152,11 +1164,14 @@ export type Database = {
           closing_time?: string | null
           created_at?: string | null
           days_open?: string[] | null
+          delivery_radius_km?: number | null
           id?: string
           image?: string | null
           is_active?: boolean | null
           joined_at?: string | null
           last_payment_date?: string | null
+          latitude?: number | null
+          longitude?: number | null
           name: string
           next_payment_due?: string | null
           opening_time?: string | null
@@ -1178,11 +1193,14 @@ export type Database = {
           closing_time?: string | null
           created_at?: string | null
           days_open?: string[] | null
+          delivery_radius_km?: number | null
           id?: string
           image?: string | null
           is_active?: boolean | null
           joined_at?: string | null
           last_payment_date?: string | null
+          latitude?: number | null
+          longitude?: number | null
           name?: string
           next_payment_due?: string | null
           opening_time?: string | null
@@ -1459,6 +1477,10 @@ export type Database = {
       }
     }
     Functions: {
+      calculate_distance: {
+        Args: { lat1: number; lat2: number; lon1: number; lon2: number }
+        Returns: number
+      }
       change_order_status: {
         Args: {
           p_changed_by: string
@@ -1496,6 +1518,16 @@ export type Database = {
       get_simplified_address: {
         Args: { full_address: string }
         Returns: string
+      }
+      get_vendors_in_range: {
+        Args: { user_lat: number; user_lon: number }
+        Returns: {
+          delivery_radius_km: number
+          distance_km: number
+          is_open: boolean
+          vendor_id: string
+          vendor_name: string
+        }[]
       }
       has_role: {
         Args: {
