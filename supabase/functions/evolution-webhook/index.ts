@@ -137,8 +137,20 @@ serve(async (req) => {
       });
     }
 
-    const normalizedPhone = normalizeArgentinePhone(rawJid);
-    console.log('📞 Normalized:', { rawJid, normalizedPhone });
+    // Si es un LID (Lidded ID), usar remoteJidAlt en su lugar
+    let phoneToUse = rawJid;
+    if (rawJid.includes('@lid')) {
+      console.log('🔍 Detected LID format, checking for remoteJidAlt...');
+      if (data.key?.remoteJidAlt) {
+        phoneToUse = data.key.remoteJidAlt;
+        console.log('✅ Using remoteJidAlt:', phoneToUse);
+      } else {
+        console.warn('⚠️ LID detected but no remoteJidAlt available');
+      }
+    }
+
+    const normalizedPhone = normalizeArgentinePhone(phoneToUse);
+    console.log('📞 Normalized:', { rawJid, phoneToUse, normalizedPhone });
 
     const messageText = data.message?.conversation ||
       data.message?.extendedTextMessage?.text ||
