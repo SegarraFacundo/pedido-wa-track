@@ -1792,16 +1792,22 @@ ${context.user_latitude && context.user_longitude
 - Si el usuario está buscando y no tiene ubicación, sugerile compartirla para ver solo lo que está a su alcance
 - ⚠️ CRÍTICO: Cuando muestres negocios, SIEMPRE incluí la distancia si la herramienta la proporciona. No la elimines ni la omitas al reformular el mensaje.
 
-REGLAS CRÍTICAS SOBRE HERRAMIENTAS:
-⚠️ **ABSOLUTAMENTE PROHIBIDO REFORMULAR RESULTADOS DE HERRAMIENTAS**
-- Cuando uses ver_locales_abiertos, ver_menu_negocio, buscar_productos, etc.
-- **Copiá y pegá el resultado EXACTAMENTE** como lo devuelve la herramienta
-- **NO cambies**: direcciones, distancias, precios, IDs, nombres, horarios
-- **NO agregues**: información del contexto del usuario
-- **NO reemplaces**: datos del vendor con datos del cliente
-- Si la herramienta dice "Av. España 1234", enviá "Av. España 1234"
-- Si dice "A 2.5 km", enviá "A 2.5 km"
-- **Única excepción**: Podés agregar una frase corta antes o después del resultado, pero NUNCA dentro
+REGLAS CRÍTICAS SOBRE HERRAMIENTAS (MÁXIMA PRIORIDAD):
+🚨 **PROHIBIDO MODIFICAR RESULTADOS DE HERRAMIENTAS** 🚨
+Cuando una herramienta devuelve un resultado:
+- **COPIÁ TODO EL TEXTO TAL CUAL ESTÁ**
+- **NO CAMBIES NINGÚN DATO**: ni direcciones, ni distancias, ni precios, ni nombres
+- **NO AGREGUES información** del contexto del usuario
+- **NO RESUMAS** el resultado
+- **NO REFORMULES** el formato
+
+Ejemplo CORRECTO:
+Herramienta devuelve: "1. Pizzería Don Luigi\n   📍 Av. España 1234 - A 0.5 km"
+TU respuesta: "1. Pizzería Don Luigi\n   📍 Av. España 1234 - A 0.5 km"
+
+Ejemplo INCORRECTO:
+Herramienta devuelve: "1. Pizzería Don Luigi\n   📍 Av. España 1234 - A 0.5 km"
+TU respuesta: "1. Pizzería Don Luigi\n   📍 LAVALLE 1582"  ❌ NUNCA HAGAS ESTO
 
 REGLAS GENERALES:
 1. Hablá en argentino informal pero respetuoso (vos, querés, podés, etc)
@@ -1907,10 +1913,11 @@ IMPORTANTE: Siempre confirmá antes de crear un pedido. Preguntá dirección y m
       console.log(`🔁 Iteration ${iterationCount}...`);
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-5-mini-2025-08-07",
+        model: "gpt-4o-mini",
         messages: messages,
         tools: tools,
-        max_completion_tokens: 500
+        temperature: 0.3,
+        max_tokens: 800
       });
 
       const assistantMessage = completion.choices[0].message;
