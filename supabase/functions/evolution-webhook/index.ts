@@ -205,8 +205,9 @@ serve(async (req) => {
 
           if (uploadError) {
             console.error('Error uploading receipt:', uploadError);
-            const chatId = data.key?.remoteJid?.includes('@lid') || data.key?.remoteJid?.includes(':')
-              ? data.key.remoteJid.replace(/(:\d+)?@lid$/, '@s.whatsapp.net')
+            // Para LID, usar el remoteJid original; sino usar el número normalizado
+            const chatId = data.key?.remoteJid?.includes('@lid')
+              ? data.key.remoteJid
               : `${normalizedPhone}@s.whatsapp.net`;
 
             const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL');
@@ -240,8 +241,9 @@ serve(async (req) => {
           const responseMessage = await processWithVendorBot(normalizedPhone, messageText || 'comprobante_recibido', publicUrl);
 
           if (responseMessage) {
-            const chatId = data.key?.remoteJid?.includes('@lid') || data.key?.remoteJid?.includes(':')
-              ? data.key.remoteJid.replace(/(:\d+)?@lid$/, '@s.whatsapp.net')
+            // Para LID, usar el remoteJid original; sino usar el número normalizado
+            const chatId = data.key?.remoteJid?.includes('@lid')
+              ? data.key.remoteJid
               : `${normalizedPhone}@s.whatsapp.net`;
 
             const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL');
@@ -275,8 +277,9 @@ serve(async (req) => {
       console.log('🎤 Audio message received (Baileys), attempting transcription');
       console.log('Audio message structure:', JSON.stringify(data.message.audioMessage, null, 2));
 
-      const chatId = data.key?.remoteJid?.includes('@lid') || data.key?.remoteJid?.includes(':')
-        ? data.key.remoteJid.replace(/(:\d+)?@lid$/, '@s.whatsapp.net')
+      // Para LID, usar el remoteJid original; sino usar el número normalizado
+      const chatId = data.key?.remoteJid?.includes('@lid')
+        ? data.key.remoteJid
         : `${normalizedPhone}@s.whatsapp.net`;
 
       const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL');
@@ -402,8 +405,9 @@ serve(async (req) => {
     // --- Otros mensajes multimedia sin texto ---
     if (!messageText && (data.message?.imageMessage || data.message?.videoMessage)) {
       const defaultResponse = 'Recibí tu mensaje multimedia. Por favor envía un mensaje de texto para continuar.';
-      const chatId = data.key?.remoteJid?.includes('@lid') || data.key?.remoteJid?.includes(':')
-        ? data.key.remoteJid.replace(/(:\d+)?@lid$/, '@s.whatsapp.net')
+      // Para LID, usar el remoteJid original; sino usar el número normalizado
+      const chatId = data.key?.remoteJid?.includes('@lid')
+        ? data.key.remoteJid
         : `${normalizedPhone}@s.whatsapp.net`;
 
       const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL');
@@ -445,11 +449,10 @@ serve(async (req) => {
       const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
       const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
 
-      // ✅ Fix universal: compatibilidad con JIDs @lid o multi-device
-      const chatId =
-        data.key?.remoteJid?.includes('@lid') || data.key?.remoteJid?.includes(':')
-          ? data.key.remoteJid.replace(/(:\d+)?@lid$/, '@s.whatsapp.net')
-          : `${normalizedPhone}@s.whatsapp.net`;
+      // Para LID, usar el remoteJid original; sino usar el número normalizado
+      const chatId = data.key?.remoteJid?.includes('@lid')
+        ? data.key.remoteJid
+        : `${normalizedPhone}@s.whatsapp.net`;
 
       console.log('📤 Sending to Evolution API:', { normalizedPhone, chatId, messagePreview: responseMessage.slice(0, 100) });
 
