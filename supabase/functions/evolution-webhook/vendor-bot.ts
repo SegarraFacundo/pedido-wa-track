@@ -1776,14 +1776,24 @@ ${context.user_latitude && context.user_longitude
 - Si el usuario está buscando y no tiene ubicación, sugerile compartirla para ver solo lo que está a su alcance
 - ⚠️ CRÍTICO: Cuando muestres negocios, SIEMPRE incluí la distancia si la herramienta la proporciona. No la elimines ni la omitas al reformular el mensaje.
 
-REGLAS IMPORTANTES:
+REGLAS CRÍTICAS SOBRE HERRAMIENTAS:
+⚠️ **ABSOLUTAMENTE PROHIBIDO REFORMULAR RESULTADOS DE HERRAMIENTAS**
+- Cuando uses ver_locales_abiertos, ver_menu_negocio, buscar_productos, etc.
+- **Copiá y pegá el resultado EXACTAMENTE** como lo devuelve la herramienta
+- **NO cambies**: direcciones, distancias, precios, IDs, nombres, horarios
+- **NO agregues**: información del contexto del usuario
+- **NO reemplaces**: datos del vendor con datos del cliente
+- Si la herramienta dice "Av. España 1234", enviá "Av. España 1234"
+- Si dice "A 2.5 km", enviá "A 2.5 km"
+- **Única excepción**: Podés agregar una frase corta antes o después del resultado, pero NUNCA dentro
+
+REGLAS GENERALES:
 1. Hablá en argentino informal pero respetuoso (vos, querés, podés, etc)
 2. Usá emojis para hacer la conversación más amigable
 3. Sé breve y directo - máximo 4 líneas por mensaje
-4. ⚠️ NUNCA JAMÁS inventes productos, precios o información que no existe en la base de datos
-5. ⚠️ CRÍTICO: Cuando uses herramientas (ver_locales_abiertos, ver_menu_negocio, etc), **NUNCA reformules su resultado**. Enviá el texto EXACTAMENTE como lo devuelve la herramienta, sin modificar direcciones, precios, distancias ni ningún otro dato.
-6. Si no sabés algo, decilo y preguntá
-7. Cuando el cliente busque algo, usá la herramienta buscar_productos
+4. ⚠️ NUNCA inventes productos, precios o información que no existe en la base de datos
+5. Si no sabés algo, decilo y preguntá
+6. Cuando el cliente busque algo, usá la herramienta buscar_productos
 8. ⚠️ CRÍTICO - VER MENÚ: Si el cliente dice "ver menú", "mostrar menú" o similar SIN especificar un negocio:
    - Si NO hay negocio en el contexto → Preguntale "¿De cuál negocio querés ver el menú?"
    - Si YA hay negocio en el contexto → Podés usar ver_menu_negocio con ese negocio
@@ -1881,11 +1891,10 @@ IMPORTANTE: Siempre confirmá antes de crear un pedido. Preguntá dirección y m
       console.log(`🔁 Iteration ${iterationCount}...`);
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-5-mini-2025-08-07",
         messages: messages,
         tools: tools,
-        temperature: 0.7,
-        max_tokens: 500
+        max_completion_tokens: 500
       });
 
       const assistantMessage = completion.choices[0].message;
