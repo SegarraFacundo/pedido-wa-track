@@ -340,6 +340,39 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       name: "mostrar_menu_ayuda",
       description: "Muestra un menú con todas las opciones y funcionalidades disponibles para el cliente. Usa esto cuando el cliente pida ayuda o quiera saber qué puede hacer."
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "registrar_calificacion",
+      description: "Registra la calificación y opinión del cliente sobre su pedido. Permite calificar delivery, atención y producto por separado del 1 al 5, además de agregar comentarios opcionales.",
+      parameters: {
+        type: "object",
+        properties: {
+          delivery_rating: {
+            type: "number",
+            description: "Calificación del tiempo de entrega (1-5 estrellas). Opcional."
+          },
+          service_rating: {
+            type: "number",
+            description: "Calificación de la atención del vendedor (1-5 estrellas). Opcional."
+          },
+          product_rating: {
+            type: "number",
+            description: "Calificación de la calidad del producto (1-5 estrellas). Opcional."
+          },
+          comment: {
+            type: "string",
+            description: "Comentario o observación adicional del cliente. Opcional."
+          },
+          customer_name: {
+            type: "string",
+            description: "Nombre del cliente (opcional, si no se proporciona se usa el teléfono)"
+          }
+        },
+        required: []
+      }
+    }
   }
 ];
 
@@ -858,6 +891,67 @@ async function ejecutarHerramienta(
         return mensaje;
       }
 
+      case "registrar_calificacion": {
+        // Validar que tengamos al menos una calificación o comentario
+        if (!args.delivery_rating && !args.service_rating && !args.product_rating && !args.comment) {
+          return 'Por favor proporciona al menos una calificación (delivery, atención o producto) o un comentario.';
+        }
+
+        // Buscar el pedido más reciente del cliente
+        const { data: recentOrder } = await supabase
+          .from('orders')
+          .select('id, vendor_id')
+          .eq('customer_phone', context.phone)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!recentOrder) {
+          return 'No encontré ningún pedido reciente para calificar. Intenta de nuevo después de realizar un pedido.';
+        }
+
+        // Calcular rating general (promedio de los ratings proporcionados)
+        const ratings = [
+          args.delivery_rating,
+          args.service_rating,
+          args.product_rating
+        ].filter(r => r !== null && r !== undefined);
+        
+        const averageRating = ratings.length > 0
+          ? Math.round(ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length)
+          : null;
+
+        // Insertar review
+        const { error } = await supabase
+          .from('vendor_reviews')
+          .insert({
+            vendor_id: recentOrder.vendor_id,
+            order_id: recentOrder.id,
+            customer_phone: context.phone,
+            customer_name: args.customer_name || context.phone,
+            rating: averageRating,
+            delivery_rating: args.delivery_rating,
+            service_rating: args.service_rating,
+            product_rating: args.product_rating,
+            comment: args.comment
+          });
+
+        if (error) {
+          console.error('Error saving review:', error);
+          return 'Hubo un error al guardar tu calificación. Por favor intenta de nuevo.';
+        }
+
+        let respuesta = '⭐ *¡Gracias por tu calificación!*\n\n';
+        respuesta += '📊 *Tu calificación:*\n';
+        if (args.delivery_rating) respuesta += `🚚 Tiempo de entrega: ${args.delivery_rating}/5\n`;
+        if (args.service_rating) respuesta += `👥 Atención: ${args.service_rating}/5\n`;
+        if (args.product_rating) respuesta += `📦 Producto: ${args.product_rating}/5\n`;
+        if (args.comment) respuesta += `\n💬 Comentario: "${args.comment}"\n`;
+        respuesta += '\nTu opinión nos ayuda a mejorar. ¡Gracias por confiar en nosotros! 😊';
+
+        return respuesta;
+      }
+
       case "crear_ticket_soporte": {
         const prioridad = args.prioridad || 'normal';
         
@@ -984,6 +1078,7 @@ REGLAS IMPORTANTES:
 10. Si el cliente pregunta por el estado de un pedido, usá ver_estado_pedido
 11. Si el cliente pide ayuda o pregunta qué puede hacer, usá mostrar_menu_ayuda
 12. Para "hablar con un vendedor", usá el negocio que el cliente tiene en el contexto actual
+13. Cuando el cliente quiera calificar su experiencia, usá registrar_calificacion
 
 FLUJO TÍPICO:
 1. Cliente busca algo (pizza, hamburguesa, etc) → buscar_productos
@@ -992,6 +1087,15 @@ FLUJO TÍPICO:
 4. Cliente elige productos → agregar_al_carrito
 5. Cuando el cliente quiera finalizar, preguntás dirección y forma de pago
 6. Con toda la info confirmada → crear_pedido
+
+CALIFICACIONES:
+- Cuando un cliente quiera calificar, preguntale por separado:
+  🚚 Tiempo de entrega (1-5)
+  👥 Atención del vendedor (1-5)
+  📦 Calidad del producto (1-5)
+  💬 Comentario opcional
+- Puede dar una o todas las calificaciones
+- Siempre agradecé su opinión
 
 IMPORTANTE: Siempre confirmá antes de crear un pedido. Preguntá dirección y método de pago solo cuando el cliente esté listo para finalizar.`;
 

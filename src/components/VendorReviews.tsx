@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Star, MessageSquare, User } from 'lucide-react';
+import { Star, MessageSquare, User, Truck, Users, Package } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -11,9 +11,13 @@ interface VendorReview {
   id: string;
   customer_name?: string;
   customer_phone: string;
-  rating: number;
+  rating?: number | null;
+  delivery_rating?: number | null;
+  service_rating?: number | null;
+  product_rating?: number | null;
   comment?: string;
   created_at: Date;
+  order_id?: string | null;
 }
 
 interface VendorReviewsProps {
@@ -35,7 +39,7 @@ export function VendorReviews({ vendorId }: VendorReviewsProps) {
   const fetchReviews = async () => {
     try {
       const { data, error } = await supabase
-        .from('vendor_reviews_public')
+        .from('vendor_reviews')
         .select('*')
         .eq('vendor_id', vendorId)
         .order('created_at', { ascending: false })
@@ -76,13 +80,16 @@ export function VendorReviews({ vendorId }: VendorReviewsProps) {
     }
   };
 
-  const renderStars = (rating: number) => {
+  const renderStars = (rating: number | null | undefined, size: 'sm' | 'md' = 'md') => {
+    if (!rating) return null;
+    const sizeClass = size === 'sm' ? 'h-3 w-3' : 'h-4 w-4';
+    
     return (
       <div className="flex gap-0.5">
         {[1, 2, 3, 4, 5].map((star) => (
           <Star
             key={star}
-            className={`h-4 w-4 ${
+            className={`${sizeClass} ${
               star <= rating
                 ? 'fill-yellow-400 text-yellow-400'
                 : 'fill-muted text-muted'
@@ -96,7 +103,13 @@ export function VendorReviews({ vendorId }: VendorReviewsProps) {
   const getRatingDistribution = () => {
     const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
     reviews.forEach(review => {
-      distribution[review.rating as keyof typeof distribution]++;
+      const rating = review.rating || 
+        (review.delivery_rating && review.service_rating && review.product_rating 
+          ? Math.round((review.delivery_rating + review.service_rating + review.product_rating) / 3)
+          : null);
+      if (rating) {
+        distribution[rating as keyof typeof distribution]++;
+      }
     });
     return distribution;
   };
@@ -163,37 +176,85 @@ export function VendorReviews({ vendorId }: VendorReviewsProps) {
 
       {/* Lista de reseñas */}
       <div className="space-y-4">
-        {reviews.map((review) => (
-          <Card key={review.id}>
-            <CardContent className="pt-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="bg-muted rounded-full p-2">
-                    <User className="h-5 w-5" />
+        {reviews.map((review) => {
+          const hasDetailedRatings = review.delivery_rating || review.service_rating || review.product_rating;
+          const displayRating = review.rating || 
+            (review.delivery_rating && review.service_rating && review.product_rating 
+              ? Math.round((review.delivery_rating + review.service_rating + review.product_rating) / 3)
+              : null);
+
+          return (
+            <Card key={review.id}>
+              <CardContent className="pt-6">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-muted rounded-full p-2">
+                      <User className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="font-medium">
+                        {review.customer_name || 'Cliente'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(review.created_at, "d 'de' MMMM, yyyy", { locale: es })}
+                      </p>
+                      {review.order_id && (
+                        <p className="text-xs text-muted-foreground">
+                          Pedido: #{review.order_id.substring(0, 8)}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium">
-                      {review.customer_name || 'Cliente'}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(review.created_at, "d 'de' MMMM, yyyy", { locale: es })}
+                  {displayRating && renderStars(displayRating)}
+                </div>
+                
+                {/* Calificaciones detalladas */}
+                {hasDetailedRatings && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3 p-3 bg-secondary/10 rounded-lg">
+                    {review.delivery_rating && (
+                      <div className="flex items-center gap-2">
+                        <Truck className="h-4 w-4 text-muted-foreground" />
+                        <div className="flex-1">
+                          <p className="text-xs text-muted-foreground">Tiempo de entrega</p>
+                          {renderStars(review.delivery_rating, 'sm')}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {review.service_rating && (
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <div className="flex-1">
+                          <p className="text-xs text-muted-foreground">Atención</p>
+                          {renderStars(review.service_rating, 'sm')}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {review.product_rating && (
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4 text-muted-foreground" />
+                        <div className="flex-1">
+                          <p className="text-xs text-muted-foreground">Producto</p>
+                          {renderStars(review.product_rating, 'sm')}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {review.comment && (
+                  <div className="flex gap-2">
+                    <MessageSquare className="h-4 w-4 text-muted-foreground mt-0.5" />
+                    <p className="text-sm text-muted-foreground flex-1">
+                      {review.comment}
                     </p>
                   </div>
-                </div>
-                {renderStars(review.rating)}
-              </div>
-              
-              {review.comment && (
-                <div className="flex gap-2">
-                  <MessageSquare className="h-4 w-4 text-muted-foreground mt-0.5" />
-                  <p className="text-sm text-muted-foreground flex-1">
-                    {review.comment}
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
 
         {reviews.length === 0 && (
           <Card>

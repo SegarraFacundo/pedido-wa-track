@@ -1045,8 +1045,12 @@ export type Database = {
           created_at: string | null
           customer_name: string | null
           customer_phone: string
+          delivery_rating: number | null
           id: string
-          rating: number
+          order_id: string | null
+          product_rating: number | null
+          rating: number | null
+          service_rating: number | null
           vendor_id: string
         }
         Insert: {
@@ -1054,8 +1058,12 @@ export type Database = {
           created_at?: string | null
           customer_name?: string | null
           customer_phone: string
+          delivery_rating?: number | null
           id?: string
-          rating: number
+          order_id?: string | null
+          product_rating?: number | null
+          rating?: number | null
+          service_rating?: number | null
           vendor_id: string
         }
         Update: {
@@ -1063,11 +1071,29 @@ export type Database = {
           created_at?: string | null
           customer_name?: string | null
           customer_phone?: string
+          delivery_rating?: number | null
           id?: string
-          rating?: number
+          order_id?: string | null
+          product_rating?: number | null
+          rating?: number | null
+          service_rating?: number | null
           vendor_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "vendor_reviews_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_reviews_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_orders_view"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "vendor_reviews_vendor_id_fkey"
             columns: ["vendor_id"]
