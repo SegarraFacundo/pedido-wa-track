@@ -90,21 +90,30 @@ async function saveContext(context: ConversationContext, supabase: any): Promise
     context.conversation_history = context.conversation_history.slice(-20);
   }
 
+  const contextData = {
+    cart: context.cart,
+    selected_vendor_id: context.selected_vendor_id,
+    selected_vendor_name: context.selected_vendor_name,
+    delivery_address: context.delivery_address,
+    payment_method: context.payment_method,
+    payment_receipt_url: context.payment_receipt_url,
+    pending_order_id: context.pending_order_id,
+    conversation_history: context.conversation_history
+  };
+
+  console.log('💾 Saving context:', {
+    phone: context.phone,
+    cartItems: context.cart.length,
+    cartPreview: context.cart.map(i => `${i.product_name} x${i.quantity}`).join(', ') || 'empty',
+    vendorId: context.selected_vendor_id
+  });
+
   await supabase
     .from('user_sessions')
     .upsert({
       phone: context.phone,
       previous_state: 'AI_CONVERSATION',
-      last_bot_message: JSON.stringify({
-        cart: context.cart,
-        selected_vendor_id: context.selected_vendor_id,
-        selected_vendor_name: context.selected_vendor_name,
-        delivery_address: context.delivery_address,
-        payment_method: context.payment_method,
-        payment_receipt_url: context.payment_receipt_url,
-        pending_order_id: context.pending_order_id,
-        conversation_history: context.conversation_history
-      }),
+      last_bot_message: JSON.stringify(contextData),
       updated_at: new Date().toISOString()
     }, { onConflict: 'phone' });
 }
@@ -727,6 +736,12 @@ async function ejecutarHerramienta(
       case "agregar_al_carrito": {
         const items = args.items as CartItem[];
         
+        console.log('🛒 agregar_al_carrito called:', {
+          vendor_id: args.vendor_id,
+          items: items.map(i => `${i.product_name} x${i.quantity}`),
+          currentCart: context.cart.length
+        });
+        
         // CRITICAL: Resolver vendor_id si no es un UUID válido
         let vendorId = args.vendor_id;
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -820,6 +835,13 @@ async function ejecutarHerramienta(
         });
 
         const total = context.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        
+        console.log('✅ Cart updated:', {
+          totalItems: context.cart.length,
+          items: context.cart.map(i => `${i.product_name} x${i.quantity}`),
+          total
+        });
+        
         return `✅ Agregado al carrito. Total actual: $${total}`;
       }
 
@@ -856,19 +878,77 @@ async function ejecutarHerramienta(
       case "crear_pedido": {
         console.log('🛒 crear_pedido called with context:', {
           cartLength: context.cart.length,
+          cartPreview: context.cart.map(i => `${i.product_name} x${i.quantity}`).join(', '),
           vendorId: context.selected_vendor_id,
           vendorName: context.selected_vendor_name,
           address: args.direccion,
-          paymentMethod: args.metodo_pago
+          paymentMethod: args.metodo_pago,
+          userLocation: context.user_latitude ? `${context.user_latitude},${context.user_longitude}` : 'none'
         });
 
         if (context.cart.length === 0) {
-          return 'No podés crear un pedido con el carrito vacío';
+          return 'No podés crear un pedido con el carrito vacío. ¿Querés que te muestre productos disponibles?';
         }
 
         if (!context.selected_vendor_id) {
           console.error('❌ No vendor_id in context!');
           return 'Error: No hay negocio seleccionado. Por favor elegí un negocio antes de hacer el pedido.';
+        }
+
+        // 📍 VALIDACIÓN DE UBICACIÓN Y COBERTURA
+        if (context.user_latitude && context.user_longitude) {
+          // Usuario tiene ubicación, validar cobertura
+          const { data: vendor } = await supabase
+            .from('vendors')
+            .select('id, name, latitude, longitude, delivery_radius_km, address')
+            .eq('id', context.selected_vendor_id)
+            .single();
+
+          if (vendor?.latitude && vendor?.longitude && vendor?.delivery_radius_km) {
+            // Calcular distancia
+            const { data: distanceResult, error: distError } = await supabase
+              .rpc('calculate_distance', {
+                lat1: context.user_latitude,
+                lon1: context.user_longitude,
+                lat2: vendor.latitude,
+                lon2: vendor.longitude
+              });
+
+            if (!distError && distanceResult !== null) {
+              console.log(`📏 Distance: ${distanceResult}km, Max: ${vendor.delivery_radius_km}km`);
+              
+              if (distanceResult > vendor.delivery_radius_km) {
+                return `😔 Lo siento, ${vendor.name} no hace delivery a tu ubicación.\n\n📍 Tu ubicación está a ${distanceResult.toFixed(1)} km del local.\n🚗 Radio de cobertura: ${vendor.delivery_radius_km} km\n\n💡 Podés buscar otros negocios más cercanos o actualizar tu ubicación.`;
+              }
+            }
+          }
+
+          // Si llegamos acá, está dentro del radio o no se pudo validar
+          // Usar la dirección de la ubicación guardada si no se especificó una
+          if (!args.direccion || args.direccion.trim() === '') {
+            // Si tiene location_name o location_address guardados, usarlos
+            const { data: session } = await supabase
+              .from('user_sessions')
+              .select('location_name, location_address')
+              .eq('phone', context.phone)
+              .maybeSingle();
+
+            if (session?.location_address) {
+              args.direccion = session.location_address;
+              console.log(`✅ Using saved location address: ${args.direccion}`);
+            } else if (session?.location_name) {
+              args.direccion = session.location_name;
+              console.log(`✅ Using saved location name: ${args.direccion}`);
+            } else {
+              args.direccion = `Lat: ${context.user_latitude.toFixed(6)}, Lon: ${context.user_longitude.toFixed(6)}`;
+              console.log(`✅ Using coordinates as address: ${args.direccion}`);
+            }
+          }
+        } else {
+          // Sin ubicación, pedir que la comparta
+          if (!args.direccion || args.direccion.trim() === '') {
+            return `📍 Para confirmar tu pedido, necesito que compartas tu ubicación.\n\n👉 Tocá el clip 📎 en WhatsApp y elegí "Ubicación"\n\nAsí puedo verificar que ${context.selected_vendor_name} hace delivery a tu zona. 🚗`;
+          }
         }
 
         // 🚫 Verificar si el usuario ya tiene un pedido activo
@@ -1289,8 +1369,11 @@ export async function handleVendorBot(
     console.log('📋 Context loaded:', {
       phone: context.phone,
       cartItems: context.cart.length,
+      cartPreview: context.cart.map(i => `${i.product_name} x${i.quantity}`).join(', ') || 'empty',
       vendor: context.selected_vendor_name,
-      historyLength: context.conversation_history.length
+      vendorId: context.selected_vendor_id,
+      historyLength: context.conversation_history.length,
+      hasLocation: !!(context.user_latitude && context.user_longitude)
     });
 
     // Agregar mensaje del usuario al historial
@@ -1363,8 +1446,16 @@ FLUJO OBLIGATORIO:
 2. Mostrás resultados → Cliente elige negocio
 3. ver_menu_negocio (OBLIGATORIO antes de agregar productos)
 4. Cliente elige productos DEL MENÚ → agregar_al_carrito (SOLO productos que mostraste)
-5. Preguntás dirección y método de pago
+5. Preguntás dirección y método de pago (ver sección 📍 UBICACIÓN abajo)
 6. Confirmás datos → crear_pedido
+
+📍 UBICACIÓN Y DIRECCIÓN:
+${context.user_latitude && context.user_longitude 
+  ? '- ✅ El usuario YA tiene ubicación → crear_pedido la usará automáticamente'
+  : '- ⚠️ IMPORTANTE: Si el usuario NO tiene ubicación, ANTES de crear el pedido decile:\n  "📍 Para confirmar tu pedido, compartí tu ubicación tocando el clip 📎 en WhatsApp y eligiendo Ubicación"\n  NO aceptes direcciones escritas si no tiene ubicación - necesitamos validar cobertura'
+}
+- Una vez que tengas ubicación, crear_pedido validará si el negocio hace delivery a su zona
+- Si está fuera de cobertura, el sistema le avisará automáticamente
 
 CALIFICACIONES:
 - Cuando un cliente quiera calificar, preguntale por separado:
