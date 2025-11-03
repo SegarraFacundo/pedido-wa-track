@@ -608,6 +608,8 @@ async function ejecutarHerramienta(
               user_lon: context.user_longitude
             });
           
+          console.log(`📊 Vendors in range:`, JSON.stringify(vendorsInRange, null, 2));
+          
           if (rangeError) {
             console.error('Error getting vendors in range:', rangeError);
             return 'Hubo un error al buscar negocios cerca tuyo. Por favor intenta de nuevo.';
@@ -651,15 +653,29 @@ async function ejecutarHerramienta(
             .select('id, name, category, address, opening_time, closing_time, average_rating, total_reviews')
             .in('id', vendorIds);
           
+          console.log(`📋 Full vendors from DB:`, JSON.stringify(fullVendors, null, 2));
+          
           const vendorMap = new Map(fullVendors?.map((v: any) => [v.id, v]) || []);
           
           // Formatear resultados - PRIMERO abiertos, DESPUÉS cerrados
           let resultado = `¡Aquí tenés ${filteredVendors.length} ${filteredVendors.length === 1 ? 'negocio' : 'negocios'} que hacen delivery a tu zona! 🚗\n\n`;
           
+          console.log(`📝 Starting to format results. Open: ${openVendors.length}, Closed: ${closedVendors.length}`);
+          
           if (openVendors.length > 0) {
             resultado += `🟢 *ABIERTOS AHORA* (${openVendors.length}):\n\n`;
             openVendors.forEach((v: any, i: number) => {
               const vendor = vendorMap.get(v.vendor_id);
+              console.log(`🔍 Processing vendor ${i + 1}:`, {
+                vendor_id: v.vendor_id,
+                vendor_name: v.vendor_name,
+                distance_km: v.distance_km,
+                vendorFromDB: vendor ? {
+                  id: vendor.id,
+                  name: vendor.name,
+                  address: vendor.address
+                } : 'NOT FOUND'
+              });
               
               if (!vendor) {
                 // Mostrar info básica aunque no tengamos detalles completos
