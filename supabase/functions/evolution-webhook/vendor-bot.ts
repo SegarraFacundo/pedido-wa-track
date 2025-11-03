@@ -633,20 +633,18 @@ async function ejecutarHerramienta(
             );
           }
           
-          // Filtrar por horario de apertura
+          // Separar abiertos y cerrados, pero MOSTRAR AMBOS
           const openVendors = filteredVendors.filter((v: any) => v.is_open);
+          const closedVendors = filteredVendors.filter((v: any) => !v.is_open);
           
-          if (openVendors.length === 0) {
+          if (filteredVendors.length === 0) {
             return args.categoria
-              ? `No hay negocios de tipo "${args.categoria}" abiertos que lleguen a tu zona. 😔`
-              : 'No hay negocios abiertos que lleguen a tu zona en este momento. 😔';
+              ? `No hay negocios de tipo "${args.categoria}" que lleguen a tu zona. 😔`
+              : 'No hay negocios que lleguen a tu zona en este momento. 😔';
           }
           
-          // Formatear resultados con distancia
-          let resultado = `🟢 Encontré ${openVendors.length} ${openVendors.length === 1 ? 'negocio abierto' : 'negocios abiertos'} que hacen delivery a tu zona:\n\n`;
-          
           // Obtener detalles completos de vendors
-          const vendorIds = openVendors.map((v: any) => v.vendor_id);
+          const vendorIds = filteredVendors.map((v: any) => v.vendor_id);
           const { data: fullVendors } = await supabase
             .from('vendors')
             .select('id, name, category, address, opening_time, closing_time, average_rating, total_reviews')
@@ -654,20 +652,45 @@ async function ejecutarHerramienta(
           
           const vendorMap = new Map(fullVendors?.map((v: any) => [v.id, v]) || []);
           
-          openVendors.forEach((v: any, i: number) => {
-            const vendor = vendorMap.get(v.vendor_id);
-            if (!vendor) return;
-            
-            resultado += `${i + 1}. ${vendor.name} (${vendor.category}) - ${v.distance_km.toFixed(1)} km\n`;
-            resultado += `   ID: ${vendor.id}\n`;
-            resultado += `   📍 ${vendor.address}\n`;
-            resultado += `   ⏰ Horario: ${vendor.opening_time} - ${vendor.closing_time}\n`;
-            if (vendor.average_rating) {
-              resultado += `   ⭐ Rating: ${vendor.average_rating} (${vendor.total_reviews || 0} reseñas)\n`;
-            }
-            resultado += `   🚗 Radio de cobertura: ${v.delivery_radius_km} km\n`;
-            resultado += `\n`;
-          });
+          // Formatear resultados - PRIMERO abiertos, DESPUÉS cerrados
+          let resultado = `¡Aquí tenés ${filteredVendors.length} ${filteredVendors.length === 1 ? 'negocio' : 'negocios'} que hacen delivery a tu zona! 🚗\n\n`;
+          
+          if (openVendors.length > 0) {
+            resultado += `🟢 *ABIERTOS AHORA* (${openVendors.length}):\n\n`;
+            openVendors.forEach((v: any, i: number) => {
+              const vendor = vendorMap.get(v.vendor_id);
+              if (!vendor) return;
+              
+              resultado += `${i + 1}. ${vendor.name} 🍕\n`;
+              resultado += `   📍 ${vendor.address} (${v.distance_km.toFixed(1)} km)\n`;
+              resultado += `   ID: ${vendor.id}\n`;
+              if (vendor.opening_time && vendor.closing_time) {
+                resultado += `   ⏰ ${vendor.opening_time} - ${vendor.closing_time}\n`;
+              }
+              if (vendor.average_rating) {
+                resultado += `   ⭐ ${vendor.average_rating} (${vendor.total_reviews || 0} reseñas)\n`;
+              }
+              resultado += `\n`;
+            });
+          }
+          
+          if (closedVendors.length > 0) {
+            resultado += `🔴 *CERRADOS* (${closedVendors.length}):\n\n`;
+            closedVendors.forEach((v: any, i: number) => {
+              const vendor = vendorMap.get(v.vendor_id);
+              if (!vendor) return;
+              
+              resultado += `${i + 1}. ${vendor.name}\n`;
+              resultado += `   📍 ${vendor.address} (${v.distance_km.toFixed(1)} km)\n`;
+              resultado += `   ID: ${vendor.id}\n`;
+              if (vendor.opening_time && vendor.closing_time) {
+                resultado += `   ⏰ Abre: ${vendor.opening_time}\n`;
+              }
+              resultado += `\n`;
+            });
+          }
+          
+          resultado += `\n💡 Para ver el menú de alguno, decime el nombre o ID del negocio.`;
           
           return resultado;
         } else {
