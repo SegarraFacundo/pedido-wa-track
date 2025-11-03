@@ -653,12 +653,30 @@ async function ejecutarHerramienta(
       }
 
       case "crear_pedido": {
+        console.log('🛒 crear_pedido called with context:', {
+          cartLength: context.cart.length,
+          vendorId: context.selected_vendor_id,
+          vendorName: context.selected_vendor_name,
+          address: args.direccion,
+          paymentMethod: args.metodo_pago
+        });
+
         if (context.cart.length === 0) {
           return 'No podés crear un pedido con el carrito vacío';
         }
 
         if (!context.selected_vendor_id) {
-          return 'Error: No hay negocio seleccionado';
+          console.error('❌ No vendor_id in context!');
+          return 'Error: No hay negocio seleccionado. Por favor elegí un negocio antes de hacer el pedido.';
+        }
+
+        // Validar que la dirección y método de pago estén presentes
+        if (!args.direccion || args.direccion.trim() === '') {
+          return 'Por favor indicá tu dirección de entrega.';
+        }
+
+        if (!args.metodo_pago) {
+          return 'Por favor seleccioná un método de pago (efectivo, transferencia o mercadopago).';
         }
 
         context.delivery_address = args.direccion;
@@ -666,11 +684,20 @@ async function ejecutarHerramienta(
 
         const total = context.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
+        console.log('📤 Inserting order:', {
+          vendor_id: context.selected_vendor_id,
+          customer_phone: context.phone,
+          items_count: context.cart.length,
+          total,
+          address: context.delivery_address,
+          payment_method: context.payment_method
+        });
+
         const { data: order, error } = await supabase
           .from('orders')
           .insert({
             vendor_id: context.selected_vendor_id,
-            customer_name: context.phone, // Usar teléfono como nombre por defecto
+            customer_name: context.phone,
             customer_phone: context.phone,
             items: context.cart,
             total,
@@ -682,9 +709,12 @@ async function ejecutarHerramienta(
           .single();
 
         if (error) {
-          console.error('Error creating order:', error);
-          return 'Hubo un error al crear el pedido. Intentá de nuevo.';
+          console.error('❌ Error creating order:', error);
+          console.error('Error details:', JSON.stringify(error, null, 2));
+          return `Hubo un error al crear el pedido: ${error.message}. Por favor intentá de nuevo o contactá con el vendedor.`;
         }
+
+        console.log('✅ Order created successfully:', order.id);
 
         context.pending_order_id = order.id;
         
