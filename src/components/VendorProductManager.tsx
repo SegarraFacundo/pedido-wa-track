@@ -14,7 +14,7 @@ import { Plus, Edit2, Trash2, Save, X, Upload } from 'lucide-react';
 interface Product {
   id: string;
   name: string;
-  category: string[];
+  category: string[] | string; // Soportar tanto array como string para compatibilidad
   description: string | null;
   price: number;
   is_available: boolean;
@@ -62,15 +62,22 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
         .from('products')
         .select('*')
         .eq('vendor_id', vendorId)
-        .order('category', { ascending: true })
         .order('name', { ascending: true });
 
       if (error) throw error;
 
-      setProducts(data || []);
+      // Asegurar que todas las categorías sean arrays
+      const productsWithArrayCategories = (data || []).map(product => ({
+        ...product,
+        category: Array.isArray(product.category) 
+          ? product.category 
+          : (typeof product.category === 'string' ? [product.category] : [])
+      }));
+
+      setProducts(productsWithArrayCategories);
       
       // Extract unique categories (flatten all category arrays)
-      const allCategories = data?.flatMap(p => p.category) || [];
+      const allCategories = productsWithArrayCategories.flatMap(p => p.category);
       const uniqueCategories = [...new Set(allCategories)];
       setCategories(uniqueCategories);
     } catch (error) {
@@ -294,9 +301,19 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
 
   const startEditProduct = (product: Product) => {
     setEditingProduct(product);
+    
+    // Asegurar que category siempre sea un array
+    let categoryArray: string[] = [];
+    if (Array.isArray(product.category)) {
+      categoryArray = product.category;
+    } else if (typeof product.category === 'string') {
+      // Convertir string a array para productos antiguos
+      categoryArray = [product.category];
+    }
+    
     setFormData({
       name: product.name,
-      category: product.category,
+      category: categoryArray,
       description: product.description || '',
       price: product.price.toString(),
       is_available: product.is_available,
@@ -310,7 +327,10 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
 
   const filteredProducts = selectedCategory === 'all' 
     ? products 
-    : products.filter(p => p.category.includes(selectedCategory));
+    : products.filter(p => {
+        const categories = Array.isArray(p.category) ? p.category : [p.category];
+        return categories.includes(selectedCategory);
+      });
 
   const handleAddCategory = () => {
     if (newCategory.trim() && !formData.category.includes(newCategory.trim())) {
@@ -346,11 +366,17 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
       <Tabs value={selectedCategory} onValueChange={setSelectedCategory}>
         <TabsList className="w-full flex-wrap h-auto">
           <TabsTrigger value="all">Todos ({products.length})</TabsTrigger>
-          {categories.map(category => (
-            <TabsTrigger key={category} value={category}>
-              {category} ({products.filter(p => p.category.includes(category)).length})
-            </TabsTrigger>
-          ))}
+          {categories.map(category => {
+            const categoryProducts = products.filter(p => {
+              const cats = Array.isArray(p.category) ? p.category : [p.category];
+              return cats.includes(category);
+            });
+            return (
+              <TabsTrigger key={category} value={category}>
+                {category} ({categoryProducts.length})
+              </TabsTrigger>
+            );
+          })}
         </TabsList>
 
         <TabsContent value={selectedCategory} className="mt-4">
@@ -370,7 +396,7 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
                       <div className="flex items-start gap-2 mb-1">
                         <h3 className="font-semibold">{product.name}</h3>
                         <div className="flex flex-wrap gap-1">
-                          {product.category.map(cat => (
+                          {(Array.isArray(product.category) ? product.category : [product.category]).map(cat => (
                             <span key={cat} className="text-xs px-2 py-1 bg-secondary rounded-full">
                               {cat}
                             </span>
