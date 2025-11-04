@@ -41,18 +41,18 @@ export function VendorDashboardWithRealtime({ vendor }: VendorDashboardWithRealt
   const { toast } = useToast();
 
   // Today hours (from vendor_hours)
-  const [todayHours, setTodayHours] = useState<{ opening_time: string; closing_time: string; is_closed: boolean } | null>(null);
+  const [todayHours, setTodayHours] = useState<Array<{ opening_time: string; closing_time: string; is_closed: boolean; is_open_24_hours: boolean }>>([]);
   const timeZone = ARGENTINA_TIMEZONE;
 
   useEffect(() => {
     const currentDay = getCurrentDayInArgentina();
     supabase
       .from('vendor_hours')
-      .select('opening_time, closing_time, is_closed')
+      .select('opening_time, closing_time, is_closed, is_open_24_hours')
       .eq('vendor_id', vendor.id)
       .eq('day_of_week', currentDay)
-      .maybeSingle()
-      .then(({ data }) => setTodayHours(data));
+      .order('slot_number', { ascending: true })
+      .then(({ data }) => setTodayHours(data || []));
   }, [vendor.id]);
 
   // Play notification sound for new orders
@@ -115,8 +115,13 @@ export function VendorDashboardWithRealtime({ vendor }: VendorDashboardWithRealt
   ];
 
   const isOpen = () => {
-    if (!todayHours) return false;
-    if (todayHours.is_closed) return false;
+    if (!todayHours || todayHours.length === 0) return false;
+    
+    // Check if any slot is open 24 hours
+    if (todayHours.some(slot => slot.is_open_24_hours)) return true;
+    
+    // Check if all slots are closed
+    if (todayHours.every(slot => slot.is_closed)) return false;
 
     const parts = new Intl.DateTimeFormat('en-US', {
       timeZone,
@@ -129,10 +134,22 @@ export function VendorDashboardWithRealtime({ vendor }: VendorDashboardWithRealt
     const mm = parts.find(p => p.type === 'minute')?.value || '00';
     const currentTime = `${hh}:${mm}`;
 
-    const openingTime = todayHours.opening_time.slice(0, 5);
-    const closingTime = todayHours.closing_time.slice(0, 5);
+    // Check if current time is within any of the time slots
+    return todayHours.some(slot => {
+      if (slot.is_closed) return false;
+      const openingTime = slot.opening_time.slice(0, 5);
+      const closingTime = slot.closing_time.slice(0, 5);
+      return currentTime >= openingTime && currentTime <= closingTime;
+    });
+  };
 
-    return currentTime >= openingTime && currentTime <= closingTime;
+  const getHoursDisplay = () => {
+    if (!todayHours || todayHours.length === 0) return 'Horario no configurado';
+    if (todayHours.some(slot => slot.is_open_24_hours)) return '24 horas';
+    if (todayHours.every(slot => slot.is_closed)) return 'Cerrado';
+    
+    const activeSlots = todayHours.filter(slot => !slot.is_closed);
+    return activeSlots.map(slot => `${slot.opening_time.slice(0, 5)} - ${slot.closing_time.slice(0, 5)}`).join(', ');
   };
 
   if (loading) {
@@ -153,7 +170,7 @@ export function VendorDashboardWithRealtime({ vendor }: VendorDashboardWithRealt
               <div>
                 <h2 className="text-2xl font-bold">{vendor.name}</h2>
                 <Badge variant={isOpen() ? "default" : "secondary"} className="mt-2">
-                  {isOpen() ? "Abierto" : todayHours ? "Cerrado" : "Sin horario"}
+                  {isOpen() ? "Abierto" : todayHours.length > 0 ? "Cerrado" : "Sin horario"}
                 </Badge>
               </div>
               
@@ -168,9 +185,7 @@ export function VendorDashboardWithRealtime({ vendor }: VendorDashboardWithRealt
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Clock className="h-4 w-4" />
-                  {todayHours 
-                    ? `${todayHours.opening_time} - ${todayHours.closing_time}`
-                    : 'Horario no configurado'}
+                  {getHoursDisplay()}
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Calendar className="h-4 w-4" />
