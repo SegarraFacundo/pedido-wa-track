@@ -601,7 +601,7 @@ async function ejecutarHerramienta(
 
         // Si el usuario tiene ubicación, filtrar por radio
         if (context.user_latitude && context.user_longitude) {
-          console.log(`📍 User has location, filtering by delivery radius`);
+          console.log(`📍 User has location (${context.user_latitude}, ${context.user_longitude}), filtering by delivery radius`);
           
           const { data: vendorsInRange, error: rangeError } = await supabase
             .rpc('get_vendors_in_range', {
@@ -609,7 +609,7 @@ async function ejecutarHerramienta(
               user_lon: context.user_longitude
             });
           
-          console.log(`📊 Vendors in range:`, JSON.stringify(vendorsInRange, null, 2));
+          console.log(`📊 Vendors in range (${vendorsInRange?.length || 0} total):`, JSON.stringify(vendorsInRange, null, 2));
           
           if (rangeError) {
             console.error('Error getting vendors in range:', rangeError);
