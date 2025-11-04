@@ -1423,6 +1423,46 @@ async function ejecutarHerramienta(
         
         const vendorPhone = vendor.whatsapp_number || vendor.phone;
         
+        // Verificar si ya existe un chat activo para evitar duplicados
+        const { data: existingChat } = await supabase
+          .from('vendor_chats')
+          .select('id')
+          .eq('vendor_id', vendorId)
+          .eq('customer_phone', context.phone)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        let chatId = existingChat?.id;
+
+        // Si no existe un chat activo, crear uno nuevo
+        if (!chatId) {
+          const { data: newChat, error: chatError } = await supabase
+            .from('vendor_chats')
+            .insert({
+              vendor_id: vendorId,
+              customer_phone: context.phone,
+              is_active: true
+            })
+            .select('id')
+            .single();
+
+          if (chatError) {
+            console.error('Error creating vendor chat:', chatError);
+          } else {
+            chatId = newChat.id;
+            console.log('✅ Chat created with vendor:', { chatId, vendorId });
+
+            // Crear mensaje inicial del sistema
+            await supabase
+              .from('chat_messages')
+              .insert({
+                chat_id: chatId,
+                sender_type: 'bot',
+                message: `Cliente ${context.phone} solicitó hablar con el vendedor`
+              });
+          }
+        }
+        
         // Actualizar sesión del usuario
         const { error } = await supabase
           .from('user_sessions')

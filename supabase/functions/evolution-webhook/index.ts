@@ -559,6 +559,56 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
       });
     }
 
+    // 💬 Verificar si el usuario está en modo chat directo con vendedor
+    const { data: vendorSession } = await supabase
+      .from('user_sessions')
+      .select('in_vendor_chat, assigned_vendor_phone')
+      .eq('phone', normalizedPhone)
+      .maybeSingle();
+
+    if (vendorSession?.in_vendor_chat) {
+      console.log('💬 User is in vendor chat mode');
+
+      // Buscar el chat activo con el vendedor
+      const { data: activeChat } = await supabase
+        .from('vendor_chats')
+        .select('id, vendor_id')
+        .eq('customer_phone', normalizedPhone)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (activeChat) {
+        console.log('📝 Saving message to vendor chat:', activeChat.id);
+        
+        // Guardar el mensaje del cliente en chat_messages
+        await supabase
+          .from('chat_messages')
+          .insert({
+            chat_id: activeChat.id,
+            sender_type: 'customer',
+            message: messageText
+          });
+
+        console.log('✅ Message saved to vendor chat, bot will not respond');
+
+        // NO procesamos con el bot si está en chat directo
+        return new Response(JSON.stringify({ status: 'vendor_chat_mode', chat_id: activeChat.id }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200
+        });
+      } else {
+        console.log('⚠️ User marked as in_vendor_chat but no active chat found, resetting...');
+        // Si no hay chat activo, desactivar el modo
+        await supabase
+          .from('user_sessions')
+          .update({
+            in_vendor_chat: false,
+            assigned_vendor_phone: null
+          })
+          .eq('phone', normalizedPhone);
+      }
+    }
+
     // Procesar mensaje con el bot de IA
     let responseMessage = await processWithVendorBot(normalizedPhone, messageText);
 
