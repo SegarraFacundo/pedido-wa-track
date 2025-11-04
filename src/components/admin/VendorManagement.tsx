@@ -104,38 +104,32 @@ export default function VendorManagement() {
 
   const createVendor = async () => {
     try {
-      // Create auth user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-      });
-
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('Error creando usuario');
-
-      // Create vendor record
-      const { error: vendorError } = await supabase
+      // First create the vendor record without user_id
+      const { data: vendorData, error: vendorError } = await supabase
         .from('vendors')
         .insert({
           name: formData.name,
           category: formData.category,
           phone: formData.phone,
           address: formData.address,
-          user_id: authData.user.id,
           payment_status: 'active',
-        });
+        })
+        .select()
+        .single();
 
       if (vendorError) throw vendorError;
+      if (!vendorData) throw new Error('Error creando negocio');
 
-      // Assign vendor role
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({
-          user_id: authData.user.id,
-          role: 'vendor',
-        });
+      // Then create user and link to vendor using edge function
+      const { data, error } = await supabase.functions.invoke('create-vendor-user', {
+        body: {
+          email: formData.email,
+          password: formData.password,
+          vendorId: vendorData.id
+        }
+      });
 
-      if (roleError) throw roleError;
+      if (error) throw error;
 
       toast({
         title: "Negocio creado",
