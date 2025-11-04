@@ -35,11 +35,28 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
   const [uploading, setUploading] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [categories, setCategories] = useState<string[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchVendorData();
+    fetchCategories();
   }, [vendorId]);
+
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('vendors')
+        .select('category');
+
+      if (error) throw error;
+      
+      const uniqueCategories = [...new Set(data.map(v => v.category))].filter(Boolean);
+      setCategories(uniqueCategories);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  };
 
   const fetchVendorData = async () => {
     try {
@@ -204,11 +221,12 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
               <SelectTrigger id="category">
                 <SelectValue placeholder="Seleccionar categoría" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="restaurant">Restaurante</SelectItem>
-                <SelectItem value="pharmacy">Farmacia</SelectItem>
-                <SelectItem value="market">Supermercado</SelectItem>
-                <SelectItem value="other">Otro</SelectItem>
+              <SelectContent className="bg-background z-50">
+                {categories.map((cat) => (
+                  <SelectItem key={cat} value={cat}>
+                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

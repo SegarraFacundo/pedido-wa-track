@@ -51,16 +51,7 @@ export default function VendorManagement() {
   const [existingUsers, setExistingUsers] = useState<any[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>('');
 
-  const [categories, setCategories] = useState([
-    'restaurant',
-    'food',
-    'grocery',
-    'pharmacy',
-    'retail',
-    'service',
-    'vivero',
-    'other'
-  ]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [customCategory, setCustomCategory] = useState('');
   const [showCustomCategory, setShowCustomCategory] = useState(false);
 
@@ -75,7 +66,29 @@ export default function VendorManagement() {
 
   useEffect(() => {
     fetchVendors();
+    fetchCategories();
   }, []);
+
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('vendors')
+        .select('category');
+
+      if (error) throw error;
+      
+      const uniqueCategories = [...new Set(data.map(v => v.category))].filter(Boolean);
+      const defaultCategories = ['restaurant', 'food', 'grocery', 'pharmacy', 'retail', 'service', 'vivero', 'other'];
+      const allCategories = [...new Set([...defaultCategories, ...uniqueCategories])];
+      setCategories(allCategories);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   const fetchExistingUsers = async () => {
     try {
