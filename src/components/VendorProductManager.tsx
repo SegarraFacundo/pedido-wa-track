@@ -146,7 +146,7 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
     if (!formData.name || formData.category.length === 0 || !formData.price) {
       toast({
         title: 'Error',
-        description: 'Por favor complete todos los campos requeridos (al menos una categoría)',
+        description: 'Por favor complete todos los campos requeridos. Debes agregar al menos una categoría usando el botón +',
         variant: 'destructive'
       });
       return;
@@ -481,8 +481,13 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
             </div>
             
             <div>
-              <Label htmlFor="category">Categorías * (puedes agregar múltiples)</Label>
+              <Label htmlFor="category">Categorías * (debes agregar al menos una)</Label>
               <div className="flex flex-wrap gap-2 mb-2">
+                {formData.category.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    👆 Escribe una categoría y presiona el botón + para agregarla
+                  </p>
+                )}
                 {formData.category.map(cat => (
                   <span key={cat} className="inline-flex items-center gap-1 text-xs px-3 py-1 bg-primary text-primary-foreground rounded-full">
                     {cat}
@@ -502,7 +507,7 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCategory())}
-                  placeholder="Agregar categoría..."
+                  placeholder="Ej: Plantas, Abonos, Herramientas..."
                   list="categories"
                 />
                 <Button type="button" onClick={handleAddCategory} size="sm">
