@@ -1142,21 +1142,11 @@ async function ejecutarHerramienta(
           }
 
           // Si llegamos acá, está dentro del radio o no se pudo validar
-          // Usar la dirección de la ubicación guardada si no se especificó una
+          // Usar la dirección del contexto si ya está guardada
           if (!args.direccion || args.direccion.trim() === '') {
-            // Si tiene location_name o location_address guardados, usarlos
-            const { data: session } = await supabase
-              .from('user_sessions')
-              .select('location_name, location_address')
-              .eq('phone', context.phone)
-              .maybeSingle();
-
-            if (session?.location_address) {
-              args.direccion = session.location_address;
-              console.log(`✅ Using saved location address: ${args.direccion}`);
-            } else if (session?.location_name) {
-              args.direccion = session.location_name;
-              console.log(`✅ Using saved location name: ${args.direccion}`);
+            if (context.delivery_address) {
+              args.direccion = context.delivery_address;
+              console.log(`✅ Using saved context address: ${args.direccion}`);
             } else {
               args.direccion = `Lat: ${context.user_latitude.toFixed(6)}, Lon: ${context.user_longitude.toFixed(6)}`;
               console.log(`✅ Using coordinates as address: ${args.direccion}`);

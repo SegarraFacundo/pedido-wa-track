@@ -166,8 +166,44 @@ serve(async (req) => {
       
       const latitude = locationMessage.degreesLatitude;
       const longitude = locationMessage.degreesLongitude;
-      const locationName = locationMessage.name || '';
-      const locationAddress = locationMessage.address || '';
+      
+      // 🗺️ Hacer geocodificación inversa usando OpenStreetMap Nominatim
+      let realAddress = '';
+      try {
+        const geocodeResponse = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
+          {
+            headers: {
+              'User-Agent': 'LapachodApp/1.0'
+            }
+          }
+        );
+        
+        if (geocodeResponse.ok) {
+          const geocodeData = await geocodeResponse.json();
+          console.log('📍 Geocoding result:', geocodeData);
+          
+          // Construir dirección desde los componentes
+          const addr = geocodeData.address;
+          const parts = [];
+          
+          if (addr.road) parts.push(addr.road);
+          if (addr.house_number) parts.push(addr.house_number);
+          if (addr.suburb || addr.neighbourhood) parts.push(addr.suburb || addr.neighbourhood);
+          if (addr.city || addr.town || addr.village) parts.push(addr.city || addr.town || addr.village);
+          if (addr.state) parts.push(addr.state);
+          
+          realAddress = parts.join(', ');
+          console.log('✅ Geocoded address:', realAddress);
+        }
+      } catch (geocodeError) {
+        console.error('Error geocoding location:', geocodeError);
+      }
+      
+      // Si no se pudo geocodificar, usar coordenadas como fallback
+      if (!realAddress) {
+        realAddress = `Lat: ${latitude.toFixed(6)}, Lon: ${longitude.toFixed(6)}`;
+      }
       
       // Guardar ubicación en user_sessions
       await supabase
@@ -193,7 +229,7 @@ serve(async (req) => {
         try {
           const context = JSON.parse(sessionData.last_bot_message);
           context.pending_location_decision = true;
-          context.delivery_address = locationAddress || locationName || 'Ubicación compartida';
+          context.delivery_address = realAddress; // Usar dirección geocodificada real
           
           await supabase
             .from('user_sessions')
@@ -215,7 +251,7 @@ serve(async (req) => {
       const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
       const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
       
-      const addressText = locationAddress || locationName || 'tu ubicación';
+      const addressText = realAddress;
       const confirmMessage = `📍 Recibí tu ubicación: *${addressText}*
 
 ¿Querés usarla solo para este pedido o guardarla para la próxima?
