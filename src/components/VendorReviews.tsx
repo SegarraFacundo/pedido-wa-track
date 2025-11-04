@@ -258,7 +258,7 @@ export function VendorReviews({ vendorId }: VendorReviewsProps) {
                     </div>
                     <div>
                       <p className="font-medium">
-                        {review.customer_name || maskPhone(review.customer_phone)}
+                        {maskPhone(review.customer_phone)}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {format(review.created_at, "d 'de' MMMM, yyyy", { locale: es })}
