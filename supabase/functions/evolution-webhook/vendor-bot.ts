@@ -1227,6 +1227,25 @@ async function ejecutarHerramienta(
 
         context.pending_order_id = order.id;
         
+        // 📧 Notificar al vendedor sobre el nuevo pedido
+        try {
+          console.log('📨 Sending new order notification to vendor:', context.selected_vendor_id);
+          const { data: notifyData, error: notifyError } = await supabase.functions.invoke('notify-vendor', {
+            body: {
+              orderId: order.id,
+              eventType: 'new_order'
+            }
+          });
+          
+          if (notifyError) {
+            console.error('❌ Error notifying vendor:', notifyError);
+          } else {
+            console.log('✅ Vendor notification sent:', notifyData);
+          }
+        } catch (notifyErr) {
+          console.error('💥 Exception notifying vendor:', notifyErr);
+        }
+        
         // 🗑️ Eliminar direcciones temporales después de crear el pedido
         try {
           const { error: deleteError } = await supabase
