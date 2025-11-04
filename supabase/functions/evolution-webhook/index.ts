@@ -527,12 +527,13 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
 
     console.log('Processing message from:', normalizedPhone, 'Message:', messageText);
 
-    // 🎫 Verificar si hay un ticket de soporte abierto
+    // 🎫 Verificar si hay un ticket de soporte abierto RECIENTE (últimas 48 horas)
     const { data: openTicket } = await supabase
       .from('support_tickets')
-      .select('id, subject, status')
+      .select('id, subject, status, created_at')
       .eq('customer_phone', normalizedPhone)
       .in('status', ['open', 'in_progress'])
+      .gte('created_at', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()) // Últimas 48 horas
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
