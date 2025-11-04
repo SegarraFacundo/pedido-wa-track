@@ -115,6 +115,32 @@ export function VendorReviews({ vendorId }: VendorReviewsProps) {
     return distribution;
   };
 
+  const getAverageDetailedRatings = () => {
+    const totals = { delivery: 0, service: 0, product: 0 };
+    const counts = { delivery: 0, service: 0, product: 0 };
+    
+    reviews.forEach(review => {
+      if (review.delivery_rating) {
+        totals.delivery += review.delivery_rating;
+        counts.delivery++;
+      }
+      if (review.service_rating) {
+        totals.service += review.service_rating;
+        counts.service++;
+      }
+      if (review.product_rating) {
+        totals.product += review.product_rating;
+        counts.product++;
+      }
+    });
+    
+    return {
+      delivery: counts.delivery > 0 ? totals.delivery / counts.delivery : 0,
+      service: counts.service > 0 ? totals.service / counts.service : 0,
+      product: counts.product > 0 ? totals.product / counts.product : 0
+    };
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -124,6 +150,7 @@ export function VendorReviews({ vendorId }: VendorReviewsProps) {
   }
 
   const ratingDistribution = getRatingDistribution();
+  const detailedAverages = getAverageDetailedRatings();
 
   return (
     <div className="space-y-6">
@@ -133,44 +160,81 @@ export function VendorReviews({ vendorId }: VendorReviewsProps) {
           <CardTitle>Reseñas de Clientes</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Promedio general */}
-            <div className="text-center">
-              <div className="text-4xl font-bold mb-2">
-                {averageRating.toFixed(1)}
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Promedio general */}
+              <div className="text-center">
+                <div className="text-4xl font-bold mb-2">
+                  {averageRating.toFixed(1)}
+                </div>
+                <div className="flex justify-center mb-2">
+                  {renderStars(Math.round(averageRating))}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {totalReviews} reseñas totales
+                </p>
               </div>
-              <div className="flex justify-center mb-2">
-                {renderStars(Math.round(averageRating))}
+
+              {/* Distribución de calificaciones */}
+              <div className="space-y-2">
+                {[5, 4, 3, 2, 1].map((rating) => (
+                  <div key={rating} className="flex items-center gap-2">
+                    <span className="text-sm w-3">{rating}</span>
+                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                    <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
+                      <div
+                        className="bg-yellow-400 h-full transition-all"
+                        style={{
+                          width: `${
+                            totalReviews > 0
+                              ? (ratingDistribution[rating as keyof typeof ratingDistribution] / totalReviews) * 100
+                              : 0
+                          }%`
+                        }}
+                      />
+                    </div>
+                    <span className="text-sm text-muted-foreground w-8">
+                      {ratingDistribution[rating as keyof typeof ratingDistribution]}
+                    </span>
+                  </div>
+                ))}
               </div>
-              <p className="text-sm text-muted-foreground">
-                {totalReviews} reseñas totales
-              </p>
             </div>
 
-            {/* Distribución de calificaciones */}
-            <div className="space-y-2">
-              {[5, 4, 3, 2, 1].map((rating) => (
-                <div key={rating} className="flex items-center gap-2">
-                  <span className="text-sm w-3">{rating}</span>
-                  <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                  <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
-                    <div
-                      className="bg-yellow-400 h-full transition-all"
-                      style={{
-                        width: `${
-                          totalReviews > 0
-                            ? (ratingDistribution[rating as keyof typeof ratingDistribution] / totalReviews) * 100
-                            : 0
-                        }%`
-                      }}
-                    />
+            {/* Calificaciones por aspecto */}
+            {(detailedAverages.delivery > 0 || detailedAverages.service > 0 || detailedAverages.product > 0) && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t">
+                {detailedAverages.delivery > 0 && (
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <Truck className="h-4 w-4 text-muted-foreground" />
+                      <p className="text-sm font-medium">Tiempo de entrega</p>
+                    </div>
+                    {renderStars(Math.round(detailedAverages.delivery), 'sm')}
                   </div>
-                  <span className="text-sm text-muted-foreground w-8">
-                    {ratingDistribution[rating as keyof typeof ratingDistribution]}
-                  </span>
-                </div>
-              ))}
-            </div>
+                )}
+                
+                {detailedAverages.service > 0 && (
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <p className="text-sm font-medium">Atención</p>
+                    </div>
+                    {renderStars(Math.round(detailedAverages.service), 'sm')}
+                  </div>
+                )}
+                
+                {detailedAverages.product > 0 && (
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <Package className="h-4 w-4 text-muted-foreground" />
+                      <p className="text-sm font-medium">Producto</p>
+                    </div>
+                    {renderStars(Math.round(detailedAverages.product), 'sm')}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
