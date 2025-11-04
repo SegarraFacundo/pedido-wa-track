@@ -151,6 +151,14 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
 
       if (editingProduct) {
         // Update existing product
+        console.log('Updating product with data:', {
+          name: formData.name,
+          category: formData.category,
+          price: parseFloat(formData.price),
+          categoryType: typeof formData.category,
+          categoryIsArray: Array.isArray(formData.category)
+        });
+        
         const { error } = await supabase
           .from('products')
           .update({
@@ -165,7 +173,10 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
           })
           .eq('id', editingProduct.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Supabase error updating:', error);
+          throw error;
+        }
 
         toast({
           title: 'Éxito',
@@ -173,6 +184,15 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
         });
       } else {
         // Create new product
+        console.log('Creating product with data:', {
+          name: formData.name,
+          category: formData.category,
+          price: parseFloat(formData.price),
+          categoryType: typeof formData.category,
+          categoryIsArray: Array.isArray(formData.category),
+          categoryLength: formData.category.length
+        });
+        
         const { error } = await supabase
           .from('products')
           .insert({
@@ -187,7 +207,10 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
             stock_quantity: formData.stock_enabled ? (formData.stock_quantity ? parseInt(formData.stock_quantity) : 0) : null
           });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Supabase error inserting:', error);
+          throw error;
+        }
 
         toast({
           title: 'Éxito',
@@ -212,11 +235,12 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
       setIsAddingProduct(false);
       setEditingProduct(null);
       fetchProducts();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving product:', error);
+      const errorMessage = error?.message || error?.error_description || 'No se pudo guardar el producto';
       toast({
         title: 'Error',
-        description: 'No se pudo guardar el producto',
+        description: errorMessage,
         variant: 'destructive'
       });
     }
