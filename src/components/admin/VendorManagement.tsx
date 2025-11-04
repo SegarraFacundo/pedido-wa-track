@@ -104,7 +104,7 @@ export default function VendorManagement() {
 
   const createVendor = async () => {
     try {
-      // First create the vendor record without user_id
+      // Create the vendor record
       const { data: vendorData, error: vendorError } = await supabase
         .from('vendors')
         .insert({
@@ -120,16 +120,18 @@ export default function VendorManagement() {
       if (vendorError) throw vendorError;
       if (!vendorData) throw new Error('Error creando negocio');
 
-      // Then create user and link to vendor using edge function
-      const { data, error } = await supabase.functions.invoke('create-vendor-user', {
-        body: {
-          email: formData.email,
-          password: formData.password,
-          vendorId: vendorData.id
-        }
-      });
+      // Only create user if email and password are provided
+      if (formData.email && formData.password) {
+        const { error } = await supabase.functions.invoke('create-vendor-user', {
+          body: {
+            email: formData.email,
+            password: formData.password,
+            vendorId: vendorData.id
+          }
+        });
 
-      if (error) throw error;
+        if (error) throw error;
+      }
 
       toast({
         title: "Negocio creado",
@@ -323,18 +325,24 @@ export default function VendorManagement() {
                 value={formData.address}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
               />
-              <Input
-                type="email"
-                placeholder="Email para acceso"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              />
-              <Input
-                type="password"
-                placeholder="Contraseña"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              />
+              <div className="border-t pt-4 mt-4">
+                <p className="text-sm text-muted-foreground mb-3">
+                  Asignación de usuario (opcional - puedes asignarlo después)
+                </p>
+                <Input
+                  type="email"
+                  placeholder="Email para acceso (opcional)"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                />
+                <Input
+                  type="password"
+                  placeholder="Contraseña (opcional)"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  className="mt-2"
+                />
+              </div>
               <Button onClick={createVendor} className="w-full">
                 Crear Negocio
               </Button>
