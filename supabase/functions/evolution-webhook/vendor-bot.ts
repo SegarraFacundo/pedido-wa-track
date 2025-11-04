@@ -945,41 +945,75 @@ async function ejecutarHerramienta(
           }
         }
 
-        // ⚠️ VALIDACIÓN CRÍTICA: Verificar que TODOS los productos existan en la BD
-        const productIds = items.map(item => item.product_id);
-        const { data: existingProducts, error: productError } = await supabase
-          .from('products')
-          .select('id, name, price, vendor_id')
-          .eq('vendor_id', vendorId)
-          .eq('is_available', true)
-          .in('id', productIds);
-
-        if (productError) {
-          console.error('Error validating products:', productError);
-          return 'Hubo un error al validar los productos. Intentá de nuevo.';
-        }
-
-        // Verificar que todos los productos existan
-        const invalidItems = items.filter(item => 
-          !existingProducts?.some(p => p.id === item.product_id)
-        );
-
-        if (invalidItems.length > 0) {
-          const invalidNames = invalidItems.map(i => i.product_name).join(', ');
-          return `❌ Los siguientes productos NO existen en el menú de ${context.selected_vendor_name}: ${invalidNames}.\n\nPor favor, primero mirá el menú con "ver menú de ${context.selected_vendor_name}" y elegí productos que realmente existen.`;
-        }
-
-        // Verificar precios correctos
+        // ⚠️ VALIDACIÓN CRÍTICA: Resolver product_ids y verificar existencia
+        // Algunos LLMs pasan nombres en lugar de UUIDs, así que los resolvemos
+        const resolvedItems: CartItem[] = [];
+        
         for (const item of items) {
-          const dbProduct = existingProducts?.find(p => p.id === item.product_id);
-          if (dbProduct && Math.abs(Number(dbProduct.price) - item.price) > 0.01) {
-            console.warn(`Price mismatch for ${item.product_name}: expected ${dbProduct.price}, got ${item.price}`);
-            item.price = Number(dbProduct.price); // Corregir precio
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          let productData;
+          
+          if (uuidRegex.test(item.product_id)) {
+            // Es un UUID válido, buscar por ID
+            const { data, error } = await supabase
+              .from('products')
+              .select('id, name, price')
+              .eq('vendor_id', vendorId)
+              .eq('is_available', true)
+              .eq('id', item.product_id)
+              .maybeSingle();
+            
+            if (error) {
+              console.error(`Error fetching product ${item.product_id}:`, error);
+              continue;
+            }
+            productData = data;
+          } else {
+            // No es UUID, buscar por nombre
+            console.log(`🔍 Resolving product by name: "${item.product_name || item.product_id}"`);
+            const searchName = item.product_name || item.product_id;
+            
+            const { data, error } = await supabase
+              .from('products')
+              .select('id, name, price')
+              .eq('vendor_id', vendorId)
+              .eq('is_available', true)
+              .ilike('name', `%${searchName}%`)
+              .limit(1)
+              .maybeSingle();
+            
+            if (error) {
+              console.error(`Error searching product "${searchName}":`, error);
+              continue;
+            }
+            productData = data;
           }
+          
+          if (!productData) {
+            console.warn(`❌ Product not found: ${item.product_name || item.product_id}`);
+            continue;
+          }
+          
+          // Agregar producto resuelto con precio correcto de la BD
+          resolvedItems.push({
+            product_id: productData.id,
+            product_name: productData.name,
+            quantity: item.quantity,
+            price: Number(productData.price)
+          });
+          
+          console.log(`✅ Resolved: "${item.product_name}" -> ${productData.name} (${productData.id})`);
         }
         
+        if (resolvedItems.length === 0) {
+          return '❌ No pude encontrar esos productos en el menú. Por favor, primero mirá el menú y elegí productos válidos.';
+        }
+        
+        // Usar los items resueltos
+        const validatedItems = resolvedItems;
+        
         // Agregar productos validados al carrito
-        items.forEach(item => {
+        validatedItems.forEach(item => {
           const existing = context.cart.find(c => c.product_id === item.product_id);
           if (existing) {
             existing.quantity += item.quantity;
