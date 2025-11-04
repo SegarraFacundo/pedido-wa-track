@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Star, MessageSquare, User, Truck, Users, Package } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { maskPhone } from '@/lib/utils';
 
 interface VendorReview {
   id: string;
@@ -193,7 +194,7 @@ export function VendorReviews({ vendorId }: VendorReviewsProps) {
                     </div>
                     <div>
                       <p className="font-medium">
-                        {review.customer_name || 'Cliente'}
+                        {review.customer_name || maskPhone(review.customer_phone)}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {format(review.created_at, "d 'de' MMMM, yyyy", { locale: es })}
