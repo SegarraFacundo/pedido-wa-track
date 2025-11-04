@@ -1289,30 +1289,61 @@ async function ejecutarHerramienta(
       
       case "ver_ofertas": {
         const nowIso: string = new Date().toISOString();
+        
+        // Si el usuario está en una conversación con un vendor específico, solo mostrar sus ofertas
+        const targetVendorId = args.vendor_id || context.selected_vendor_id;
       
         let query = supabase
           .from('vendor_offers')
-          .select('*, vendors(id, name, category)')
+          .select('*, vendors(id, name, category, latitude, longitude, delivery_radius_km, is_active)')
           .eq('is_active', true)
           .lte('valid_from', nowIso)
           .or(`valid_until.gte.${nowIso},valid_until.is.null`);
 
-        // Filtrar por vendor si se especifica
-        if (args.vendor_id) {
-          query = query.eq('vendor_id', args.vendor_id);
+        // Filtrar por vendor si hay uno en contexto o especificado
+        if (targetVendorId) {
+          query = query.eq('vendor_id', targetVendorId);
         }
 
         const { data: offers, error } = await query;
 
         if (error || !offers || offers.length === 0) {
-          return args.vendor_id
+          return targetVendorId
             ? 'Este negocio no tiene ofertas activas en este momento.'
             : 'No hay ofertas disponibles en este momento. 😔';
         }
 
-        let resultado = `🎁 ${offers.length === 1 ? 'Oferta disponible' : `${offers.length} ofertas disponibles`}:\n\n`;
+        // Filtrar ofertas por ubicación y horarios
+        let filteredOffers = offers;
         
-        offers.forEach((offer: any, i: number) => {
+        if (!targetVendorId && context.user_latitude && context.user_longitude) {
+          // Si no hay vendor específico pero sí ubicación, filtrar por alcance
+          const { data: vendorsInRange } = await supabase
+            .rpc('get_vendors_in_range', {
+              user_lat: context.user_latitude,
+              user_lon: context.user_longitude
+            });
+          
+          if (vendorsInRange && vendorsInRange.length > 0) {
+            const openVendorIds = vendorsInRange
+              .filter((v: any) => v.is_open)
+              .map((v: any) => v.vendor_id);
+            
+            filteredOffers = offers.filter((offer: any) => 
+              openVendorIds.includes(offer.vendor_id)
+            );
+          } else {
+            filteredOffers = [];
+          }
+        }
+
+        if (filteredOffers.length === 0) {
+          return 'No hay ofertas disponibles de negocios que estén abiertos y te hagan delivery en este momento. 😔';
+        }
+
+        let resultado = `🎁 ${filteredOffers.length === 1 ? 'Oferta disponible' : `${filteredOffers.length} ofertas disponibles`}:\n\n`;
+        
+        filteredOffers.forEach((offer: any, i: number) => {
           resultado += `${i + 1}. ${offer.title}\n`;
           resultado += `   🏪 ${offer.vendors.name}\n`;
           resultado += `   📝 ${offer.description}\n`;
