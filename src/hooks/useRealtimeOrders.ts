@@ -130,6 +130,20 @@ export function useRealtimeOrders(vendorId?: string) {
 
                 setOrders(prev => [newOrder, ...prev]);
                 
+                // Enviar notificación al vendedor por WhatsApp si está configurado
+                supabase.functions.invoke('notify-vendor', {
+                  body: {
+                    orderId: newOrder.id,
+                    eventType: 'new_order'
+                  }
+                }).then(({ data, error }) => {
+                  if (error) {
+                    console.error('Error sending vendor notification:', error);
+                  } else {
+                    console.log('Vendor notification sent:', data);
+                  }
+                });
+                
                 toast({
                   title: '🆕 NUEVO PEDIDO INGRESADO',
                   description: `Pedido #${newOrder.id.slice(0, 8)} - $${newOrder.total.toFixed(2)}`,
@@ -202,6 +216,22 @@ export function useRealtimeOrders(vendorId?: string) {
         .eq('id', orderId);
 
       if (error) throw error;
+
+      // Notificar al vendedor si el pedido fue cancelado
+      if (newStatus === 'cancelled') {
+        supabase.functions.invoke('notify-vendor', {
+          body: {
+            orderId,
+            eventType: 'order_cancelled'
+          }
+        }).then(({ data, error }) => {
+          if (error) {
+            console.error('Error sending vendor cancellation notification:', error);
+          } else {
+            console.log('Vendor cancellation notification sent:', data);
+          }
+        });
+      }
 
       // Send WhatsApp notification to customer
       const statusMessages = {

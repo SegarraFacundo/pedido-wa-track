@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { Building2, Save, Upload, X } from 'lucide-react';
+import { VendorNotificationSettings } from '@/components/VendorNotificationSettings';
 
 interface VendorData {
   id: string;
@@ -194,13 +195,14 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
   if (!vendorData) return null;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Building2 className="h-5 w-5" />
-          Configuración del Negocio
-        </CardTitle>
-      </CardHeader>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Building2 className="h-5 w-5" />
+            Configuración del Negocio
+          </CardTitle>
+        </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
@@ -394,5 +396,11 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
         </Button>
       </CardContent>
     </Card>
+    
+    <VendorNotificationSettings 
+      vendorId={vendorId} 
+      hasWhatsApp={!!vendorData.whatsapp_number}
+    />
+    </div>
   );
 }

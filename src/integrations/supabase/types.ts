@@ -948,6 +948,58 @@ export type Database = {
           },
         ]
       }
+      vendor_notification_settings: {
+        Row: {
+          created_at: string | null
+          id: string
+          notify_customer_message: boolean | null
+          notify_new_order: boolean | null
+          notify_order_cancelled: boolean | null
+          updated_at: string | null
+          vendor_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          notify_customer_message?: boolean | null
+          notify_new_order?: boolean | null
+          notify_order_cancelled?: boolean | null
+          updated_at?: string | null
+          vendor_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          notify_customer_message?: boolean | null
+          notify_new_order?: boolean | null
+          notify_order_cancelled?: boolean | null
+          updated_at?: string | null
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_notification_settings_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: true
+            referencedRelation: "public_vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_notification_settings_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: true
+            referencedRelation: "vendor_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_notification_settings_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: true
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendor_notifications: {
         Row: {
           created_at: string | null
