@@ -922,23 +922,14 @@ async function ejecutarHerramienta(
           
           console.log(`🔍 Searching vendor by name: "${cleanedName}"`);
           
-          // Buscar por nombre normalizado
-          const { data: vendors } = await supabase
+          // Buscar directamente con ILIKE para máxima flexibilidad
+          const { data: vendor } = await supabase
             .from('vendors')
             .select('id, name')
-            .eq('is_active', true);
-          
-          // Buscar coincidencia normalizando ambos lados
-          const vendor = vendors?.find(v => {
-            const normalizedVendorName = v.name
-              .replace(/[áàâä]/gi, 'a')
-              .replace(/[éèêë]/gi, 'e')
-              .replace(/[íìîï]/gi, 'i')
-              .replace(/[óòôö]/gi, 'o')
-              .replace(/[úùûü]/gi, 'u')
-              .toLowerCase();
-            return normalizedVendorName.includes(cleanedName.toLowerCase());
-          });
+            .eq('is_active', true)
+            .ilike('name', `%${cleanedName}%`)
+            .limit(1)
+            .maybeSingle();
           
           if (vendor) {
             vendorId = vendor.id;
