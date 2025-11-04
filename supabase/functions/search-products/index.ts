@@ -92,6 +92,7 @@ Responde solo con las palabras clave corregidas, sin explicación ni ejemplos.`
     
     for (const keyword of keywordArray) {
       // Buscar en nombre, descripción y categoría
+      // Para categoría, soportar tanto string como array
       // Usar % en ambos lados para buscar la palabra en cualquier parte
       let query = supabase
         .from('products')
@@ -115,8 +116,11 @@ Responde solo con las palabras clave corregidas, sin explicación ni ejemplos.`
             vendor_hours(is_open_24_hours)
           )
         `)
-        .eq('is_available', true)
-        .or(`name.ilike.%${keyword}%,description.ilike.%${keyword}%,category.ilike.%${keyword}%`);
+        .eq('is_available', true);
+      
+      // Buscar en nombre, descripción y categoría (soportando array en category)
+      // cs = contains (para arrays), ilike para strings
+      query = query.or(`name.ilike.%${keyword}%,description.ilike.%${keyword}%,category.cs.{${keyword}}`);
       
       // Si se proporcionan vendorIds, filtrar solo esos vendors
       if (vendorIds && Array.isArray(vendorIds) && vendorIds.length > 0) {

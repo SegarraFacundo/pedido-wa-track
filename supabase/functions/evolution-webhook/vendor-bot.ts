@@ -631,9 +631,14 @@ async function ejecutarHerramienta(
               .in('id', vendorIds);
             
             const vendorCategories = new Map(vendorDetails?.map((v: any) => [v.id, v.category]) || []);
-            filteredVendors = vendorsInRange.filter((v: any) => 
-              vendorCategories.get(v.vendor_id) === args.categoria
-            );
+            filteredVendors = vendorsInRange.filter((v: any) => {
+              const category = vendorCategories.get(v.vendor_id);
+              // Soportar categoría como string o array
+              if (Array.isArray(category)) {
+                return category.includes(args.categoria);
+              }
+              return category === args.categoria;
+            });
           }
           
           // Separar abiertos y cerrados, pero MOSTRAR AMBOS
@@ -738,7 +743,8 @@ async function ejecutarHerramienta(
 
           // Filtrar por categoría si se especifica
           if (args.categoria) {
-            query = query.eq('category', args.categoria);
+            // Soportar categorías como string o array
+            query = query.or(`category.eq.${args.categoria},category.cs.{${args.categoria}}`);
           }
 
           const { data: vendors, error } = await query;
@@ -769,7 +775,9 @@ async function ejecutarHerramienta(
           // Formatear resultados
           let resultado = `🟢 Encontré ${openVendors.length} ${openVendors.length === 1 ? 'negocio abierto' : 'negocios abiertos'}:\n\n⚠️ *Sin ubicación:* Te muestro todos. Para ver solo los que te entregan, compartí tu ubicación 📍\n\n`;
           openVendors.forEach((v: any, i: number) => {
-            resultado += `${i + 1}. ${v.name} (${v.category})\n`;
+            // Formatear categorías (puede ser string o array)
+            const categoryText = Array.isArray(v.category) ? v.category.join(', ') : v.category;
+            resultado += `${i + 1}. ${v.name} (${categoryText})\n`;
             resultado += `   ID: ${v.id}\n`;
             resultado += `   📍 ${v.address}\n`;
             resultado += `   ⏰ Horario: ${v.opening_time} - ${v.closing_time}\n`;
@@ -859,6 +867,11 @@ async function ejecutarHerramienta(
         products.forEach((p: any, i: number) => {
           menu += `${i + 1}. *${p.name}* - $${p.price}\n`;
           menu += `   ID: ${p.id}\n`;
+          // Mostrar categorías del producto (puede ser string o array)
+          if (p.category) {
+            const categoryText = Array.isArray(p.category) ? p.category.join(', ') : p.category;
+            menu += `   🏷️ ${categoryText}\n`;
+          }
           if (p.description) menu += `   📝 ${p.description}\n`;
           if (p.image) menu += `   🖼️ ${p.image}\n`;
           menu += `\n`;
