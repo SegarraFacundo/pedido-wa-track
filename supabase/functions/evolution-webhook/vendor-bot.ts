@@ -1141,16 +1141,14 @@ async function ejecutarHerramienta(
             }
           }
 
-          // Si llegamos acá, está dentro del radio o no se pudo validar
-          // Usar la dirección del contexto si ya está guardada
-          if (!args.direccion || args.direccion.trim() === '') {
-            if (context.delivery_address) {
-              args.direccion = context.delivery_address;
-              console.log(`✅ Using saved context address: ${args.direccion}`);
-            } else {
-              args.direccion = `Lat: ${context.user_latitude.toFixed(6)}, Lon: ${context.user_longitude.toFixed(6)}`;
-              console.log(`✅ Using coordinates as address: ${args.direccion}`);
-            }
+          // ⚠️ CRÍTICO: SIEMPRE usar la dirección del contexto si existe
+          // Esto evita que el AI use incorrectamente la dirección del vendor
+          if (context.delivery_address) {
+            args.direccion = context.delivery_address;
+            console.log(`✅ Using saved context address (forced): ${args.direccion}`);
+          } else if (!args.direccion || args.direccion.trim() === '') {
+            args.direccion = `Lat: ${context.user_latitude.toFixed(6)}, Lon: ${context.user_longitude.toFixed(6)}`;
+            console.log(`✅ Using coordinates as address: ${args.direccion}`);
           }
         } else {
           // Sin ubicación, pedir que la comparta
