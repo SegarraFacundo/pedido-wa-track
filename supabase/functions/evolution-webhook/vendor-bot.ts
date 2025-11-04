@@ -500,6 +500,7 @@ async function ejecutarHerramienta(
   context: ConversationContext,
   supabase: any
 ): Promise<string> {
+  console.log(`🔧 [TOOL CALL] ${toolName}`, JSON.stringify(args, null, 2));
   console.log(`Ejecutando herramienta: ${toolName}`, args);
 
   try {
@@ -1862,14 +1863,14 @@ REGLAS GENERALES:
 14. NUNCA muestres múltiples menús en una sola respuesta - solo UN menú a la vez
 
 ⚠️ PRODUCTOS Y CARRITO (CRÍTICO):
-- NUNCA agregues productos inventados o que no existen en el menú
-- Si el cliente pide algo que NO está en el menú → Decile que NO lo tenés y mostrá alternativas del menú
-- Ejemplos de lo que NO hacer:
-  ❌ Cliente: "quiero cerveza" → NO agregues "cerveza artesanal" si no está en el menú
-  ❌ Cliente: "quiero whisky" → NO agregues "whisky" si no está en el menú
-  ✅ Cliente: "quiero cerveza" → "Lamentablemente no tenemos whisky/cerveza en este momento. ¿Te puedo mostrar lo que sí tenemos?"
-- SIEMPRE mostrá el menú antes de agregar productos al carrito
-- Los product_id que uses en agregar_al_carrito DEBEN ser los mismos que mostraste en ver_menu_negocio
+- SIEMPRE INTENTÁ AGREGAR AL CARRITO cuando el cliente pida productos
+- Si el cliente ya vio el menú anteriormente en la conversación, PODÉS agregar productos sin volver a mostrarlo
+- Usá el nombre del producto que el cliente menciona (ej: "agua mineral", "pizza pepperoni") - el sistema buscará el producto por nombre
+- Si el cliente pide algo que NO existe → Decile que NO lo tenés y mostrá alternativas del menú
+- Ejemplos:
+  ✅ Cliente: "un agua mineral" → agregar_al_carrito con product_id="agua_mineral" (el sistema resolverá el UUID)
+  ✅ Cliente: "pizza pepperoni" → agregar_al_carrito con product_id="pizza_pepperoni"
+  ❌ Cliente: "quiero cerveza" (y no hay cerveza en menú) → "No tenemos cerveza, pero tengo otras bebidas..."
 
 ⚠️ CREAR PEDIDO vs HABLAR CON VENDEDOR:
 - CREAR PEDIDO (crear_pedido): cuando el cliente confirma que TODO está correcto (carrito, dirección, pago)
@@ -1985,6 +1986,8 @@ IMPORTANTE: Siempre confirmá antes de crear un pedido. Preguntá dirección y m
       }
 
       // Si no hay tool calls, es la respuesta final
+      console.log('❌ No tool calls - AI responding directly');
+      console.log('   Message content:', assistantMessage.content?.slice(0, 200));
       finalResponse = assistantMessage.content || 'Perdón, no entendí. ¿Podés repetir?';
       console.log('✅ Final response ready:', finalResponse.slice(0, 100));
       continueLoop = false;
