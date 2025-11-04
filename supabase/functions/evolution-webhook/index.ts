@@ -527,6 +527,37 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
 
     console.log('Processing message from:', normalizedPhone, 'Message:', messageText);
 
+    // 🎫 Verificar si hay un ticket de soporte abierto
+    const { data: openTicket } = await supabase
+      .from('support_tickets')
+      .select('id, subject, status')
+      .eq('customer_phone', normalizedPhone)
+      .in('status', ['open', 'in_progress'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (openTicket) {
+      console.log('🎫 User has open support ticket:', openTicket.id);
+      
+      // Guardar el mensaje del usuario en support_messages
+      await supabase
+        .from('support_messages')
+        .insert({
+          ticket_id: openTicket.id,
+          sender_type: 'customer',
+          message: messageText
+        });
+      
+      console.log('📝 Message saved to support ticket, bot will not respond');
+      
+      // NO procesamos con el bot si hay un ticket abierto
+      return new Response(JSON.stringify({ status: 'support_mode', ticket_id: openTicket.id }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
+      });
+    }
+
     // Procesar mensaje con el bot de IA
     let responseMessage = await processWithVendorBot(normalizedPhone, messageText);
 
