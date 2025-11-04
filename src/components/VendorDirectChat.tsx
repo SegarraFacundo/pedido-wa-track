@@ -119,8 +119,18 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
           } as ChatMessage;
           
           if (selectedChat && newMessage.chat_id === selectedChat.id) {
-            console.log('✅ Message is for selected chat, adding to messages');
-            setMessages(prev => [...prev, newMessage]);
+            console.log('✅ Message is for selected chat, checking for duplicates');
+            
+            // Evitar duplicados verificando si el mensaje ya existe
+            setMessages(prev => {
+              const exists = prev.some(msg => msg.id === newMessage.id);
+              if (exists) {
+                console.log('⚠️ Message already exists, skipping');
+                return prev;
+              }
+              console.log('✅ Adding new message to state');
+              return [...prev, newMessage];
+            });
             
             // Forzar scroll inmediatamente
             setTimeout(() => {
@@ -334,15 +344,27 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
     }
 
     try {
-      const { error } = await supabase
+      const { data: insertedMessage, error } = await supabase
         .from('chat_messages')
         .insert({
           chat_id: selectedChat.id,
           sender_type: 'vendor',
           message: newMessage
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Agregar inmediatamente al estado local para feedback instantáneo
+      if (insertedMessage) {
+        const newMsg: ChatMessage = {
+          ...insertedMessage,
+          sender_type: insertedMessage.sender_type as 'customer' | 'vendor' | 'bot',
+          created_at: new Date(insertedMessage.created_at)
+        };
+        setMessages(prev => [...prev, newMsg]);
+      }
 
       // Desactivar bot automáticamente cuando el vendedor escribe cualquier mensaje
       await supabase
