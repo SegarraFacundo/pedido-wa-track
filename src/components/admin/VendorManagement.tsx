@@ -51,6 +51,19 @@ export default function VendorManagement() {
   const [existingUsers, setExistingUsers] = useState<any[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>('');
 
+  const [categories, setCategories] = useState([
+    'restaurant',
+    'food',
+    'grocery',
+    'pharmacy',
+    'retail',
+    'service',
+    'vivero',
+    'other'
+  ]);
+  const [customCategory, setCustomCategory] = useState('');
+  const [showCustomCategory, setShowCustomCategory] = useState(false);
+
   const [formData, setFormData] = useState({
     name: "",
     category: "",
@@ -310,11 +323,60 @@ export default function VendorManagement() {
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               />
-              <Input
-                placeholder="Categoría"
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              />
+              <div className="space-y-2">
+                <Select 
+                  value={showCustomCategory ? 'custom' : formData.category} 
+                  onValueChange={(value) => {
+                    if (value === 'custom') {
+                      setShowCustomCategory(true);
+                      setFormData({ ...formData, category: '' });
+                    } else {
+                      setShowCustomCategory(false);
+                      setFormData({ ...formData, category: value });
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar categoría" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background z-50">
+                    {categories.map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="custom">+ Agregar nueva categoría</SelectItem>
+                  </SelectContent>
+                </Select>
+                
+                {showCustomCategory && (
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Nueva categoría"
+                      value={customCategory}
+                      onChange={(e) => setCustomCategory(e.target.value)}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        if (customCategory.trim()) {
+                          setCategories([...categories, customCategory.toLowerCase()]);
+                          setFormData({ ...formData, category: customCategory.toLowerCase() });
+                          setCustomCategory('');
+                          setShowCustomCategory(false);
+                          toast({
+                            title: "Categoría agregada",
+                            description: `La categoría "${customCategory}" ha sido agregada`,
+                          });
+                        }
+                      }}
+                    >
+                      Agregar
+                    </Button>
+                  </div>
+                )}
+              </div>
               <Input
                 placeholder="Teléfono"
                 value={formData.phone}
