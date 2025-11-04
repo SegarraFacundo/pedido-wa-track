@@ -11,31 +11,60 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { orderId, eventType } = await req.json();
-    console.log('📬 Vendor notification request:', { orderId, eventType });
+    const { orderId, eventType, vendorId } = await req.json();
+    console.log('📬 Vendor notification request:', { orderId, eventType, vendorId });
 
-    if (!orderId || !eventType) {
-      throw new Error('Missing orderId or eventType');
+    if (!eventType) {
+      throw new Error('Missing eventType');
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Obtener información del pedido y vendedor
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .select('*, vendors!inner(id, name, whatsapp_number)')
-      .eq('id', orderId)
-      .single();
+    let vendor;
+    let order;
 
-    if (orderError || !order) {
-      console.error('❌ Order not found:', orderError);
-      throw new Error('Order not found');
+    // Si es un mensaje de cliente sin pedido, obtener vendor directamente
+    if (eventType === 'customer_message' && (!orderId || orderId === 'no-order')) {
+      if (!vendorId) {
+        throw new Error('vendorId required for customer_message without order');
+      }
+      
+      const { data: vendorData, error: vendorError } = await supabase
+        .from('vendors')
+        .select('id, name, whatsapp_number')
+        .eq('id', vendorId)
+        .single();
+      
+      if (vendorError || !vendorData) {
+        console.error('❌ Vendor not found:', vendorError);
+        throw new Error('Vendor not found');
+      }
+      
+      vendor = vendorData;
+      console.log('🏪 Vendor:', { id: vendor.id, name: vendor.name, hasWhatsApp: !!vendor.whatsapp_number });
+    } else {
+      // Obtener información del pedido y vendedor
+      if (!orderId) {
+        throw new Error('Missing orderId');
+      }
+      
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .select('*, vendors!inner(id, name, whatsapp_number)')
+        .eq('id', orderId)
+        .single();
+
+      if (orderError || !orderData) {
+        console.error('❌ Order not found:', orderError);
+        throw new Error('Order not found');
+      }
+
+      order = orderData;
+      vendor = order.vendors;
+      console.log('🏪 Vendor:', { id: vendor.id, name: vendor.name, hasWhatsApp: !!vendor.whatsapp_number });
     }
-
-    const vendor = order.vendors;
-    console.log('🏪 Vendor:', { id: vendor.id, name: vendor.name, hasWhatsApp: !!vendor.whatsapp_number });
 
     // Verificar si el vendedor tiene WhatsApp
     if (!vendor.whatsapp_number) {
@@ -84,6 +113,9 @@ Deno.serve(async (req) => {
     let message = '';
     switch (eventType) {
       case 'new_order':
+        if (!order) {
+          throw new Error('Order required for new_order event');
+        }
         const itemsList = order.items.map((item: any) => 
           `• ${item.quantity}x ${item.name} - $${item.price}`
         ).join('\n');
@@ -96,6 +128,9 @@ Deno.serve(async (req) => {
         break;
       
       case 'order_cancelled':
+        if (!order) {
+          throw new Error('Order required for order_cancelled event');
+        }
         message = `❌ *Pedido Cancelado #${order.id.slice(0, 8)}*\n\n` +
                   `El pedido de ${order.customer_name} ha sido cancelado.\n` +
                   `Total: $${order.total}`;
@@ -117,7 +152,7 @@ Deno.serve(async (req) => {
         body: {
           phoneNumber: vendor.whatsapp_number,
           message,
-          orderId: order.id,
+          orderId: orderId || 'no-order',
         },
       }
     );

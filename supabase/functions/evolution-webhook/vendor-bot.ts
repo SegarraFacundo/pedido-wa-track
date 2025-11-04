@@ -1428,6 +1428,18 @@ async function ejecutarHerramienta(
             reason: args.motivo
           });
 
+        // 📧 Notificar al vendedor sobre la cancelación
+        try {
+          await supabase.functions.invoke('notify-vendor', {
+            body: {
+              orderId: args.order_id,
+              eventType: 'order_cancelled'
+            }
+          });
+        } catch (notifyError) {
+          console.error('Error notifying vendor about cancellation:', notifyError);
+        }
+
         return `✅ Pedido #${args.order_id.substring(0, 8)} cancelado.\n📝 Motivo: ${args.motivo}\n\nEl vendedor ha sido notificado.`;
       }
 
@@ -1513,6 +1525,26 @@ async function ejecutarHerramienta(
                 sender_type: 'bot',
                 message: `Cliente ${context.phone} solicitó hablar con el vendedor`
               });
+            
+            // 📧 Notificar al vendedor que un cliente quiere hablar
+            try {
+              console.log('📨 Notifying vendor about customer message request');
+              const { data: notifyData, error: notifyError } = await supabase.functions.invoke('notify-vendor', {
+                body: {
+                  orderId: args.order_id || 'no-order',
+                  eventType: 'customer_message',
+                  vendorId: vendorId
+                }
+              });
+              
+              if (notifyError) {
+                console.error('❌ Error notifying vendor:', notifyError);
+              } else {
+                console.log('✅ Vendor notified about customer message');
+              }
+            } catch (notifyErr) {
+              console.error('💥 Exception notifying vendor:', notifyErr);
+            }
           }
         }
         

@@ -80,9 +80,25 @@ export function OrderCancellationDialog({
         });
       }
 
+      // Send notification to vendor if customer cancelled
+      if (!isVendor && order?.vendor_id) {
+        try {
+          await supabase.functions.invoke('notify-vendor', {
+            body: {
+              orderId,
+              eventType: 'order_cancelled'
+            }
+          });
+        } catch (vendorNotifyError) {
+          console.error('Error notifying vendor:', vendorNotifyError);
+        }
+      }
+
       toast({
         title: 'Pedido cancelado',
-        description: 'El pedido ha sido cancelado y el cliente ha sido notificado'
+        description: isVendor 
+          ? 'El pedido ha sido cancelado y el cliente ha sido notificado'
+          : 'El pedido ha sido cancelado y el vendedor ha sido notificado'
       });
 
       onSuccess();
