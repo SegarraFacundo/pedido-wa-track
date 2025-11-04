@@ -897,30 +897,55 @@ async function ejecutarHerramienta(
           currentCart: context.cart.length
         });
         
-        // CRITICAL: Resolver vendor_id si no es un UUID válido
-        let vendorId = args.vendor_id;
+        // CRITICAL: Priorizar vendor del contexto, luego resolver vendor_id
+        let vendorId = context.selected_vendor_id || args.vendor_id;
+        
+        if (!vendorId) {
+          return 'Error: Necesito que primero veas el menú de un negocio antes de agregar productos.';
+        }
+        
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         
         if (!uuidRegex.test(vendorId)) {
           console.log(`⚠️ Invalid vendor_id format: "${vendorId}", attempting to find by name`);
           
-          // Limpiar el input
+          // Limpiar el input y normalizar acentos
           const cleanedName = vendorId
             .replace(/-/g, ' ')
             .replace(/_/g, ' ')
+            .replace(/[áàâä]/gi, 'a')
+            .replace(/[éèêë]/gi, 'e')
+            .replace(/[íìîï]/gi, 'i')
+            .replace(/[óòôö]/gi, 'o')
+            .replace(/[úùûü]/gi, 'u')
             .trim();
           
-          const { data: vendor } = await supabase
+          console.log(`🔍 Searching vendor by name: "${cleanedName}"`);
+          
+          // Buscar por nombre normalizado
+          const { data: vendors } = await supabase
             .from('vendors')
             .select('id, name')
-            .ilike('name', `%${cleanedName}%`)
-            .maybeSingle();
+            .eq('is_active', true);
+          
+          // Buscar coincidencia normalizando ambos lados
+          const vendor = vendors?.find(v => {
+            const normalizedVendorName = v.name
+              .replace(/[áàâä]/gi, 'a')
+              .replace(/[éèêë]/gi, 'e')
+              .replace(/[íìîï]/gi, 'i')
+              .replace(/[óòôö]/gi, 'o')
+              .replace(/[úùûü]/gi, 'u')
+              .toLowerCase();
+            return normalizedVendorName.includes(cleanedName.toLowerCase());
+          });
           
           if (vendor) {
             vendorId = vendor.id;
             console.log(`✅ Found vendor by name: ${vendor.name} (${vendorId})`);
           } else {
-            return `No encontré el negocio "${args.vendor_id}". Por favor usá el ID correcto del menú.`;
+            console.log(`❌ No vendor found matching: "${cleanedName}"`);
+            return `No encontré el negocio "${args.vendor_id}". Por favor mirá primero el menú de un negocio.`;
           }
         }
         
