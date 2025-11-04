@@ -465,7 +465,7 @@ export type Database = {
       }
       products: {
         Row: {
-          category: string
+          category: string[] | null
           created_at: string | null
           description: string | null
           id: string
@@ -479,7 +479,7 @@ export type Database = {
           vendor_id: string
         }
         Insert: {
-          category: string
+          category?: string[] | null
           created_at?: string | null
           description?: string | null
           id?: string
@@ -493,7 +493,7 @@ export type Database = {
           vendor_id: string
         }
         Update: {
-          category?: string
+          category?: string[] | null
           created_at?: string | null
           description?: string | null
           id?: string
@@ -1269,7 +1269,7 @@ export type Database = {
           total_orders: number | null
         }
         Insert: {
-          address_area?: never
+          address_area?: string | null
           available_products?: never
           category?: string | null
           closing_time?: string | null
@@ -1285,7 +1285,7 @@ export type Database = {
           total_orders?: number | null
         }
         Update: {
-          address_area?: never
+          address_area?: string | null
           available_products?: never
           category?: string | null
           closing_time?: string | null

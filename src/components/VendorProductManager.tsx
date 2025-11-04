@@ -14,7 +14,7 @@ import { Plus, Edit2, Trash2, Save, X, Upload } from 'lucide-react';
 interface Product {
   id: string;
   name: string;
-  category: string;
+  category: string[];
   description: string | null;
   price: number;
   is_available: boolean;
@@ -42,7 +42,7 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
   // Form state
   const [formData, setFormData] = useState({
     name: '',
-    category: '',
+    category: [] as string[],
     description: '',
     price: '',
     is_available: true,
@@ -50,6 +50,7 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
     stock_enabled: false,
     stock_quantity: ''
   });
+  const [newCategory, setNewCategory] = useState('');
 
   useEffect(() => {
     fetchProducts();
@@ -68,8 +69,9 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
 
       setProducts(data || []);
       
-      // Extract unique categories
-      const uniqueCategories = [...new Set(data?.map(p => p.category) || [])];
+      // Extract unique categories (flatten all category arrays)
+      const allCategories = data?.flatMap(p => p.category) || [];
+      const uniqueCategories = [...new Set(allCategories)];
       setCategories(uniqueCategories);
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -134,10 +136,10 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
   };
 
   const handleSaveProduct = async () => {
-    if (!formData.name || !formData.category || !formData.price) {
+    if (!formData.name || formData.category.length === 0 || !formData.price) {
       toast({
         title: 'Error',
-        description: 'Por favor complete todos los campos requeridos',
+        description: 'Por favor complete todos los campos requeridos (al menos una categoría)',
         variant: 'destructive'
       });
       return;
@@ -196,7 +198,7 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
       // Reset form and refresh
       setFormData({
         name: '',
-        category: '',
+        category: [],
         description: '',
         price: '',
         is_available: true,
@@ -204,6 +206,7 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
         stock_enabled: false,
         stock_quantity: ''
       });
+      setNewCategory('');
       setImageFile(null);
       setImagePreview(null);
       setIsAddingProduct(false);
@@ -283,7 +286,18 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
 
   const filteredProducts = selectedCategory === 'all' 
     ? products 
-    : products.filter(p => p.category === selectedCategory);
+    : products.filter(p => p.category.includes(selectedCategory));
+
+  const handleAddCategory = () => {
+    if (newCategory.trim() && !formData.category.includes(newCategory.trim())) {
+      setFormData({ ...formData, category: [...formData.category, newCategory.trim()] });
+      setNewCategory('');
+    }
+  };
+
+  const handleRemoveCategory = (cat: string) => {
+    setFormData({ ...formData, category: formData.category.filter(c => c !== cat) });
+  };
 
   if (loading) {
     return (
@@ -310,7 +324,7 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
           <TabsTrigger value="all">Todos ({products.length})</TabsTrigger>
           {categories.map(category => (
             <TabsTrigger key={category} value={category}>
-              {category} ({products.filter(p => p.category === category).length})
+              {category} ({products.filter(p => p.category.includes(category)).length})
             </TabsTrigger>
           ))}
         </TabsList>
@@ -329,11 +343,15 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
                       />
                     )}
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-start gap-2 mb-1">
                         <h3 className="font-semibold">{product.name}</h3>
-                        <span className="text-xs px-2 py-1 bg-secondary rounded-full">
-                          {product.category}
-                        </span>
+                        <div className="flex flex-wrap gap-1">
+                          {product.category.map(cat => (
+                            <span key={cat} className="text-xs px-2 py-1 bg-secondary rounded-full">
+                              {cat}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                       {product.description && (
                         <p className="text-sm text-muted-foreground mb-2">{product.description}</p>
@@ -413,14 +431,34 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
             </div>
             
             <div>
-              <Label htmlFor="category">Categoría *</Label>
-              <Input
-                id="category"
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                placeholder="Ej: Pizzas, Bebidas, etc."
-                list="categories"
-              />
+              <Label htmlFor="category">Categorías * (puedes agregar múltiples)</Label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {formData.category.map(cat => (
+                  <span key={cat} className="inline-flex items-center gap-1 text-xs px-3 py-1 bg-primary text-primary-foreground rounded-full">
+                    {cat}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveCategory(cat)}
+                      className="hover:bg-primary-foreground/20 rounded-full p-0.5"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  id="category"
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCategory())}
+                  placeholder="Agregar categoría..."
+                  list="categories"
+                />
+                <Button type="button" onClick={handleAddCategory} size="sm">
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
               <datalist id="categories">
                 {categories.map(cat => (
                   <option key={cat} value={cat} />
@@ -531,9 +569,10 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
                 setEditingProduct(null);
                 setImageFile(null);
                 setImagePreview(null);
+                setNewCategory('');
                 setFormData({
                   name: '',
-                  category: '',
+                  category: [],
                   description: '',
                   price: '',
                   is_available: true,
