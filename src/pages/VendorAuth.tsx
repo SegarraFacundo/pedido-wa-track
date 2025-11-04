@@ -16,6 +16,7 @@ export default function VendorAuth() {
   const [vendorName, setVendorName] = useState('');
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<User | null>(null);
+  const [hasVendorProfile, setHasVendorProfile] = useState<boolean | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -52,7 +53,47 @@ export default function VendorAuth() {
       .maybeSingle();
 
     if (vendor) {
+      setHasVendorProfile(true);
       navigate('/vendor-dashboard');
+    } else {
+      setHasVendorProfile(false);
+    }
+  };
+
+  const handleCreateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      if (!user) throw new Error('No hay usuario autenticado');
+
+      const { error: vendorError } = await supabase
+        .from('vendors')
+        .insert({
+          user_id: user.id,
+          name: vendorName,
+          category: 'restaurant',
+          phone: '',
+          address: '',
+          is_active: false
+        });
+
+      if (vendorError) throw vendorError;
+
+      toast({
+        title: '✅ Perfil creado',
+        description: 'Tu perfil de vendedor ha sido creado exitosamente',
+      });
+
+      navigate('/vendor-dashboard');
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -139,6 +180,52 @@ export default function VendorAuth() {
   };
 
   if (user) {
+    // Si el usuario no tiene perfil de vendedor, mostrar formulario para crearlo
+    if (hasVendorProfile === false) {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <div className="flex justify-center mb-6">
+                <img src={lapachoIcon} alt="Lapacho" className="h-20 w-auto" />
+              </div>
+              <CardTitle>Crear Perfil de Vendedor</CardTitle>
+              <CardDescription>
+                Tu cuenta ({user.email}) no tiene un perfil de vendedor. Completa el formulario para crear uno.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleCreateProfile} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="vendor-name">Nombre del Negocio</Label>
+                  <Input
+                    id="vendor-name"
+                    type="text"
+                    placeholder="Mi Restaurante"
+                    value={vendorName}
+                    onChange={(e) => setVendorName(e.target.value)}
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? 'Creando perfil...' : 'Crear Perfil de Vendedor'}
+                </Button>
+                <Button 
+                  type="button"
+                  onClick={handleSignOut}
+                  variant="outline"
+                  className="w-full"
+                >
+                  Cerrar Sesión
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    // Si tiene perfil, mostrar opciones normales
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
