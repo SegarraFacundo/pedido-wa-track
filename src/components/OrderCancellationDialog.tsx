@@ -38,6 +38,15 @@ export function OrderCancellationDialog({
     setIsSubmitting(true);
 
     try {
+      // Get order details first
+      const { data: order, error: fetchError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', orderId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
       // Update order status
       const { error: updateError } = await supabase
         .from('orders')
@@ -58,9 +67,22 @@ export function OrderCancellationDialog({
 
       if (historyError) throw historyError;
 
+      // Send WhatsApp notification to customer
+      if (order?.customer_phone) {
+        const notificationMessage = `Tu pedido #${orderId.slice(0, 8)} ha sido cancelado. Motivo: ${reason.trim()}. Si tienes alguna duda, contacta al vendedor.`;
+        
+        await supabase.functions.invoke('send-whatsapp-notification', {
+          body: {
+            orderId,
+            phoneNumber: order.customer_phone,
+            message: notificationMessage
+          }
+        });
+      }
+
       toast({
         title: 'Pedido cancelado',
-        description: 'El pedido ha sido cancelado exitosamente'
+        description: 'El pedido ha sido cancelado y el cliente ha sido notificado'
       });
 
       onSuccess();
