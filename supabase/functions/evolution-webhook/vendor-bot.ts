@@ -1696,8 +1696,34 @@ Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
       }
 
       case "guardar_direccion": {
-        if (!context.user_latitude || !context.user_longitude) {
-          return '⚠️ No tengo tu ubicación guardada. Por favor compartí tu ubicación usando el botón 📍 de WhatsApp primero.';
+        // Primero intentar obtener las coordenadas del contexto
+        let lat = context.user_latitude;
+        let lng = context.user_longitude;
+        let address = context.delivery_address;
+
+        // Si no están en el contexto, buscar en la sesión más reciente
+        if (!lat || !lng) {
+          console.log('⚠️ Coordinates not in context, fetching from database...');
+          const { data: session } = await supabase
+            .from('user_sessions')
+            .select('user_latitude, user_longitude, last_bot_message')
+            .eq('phone', context.phone)
+            .maybeSingle();
+
+          if (session?.user_latitude && session?.user_longitude) {
+            lat = session.user_latitude;
+            lng = session.user_longitude;
+            console.log(`✅ Found coordinates in session: ${lat}, ${lng}`);
+            
+            // Actualizar el contexto para futuras operaciones
+            context.user_latitude = lat;
+            context.user_longitude = lng;
+          }
+        }
+
+        // Si aún no tenemos coordenadas, pedir que las comparta
+        if (!lat || !lng) {
+          return 'Parece que no tengo tu ubicación guardada. Necesito que compartas tu ubicación tocando el clip 📎 en WhatsApp y eligiendo "Ubicación". \n\nUna vez que lo hagas, podré guardarla como "' + args.nombre + '". 😊';
         }
 
         // Validar nombre
@@ -1724,9 +1750,9 @@ Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
           .insert({
             phone: context.phone,
             name: nombre,
-            address: context.delivery_address || 'Ubicación guardada',
-            latitude: context.user_latitude,
-            longitude: context.user_longitude,
+            address: address || 'Ubicación guardada',
+            latitude: lat,
+            longitude: lng,
             is_temporary: false
           });
 
@@ -1735,6 +1761,7 @@ Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
           return 'Hubo un problema al guardar tu dirección. Intentá de nuevo.';
         }
 
+        console.log(`✅ Address saved: ${nombre} at ${lat}, ${lng}`);
         return `✅ Listo, guardé tu dirección como "${nombre}" 📍\n\nLa próxima vez podés decir *"Enviar a ${nombre}"* para usarla rápido. 😊`;
       }
 
@@ -1955,6 +1982,16 @@ ${context.delivery_address ? `- Dirección: ${context.delivery_address}` : ''}
 ${context.payment_method ? `- Método de pago: ${context.payment_method}` : ''}
 ${context.pending_order_id ? `- Pedido pendiente: ${context.pending_order_id}` : ''}
 ${context.user_latitude && context.user_longitude ? `- ✅ Usuario tiene ubicación guardada (lat: ${context.user_latitude}, lng: ${context.user_longitude})` : '- ⚠️ Usuario NO compartió su ubicación aún'}
+
+🚨 DATOS EN TIEMPO REAL (MÁXIMA PRIORIDAD):
+⚠️ NUNCA ALMACENES NI MEMORICES INFORMACIÓN DE NEGOCIOS ⚠️
+- Los negocios pueden cambiar HORARIOS, PRODUCTOS, PRECIOS y DISPONIBILIDAD en cualquier momento
+- Un negocio puede estar SUSPENDIDO por falta de pago
+- Los productos disponibles varían según STOCK actual
+- El RADIO DE ENTREGA puede cambiar según ubicación del cliente
+- SIEMPRE debes consultar las herramientas para obtener información actualizada
+- NO supongas que un negocio que aparecía antes todavía está disponible
+- NO memorices menús, precios o productos - todo cambia dinámicamente
 
 📍 UBICACIÓN Y FILTRADO:
 ${context.user_latitude && context.user_longitude 
