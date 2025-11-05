@@ -354,6 +354,7 @@ export type Database = {
       orders: {
         Row: {
           address: string
+          address_is_manual: boolean
           coordinates: Json | null
           created_at: string | null
           customer_name: string
@@ -376,6 +377,7 @@ export type Database = {
         }
         Insert: {
           address: string
+          address_is_manual?: boolean
           coordinates?: Json | null
           created_at?: string | null
           customer_name: string
@@ -398,6 +400,7 @@ export type Database = {
         }
         Update: {
           address?: string
+          address_is_manual?: boolean
           coordinates?: Json | null
           created_at?: string | null
           customer_name?: string
@@ -565,6 +568,7 @@ export type Database = {
           address: string
           created_at: string
           id: string
+          is_manual_entry: boolean
           is_temporary: boolean
           latitude: number
           longitude: number
@@ -575,6 +579,7 @@ export type Database = {
           address: string
           created_at?: string
           id?: string
+          is_manual_entry?: boolean
           is_temporary?: boolean
           latitude: number
           longitude: number
@@ -585,6 +590,7 @@ export type Database = {
           address?: string
           created_at?: string
           id?: string
+          is_manual_entry?: boolean
           is_temporary?: boolean
           latitude?: number
           longitude?: number

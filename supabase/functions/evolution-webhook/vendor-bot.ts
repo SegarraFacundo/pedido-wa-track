@@ -489,6 +489,27 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       name: "eliminar_todas_direcciones",
       description: "Elimina todas las direcciones guardadas del cliente."
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "agregar_direccion_manual",
+      description: "Permite al cliente escribir su dirección manualmente cuando no puede compartir ubicación GPS. ⚠️ Esta dirección NO será validada para radio de entrega.",
+      parameters: {
+        type: "object",
+        properties: {
+          direccion_completa: {
+            type: "string",
+            description: "Dirección completa escrita por el cliente (calle, número, ciudad, referencias)"
+          },
+          nombre: {
+            type: "string",
+            description: "Nombre para guardar la dirección (ej: 'Casa', 'Trabajo'). Opcional - si no se proporciona, se usa como temporal."
+          }
+        },
+        required: ["direccion_completa"]
+      }
+    }
   }
 ];
 
@@ -1210,7 +1231,8 @@ async function ejecutarHerramienta(
             total,
             status: 'pending',
             address: context.delivery_address,
-            payment_method: context.payment_method
+            payment_method: context.payment_method,
+            address_is_manual: (!context.user_latitude || context.user_latitude === 0) // Marca si es manual
           })
           .select()
           .single();
@@ -1927,6 +1949,57 @@ Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
         return `✅ Listo, eliminé todas tus ubicaciones guardadas. 💬\n\nPodés compartir tu ubicación 📍 cuando quieras hacer un nuevo pedido.`;
       }
 
+      case "agregar_direccion_manual": {
+        const direccionCompleta = args.direccion_completa.trim();
+        const nombre = args.nombre?.trim();
+
+        if (!direccionCompleta || direccionCompleta.length < 10) {
+          return 'Por favor escribí una dirección más completa (calle, número, ciudad, referencias). Mínimo 10 caracteres.';
+        }
+
+        // Si tiene nombre, guardar de forma permanente
+        if (nombre && nombre.length >= 2) {
+          // Verificar si ya existe
+          const { data: existing } = await supabase
+            .from('saved_addresses')
+            .select('id')
+            .eq('phone', context.phone)
+            .eq('name', nombre)
+            .maybeSingle();
+
+          if (existing) {
+            return `Ya tenés una dirección guardada con el nombre "${nombre}". Podés borrarla primero o usar otro nombre.`;
+          }
+
+          // Guardar con coordenadas null e indicador manual
+          const { error } = await supabase
+            .from('saved_addresses')
+            .insert({
+              phone: context.phone,
+              name: nombre,
+              address: direccionCompleta,
+              latitude: 0, // Coordenadas en 0,0 indican entrada manual
+              longitude: 0,
+              is_temporary: false,
+              is_manual_entry: true
+            });
+
+          if (error) {
+            console.error('Error saving manual address:', error);
+            return 'Hubo un problema al guardar tu dirección. Intentá de nuevo.';
+          }
+
+          return `✅ Dirección guardada como "${nombre}": ${direccionCompleta}\n\n⚠️ Importante: Esta dirección NO fue validada con GPS. El negocio verá que fue ingresada manualmente y confirmará si hace delivery ahí. 📍`;
+        } else {
+          // Sin nombre = temporal para este pedido
+          context.delivery_address = direccionCompleta;
+          context.user_latitude = 0; // Marca como manual
+          context.user_longitude = 0;
+          
+          return `✅ Voy a usar esta dirección para tu pedido: ${direccionCompleta}\n\n⚠️ Esta dirección NO fue validada con GPS. El negocio confirmará si hace delivery ahí. 📍\n\n¿Qué método de pago preferís? (efectivo, transferencia o mercadopago)`;
+        }
+      }
+
       default:
         return `Herramienta ${toolName} no implementada`;
     }
@@ -2068,14 +2141,15 @@ FLUJO OBLIGATORIO:
 ⚠️ IMPORTANTE: NO uses ver_menu_negocio hasta que el cliente especifique cuál negocio quiere ver
 
 📍 UBICACIÓN Y DIRECCIÓN:
-${context.user_latitude && context.user_longitude 
+${context.user_latitude && context.user_longitude && context.user_latitude !== 0
   ? '- ✅ El usuario YA tiene ubicación → crear_pedido la usará automáticamente'
-  : '- ⚠️ IMPORTANTE: Si el usuario NO tiene ubicación, ANTES de crear el pedido decile:\n  "📍 Para confirmar tu pedido, compartí tu ubicación tocando el clip 📎 en WhatsApp y eligiendo Ubicación"\n  NO aceptes direcciones escritas si no tiene ubicación - necesitamos validar cobertura'
+  : '- ⚠️ El usuario NO tiene ubicación GPS. Opciones:\n  1. IDEAL: "📍 Compartí tu ubicación tocando el clip 📎 en WhatsApp" (valida radio)\n  2. ALTERNATIVA: Usar agregar_direccion_manual si el cliente no puede compartir GPS\n  ⚠️ Las direcciones manuales NO validan radio de entrega - el negocio debe confirmar'
 }
-- Una vez que tengas ubicación, crear_pedido validará si el negocio hace delivery a su zona
+- Una vez que tengas ubicación GPS, crear_pedido validará si el negocio hace delivery a su zona
 - Si está fuera de cobertura, el sistema le avisará automáticamente
+- ⚠️ Direcciones manuales (sin GPS): El negocio verá una marca especial indicando que debe confirmar cobertura
 
-📍 GESTIÓN DE DIRECCIONES GUARDADAS (NUEVO):
+📍 GESTIÓN DE DIRECCIONES GUARDADAS:
 - Cuando el usuario comparta una ubicación 📍, preguntale SIEMPRE:
   "Recibí tu ubicación 📍 [dirección si está disponible]
    ¿Querés usarla solo para este pedido o guardarla para la próxima?
@@ -2083,6 +2157,11 @@ ${context.user_latitude && context.user_longitude
    Escribí:
    • TEMP — usar solo para este pedido (se eliminará automáticamente)
    • GUARDAR [nombre] — guardarla con un nombre (ej: Casa, Trabajo)"
+
+- Si el cliente NO puede compartir ubicación GPS:
+  • "Escribí tu dirección" → agregar_direccion_manual
+  • Ejemplo: "Av. San Martín 1234, Rosario" sin nombre = temporal
+  • Ejemplo: "Av. San Martín 1234, Rosario" + "Casa" = guardada
 
 - El cliente puede decir cosas como:
   • "Enviar a Casa" → usar_direccion_guardada

@@ -78,6 +78,16 @@ export function OrderCard({ order, onStatusChange, onOpenChat, isVendorView = fa
             <span className="line-clamp-1">{isVendorView && order.addressSimplified ? order.addressSimplified : order.address}</span>
           </div>
           
+          {/* Alerta de dirección manual */}
+          {isVendorView && order.address_is_manual && (
+            <div className="flex items-start gap-2 text-xs bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 p-2 rounded-md">
+              <span className="text-amber-600 dark:text-amber-400 font-medium">⚠️</span>
+              <span className="text-amber-700 dark:text-amber-300">
+                <strong>Dirección ingresada manualmente</strong> (sin GPS). Confirmar cobertura de delivery.
+              </span>
+            </div>
+          )}
+          
           {order.estimatedDelivery && (
             <div className="flex items-center gap-2 text-sm">
               <Clock className="h-4 w-4 text-muted-foreground" />

@@ -53,6 +53,7 @@ export function useRealtimeOrders(vendorId?: string) {
           deliveryPersonName: order.delivery_person_name,
           deliveryPersonPhone: order.delivery_person_phone,
           payment_receipt_url: order.payment_receipt_url,
+          address_is_manual: order.address_is_manual || false,
           // Masked fields for vendor view
           customerNameMasked: order.customer_name?.substring(0, 3) + '***',
           customerPhoneMasked: '****' + order.customer_phone?.slice(-4),
@@ -123,6 +124,7 @@ export function useRealtimeOrders(vendorId?: string) {
                   deliveryPersonName: data.delivery_person_name,
                   deliveryPersonPhone: data.delivery_person_phone,
                   payment_receipt_url: data.payment_receipt_url,
+                  address_is_manual: data.address_is_manual || false,
                   customerNameMasked: data.customer_name?.substring(0, 3) + '***',
                   customerPhoneMasked: '****' + data.customer_phone?.slice(-4),
                   addressSimplified: data.address?.split(',')[0]
