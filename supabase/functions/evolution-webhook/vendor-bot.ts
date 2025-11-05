@@ -6,7 +6,7 @@ function normalizeArgentinePhone(phone: string): string {
   let cleaned = phone.replace(/@s\.whatsapp\.net$/i, '');
   cleaned = cleaned.replace(/[\s\-\(\)\+]/g, '');
   cleaned = cleaned.replace(/[^\d]/g, '');
-  
+
   if (cleaned.startsWith('549') && cleaned.length === 13) return cleaned;
   if (cleaned.startsWith('54') && !cleaned.startsWith('549') && cleaned.length === 12) {
     return '549' + cleaned.substring(2);
@@ -14,7 +14,7 @@ function normalizeArgentinePhone(phone: string): string {
   if (cleaned.startsWith('9') && cleaned.length === 11) return '54' + cleaned;
   if (!cleaned.startsWith('54') && cleaned.length === 10) return '549' + cleaned;
   if (cleaned.length > 13) return normalizeArgentinePhone(cleaned.slice(-13));
-  
+
   return cleaned;
 }
 
@@ -39,7 +39,7 @@ interface ConversationContext {
   user_latitude?: number;
   user_longitude?: number;
   pending_location_decision?: boolean;  // Nueva: indica si hay ubicación pendiente de decisión
-  conversation_history: Array<{role: "user" | "assistant" | "system"; content: string}>;
+  conversation_history: Array<{ role: "user" | "assistant" | "system"; content: string }>;
 }
 
 // ==================== GESTIÓN DE CONTEXTO ====================
@@ -530,37 +530,37 @@ async function ejecutarHerramienta(
         // Si el usuario tiene ubicación, usar función de filtrado por radio
         if (context.user_latitude && context.user_longitude) {
           console.log(`📍 User has location, filtering by delivery radius`);
-          
+
           // Primero obtener vendors en rango
           const { data: vendorsInRange, error: rangeError } = await supabase
             .rpc('get_vendors_in_range', {
               user_lat: context.user_latitude,
               user_lon: context.user_longitude
             });
-          
+
           if (rangeError) {
             console.error('Error getting vendors in range:', rangeError);
           }
-          
+
           if (!vendorsInRange || vendorsInRange.length === 0) {
             return `😔 No encontré negocios que hagan delivery a tu ubicación con "${args.consulta}".\n\n💡 Tip: Si te moviste de zona, podés compartir tu nueva ubicación usando el botón 📍 de WhatsApp.`;
           }
-          
+
           // Filtrar solo los vendor IDs que están en rango
           const vendorIdsInRange = vendorsInRange.map((v: any) => v.vendor_id);
-          
+
           // Buscar productos solo en esos vendors
           const { data: searchResults, error: searchError } = await supabase.functions.invoke('search-products', {
-            body: { 
+            body: {
               searchQuery: args.consulta,
               vendorIds: vendorIdsInRange  // Filtrar por vendors en rango
             }
           });
-          
+
           if (searchError || !searchResults?.found) {
             return `No encontré productos de "${args.consulta}" en negocios que lleguen a tu zona.\n\nPodés buscar otra cosa o ver todos los locales disponibles diciendo "ver locales".`;
           }
-          
+
           // Formatear resultados con distancia
           let resultado = `Encontré ${searchResults.totalVendors} negocios cerca tuyo con ${searchResults.totalProducts} productos:\n\n`;
           searchResults.results.forEach((r: any, i: number) => {
@@ -579,7 +579,7 @@ async function ejecutarHerramienta(
             });
             resultado += `\n`;
           });
-          
+
           return resultado;
         } else {
           // Sin ubicación, búsqueda normal pero informar al usuario
@@ -623,24 +623,24 @@ async function ejecutarHerramienta(
         // Si el usuario tiene ubicación, filtrar por radio
         if (context.user_latitude && context.user_longitude) {
           console.log(`📍 User has location (${context.user_latitude}, ${context.user_longitude}), filtering by delivery radius`);
-          
+
           const { data: vendorsInRange, error: rangeError } = await supabase
             .rpc('get_vendors_in_range', {
               user_lat: context.user_latitude,
               user_lon: context.user_longitude
             });
-          
+
           console.log(`📊 Vendors in range (${vendorsInRange?.length || 0} total):`, JSON.stringify(vendorsInRange, null, 2));
-          
+
           if (rangeError) {
             console.error('Error getting vendors in range:', rangeError);
             return 'Hubo un error al buscar negocios cerca tuyo. Por favor intenta de nuevo.';
           }
-          
+
           if (!vendorsInRange || vendorsInRange.length === 0) {
             return `😔 No hay negocios que hagan delivery a tu ubicación${args.categoria ? ` de tipo "${args.categoria}"` : ''}.\n\n💡 Podés:\n- Buscar en otra categoría\n- Actualizar tu ubicación si te moviste 📍`;
           }
-          
+
           // Filtrar por categoría si se especifica
           let filteredVendors = vendorsInRange;
           if (args.categoria) {
@@ -650,7 +650,7 @@ async function ejecutarHerramienta(
               .from('vendors')
               .select('id, category')
               .in('id', vendorIds);
-            
+
             const vendorCategories = new Map(vendorDetails?.map((v: any) => [v.id, v.category]) || []);
             filteredVendors = vendorsInRange.filter((v: any) => {
               const category = vendorCategories.get(v.vendor_id);
@@ -661,34 +661,34 @@ async function ejecutarHerramienta(
               return category === args.categoria;
             });
           }
-          
+
           // Separar abiertos y cerrados, pero MOSTRAR AMBOS
           const openVendors = filteredVendors.filter((v: any) => v.is_open);
           const closedVendors = filteredVendors.filter((v: any) => !v.is_open);
-          
+
           if (filteredVendors.length === 0) {
             return args.categoria
               ? `No hay negocios de tipo "${args.categoria}" que lleguen a tu zona. 😔`
               : 'No hay negocios que lleguen a tu zona en este momento. 😔';
           }
-          
+
           // Obtener detalles completos de vendors
           const vendorIds = filteredVendors.map((v: any) => v.vendor_id);
-          
+
           const { data: fullVendors } = await supabase
             .from('vendors')
             .select('id, name, category, address, opening_time, closing_time, average_rating, total_reviews')
             .in('id', vendorIds);
-          
+
           console.log(`📋 Full vendors from DB:`, JSON.stringify(fullVendors, null, 2));
-          
+
           const vendorMap = new Map(fullVendors?.map((v: any) => [v.id, v]) || []);
-          
+
           // Formatear resultados - PRIMERO abiertos, DESPUÉS cerrados
           let resultado = `¡Aquí tenés ${filteredVendors.length} ${filteredVendors.length === 1 ? 'negocio' : 'negocios'} que hacen delivery a tu zona! 🚗\n\n`;
-          
+
           console.log(`📝 Starting to format results. Open: ${openVendors.length}, Closed: ${closedVendors.length}`);
-          
+
           if (openVendors.length > 0) {
             resultado += `🟢 *ABIERTOS AHORA* (${openVendors.length}):\n\n`;
             openVendors.forEach((v: any, i: number) => {
@@ -703,7 +703,7 @@ async function ejecutarHerramienta(
                   address: vendor.address
                 } : 'NOT FOUND'
               });
-              
+
               if (!vendor) {
                 // Mostrar info básica aunque no tengamos detalles completos
                 resultado += `${i + 1}. ${v.vendor_name} 📦\n`;
@@ -711,12 +711,12 @@ async function ejecutarHerramienta(
                 resultado += `   ID: ${v.vendor_id}\n\n`;
                 return;
               }
-              
+
               resultado += `${i + 1}. ${vendor.name}\n`;
               resultado += `   📍 ${vendor.address} - A ${v.distance_km.toFixed(1)} km\n`;
               resultado += `   ID: ${vendor.id}\n`;
               if (vendor.opening_time && vendor.closing_time) {
-                resultado += `   ⏰ Horario: ${vendor.opening_time.substring(0,5)} - ${vendor.closing_time.substring(0,5)}\n`;
+                resultado += `   ⏰ Horario: ${vendor.opening_time.substring(0, 5)} - ${vendor.closing_time.substring(0, 5)}\n`;
               }
               if (vendor.average_rating && vendor.total_reviews) {
                 resultado += `   ⭐ Rating: ${vendor.average_rating.toFixed(1)} (${vendor.total_reviews} reseñas)\n`;
@@ -724,12 +724,12 @@ async function ejecutarHerramienta(
               resultado += `\n`;
             });
           }
-          
+
           if (closedVendors.length > 0) {
             resultado += `🔴 *CERRADOS* (${closedVendors.length}):\n\n`;
             closedVendors.forEach((v: any, i: number) => {
               const vendor = vendorMap.get(v.vendor_id);
-              
+
               if (!vendor) {
                 // Mostrar info básica aunque no tengamos detalles completos
                 resultado += `${i + 1}. ${v.vendor_name} 🔒\n`;
@@ -737,12 +737,12 @@ async function ejecutarHerramienta(
                 resultado += `   ID: ${v.vendor_id}\n\n`;
                 return;
               }
-              
+
               resultado += `${i + 1}. ${vendor.name} 🔒\n`;
               resultado += `   📍 ${vendor.address} - A ${v.distance_km.toFixed(1)} km\n`;
               resultado += `   ID: ${vendor.id}\n`;
               if (vendor.opening_time && vendor.closing_time) {
-                resultado += `   ⏰ Horario: ${vendor.opening_time.substring(0,5)} - ${vendor.closing_time.substring(0,5)}\n`;
+                resultado += `   ⏰ Horario: ${vendor.opening_time.substring(0, 5)} - ${vendor.closing_time.substring(0, 5)}\n`;
               }
               if (vendor.average_rating && vendor.total_reviews) {
                 resultado += `   ⭐ Rating: ${vendor.average_rating.toFixed(1)} (${vendor.total_reviews} reseñas)\n`;
@@ -750,9 +750,9 @@ async function ejecutarHerramienta(
               resultado += `\n`;
             });
           }
-          
+
           resultado += `\n💡 Para ver el menú de alguno, decime el nombre o ID del negocio.`;
-          
+
           return resultado;
         } else {
           // Sin ubicación, búsqueda normal pero informar
@@ -771,7 +771,7 @@ async function ejecutarHerramienta(
           const { data: vendors, error } = await query;
 
           if (error || !vendors || vendors.length === 0) {
-            return args.categoria 
+            return args.categoria
               ? `No encontré negocios de tipo "${args.categoria}" disponibles.\n\n💡 Tip: Compartí tu ubicación 📍 para ver solo los que te entregan.`
               : 'No hay negocios disponibles en este momento.\n\n💡 Tip: Compartí tu ubicación 📍 para ver solo los que te entregan.';
           }
@@ -817,106 +817,68 @@ async function ejecutarHerramienta(
 
       case "ver_menu_negocio": {
         console.log(`🔍 ver_menu_negocio called with vendor_id: "${args.vendor_id}"`);
-        
-        // Primero intentar obtener el vendor (puede ser por ID o por nombre)
+
+        // 🔄 Limpiar contexto si el usuario cambia de negocio
+        if (context.selected_vendor_id && context.selected_vendor_id !== args.vendor_id) {
+          console.log('🔄 Nuevo negocio seleccionado, limpiando carrito y contexto anterior...');
+          context.cart = [];
+          context.selected_vendor_id = undefined;
+          context.selected_vendor_name = undefined;
+        }
+
+        // Buscar vendor (por ID o nombre)
         let vendorId = args.vendor_id;
         let vendor: any = null;
 
-        // Si parece un UUID, buscar directamente
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (uuidRegex.test(args.vendor_id)) {
-          console.log(`✅ Detected UUID format, searching by ID`);
-          const { data, error: vendorError } = await supabase
+          const { data } = await supabase
             .from('vendors')
             .select('id, name')
             .eq('id', args.vendor_id)
             .maybeSingle();
-          
-          if (vendorError) console.error('Error fetching vendor by ID:', vendorError);
           vendor = data;
-          console.log(`Vendor found by ID:`, vendor);
         } else {
-          // Si no es UUID, buscar por nombre (case insensitive)
-          // Limpiar el input: convertir guiones a espacios, remover caracteres especiales
           const cleanedName = args.vendor_id
-            .replace(/-/g, ' ')  // guiones a espacios
-            .replace(/_/g, ' ')  // guiones bajos a espacios
+            .replace(/[-_]/g, ' ')
             .trim();
-          
-          console.log(`🔤 Not UUID, searching by name. Original: "${args.vendor_id}", Cleaned: "${cleanedName}"`);
-          
-          const { data, error: vendorError } = await supabase
+          const { data } = await supabase
             .from('vendors')
             .select('id, name')
             .ilike('name', `%${cleanedName}%`)
             .maybeSingle();
-          
-          if (vendorError) console.error('Error fetching vendor by name:', vendorError);
           vendor = data;
-          console.log(`Vendor found by name:`, vendor);
           if (vendor) vendorId = vendor.id;
         }
 
         if (!vendor) {
-          console.log(`❌ Vendor not found for: "${args.vendor_id}"`);
-          return 'No encontré ese negocio. Por favor usa el ID exacto que te mostré en la lista de locales abiertos.';
+          return 'No encontré ese negocio. Por favor usá el ID exacto que te mostré en la lista de locales abiertos.';
         }
 
-        console.log(`✅ Using vendor_id: ${vendorId} (${vendor.name})`);
+        console.log(`✅ Using vendor_id: ${vendor.id} (${vendor.name})`);
 
-        // Ahora buscar productos con el vendor_id correcto
+        // Guardar correctamente el negocio (siempre UUID real)
+        context.selected_vendor_id = vendor.id;
+        context.selected_vendor_name = vendor.name;
+        context.cart = []; // Limpieza de carrito al abrir nuevo menú
+
+        // Buscar productos del negocio
         const { data: products, error } = await supabase
           .from('products')
           .select('*')
-          .eq('vendor_id', vendorId)
+          .eq('vendor_id', vendor.id)
           .eq('is_available', true);
 
-        console.log(`📦 Products query result:`, { count: products?.length || 0, error, vendorId });
-
-        if (error || !products || products.length === 0) {
-          console.log(`❌ No products found for vendor ${vendorId}`);
+        if (error || !products?.length) {
           return `No encontré productos disponibles para "${vendor.name}" en este momento.`;
         }
 
-        // Guardar vendor seleccionado
-        context.selected_vendor_id = vendorId;
-        context.selected_vendor_name = vendor.name;
-        
-        console.log(`✅ Found ${products.length} products for ${vendor.name}`);
-
         let menu = `📋 *Menú de ${vendor.name}*\n\n`;
-        products.forEach((p: any, i: number) => {
-          menu += `${i + 1}. *${p.name}* - $${p.price}\n`;
-          menu += `   ID: ${p.id}\n`;
-          // Mostrar categorías del producto (puede ser string o array)
-          if (p.category) {
-            const categoryText = Array.isArray(p.category) ? p.category.join(', ') : p.category;
-            menu += `   🏷️ ${categoryText}\n`;
-          }
+        for (const [i, p] of products.entries()) {
+          menu += `${i + 1}. *${p.name}* - $${p.price}\n   ID: ${p.id}\n`;
+          if (p.category) menu += `   🏷️ ${Array.isArray(p.category) ? p.category.join(', ') : p.category}\n`;
           if (p.description) menu += `   📝 ${p.description}\n`;
-          if (p.image) menu += `   🖼️ ${p.image}\n`;
           menu += `\n`;
-        });
-        
-        // Mostrar ofertas del negocio si hay
-        const { data: offers } = await supabase
-          .from('vendor_offers')
-          .select('*')
-          .eq('vendor_id', vendorId)
-          .eq('is_active', true)
-          .gte('valid_until', new Date().toISOString());
-        
-        if (offers && offers.length > 0) {
-          menu += `\n🎁 *Ofertas especiales:*\n\n`;
-          offers.forEach((offer: any, i: number) => {
-            menu += `${i + 1}. ${offer.title}\n`;
-            menu += `   📝 ${offer.description}\n`;
-            if (offer.discount_percentage) menu += `   💰 ${offer.discount_percentage}% OFF\n`;
-            if (offer.original_price && offer.offer_price) {
-              menu += `   💵 Antes: $${offer.original_price} → Ahora: $${offer.offer_price}\n`;
-            }
-            menu += `\n`;
-          });
         }
 
         return menu;
@@ -924,165 +886,71 @@ async function ejecutarHerramienta(
 
       case "agregar_al_carrito": {
         const items = args.items as CartItem[];
-        
-        console.log('🛒 agregar_al_carrito called:', {
-          vendor_id: args.vendor_id,
-          items: items.map(i => `${i.product_name} x${i.quantity}`),
-          currentCart: context.cart.length
-        });
-        
-        // CRITICAL: Priorizar vendor del contexto, luego resolver vendor_id
+        console.log('🛒 agregar_al_carrito called:', items);
+
+        // Normalizar vendor_id
         let vendorId = context.selected_vendor_id || args.vendor_id;
-        
-        if (!vendorId) {
-          return 'Error: Necesito que primero veas el menú de un negocio antes de agregar productos.';
-        }
-        
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        
+
         if (!uuidRegex.test(vendorId)) {
-          console.log(`⚠️ Invalid vendor_id format: "${vendorId}", attempting to find by name`);
-          
-          // Limpiar el input y normalizar acentos
-          const cleanedName = vendorId
-            .replace(/-/g, ' ')
-            .replace(/_/g, ' ')
-            .replace(/[áàâä]/gi, 'a')
-            .replace(/[éèêë]/gi, 'e')
-            .replace(/[íìîï]/gi, 'i')
-            .replace(/[óòôö]/gi, 'o')
-            .replace(/[úùûü]/gi, 'u')
-            .trim();
-          
-          console.log(`🔍 Searching vendor by name: "${cleanedName}"`);
-          
-          // Buscar directamente con ILIKE para máxima flexibilidad
+          const cleanedName = vendorId.replace(/[-_]/g, ' ').trim();
           const { data: vendor } = await supabase
             .from('vendors')
             .select('id, name')
-            .eq('is_active', true)
             .ilike('name', `%${cleanedName}%`)
-            .limit(1)
             .maybeSingle();
-          
-          if (vendor) {
-            vendorId = vendor.id;
-            console.log(`✅ Found vendor by name: ${vendor.name} (${vendorId})`);
-          } else {
-            console.log(`❌ No vendor found matching: "${cleanedName}"`);
-            return `No encontré el negocio "${args.vendor_id}". Por favor mirá primero el menú de un negocio.`;
-          }
+          if (!vendor) return `No encontré el negocio "${args.vendor_id}".`;
+          vendorId = vendor.id;
         }
-        
-        // Si hay items en el carrito pero son de otro negocio, vaciar el carrito
+
+        // 🧹 Si el carrito es de otro negocio, vaciarlo
         if (context.cart.length > 0 && context.selected_vendor_id && vendorId !== context.selected_vendor_id) {
+          console.log(`🗑️ Cambiaste de negocio: ${context.selected_vendor_id} → ${vendorId}. Vaciando carrito.`);
           context.cart = [];
-          console.log('🗑️ Carrito vaciado porque cambiaste de negocio');
-        }
-        
-        // Actualizar el vendor seleccionado con el UUID correcto
-        context.selected_vendor_id = vendorId;
-        
-        // Obtener nombre del vendor
-        if (!context.selected_vendor_name || context.selected_vendor_id !== vendorId) {
+          context.selected_vendor_id = vendorId;
           const { data: vendor } = await supabase
             .from('vendors')
             .select('name')
             .eq('id', vendorId)
             .single();
-          if (vendor) {
-            context.selected_vendor_name = vendor.name;
-            console.log(`✅ Vendor set: ${vendor.name} (${vendorId})`);
-          }
+          context.selected_vendor_name = vendor?.name || 'Negocio';
+        } else {
+          context.selected_vendor_id = vendorId;
         }
 
-        // ⚠️ VALIDACIÓN CRÍTICA: Resolver product_ids y verificar existencia
-        // Algunos LLMs pasan nombres en lugar de UUIDs, así que los resolvemos
+        // Resolver productos
         const resolvedItems: CartItem[] = [];
-        
         for (const item of items) {
-          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-          let productData;
-          
-          if (uuidRegex.test(item.product_id)) {
-            // Es un UUID válido, buscar por ID
-            const { data, error } = await supabase
-              .from('products')
-              .select('id, name, price')
-              .eq('vendor_id', vendorId)
-              .eq('is_available', true)
-              .eq('id', item.product_id)
-              .maybeSingle();
-            
-            if (error) {
-              console.error(`Error fetching product ${item.product_id}:`, error);
-              continue;
-            }
-            productData = data;
-          } else {
-            // No es UUID, buscar por nombre
-            console.log(`🔍 Resolving product by name: "${item.product_name || item.product_id}"`);
-            const searchName = item.product_name || item.product_id;
-            
-            const { data, error } = await supabase
-              .from('products')
-              .select('id, name, price')
-              .eq('vendor_id', vendorId)
-              .eq('is_available', true)
-              .ilike('name', `%${searchName}%`)
-              .limit(1)
-              .maybeSingle();
-            
-            if (error) {
-              console.error(`Error searching product "${searchName}":`, error);
-              continue;
-            }
-            productData = data;
-          }
-          
-          if (!productData) {
-            console.warn(`❌ Product not found: ${item.product_name || item.product_id}`);
-            continue;
-          }
-          
-          // Agregar producto resuelto con precio correcto de la BD
-          resolvedItems.push({
-            product_id: productData.id,
-            product_name: productData.name,
-            quantity: item.quantity,
-            price: Number(productData.price)
-          });
-          
-          console.log(`✅ Resolved: "${item.product_name}" -> ${productData.name} (${productData.id})`);
-        }
-        
-        if (resolvedItems.length === 0) {
-          return '❌ No pude encontrar esos productos en el menú. Por favor, primero mirá el menú y elegí productos válidos.';
-        }
-        
-        // Usar los items resueltos
-        const validatedItems = resolvedItems;
-        
-        // Agregar productos validados al carrito
-        validatedItems.forEach(item => {
-          const existing = context.cart.find(c => c.product_id === item.product_id);
-          if (existing) {
-            existing.quantity += item.quantity;
-          } else {
-            context.cart.push(item);
-          }
-        });
+          const query = uuidRegex.test(item.product_id)
+            ? supabase.from('products').select('id, name, price').eq('id', item.product_id).maybeSingle()
+            : supabase.from('products').select('id, name, price').ilike('name', `%${item.product_name}%`).eq('vendor_id', vendorId).maybeSingle();
 
-        const total = context.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-        
-        console.log('✅ Cart updated:', {
-          totalItems: context.cart.length,
-          items: context.cart.map(i => `${i.product_name} x${i.quantity}`),
-          total
-        });
-        
-        return `✅ Agregado al carrito. Total actual: $${total}`;
+          const { data: product } = await query;
+          if (product) {
+            resolvedItems.push({
+              product_id: product.id,
+              product_name: product.name,
+              quantity: item.quantity,
+              price: product.price
+            });
+          }
+        }
+
+        if (!resolvedItems.length) {
+          return '❌ No pude encontrar esos productos en el menú.';
+        }
+
+        // Agregar productos validados
+        for (const item of resolvedItems) {
+          const existing = context.cart.find(c => c.product_id === item.product_id);
+          if (existing) existing.quantity += item.quantity;
+          else context.cart.push(item);
+        }
+
+        const total = context.cart.reduce((s, i) => s + i.price * i.quantity, 0);
+        return `✅ Productos agregados al carrito de ${context.selected_vendor_name}.\n💰 Total actual: $${total}`;
       }
+
 
       case "ver_carrito": {
         if (context.cart.length === 0) {
@@ -1155,7 +1023,7 @@ async function ejecutarHerramienta(
 
             if (!distError && distanceResult !== null) {
               console.log(`📏 Distance: ${distanceResult}km, Max: ${vendor.delivery_radius_km}km`);
-              
+
               if (distanceResult > vendor.delivery_radius_km) {
                 return `😔 Lo siento, ${vendor.name} no hace delivery a tu ubicación.\n\n📍 Tu ubicación está a ${distanceResult.toFixed(1)} km del local.\n🚗 Radio de cobertura: ${vendor.delivery_radius_km} km\n\n💡 Podés buscar otros negocios más cercanos o actualizar tu ubicación.`;
               }
@@ -1194,7 +1062,7 @@ async function ejecutarHerramienta(
             .select('name')
             .eq('id', activeOrder.vendor_id)
             .single();
-          
+
           return `⚠️ Ya tenés un pedido en curso (#${activeOrder.id.substring(0, 8)}) con ${vendor?.name || 'un negocio'} en estado "${activeOrder.status}".\n\nPor favor esperá a que se complete o cancele ese pedido antes de hacer uno nuevo.`;
         }
 
@@ -1246,7 +1114,7 @@ async function ejecutarHerramienta(
         console.log('✅ Order created successfully:', order.id);
 
         context.pending_order_id = order.id;
-        
+
         // 📧 Notificar al vendedor sobre el nuevo pedido
         try {
           console.log('📨 Sending new order notification to vendor:', context.selected_vendor_id);
@@ -1256,7 +1124,7 @@ async function ejecutarHerramienta(
               eventType: 'new_order'
             }
           });
-          
+
           if (notifyError) {
             console.error('❌ Error notifying vendor:', notifyError);
           } else {
@@ -1265,7 +1133,7 @@ async function ejecutarHerramienta(
         } catch (notifyErr) {
           console.error('💥 Exception notifying vendor:', notifyErr);
         }
-        
+
         // 🗑️ Eliminar direcciones temporales después de crear el pedido
         try {
           const { error: deleteError } = await supabase
@@ -1273,7 +1141,7 @@ async function ejecutarHerramienta(
             .delete()
             .eq('phone', context.phone)
             .eq('is_temporary', true);
-          
+
           if (deleteError) {
             console.error('Error deleting temporary addresses:', deleteError);
           } else {
@@ -1282,7 +1150,7 @@ async function ejecutarHerramienta(
         } catch (cleanupError) {
           console.error('Error in cleanup process:', cleanupError);
         }
-        
+
         let confirmacion = `✅ ¡Pedido creado exitosamente!\n\n`;
         confirmacion += `📦 Pedido #${order.id.substring(0, 8)}\n`;
         confirmacion += `🏪 Negocio: ${context.selected_vendor_name}\n`;
@@ -1328,13 +1196,13 @@ async function ejecutarHerramienta(
         return estado;
       }
 
-      
+
       case "ver_ofertas": {
         const nowIso: string = new Date().toISOString();
-        
+
         // Si el usuario está en una conversación con un vendor específico, solo mostrar sus ofertas
         const targetVendorId = args.vendor_id || context.selected_vendor_id;
-      
+
         let query = supabase
           .from('vendor_offers')
           .select('*, vendors(id, name, category, latitude, longitude, delivery_radius_km, is_active)')
@@ -1357,7 +1225,7 @@ async function ejecutarHerramienta(
 
         // Filtrar ofertas por ubicación y horarios
         let filteredOffers = offers;
-        
+
         if (!targetVendorId && context.user_latitude && context.user_longitude) {
           // Si no hay vendor específico pero sí ubicación, filtrar por alcance
           const { data: vendorsInRange } = await supabase
@@ -1365,13 +1233,13 @@ async function ejecutarHerramienta(
               user_lat: context.user_latitude,
               user_lon: context.user_longitude
             });
-          
+
           if (vendorsInRange && vendorsInRange.length > 0) {
             const openVendorIds = vendorsInRange
               .filter((v: any) => v.is_open)
               .map((v: any) => v.vendor_id);
-            
-            filteredOffers = offers.filter((offer: any) => 
+
+            filteredOffers = offers.filter((offer: any) =>
               openVendorIds.includes(offer.vendor_id)
             );
           } else {
@@ -1384,19 +1252,19 @@ async function ejecutarHerramienta(
         }
 
         let resultado = `🎁 ${filteredOffers.length === 1 ? 'Oferta disponible' : `${filteredOffers.length} ofertas disponibles`}:\n\n`;
-        
+
         filteredOffers.forEach((offer: any, i: number) => {
           resultado += `${i + 1}. ${offer.title}\n`;
           resultado += `   🏪 ${offer.vendors.name}\n`;
           resultado += `   📝 ${offer.description}\n`;
-          
+
           if (offer.discount_percentage) {
             resultado += `   💰 ${offer.discount_percentage}% OFF\n`;
           }
           if (offer.original_price && offer.offer_price) {
             resultado += `   💵 Antes: $${offer.original_price} → Ahora: $${offer.offer_price}\n`;
           }
-          
+
           const validUntil = new Date(offer.valid_until);
           resultado += `   ⏰ Válido hasta: ${validUntil.toLocaleDateString('es-AR')}\n`;
           resultado += `   ID Negocio: ${offer.vendor_id}\n`;
@@ -1465,26 +1333,26 @@ async function ejecutarHerramienta(
 
       case "hablar_con_vendedor": {
         console.log('🔄 Switching to vendor chat mode');
-        
+
         // Usar vendor_id del contexto si está disponible
         let vendorId = context.selected_vendor_id;
-        
+
         if (!vendorId) {
           return 'Primero necesito que selecciones un negocio. Podés buscar productos o locales para elegir con quién querés hablar.';
         }
-        
+
         // Validar que sea un UUID válido
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (!uuidRegex.test(vendorId)) {
           console.log(`⚠️ Invalid vendor_id format: "${vendorId}", attempting to find by name`);
-          
+
           // Intentar buscar por nombre si no es UUID
           const { data: foundVendor } = await supabase
             .from('vendors')
             .select('id, name')
             .ilike('name', `%${vendorId}%`)
             .maybeSingle();
-          
+
           if (foundVendor) {
             vendorId = foundVendor.id;
             context.selected_vendor_id = foundVendor.id; // Actualizar contexto con UUID correcto
@@ -1493,21 +1361,21 @@ async function ejecutarHerramienta(
             return 'No pude encontrar el negocio seleccionado. Por favor buscá locales o productos de nuevo.';
           }
         }
-        
+
         // Obtener información del vendedor
         const { data: vendor, error: vendorError } = await supabase
           .from('vendors')
           .select('phone, whatsapp_number, name')
           .eq('id', vendorId)
           .single();
-        
+
         if (vendorError || !vendor) {
           console.error('Error getting vendor:', vendorError);
           return 'Hubo un problema al conectar con el negocio. Por favor intentá de nuevo.';
         }
-        
+
         const vendorPhone = vendor.whatsapp_number || vendor.phone;
-        
+
         // Verificar si ya existe un chat activo para evitar duplicados
         const { data: existingChat } = await supabase
           .from('vendor_chats')
@@ -1545,7 +1413,7 @@ async function ejecutarHerramienta(
                 sender_type: 'bot',
                 message: `Cliente ${context.phone} solicitó hablar con el vendedor`
               });
-            
+
             // 📧 Notificar al vendedor que un cliente quiere hablar
             try {
               console.log('📨 Notifying vendor about customer message request');
@@ -1556,7 +1424,7 @@ async function ejecutarHerramienta(
                   vendorId: vendorId
                 }
               });
-              
+
               if (notifyError) {
                 console.error('❌ Error notifying vendor:', notifyError);
               } else {
@@ -1567,7 +1435,7 @@ async function ejecutarHerramienta(
             }
           }
         }
-        
+
         // Actualizar sesión del usuario
         const { error } = await supabase
           .from('user_sessions')
@@ -1585,7 +1453,7 @@ async function ejecutarHerramienta(
         let mensaje = `👤 *Conectando con ${vendor.name}*\n\n`;
         mensaje += 'Un representante del negocio te atenderá en breve. Los mensajes que envíes ahora irán directamente al vendedor.\n\n';
         mensaje += 'Para volver al bot automático, el vendedor puede reactivarlo desde su panel.';
-        
+
         return mensaje;
       }
 
@@ -1614,7 +1482,7 @@ async function ejecutarHerramienta(
           args.service_rating,
           args.product_rating
         ].filter(r => r !== null && r !== undefined);
-        
+
         const averageRating = ratings.length > 0
           ? Math.round(ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length)
           : null;
@@ -1652,7 +1520,7 @@ async function ejecutarHerramienta(
 
       case "crear_ticket_soporte": {
         const prioridad = args.prioridad || 'normal';
-        
+
         const { data: ticket, error } = await supabase
           .from('support_tickets')
           .insert({
@@ -1736,7 +1604,7 @@ Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
             lat = session.user_latitude;
             lng = session.user_longitude;
             console.log(`✅ Found coordinates in session: ${lat}, ${lng}`);
-            
+
             // Actualizar el contexto para futuras operaciones
             context.user_latitude = lat;
             context.user_longitude = lng;
@@ -1794,7 +1662,7 @@ Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
 
         // Marcar como temporal
         context.pending_location_decision = false;
-        
+
         return `Perfecto 👍 Usaré esta ubicación solo para este pedido.\n\n⚠️ *Importante:* Esta dirección se eliminará automáticamente al finalizar el pedido.\n\n¿Qué te gustaría pedir? 😊`;
       }
 
@@ -1828,7 +1696,7 @@ Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
 
       case "borrar_direccion": {
         const nombre = args.nombre.trim();
-        
+
         const { data: address } = await supabase
           .from('saved_addresses')
           .select('id')
@@ -1903,7 +1771,7 @@ Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
 
       case "usar_direccion_guardada": {
         const nombre = args.nombre.trim();
-        
+
         const { data: address, error } = await supabase
           .from('saved_addresses')
           .select('*')
@@ -1995,7 +1863,7 @@ Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
           context.delivery_address = direccionCompleta;
           context.user_latitude = 0; // Marca como manual
           context.user_longitude = 0;
-          
+
           return `✅ Voy a usar esta dirección para tu pedido: ${direccionCompleta}\n\n⚠️ Esta dirección NO fue validada con GPS. El negocio confirmará si hace delivery ahí. 📍\n\n¿Qué método de pago preferís? (efectivo, transferencia o mercadopago)`;
         }
       }
@@ -2067,10 +1935,10 @@ ${context.user_latitude && context.user_longitude ? `- ✅ Usuario tiene ubicaci
 - NO memorices menús, precios o productos - todo cambia dinámicamente
 
 📍 UBICACIÓN Y FILTRADO:
-${context.user_latitude && context.user_longitude 
-  ? '- El usuario YA compartió su ubicación → Solo verá negocios que entregan en su zona'
-  : '- El usuario NO compartió ubicación → Verá todos los negocios, pero es recomendable pedirle que la comparta'
-}
+${context.user_latitude && context.user_longitude
+        ? '- El usuario YA compartió su ubicación → Solo verá negocios que entregan en su zona'
+        : '- El usuario NO compartió ubicación → Verá todos los negocios, pero es recomendable pedirle que la comparta'
+      }
 - Si el usuario pregunta por delivery o zona: explicale que puede compartir su ubicación usando el botón 📍 de WhatsApp
 - Cuando el usuario busque locales o productos, automáticamente se filtrarán por su ubicación si la compartió
 - Si el usuario está buscando y no tiene ubicación, sugerile compartirla para ver solo lo que está a su alcance
@@ -2142,9 +2010,9 @@ FLUJO OBLIGATORIO:
 
 📍 UBICACIÓN Y DIRECCIÓN:
 ${context.user_latitude && context.user_longitude && context.user_latitude !== 0
-  ? '- ✅ El usuario YA tiene ubicación → crear_pedido la usará automáticamente'
-  : '- ⚠️ El usuario NO tiene ubicación GPS. Opciones:\n  1. IDEAL: "📍 Compartí tu ubicación tocando el clip 📎 en WhatsApp" (valida radio)\n  2. ALTERNATIVA: Usar agregar_direccion_manual si el cliente no puede compartir GPS\n  ⚠️ Las direcciones manuales NO validan radio de entrega - el negocio debe confirmar'
-}
+        ? '- ✅ El usuario YA tiene ubicación → crear_pedido la usará automáticamente'
+        : '- ⚠️ El usuario NO tiene ubicación GPS. Opciones:\n  1. IDEAL: "📍 Compartí tu ubicación tocando el clip 📎 en WhatsApp" (valida radio)\n  2. ALTERNATIVA: Usar agregar_direccion_manual si el cliente no puede compartir GPS\n  ⚠️ Las direcciones manuales NO validan radio de entrega - el negocio debe confirmar'
+      }
 - Una vez que tengas ubicación GPS, crear_pedido validará si el negocio hace delivery a su zona
 - Si está fuera de cobertura, el sistema le avisará automáticamente
 - ⚠️ Direcciones manuales (sin GPS): El negocio verá una marca especial indicando que debe confirmar cobertura
