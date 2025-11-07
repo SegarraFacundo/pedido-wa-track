@@ -689,6 +689,20 @@ async function ejecutarHerramienta(
           hoursMap.get(h.vendor_id).push(h);
         });
 
+        // 📋 Obtener información detallada de todos los vendors
+        const { data: vendorsInfo, error: vendorsInfoError } = await supabase
+          .from("vendors")
+          .select("id, address, average_rating, total_reviews")
+          .in("id", vendorIds);
+
+        if (vendorsInfoError) console.error("Error obteniendo info vendors:", vendorsInfoError);
+
+        // 🗺️ Crear mapa vendor_id → información
+        const vendorsInfoMap = new Map();
+        vendorsInfo?.forEach((vi) => {
+          vendorsInfoMap.set(vi.id, vi);
+        });
+
         // 🟢 y 🔴 Separar abiertos y cerrados
         const openVendors = vendorsInRange.filter((v: any) => v.is_open);
         const closedVendors = vendorsInRange.filter((v: any) => !v.is_open);
@@ -702,12 +716,7 @@ async function ejecutarHerramienta(
             resultado += `${i + 1}. *${v.vendor_name}*\n`;
 
             // Dirección y distancia
-            const { data: vendorInfo } = supabase
-              .from("vendors")
-              .select("address, average_rating, total_reviews, opening_time, closing_time")
-              .eq("id", v.vendor_id)
-              .maybeSingle();
-
+            const vendorInfo = vendorsInfoMap.get(v.vendor_id);
             resultado += `📍 ${vendorInfo?.address || "Dirección no disponible"} - A ${v.distance_km.toFixed(
               1
             )} km\n`;
@@ -729,8 +738,8 @@ async function ejecutarHerramienta(
             }
 
             // Rating si existe
-            if (v.average_rating && v.total_reviews)
-              resultado += `⭐ Rating: ${v.average_rating.toFixed(1)} (${v.total_reviews} reseñas)\n`;
+            if (vendorInfo?.average_rating && vendorInfo?.total_reviews)
+              resultado += `⭐ Rating: ${vendorInfo.average_rating.toFixed(1)} (${vendorInfo.total_reviews} reseñas)\n`;
 
             resultado += `\n`;
           });
@@ -742,12 +751,7 @@ async function ejecutarHerramienta(
           closedVendors.forEach((v: any, i: number) => {
             resultado += `${i + 1}. *${v.vendor_name}* 🔒\n`;
 
-            const { data: vendorInfo } = supabase
-              .from("vendors")
-              .select("address, average_rating, total_reviews, opening_time, closing_time")
-              .eq("id", v.vendor_id)
-              .maybeSingle();
-
+            const vendorInfo = vendorsInfoMap.get(v.vendor_id);
             resultado += `📍 ${vendorInfo?.address || "Dirección no disponible"} - A ${v.distance_km.toFixed(
               1
             )} km\n`;
@@ -769,8 +773,8 @@ async function ejecutarHerramienta(
             }
 
             // Rating si existe
-            if (v.average_rating && v.total_reviews)
-              resultado += `⭐ Rating: ${v.average_rating.toFixed(1)} (${v.total_reviews} reseñas)\n`;
+            if (vendorInfo?.average_rating && vendorInfo?.total_reviews)
+              resultado += `⭐ Rating: ${vendorInfo.average_rating.toFixed(1)} (${vendorInfo.total_reviews} reseñas)\n`;
 
             resultado += `\n`;
           });
