@@ -631,30 +631,35 @@ async function ejecutarHerramienta(
       }
 
       case "ver_locales_abiertos": {
-        // Obtener hora actual en Argentina
+        // 🕐 Obtener hora actual en Argentina
         const now = new Date();
-        const argentinaTime = new Date(now.toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
-        const currentDay = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"][
-          argentinaTime.getDay()
-        ];
+        const argentinaTime = new Date(
+          now.toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" })
+        );
+        const currentDay = [
+          "sunday",
+          "monday",
+          "tuesday",
+          "wednesday",
+          "thursday",
+          "friday",
+          "saturday",
+        ][argentinaTime.getDay()];
         const currentTime = argentinaTime.toTimeString().slice(0, 5); // HH:MM formato
-
         console.log(`🕒 Buscando locales abiertos - Día: ${currentDay}, Hora: ${currentTime}`);
 
-        // Si el usuario tiene ubicación, filtrar por radio
+        // 📍 Si el usuario tiene ubicación, buscar negocios en rango
         if (context.user_latitude && context.user_longitude) {
           console.log(
-            `📍 User has location (${context.user_latitude}, ${context.user_longitude}), filtering by delivery radius`,
+            `📍 User has location (${context.user_latitude}, ${context.user_longitude}), filtering by delivery radius`
           );
 
-          const { data: vendorsInRange, error: rangeError } = await supabase.rpc("get_vendors_in_range", {
-            user_lat: context.user_latitude,
-            user_lon: context.user_longitude,
-          });
-
-          console.log(
-            `📊 Vendors in range (${vendorsInRange?.length || 0} total):`,
-            JSON.stringify(vendorsInRange, null, 2),
+          const { data: vendorsInRange, error: rangeError } = await supabase.rpc(
+            "get_vendors_in_range",
+            {
+              user_lat: context.user_latitude,
+              user_lon: context.user_longitude,
+            }
           );
 
           if (rangeError) {
@@ -663,88 +668,78 @@ async function ejecutarHerramienta(
           }
 
           if (!vendorsInRange || vendorsInRange.length === 0) {
-            return `😔 No hay negocios que hagan delivery a tu ubicación${args.categoria ? ` de tipo "${args.categoria}"` : ""}.\n\n💡 Podés:\n- Buscar en otra categoría\n- Actualizar tu ubicación si te moviste 📍`;
+            return `😔 No hay negocios que hagan delivery a tu ubicación${args.categoria ? ` de tipo "${args.categoria}"` : ""
+              }.\n\n💡 Podés:\n- Buscar en otra categoría\n- Actualizar tu ubicación si te moviste 📍`;
           }
 
-          // Filtrar por categoría si se especifica
+          // 📂 Filtrar por categoría si se especifica
           let filteredVendors = vendorsInRange;
           if (args.categoria) {
-            // Necesitamos obtener la categoría de cada vendor
             const vendorIds = vendorsInRange.map((v: any) => v.vendor_id);
-            const { data: vendorDetails } = await supabase.from("vendors").select("id, category").in("id", vendorIds);
+            const { data: vendorDetails } = await supabase
+              .from("vendors")
+              .select("id, category")
+              .in("id", vendorIds);
 
-            const vendorCategories = new Map(vendorDetails?.map((v: any) => [v.id, v.category]) || []);
+            const vendorCategories = new Map(
+              vendorDetails?.map((v: any) => [v.id, v.category]) || []
+            );
+
             filteredVendors = vendorsInRange.filter((v: any) => {
               const category = vendorCategories.get(v.vendor_id);
-              // Soportar categoría como string o array
-              if (Array.isArray(category)) {
-                return category.includes(args.categoria);
-              }
+              if (Array.isArray(category)) return category.includes(args.categoria);
               return category === args.categoria;
             });
           }
 
-          // Separar abiertos y cerrados, pero MOSTRAR AMBOS
+          if (filteredVendors.length === 0)
+            return "No hay negocios disponibles para esa categoría en tu zona.";
+
+          // 🔎 Obtener horarios reales desde vendor_hours
+          const vendorIds = filteredVendors.map((v: any) => v.vendor_id);
+          const { data: vendorHours } = await supabase
+            .from("vendor_hours")
+            .select(
+              "vendor_id, day_of_week, opening_time, closing_time, is_closed, is_open_24_hours"
+            )
+            .in("vendor_id", vendorIds)
+            .eq("day_of_week", currentDay);
+
+          const hoursMap = new Map();
+          vendorHours?.forEach((h) => {
+            if (!hoursMap.has(h.vendor_id)) hoursMap.set(h.vendor_id, []);
+            hoursMap.get(h.vendor_id).push(h);
+          });
+
+          // 🟢 Separar abiertos y cerrados (usando is_open calculado)
           const openVendors = filteredVendors.filter((v: any) => v.is_open);
           const closedVendors = filteredVendors.filter((v: any) => !v.is_open);
 
-          if (filteredVendors.length === 0) {
-            return args.categoria
-              ? `No hay negocios de tipo "${args.categoria}" que lleguen a tu zona. 😔`
-              : "No hay negocios que lleguen a tu zona en este momento. 😔";
-          }
-
-          // Obtener detalles completos de vendors
-          const vendorIds = filteredVendors.map((v: any) => v.vendor_id);
-
-          const { data: fullVendors } = await supabase
-            .from("vendors")
-            .select("id, name, category, address, opening_time, closing_time, average_rating, total_reviews")
-            .in("id", vendorIds);
-
-          console.log(`📋 Full vendors from DB:`, JSON.stringify(fullVendors, null, 2));
-
-          const vendorMap = new Map(fullVendors?.map((v: any) => [v.id, v]) || []);
-
-          // Formatear resultados - PRIMERO abiertos, DESPUÉS cerrados
-          let resultado = `¡Aquí tenés ${filteredVendors.length} ${filteredVendors.length === 1 ? "negocio" : "negocios"} que hacen delivery a tu zona! 🚗\n\n`;
-
-          console.log(`📝 Starting to format results. Open: ${openVendors.length}, Closed: ${closedVendors.length}`);
+          let resultado = "Aquí tenés los negocios abiertos ahora: 🚗\n\n";
 
           if (openVendors.length > 0) {
             resultado += `🟢 *ABIERTOS AHORA* (${openVendors.length}):\n\n`;
             openVendors.forEach((v: any, i: number) => {
-              const vendor = vendorMap.get(v.vendor_id);
-              console.log(`🔍 Processing vendor ${i + 1}:`, {
-                vendor_id: v.vendor_id,
-                vendor_name: v.vendor_name,
-                distance_km: v.distance_km,
-                vendorFromDB: vendor
-                  ? {
-                      id: vendor.id,
-                      name: vendor.name,
-                      address: vendor.address,
-                    }
-                  : "NOT FOUND",
-              });
+              const vendor = v.vendor_details || {}; // si tenés vendorMap o vendor data previa
+              resultado += `${i + 1}. ${v.vendor_name}\n`;
+              resultado += `   📍 ${vendor.address || "Dirección no disponible"} - A ${v.distance_km.toFixed(1)} km\n`;
 
-              if (!vendor) {
-                // Mostrar info básica aunque no tengamos detalles completos
-                resultado += `${i + 1}. ${v.vendor_name} 📦\n`;
-                resultado += `   📍 A ${v.distance_km.toFixed(1)} km de distancia\n`;
-                resultado += `   ID: ${v.vendor_id}\n\n`;
-                return;
+              // Mostrar horario real
+              const todayHours = hoursMap.get(v.vendor_id);
+              if (todayHours && todayHours.length > 0) {
+                const slots = todayHours
+                  .filter((h: any) => !h.is_closed)
+                  .map((h: any) => {
+                    if (h.is_open_24_hours) return "24 hs";
+                    return `${h.opening_time.slice(0, 5)} - ${h.closing_time.slice(0, 5)}`;
+                  });
+                resultado += `   ⏰ Horario: ${slots.join(", ")}\n`;
+              } else if (vendor.opening_time && vendor.closing_time) {
+                resultado += `   ⏰ Horario: ${vendor.opening_time.slice(0, 5)} - ${vendor.closing_time.slice(0, 5)}\n`;
               }
 
-              resultado += `${i + 1}. ${vendor.name}\n`;
-              resultado += `   📍 ${vendor.address} - A ${v.distance_km.toFixed(1)} km\n`;
-              resultado += `   ID: ${vendor.id}\n`;
-              if (vendor.opening_time && vendor.closing_time) {
-                resultado += `   ⏰ Horario: ${vendor.opening_time.substring(0, 5)} - ${vendor.closing_time.substring(0, 5)}\n`;
-              }
-              if (vendor.average_rating && vendor.total_reviews) {
+              if (vendor.average_rating && vendor.total_reviews)
                 resultado += `   ⭐ Rating: ${vendor.average_rating.toFixed(1)} (${vendor.total_reviews} reseñas)\n`;
-              }
               resultado += `\n`;
             });
           }
@@ -752,94 +747,39 @@ async function ejecutarHerramienta(
           if (closedVendors.length > 0) {
             resultado += `🔴 *CERRADOS* (${closedVendors.length}):\n\n`;
             closedVendors.forEach((v: any, i: number) => {
-              const vendor = vendorMap.get(v.vendor_id);
+              const vendor = v.vendor_details || {};
+              resultado += `${i + 1}. ${v.vendor_name} 🔒\n`;
+              resultado += `   📍 ${vendor.address || "Dirección no disponible"} - A ${v.distance_km.toFixed(1)} km\n`;
 
-              if (!vendor) {
-                // Mostrar info básica aunque no tengamos detalles completos
-                resultado += `${i + 1}. ${v.vendor_name} 🔒\n`;
-                resultado += `   📍 A ${v.distance_km.toFixed(1)} km de distancia\n`;
-                resultado += `   ID: ${v.vendor_id}\n\n`;
-                return;
+              // Mostrar horario real
+              const todayHours = hoursMap.get(v.vendor_id);
+              if (todayHours && todayHours.length > 0) {
+                const slots = todayHours
+                  .filter((h: any) => !h.is_closed)
+                  .map((h: any) => {
+                    if (h.is_open_24_hours) return "24 hs";
+                    return `${h.opening_time.slice(0, 5)} - ${h.closing_time.slice(0, 5)}`;
+                  });
+                resultado += `   ⏰ Horario: ${slots.join(", ")}\n`;
+              } else if (vendor.opening_time && vendor.closing_time) {
+                resultado += `   ⏰ Horario: ${vendor.opening_time.slice(0, 5)} - ${vendor.closing_time.slice(0, 5)}\n`;
               }
 
-              resultado += `${i + 1}. ${vendor.name} 🔒\n`;
-              resultado += `   📍 ${vendor.address} - A ${v.distance_km.toFixed(1)} km\n`;
-              resultado += `   ID: ${vendor.id}\n`;
-              if (vendor.opening_time && vendor.closing_time) {
-                resultado += `   ⏰ Horario: ${vendor.opening_time.substring(0, 5)} - ${vendor.closing_time.substring(0, 5)}\n`;
-              }
-              if (vendor.average_rating && vendor.total_reviews) {
+              if (vendor.average_rating && vendor.total_reviews)
                 resultado += `   ⭐ Rating: ${vendor.average_rating.toFixed(1)} (${vendor.total_reviews} reseñas)\n`;
-              }
               resultado += `\n`;
             });
           }
 
-          resultado += `\n💡 Para ver el menú de alguno, decime el nombre o ID del negocio.`;
+          resultado +=
+            "\n💡 Si querés hacer un pedido, decime el nombre o ID del negocio y qué te gustaría pedir. 😊";
 
           return resultado;
         } else {
-          // Sin ubicación, búsqueda normal pero informar
-          let query = supabase
-            .from("vendors")
-            .select(
-              "id, name, category, address, opening_time, closing_time, days_open, average_rating, total_reviews, latitude, longitude, delivery_radius_km",
-            )
-            .eq("is_active", true)
-            .eq("payment_status", "active");
-
-          // Filtrar por categoría si se especifica
-          if (args.categoria) {
-            // Soportar categorías como string o array
-            query = query.or(`category.eq.${args.categoria},category.cs.{${args.categoria}}`);
-          }
-
-          const { data: vendors, error } = await query;
-
-          if (error || !vendors || vendors.length === 0) {
-            return args.categoria
-              ? `No encontré negocios de tipo "${args.categoria}" disponibles.\n\n💡 Tip: Compartí tu ubicación 📍 para ver solo los que te entregan.`
-              : "No hay negocios disponibles en este momento.\n\n💡 Tip: Compartí tu ubicación 📍 para ver solo los que te entregan.";
-          }
-
-          // Filtrar locales que están abiertos ahora
-          const openVendors = vendors.filter((vendor) => {
-            if (!vendor.days_open || !vendor.days_open.includes(currentDay)) {
-              return false;
-            }
-            if (!vendor.opening_time || !vendor.closing_time) {
-              return false;
-            }
-            return currentTime >= vendor.opening_time && currentTime <= vendor.closing_time;
-          });
-
-          if (openVendors.length === 0) {
-            return args.categoria
-              ? `No hay negocios de tipo "${args.categoria}" abiertos en este momento. 😔\n\n💡 Tip: Compartí tu ubicación 📍 para ver solo los que te entregan.`
-              : "No hay negocios abiertos en este momento. 😔\n\n💡 Tip: Compartí tu ubicación 📍 para ver solo los que te entregan.";
-          }
-
-          // Formatear resultados
-          let resultado = `🟢 Encontré ${openVendors.length} ${openVendors.length === 1 ? "negocio abierto" : "negocios abiertos"}:\n\n⚠️ *Sin ubicación:* Te muestro todos. Para ver solo los que te entregan, compartí tu ubicación 📍\n\n`;
-          openVendors.forEach((v: any, i: number) => {
-            // Formatear categorías (puede ser string o array)
-            const categoryText = Array.isArray(v.category) ? v.category.join(", ") : v.category;
-            resultado += `${i + 1}. ${v.name} (${categoryText})\n`;
-            resultado += `   ID: ${v.id}\n`;
-            resultado += `   📍 ${v.address}\n`;
-            resultado += `   ⏰ Horario: ${v.opening_time} - ${v.closing_time}\n`;
-            if (v.average_rating) {
-              resultado += `   ⭐ Rating: ${v.average_rating} (${v.total_reviews || 0} reseñas)\n`;
-            }
-            if (v.latitude && v.longitude && v.delivery_radius_km) {
-              resultado += `   🚗 Radio de cobertura: ${v.delivery_radius_km} km\n`;
-            }
-            resultado += `\n`;
-          });
-
-          return resultado;
+          return "📍 Compartí tu ubicación para ver qué negocios están abiertos cerca tuyo.";
         }
       }
+
 
       case "ver_menu_negocio": {
         console.log(`🔍 ver_menu_negocio called with vendor_id: "${args.vendor_id}"`);
@@ -940,11 +880,11 @@ async function ejecutarHerramienta(
           const query = uuidRegex.test(item.product_id)
             ? supabase.from("products").select("id, name, price").eq("id", item.product_id).maybeSingle()
             : supabase
-                .from("products")
-                .select("id, name, price")
-                .ilike("name", `%${item.product_name}%`)
-                .eq("vendor_id", vendorId)
-                .maybeSingle();
+              .from("products")
+              .select("id, name, price")
+              .ilike("name", `%${item.product_name}%`)
+              .eq("vendor_id", vendorId)
+              .maybeSingle();
 
           const { data: product } = await query;
           if (product) {
@@ -1025,7 +965,7 @@ async function ejecutarHerramienta(
         // 📍 VALIDACIÓN DE UBICACIÓN Y COBERTURA
         let deliveryCost = 0;
         let deliveryDistance = 0;
-        
+
         if (context.user_latitude && context.user_longitude) {
           // Usuario tiene ubicación, validar cobertura
           const { data: vendor } = await supabase
@@ -1187,7 +1127,7 @@ async function ejecutarHerramienta(
         let confirmacion = `✅ ¡Pedido creado exitosamente!\n\n`;
         confirmacion += `📦 Pedido #${order.id.substring(0, 8)}\n`;
         confirmacion += `🏪 Negocio: ${context.selected_vendor_name}\n`;
-        
+
         if (deliveryCost > 0) {
           confirmacion += `🛒 Subtotal: $ ${subtotal}\n`;
           confirmacion += `🚚 Delivery (${deliveryDistance.toFixed(1)} km): $ ${deliveryCost}\n`;
@@ -1195,7 +1135,7 @@ async function ejecutarHerramienta(
         } else {
           confirmacion += `💰 Total: $ ${total}\n`;
         }
-        
+
         confirmacion += `📍 Dirección: ${context.delivery_address}\n`;
         confirmacion += `💳 Pago: ${context.payment_method}\n\n`;
 
@@ -2015,11 +1955,10 @@ ${context.user_latitude && context.user_longitude ? `- ✅ Usuario tiene ubicaci
 - NO memorices menús, precios o productos - todo cambia dinámicamente
 
 📍 UBICACIÓN Y FILTRADO:
-${
-  context.user_latitude && context.user_longitude
-    ? "- El usuario YA compartió su ubicación → Solo verá negocios que entregan en su zona"
-    : "- El usuario NO compartió ubicación → Verá todos los negocios, pero es recomendable pedirle que la comparta"
-}
+${context.user_latitude && context.user_longitude
+        ? "- El usuario YA compartió su ubicación → Solo verá negocios que entregan en su zona"
+        : "- El usuario NO compartió ubicación → Verá todos los negocios, pero es recomendable pedirle que la comparta"
+      }
 - Si el usuario pregunta por delivery o zona: explicale que puede compartir su ubicación usando el botón 📍 de WhatsApp
 - Cuando el usuario busque locales o productos, automáticamente se filtrarán por su ubicación si la compartió
 - Si el usuario está buscando y no tiene ubicación, sugerile compartirla para ver solo lo que está a su alcance
@@ -2090,11 +2029,10 @@ FLUJO OBLIGATORIO:
 ⚠️ IMPORTANTE: NO uses ver_menu_negocio hasta que el cliente especifique cuál negocio quiere ver
 
 📍 UBICACIÓN Y DIRECCIÓN:
-${
-  context.user_latitude && context.user_longitude && context.user_latitude !== 0
-    ? "- ✅ El usuario YA tiene ubicación → crear_pedido la usará automáticamente"
-    : '- ⚠️ El usuario NO tiene ubicación GPS. Opciones:\n  1. IDEAL: "📍 Compartí tu ubicación tocando el clip 📎 en WhatsApp" (valida radio)\n  2. ALTERNATIVA: Usar agregar_direccion_manual si el cliente no puede compartir GPS\n  ⚠️ Las direcciones manuales NO validan radio de entrega - el negocio debe confirmar'
-}
+${context.user_latitude && context.user_longitude && context.user_latitude !== 0
+        ? "- ✅ El usuario YA tiene ubicación → crear_pedido la usará automáticamente"
+        : '- ⚠️ El usuario NO tiene ubicación GPS. Opciones:\n  1. IDEAL: "📍 Compartí tu ubicación tocando el clip 📎 en WhatsApp" (valida radio)\n  2. ALTERNATIVA: Usar agregar_direccion_manual si el cliente no puede compartir GPS\n  ⚠️ Las direcciones manuales NO validan radio de entrega - el negocio debe confirmar'
+      }
 - Una vez que tengas ubicación GPS, crear_pedido validará si el negocio hace delivery a su zona
 - Si está fuera de cobertura, el sistema le avisará automáticamente
 - ⚠️ Direcciones manuales (sin GPS): El negocio verá una marca especial indicando que debe confirmar cobertura
