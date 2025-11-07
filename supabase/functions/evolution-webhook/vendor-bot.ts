@@ -708,7 +708,7 @@ async function ejecutarHerramienta(
               .eq("id", v.vendor_id)
               .maybeSingle();
 
-            resultado += `📍 ${v.address || "Dirección no disponible"} - A ${v.distance_km.toFixed(
+            resultado += `📍 ${vendorInfo.address || "Dirección no disponible"} - A ${v.distance_km.toFixed(
               1
             )} km\n`;
             resultado += `ID: ${v.vendor_id}\n`;
@@ -748,7 +748,7 @@ async function ejecutarHerramienta(
               .eq("id", v.vendor_id)
               .maybeSingle();
 
-            resultado += `📍 ${v.address || "Dirección no disponible"} - A ${v.distance_km.toFixed(
+            resultado += `📍 ${vendorInfo.address || "Dirección no disponible"} - A ${v.distance_km.toFixed(
               1
             )} km\n`;
             resultado += `ID: ${v.vendor_id}\n`;
