@@ -24,6 +24,9 @@ interface VendorData {
   longitude: number | null;
   delivery_radius_km: number;
   delivery_price_per_km: number;
+  delivery_pricing_type: string;
+  delivery_fixed_price: number;
+  delivery_additional_per_km: number;
 }
 
 interface VendorSettingsProps {
@@ -160,7 +163,10 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
           latitude: vendorData.latitude,
           longitude: vendorData.longitude,
           delivery_radius_km: vendorData.delivery_radius_km,
-          delivery_price_per_km: vendorData.delivery_price_per_km
+          delivery_price_per_km: vendorData.delivery_price_per_km,
+          delivery_pricing_type: vendorData.delivery_pricing_type,
+          delivery_fixed_price: vendorData.delivery_fixed_price,
+          delivery_additional_per_km: vendorData.delivery_additional_per_km
         })
         .eq('id', vendorId);
 
@@ -322,19 +328,91 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="delivery_price">Precio por Kilómetro ($)</Label>
-              <Input
-                id="delivery_price"
-                type="number"
-                step="100"
-                min="0"
-                value={vendorData.delivery_price_per_km || 0}
-                onChange={(e) => setVendorData({ ...vendorData, delivery_price_per_km: parseFloat(e.target.value) || 0 })}
-              />
-              <p className="text-xs text-muted-foreground">
-                💰 Costo de delivery: {vendorData.delivery_price_per_km} $/km
-              </p>
+              <Label htmlFor="delivery_pricing_type">Tipo de Cobro de Delivery</Label>
+              <Select
+                value={vendorData.delivery_pricing_type || 'per_km'}
+                onValueChange={(value) => setVendorData({ ...vendorData, delivery_pricing_type: value })}
+              >
+                <SelectTrigger id="delivery_pricing_type">
+                  <SelectValue placeholder="Seleccionar tipo de cobro" />
+                </SelectTrigger>
+                <SelectContent className="bg-background z-50">
+                  <SelectItem value="per_km">Por Kilómetro Total</SelectItem>
+                  <SelectItem value="fixed">Monto Fijo</SelectItem>
+                  <SelectItem value="base_plus_km">Base + Adicional por Km</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+
+            {vendorData.delivery_pricing_type === 'per_km' && (
+              <div className="space-y-2">
+                <Label htmlFor="delivery_price">Precio por Kilómetro (Gs)</Label>
+                <Input
+                  id="delivery_price"
+                  type="number"
+                  step="100"
+                  min="0"
+                  value={vendorData.delivery_price_per_km || 0}
+                  onChange={(e) => setVendorData({ ...vendorData, delivery_price_per_km: parseFloat(e.target.value) || 0 })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  💰 Se multiplica la distancia total por este valor
+                </p>
+              </div>
+            )}
+
+            {vendorData.delivery_pricing_type === 'fixed' && (
+              <div className="space-y-2">
+                <Label htmlFor="delivery_fixed_price">Precio Fijo de Delivery (Gs)</Label>
+                <Input
+                  id="delivery_fixed_price"
+                  type="number"
+                  step="100"
+                  min="0"
+                  value={vendorData.delivery_fixed_price || 0}
+                  onChange={(e) => setVendorData({ ...vendorData, delivery_fixed_price: parseFloat(e.target.value) || 0 })}
+                  placeholder="Ej: 1000"
+                />
+                <p className="text-xs text-muted-foreground">
+                  💰 Todos los deliveries cuestan lo mismo, sin importar la distancia
+                </p>
+              </div>
+            )}
+
+            {vendorData.delivery_pricing_type === 'base_plus_km' && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="delivery_fixed_price_base">Precio Base (Primer Km) (Gs)</Label>
+                  <Input
+                    id="delivery_fixed_price_base"
+                    type="number"
+                    step="100"
+                    min="0"
+                    value={vendorData.delivery_fixed_price || 0}
+                    onChange={(e) => setVendorData({ ...vendorData, delivery_fixed_price: parseFloat(e.target.value) || 0 })}
+                    placeholder="Ej: 1000"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    💰 Precio dentro del primer kilómetro
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="delivery_additional_per_km">Precio Adicional por Km (Gs)</Label>
+                  <Input
+                    id="delivery_additional_per_km"
+                    type="number"
+                    step="100"
+                    min="0"
+                    value={vendorData.delivery_additional_per_km || 0}
+                    onChange={(e) => setVendorData({ ...vendorData, delivery_additional_per_km: parseFloat(e.target.value) || 0 })}
+                    placeholder="Ej: 500"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    💰 Se suma por cada kilómetro después del primero
+                  </p>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="mt-3 p-3 bg-muted rounded-lg">

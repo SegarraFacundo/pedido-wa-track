@@ -972,7 +972,7 @@ async function ejecutarHerramienta(
           // Usuario tiene ubicación, validar cobertura
           const { data: vendor } = await supabase
             .from("vendors")
-            .select("id, name, latitude, longitude, delivery_radius_km, delivery_price_per_km, address")
+            .select("id, name, latitude, longitude, delivery_radius_km, delivery_pricing_type, delivery_price_per_km, delivery_fixed_price, delivery_additional_per_km, address")
             .eq("id", context.selected_vendor_id)
             .single();
 
@@ -993,11 +993,25 @@ async function ejecutarHerramienta(
                 return `😔 Lo siento, ${vendor.name} no hace delivery a tu ubicación.\n\n📍 Tu ubicación está a ${distanceResult.toFixed(1)} km del local.\n🚗 Radio de cobertura: ${vendor.delivery_radius_km} km\n\n💡 Podés buscar otros negocios más cercanos o actualizar tu ubicación.`;
               }
 
-              // Calcular costo de delivery si el vendor tiene precio configurado
-              if (vendor.delivery_price_per_km && vendor.delivery_price_per_km > 0) {
-                deliveryCost = Math.round(distanceResult * vendor.delivery_price_per_km);
-                console.log(`🚚 Delivery cost: ${deliveryCost} $ (${distanceResult}km × ${vendor.delivery_price_per_km} $/km)`);
+              // Calcular costo de delivery según el tipo de pricing
+              const pricingType = vendor.delivery_pricing_type || 'per_km';
+              
+              if (pricingType === 'fixed') {
+                deliveryCost = vendor.delivery_fixed_price || 0;
+              } else if (pricingType === 'base_plus_km') {
+                const basePrice = vendor.delivery_fixed_price || 0;
+                const additionalPerKm = vendor.delivery_additional_per_km || 0;
+                const additionalDistance = Math.max(0, distanceResult - 1);
+                deliveryCost = basePrice + (additionalDistance * additionalPerKm);
+              } else {
+                // per_km
+                if (vendor.delivery_price_per_km && vendor.delivery_price_per_km > 0) {
+                  deliveryCost = distanceResult * vendor.delivery_price_per_km;
+                }
               }
+              
+              deliveryCost = Math.round(deliveryCost);
+              console.log(`🚚 Delivery cost: ${deliveryCost} Gs (Type: ${pricingType}, Distance: ${distanceResult}km)`);
             }
           }
 
@@ -1131,11 +1145,11 @@ async function ejecutarHerramienta(
         confirmacion += `🏪 Negocio: ${context.selected_vendor_name}\n`;
 
         if (deliveryCost > 0) {
-          confirmacion += `🛒 Subtotal: $ ${subtotal}\n`;
-          confirmacion += `🚚 Delivery (${deliveryDistance.toFixed(1)} km): $ ${deliveryCost}\n`;
-          confirmacion += `💰 Total: $ ${total}\n`;
+          confirmacion += `🛒 Subtotal: Gs ${Math.round(subtotal).toLocaleString("es-PY")}\n`;
+          confirmacion += `🚚 Delivery (${deliveryDistance.toFixed(1)} km): Gs ${Math.round(deliveryCost).toLocaleString("es-PY")}\n`;
+          confirmacion += `💰 Total: Gs ${Math.round(total).toLocaleString("es-PY")}\n`;
         } else {
-          confirmacion += `💰 Total: $ ${total}\n`;
+          confirmacion += `💰 Total: Gs ${Math.round(total).toLocaleString("es-PY")}\n`;
         }
 
         confirmacion += `📍 Dirección: ${context.delivery_address}\n`;
@@ -1852,7 +1866,7 @@ Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
         // Obtener información del vendor
         const { data: vendor, error: vendorError } = await supabase
           .from("vendors")
-          .select("id, name, latitude, longitude, delivery_radius_km, delivery_price_per_km")
+          .select("id, name, latitude, longitude, delivery_radius_km, delivery_pricing_type, delivery_price_per_km, delivery_fixed_price, delivery_additional_per_km")
           .eq("id", context.selected_vendor_id)
           .single();
 
@@ -1884,14 +1898,47 @@ Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
           return `😔 Lo siento, ${vendor.name} no hace delivery a tu ubicación.\n\n📍 Tu ubicación está a ${distance.toFixed(1)} km del local.\n🚗 Radio de cobertura: ${vendor.delivery_radius_km} km\n\n💡 Podés buscar otros negocios más cercanos.`;
         }
 
-        // Calcular costo si el vendor tiene precio configurado
-        if (!vendor.delivery_price_per_km || vendor.delivery_price_per_km <= 0) {
+        // Calcular costo según el tipo de pricing
+        const pricingType = vendor.delivery_pricing_type || 'per_km';
+        let deliveryCost = 0;
+        let costExplanation = "";
+
+        if (pricingType === 'fixed') {
+          deliveryCost = vendor.delivery_fixed_price || 0;
+          costExplanation = "Precio fijo";
+        } else if (pricingType === 'base_plus_km') {
+          const basePrice = vendor.delivery_fixed_price || 0;
+          const additionalPerKm = vendor.delivery_additional_per_km || 0;
+          const additionalDistance = Math.max(0, distance - 1);
+          deliveryCost = basePrice + (additionalDistance * additionalPerKm);
+          
+          if (distance <= 1) {
+            costExplanation = `Precio base (dentro del primer km)`;
+          } else {
+            costExplanation = `Gs ${Math.round(basePrice).toLocaleString("es-PY")} (base) + Gs ${Math.round(additionalDistance * additionalPerKm).toLocaleString("es-PY")} (${additionalDistance.toFixed(2)} km adicionales × Gs ${Math.round(additionalPerKm).toLocaleString("es-PY")})`;
+          }
+        } else {
+          // per_km
+          const pricePerKm = vendor.delivery_price_per_km || 0;
+          deliveryCost = distance * pricePerKm;
+          costExplanation = `${distance.toFixed(1)} km × Gs ${Math.round(pricePerKm).toLocaleString("es-PY")}`;
+        }
+
+        deliveryCost = Math.round(deliveryCost);
+
+        if (deliveryCost === 0) {
           return `✅ ¡${vendor.name} hace delivery a tu zona!\n\n📏 Distancia: ${distance.toFixed(1)} km\n\n💰 El delivery está incluido en el precio total sin costo adicional. 🎉`;
         }
 
-        const deliveryCost = Math.round(distance * vendor.delivery_price_per_km);
+        let response = `✅ ¡${vendor.name} hace delivery a tu zona!\n\n📏 Distancia: ${distance.toFixed(1)} km\n💰 Costo del delivery: Gs ${deliveryCost.toLocaleString("es-PY")}`;
+        
+        if (costExplanation && pricingType !== 'fixed') {
+          response += `\n   (${costExplanation})`;
+        }
+        
+        response += `\n\nEste monto se suma al total de tu pedido al confirmar. 🚚`;
 
-        return `✅ ¡${vendor.name} hace delivery a tu zona!\n\n📏 Distancia: ${distance.toFixed(1)} km\n💰 Costo del delivery: $ ${deliveryCost}\n\n📌 Tarifa: $ ${vendor.delivery_price_per_km}/km\n\nEste monto se suma al total de tu pedido al confirmar. 🚚`;
+        return response;
       }
 
       default:
