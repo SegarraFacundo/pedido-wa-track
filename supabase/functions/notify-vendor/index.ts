@@ -30,18 +30,18 @@ Deno.serve(async (req) => {
       if (!vendorId) {
         throw new Error('vendorId required for customer_message without order');
       }
-      
+
       const { data: vendorData, error: vendorError } = await supabase
         .from('vendors')
         .select('id, name, whatsapp_number')
         .eq('id', vendorId)
         .single();
-      
+
       if (vendorError || !vendorData) {
         console.error('❌ Vendor not found:', vendorError);
         throw new Error('Vendor not found');
       }
-      
+
       vendor = vendorData;
       console.log('🏪 Vendor:', { id: vendor.id, name: vendor.name, hasWhatsApp: !!vendor.whatsapp_number });
     } else {
@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
       if (!orderId) {
         throw new Error('Missing orderId');
       }
-      
+
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .select('*, vendors!inner(id, name, whatsapp_number)')
@@ -116,30 +116,34 @@ Deno.serve(async (req) => {
         if (!order) {
           throw new Error('Order required for new_order event');
         }
-        const itemsList = order.items.map((item: any) => 
-          `• ${item.quantity}x ${item.name} - $${item.price}`
-        ).join('\n');
+        const itemsList = order.items.map((item: any) => {
+          const name = item.product_name || item.name || "Producto sin nombre";
+          const unitPrice = item.price ?? 0;
+          const subtotal = unitPrice * (item.quantity ?? 1);
+          return `• ${item.quantity ?? 1}x ${name} - $${subtotal}`;
+        })
+          .join("\n");
         message = `🛍️ *Nuevo Pedido #${order.id.slice(0, 8)}*\n\n` +
-                  `👤 Cliente: ${order.customer_name}\n` +
-                  `📍 Dirección: ${order.address}\n\n` +
-                  `*Productos:*\n${itemsList}\n\n` +
-                  `💰 Total: $${order.total}\n\n` +
-                  `Por favor, confirma el pedido desde tu panel de vendedor.`;
+          `👤 Cliente: ${order.customer_name}\n` +
+          `📍 Dirección: ${order.address}\n\n` +
+          `*Productos:*\n${itemsList}\n\n` +
+          `💰 Total: $${order.total}\n\n` +
+          `Por favor, confirma el pedido desde tu panel de vendedor.`;
         break;
-      
+
       case 'order_cancelled':
         if (!order) {
           throw new Error('Order required for order_cancelled event');
         }
         message = `❌ *Pedido Cancelado #${order.id.slice(0, 8)}*\n\n` +
-                  `El pedido de ${order.customer_name} ha sido cancelado.\n` +
-                  `Total: $${order.total}`;
+          `El pedido de ${order.customer_name} ha sido cancelado.\n` +
+          `Total: $${order.total}`;
         break;
-      
+
       case 'customer_message':
         message = `💬 *Nuevo mensaje de cliente*\n\n` +
-                  `Un cliente está intentando comunicarse contigo. ` +
-                  `Por favor, revisa tu panel de vendedor.`;
+          `Un cliente está intentando comunicarse contigo. ` +
+          `Por favor, revisa tu panel de vendedor.`;
         break;
     }
 
