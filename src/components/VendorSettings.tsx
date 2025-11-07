@@ -23,6 +23,7 @@ interface VendorData {
   latitude: number | null;
   longitude: number | null;
   delivery_radius_km: number;
+  delivery_price_per_km: number;
 }
 
 interface VendorSettingsProps {
@@ -158,7 +159,8 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
           image: imageUrl,
           latitude: vendorData.latitude,
           longitude: vendorData.longitude,
-          delivery_radius_km: vendorData.delivery_radius_km
+          delivery_radius_km: vendorData.delivery_radius_km,
+          delivery_price_per_km: vendorData.delivery_price_per_km
         })
         .eq('id', vendorId);
 
@@ -272,7 +274,7 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
             Configurá tu ubicación y radio para que los clientes vean si estás en su zona de delivery.
           </p>
           
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="latitude">Latitud</Label>
               <Input
@@ -316,6 +318,21 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
               />
               <p className="text-xs text-muted-foreground">
                 Distancia máxima: {vendorData.delivery_radius_km} km
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="delivery_price">Precio por Kilómetro (Gs)</Label>
+              <Input
+                id="delivery_price"
+                type="number"
+                step="100"
+                min="0"
+                value={vendorData.delivery_price_per_km || 0}
+                onChange={(e) => setVendorData({ ...vendorData, delivery_price_per_km: parseFloat(e.target.value) || 0 })}
+              />
+              <p className="text-xs text-muted-foreground">
+                💰 Costo de delivery: {vendorData.delivery_price_per_km} Gs/km
               </p>
             </div>
           </div>

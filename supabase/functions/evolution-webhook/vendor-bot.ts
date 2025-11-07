@@ -1010,11 +1010,14 @@ async function ejecutarHerramienta(
         }
 
         // 📍 VALIDACIÓN DE UBICACIÓN Y COBERTURA
+        let deliveryCost = 0;
+        let deliveryDistance = 0;
+        
         if (context.user_latitude && context.user_longitude) {
           // Usuario tiene ubicación, validar cobertura
           const { data: vendor } = await supabase
             .from("vendors")
-            .select("id, name, latitude, longitude, delivery_radius_km, address")
+            .select("id, name, latitude, longitude, delivery_radius_km, delivery_price_per_km, address")
             .eq("id", context.selected_vendor_id)
             .single();
 
@@ -1028,10 +1031,17 @@ async function ejecutarHerramienta(
             });
 
             if (!distError && distanceResult !== null) {
+              deliveryDistance = distanceResult;
               console.log(`📏 Distance: ${distanceResult}km, Max: ${vendor.delivery_radius_km}km`);
 
               if (distanceResult > vendor.delivery_radius_km) {
                 return `😔 Lo siento, ${vendor.name} no hace delivery a tu ubicación.\n\n📍 Tu ubicación está a ${distanceResult.toFixed(1)} km del local.\n🚗 Radio de cobertura: ${vendor.delivery_radius_km} km\n\n💡 Podés buscar otros negocios más cercanos o actualizar tu ubicación.`;
+              }
+
+              // Calcular costo de delivery si el vendor tiene precio configurado
+              if (vendor.delivery_price_per_km && vendor.delivery_price_per_km > 0) {
+                deliveryCost = Math.round(distanceResult * vendor.delivery_price_per_km);
+                console.log(`🚚 Delivery cost: ${deliveryCost} Gs (${distanceResult}km × ${vendor.delivery_price_per_km} Gs/km)`);
               }
             }
           }
@@ -1084,12 +1094,16 @@ async function ejecutarHerramienta(
         context.delivery_address = args.direccion;
         context.payment_method = args.metodo_pago;
 
-        const total = context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        const subtotal = context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        const total = subtotal + deliveryCost;
 
         console.log("📤 Inserting order:", {
           vendor_id: context.selected_vendor_id,
           customer_phone: context.phone,
           items_count: context.cart.length,
+          subtotal,
+          delivery_cost: deliveryCost,
+          delivery_distance: deliveryDistance,
           total,
           address: context.delivery_address,
           payment_method: context.payment_method,
@@ -1160,7 +1174,15 @@ async function ejecutarHerramienta(
         let confirmacion = `✅ ¡Pedido creado exitosamente!\n\n`;
         confirmacion += `📦 Pedido #${order.id.substring(0, 8)}\n`;
         confirmacion += `🏪 Negocio: ${context.selected_vendor_name}\n`;
-        confirmacion += `💰 Total: $${total}\n`;
+        
+        if (deliveryCost > 0) {
+          confirmacion += `🛒 Subtotal: Gs ${subtotal}\n`;
+          confirmacion += `🚚 Delivery (${deliveryDistance.toFixed(1)} km): Gs ${deliveryCost}\n`;
+          confirmacion += `💰 Total: Gs ${total}\n`;
+        } else {
+          confirmacion += `💰 Total: Gs ${total}\n`;
+        }
+        
         confirmacion += `📍 Dirección: ${context.delivery_address}\n`;
         confirmacion += `💳 Pago: ${context.payment_method}\n\n`;
 

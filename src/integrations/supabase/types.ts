@@ -1226,6 +1226,7 @@ export type Database = {
           closing_time: string | null
           created_at: string | null
           days_open: string[] | null
+          delivery_price_per_km: number | null
           delivery_radius_km: number | null
           id: string
           image: string | null
@@ -1255,6 +1256,7 @@ export type Database = {
           closing_time?: string | null
           created_at?: string | null
           days_open?: string[] | null
+          delivery_price_per_km?: number | null
           delivery_radius_km?: number | null
           id?: string
           image?: string | null
@@ -1284,6 +1286,7 @@ export type Database = {
           closing_time?: string | null
           created_at?: string | null
           days_open?: string[] | null
+          delivery_price_per_km?: number | null
           delivery_radius_km?: number | null
           id?: string
           image?: string | null
