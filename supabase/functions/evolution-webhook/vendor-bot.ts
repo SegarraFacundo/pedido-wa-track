@@ -690,17 +690,20 @@ async function ejecutarHerramienta(
         });
 
         // 📋 Obtener información detallada de todos los vendors
+        console.log("📋 Vendor IDs to fetch:", vendorIds);
         const { data: vendorsInfo, error: vendorsInfoError } = await supabase
           .from("vendors")
           .select("id, address, average_rating, total_reviews")
           .in("id", vendorIds);
 
         if (vendorsInfoError) console.error("Error obteniendo info vendors:", vendorsInfoError);
+        console.log("📋 Vendors info fetched:", JSON.stringify(vendorsInfo, null, 2));
 
         // 🗺️ Crear mapa vendor_id → información
         const vendorsInfoMap = new Map();
         vendorsInfo?.forEach((vi) => {
           vendorsInfoMap.set(vi.id, vi);
+          console.log(`  Mapped vendor ${vi.id}: ${vi.address}`);
         });
 
         // 🟢 y 🔴 Separar abiertos y cerrados
@@ -717,6 +720,7 @@ async function ejecutarHerramienta(
 
             // Dirección y distancia
             const vendorInfo = vendorsInfoMap.get(v.vendor_id);
+            console.log(`🔍 Looking for vendor ${v.vendor_id}, found:`, vendorInfo);
             resultado += `📍 ${vendorInfo?.address || "Dirección no disponible"} - A ${v.distance_km.toFixed(
               1
             )} km\n`;
