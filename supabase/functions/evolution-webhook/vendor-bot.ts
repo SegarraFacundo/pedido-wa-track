@@ -518,6 +518,19 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "calcular_costo_delivery",
+      description:
+        "Calcula el costo de delivery desde el negocio actual hasta la ubicación del cliente. Usa esto cuando el cliente pregunte cuánto sale el delivery.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
 ];
 
 // ==================== EJECUTORES DE HERRAMIENTAS ====================
@@ -1883,6 +1896,62 @@ Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
         }
       }
 
+      case "calcular_costo_delivery": {
+        // Verificar que hay un negocio seleccionado
+        if (!context.selected_vendor_id) {
+          return "Primero tenés que elegir un negocio para saber el costo del delivery. ¿Querés que te muestre los locales disponibles?";
+        }
+
+        // Verificar que el cliente tiene ubicación
+        if (!context.user_latitude || !context.user_longitude || context.user_latitude === 0) {
+          return `📍 Para calcular el costo del delivery necesito que compartas tu ubicación.\n\n👉 Tocá el clip 📎 en WhatsApp y elegí "Ubicación"\n\nAsí puedo calcular la distancia desde ${context.selected_vendor_name || "el negocio"} hasta tu domicilio. 🚗`;
+        }
+
+        // Obtener información del vendor
+        const { data: vendor, error: vendorError } = await supabase
+          .from("vendors")
+          .select("id, name, latitude, longitude, delivery_radius_km, delivery_price_per_km")
+          .eq("id", context.selected_vendor_id)
+          .single();
+
+        if (vendorError || !vendor) {
+          console.error("Error fetching vendor for delivery calc:", vendorError);
+          return "Hubo un problema al obtener la información del negocio. Intentá de nuevo.";
+        }
+
+        // Verificar que el vendor tiene ubicación configurada
+        if (!vendor.latitude || !vendor.longitude) {
+          return `${vendor.name} todavía no configuró su ubicación exacta, por lo que no puedo calcular el costo del delivery automáticamente. Podés consultarle directamente al negocio.`;
+        }
+
+        // Calcular distancia
+        const { data: distance, error: distError } = await supabase.rpc("calculate_distance", {
+          lat1: context.user_latitude,
+          lon1: context.user_longitude,
+          lat2: vendor.latitude,
+          lon2: vendor.longitude,
+        });
+
+        if (distError || distance === null) {
+          console.error("Error calculating distance:", distError);
+          return "Hubo un problema al calcular la distancia. Intentá de nuevo.";
+        }
+
+        // Verificar si está dentro del radio
+        if (distance > vendor.delivery_radius_km) {
+          return `😔 Lo siento, ${vendor.name} no hace delivery a tu ubicación.\n\n📍 Tu ubicación está a ${distance.toFixed(1)} km del local.\n🚗 Radio de cobertura: ${vendor.delivery_radius_km} km\n\n💡 Podés buscar otros negocios más cercanos.`;
+        }
+
+        // Calcular costo si el vendor tiene precio configurado
+        if (!vendor.delivery_price_per_km || vendor.delivery_price_per_km <= 0) {
+          return `✅ ¡${vendor.name} hace delivery a tu zona!\n\n📏 Distancia: ${distance.toFixed(1)} km\n\n💰 El delivery está incluido en el precio total sin costo adicional. 🎉`;
+        }
+
+        const deliveryCost = Math.round(distance * vendor.delivery_price_per_km);
+
+        return `✅ ¡${vendor.name} hace delivery a tu zona!\n\n📏 Distancia: ${distance.toFixed(1)} km\n💰 Costo del delivery: Gs ${deliveryCost}\n\n📌 Tarifa: Gs ${vendor.delivery_price_per_km}/km\n\nEste monto se suma al total de tu pedido al confirmar. 🚚`;
+      }
+
       default:
         return `Herramienta ${toolName} no implementada`;
     }
@@ -2062,6 +2131,13 @@ CALIFICACIONES:
   💬 Comentario opcional
 - Puede dar una o todas las calificaciones
 - Siempre agradecé su opinión
+
+💰 COSTO DE DELIVERY:
+- Si el cliente pregunta "¿Cuánto me sale el delivery?", "¿Cuál es el costo de envío?" o similar → usar calcular_costo_delivery
+- Esta herramienta calculará automáticamente el costo basado en la distancia
+- Si el cliente NO tiene ubicación, pedile que la comparta primero
+- Algunos negocios tienen delivery gratis (precio Gs 0/km) y otros cobran por distancia
+- El costo se suma al total del pedido al confirmar
 
 IMPORTANTE: Siempre confirmá antes de crear un pedido. Preguntá dirección y método de pago solo cuando el cliente esté listo para finalizar.`;
 
