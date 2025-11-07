@@ -256,7 +256,7 @@ export function useRealtimeOrders(vendorId?: string) {
 
       let notificationMessage = `Tu pedido #${orderId.slice(0, 8)} ${statusMessages[newStatus as keyof typeof statusMessages]}. ${statusDescriptions[newStatus as keyof typeof statusDescriptions]}`;
       
-      // Si el estado es delivered, actualizar sesión para que el bot maneje la calificación
+      // Si el estado es delivered, enviar mensaje con prompt de calificación
       if (newStatus === 'delivered') {
         // Actualizar sesión del usuario para que esté en modo RATING_ORDER
         await supabase
@@ -271,8 +271,20 @@ export function useRealtimeOrders(vendorId?: string) {
             updated_at: new Date().toISOString()
           }, { onConflict: 'phone' });
         
-        // No enviar mensaje aquí - dejar que el bot lo maneje con su formato completo
-        return;
+        // Enviar mensaje de entrega con prompt de calificación
+        notificationMessage = `🎉 ¡Tu pedido #${orderId.slice(0, 8)} ha sido entregado! 
+
+¡Esperamos que lo disfrutes! 🍽️
+
+📝 *¿Querés calificar tu experiencia?*
+Tu opinión nos ayuda a mejorar.
+
+Podés calificar:
+⏱️ Tiempo de entrega (1-5 estrellas)
+👥 Atención del negocio (1-5 estrellas)
+📦 Calidad del producto (1-5 estrellas)
+
+Solo escribí "quiero calificar" o "calificar" cuando quieras hacerlo. Es opcional 😊`;
       }
 
       await supabase.functions.invoke('send-whatsapp-notification', {
