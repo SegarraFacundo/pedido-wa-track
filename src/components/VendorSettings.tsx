@@ -322,7 +322,7 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="delivery_price">Precio por Kilómetro (Gs)</Label>
+              <Label htmlFor="delivery_price">Precio por Kilómetro ($)</Label>
               <Input
                 id="delivery_price"
                 type="number"
@@ -332,7 +332,7 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
                 onChange={(e) => setVendorData({ ...vendorData, delivery_price_per_km: parseFloat(e.target.value) || 0 })}
               />
               <p className="text-xs text-muted-foreground">
-                💰 Costo de delivery: {vendorData.delivery_price_per_km} Gs/km
+                💰 Costo de delivery: {vendorData.delivery_price_per_km} $/km
               </p>
             </div>
           </div>

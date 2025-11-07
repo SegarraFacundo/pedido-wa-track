@@ -1054,7 +1054,7 @@ async function ejecutarHerramienta(
               // Calcular costo de delivery si el vendor tiene precio configurado
               if (vendor.delivery_price_per_km && vendor.delivery_price_per_km > 0) {
                 deliveryCost = Math.round(distanceResult * vendor.delivery_price_per_km);
-                console.log(`🚚 Delivery cost: ${deliveryCost} Gs (${distanceResult}km × ${vendor.delivery_price_per_km} Gs/km)`);
+                console.log(`🚚 Delivery cost: ${deliveryCost} $ (${distanceResult}km × ${vendor.delivery_price_per_km} $/km)`);
               }
             }
           }
@@ -1189,11 +1189,11 @@ async function ejecutarHerramienta(
         confirmacion += `🏪 Negocio: ${context.selected_vendor_name}\n`;
         
         if (deliveryCost > 0) {
-          confirmacion += `🛒 Subtotal: Gs ${subtotal}\n`;
-          confirmacion += `🚚 Delivery (${deliveryDistance.toFixed(1)} km): Gs ${deliveryCost}\n`;
-          confirmacion += `💰 Total: Gs ${total}\n`;
+          confirmacion += `🛒 Subtotal: $ ${subtotal}\n`;
+          confirmacion += `🚚 Delivery (${deliveryDistance.toFixed(1)} km): $ ${deliveryCost}\n`;
+          confirmacion += `💰 Total: $ ${total}\n`;
         } else {
-          confirmacion += `💰 Total: Gs ${total}\n`;
+          confirmacion += `💰 Total: $ ${total}\n`;
         }
         
         confirmacion += `📍 Dirección: ${context.delivery_address}\n`;
@@ -1949,7 +1949,7 @@ Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
 
         const deliveryCost = Math.round(distance * vendor.delivery_price_per_km);
 
-        return `✅ ¡${vendor.name} hace delivery a tu zona!\n\n📏 Distancia: ${distance.toFixed(1)} km\n💰 Costo del delivery: Gs ${deliveryCost}\n\n📌 Tarifa: Gs ${vendor.delivery_price_per_km}/km\n\nEste monto se suma al total de tu pedido al confirmar. 🚚`;
+        return `✅ ¡${vendor.name} hace delivery a tu zona!\n\n📏 Distancia: ${distance.toFixed(1)} km\n💰 Costo del delivery: $ ${deliveryCost}\n\n📌 Tarifa: $ ${vendor.delivery_price_per_km}/km\n\nEste monto se suma al total de tu pedido al confirmar. 🚚`;
       }
 
       default:
@@ -2136,7 +2136,7 @@ CALIFICACIONES:
 - Si el cliente pregunta "¿Cuánto me sale el delivery?", "¿Cuál es el costo de envío?" o similar → usar calcular_costo_delivery
 - Esta herramienta calculará automáticamente el costo basado en la distancia
 - Si el cliente NO tiene ubicación, pedile que la comparta primero
-- Algunos negocios tienen delivery gratis (precio Gs 0/km) y otros cobran por distancia
+- Algunos negocios tienen delivery gratis (precio $ 0/km) y otros cobran por distancia
 - El costo se suma al total del pedido al confirmar
 
 IMPORTANTE: Siempre confirmá antes de crear un pedido. Preguntá dirección y método de pago solo cuando el cliente esté listo para finalizar.`;
