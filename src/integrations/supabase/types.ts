@@ -515,6 +515,42 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_reviews: {
+        Row: {
+          comment: string | null
+          created_at: string | null
+          id: string
+          rating: number
+          reviewer_email: string | null
+          reviewer_name: string
+          reviewer_phone: string
+          updated_at: string | null
+          user_type: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string | null
+          id?: string
+          rating: number
+          reviewer_email?: string | null
+          reviewer_name: string
+          reviewer_phone: string
+          updated_at?: string | null
+          user_type: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string | null
+          id?: string
+          rating?: number
+          reviewer_email?: string | null
+          reviewer_name?: string
+          reviewer_phone?: string
+          updated_at?: string | null
+          user_type?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           category: string[] | null

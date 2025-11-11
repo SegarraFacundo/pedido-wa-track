@@ -4,11 +4,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Store, DollarSign, BarChart3, LogOut, Headphones, Bot } from "lucide-react";
+import { Store, DollarSign, BarChart3, LogOut, Headphones, Bot, Star } from "lucide-react";
 import VendorManagement from "@/components/admin/VendorManagement";
 import CommissionManagement from "@/components/admin/CommissionManagement";
 import CommissionReports from "@/components/admin/CommissionReports";
 import SupportPanel from "@/components/admin/SupportPanel";
+import { PlatformReviewsPanel } from "@/components/admin/PlatformReviewsPanel";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { EvolutionConfig } from "@/components/EvolutionConfig";
 import lapachoLogo from "@/assets/lapacho-logo.png";
@@ -96,7 +97,7 @@ export default function Admin() {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue="vendors" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 mb-8">
+          <TabsList className="grid w-full grid-cols-6 mb-8">
             <TabsTrigger value="vendors">
               <Store className="mr-2 h-4 w-4" />
               Negocios
@@ -108,6 +109,10 @@ export default function Admin() {
             <TabsTrigger value="reports">
               <BarChart3 className="mr-2 h-4 w-4" />
               Reportes
+            </TabsTrigger>
+            <TabsTrigger value="reviews">
+              <Star className="mr-2 h-4 w-4" />
+              Reseñas
             </TabsTrigger>
             <TabsTrigger value="support">
               <Headphones className="mr-2 h-4 w-4" />
@@ -129,6 +134,10 @@ export default function Admin() {
 
           <TabsContent value="reports">
             <CommissionReports />
+          </TabsContent>
+
+          <TabsContent value="reviews">
+            <PlatformReviewsPanel />
           </TabsContent>
 
           <TabsContent value="support">
