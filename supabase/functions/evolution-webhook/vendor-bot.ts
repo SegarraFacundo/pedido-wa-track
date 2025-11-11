@@ -2096,13 +2096,39 @@ Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
 
 // ==================== AGENTE PRINCIPAL ====================
 
-export async function handleVendorBot(message: string, phone: string, supabase: any): Promise<string> {
+export async function handleVendorBot(message: string, phone: string, supabase: any, imageUrl?: string): Promise<string> {
   const normalizedPhone = normalizeArgentinePhone(phone);
-  console.log("🤖 AI Bot START - Phone:", normalizedPhone, "Message:", message);
+  console.log("🤖 AI Bot START - Phone:", normalizedPhone, "Message:", message, "ImageUrl:", imageUrl);
 
   try {
     // Cargar contexto
     const context = await getContext(normalizedPhone, supabase);
+    
+    // 📄 MANEJO ESPECIAL: Comprobante recibido
+    if (message === 'comprobante_recibido' && imageUrl && context.pending_order_id) {
+      console.log('💳 Processing payment receipt for order:', context.pending_order_id);
+      
+      // Actualizar la orden con el payment_receipt_url
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({ 
+          payment_receipt_url: imageUrl,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', context.pending_order_id);
+      
+      if (updateError) {
+        console.error('Error updating order with receipt:', updateError);
+        return '❌ Hubo un problema al procesar tu comprobante. Por favor, intenta enviarlo de nuevo o contactá con el negocio.';
+      }
+      
+      // Limpiar pending_order_id del contexto
+      context.pending_order_id = undefined;
+      context.payment_receipt_url = imageUrl;
+      await saveContext(context, supabase);
+      
+      return `✅ ¡Perfecto! Recibí tu comprobante de pago. 📄\n\nEl negocio lo revisará y confirmará tu pedido pronto.\n\nPodés seguir el estado de tu pedido en cualquier momento. 😊\n\n¿Necesitás algo más?`;
+    }
     console.log("📋 Context loaded:", {
       phone: context.phone,
       cartItems: context.cart.length,

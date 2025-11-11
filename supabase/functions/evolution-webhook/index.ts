@@ -89,7 +89,7 @@ async function processWithVendorBot(
 ): Promise<string> {
   console.log('🤖 Bot input:', { fromNumber, messageText, imageUrl });
   try {
-    const response = await handleVendorBot(messageText, fromNumber, supabase);
+    const response = await handleVendorBot(messageText, fromNumber, supabase, imageUrl);
     console.log('✅ Bot response (preview):', response?.slice(0, 100));
     return response;
   } catch (err) {
