@@ -346,7 +346,7 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
 
             {vendorData.delivery_pricing_type === 'per_km' && (
               <div className="space-y-2">
-                <Label htmlFor="delivery_price">Precio por Kilómetro (Gs)</Label>
+                <Label htmlFor="delivery_price">Precio por Kilómetro ($)</Label>
                 <Input
                   id="delivery_price"
                   type="number"
@@ -363,7 +363,7 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
 
             {vendorData.delivery_pricing_type === 'fixed' && (
               <div className="space-y-2">
-                <Label htmlFor="delivery_fixed_price">Precio Fijo de Delivery (Gs)</Label>
+                <Label htmlFor="delivery_fixed_price">Precio Fijo de Delivery ($)</Label>
                 <Input
                   id="delivery_fixed_price"
                   type="number"
@@ -382,7 +382,7 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
             {vendorData.delivery_pricing_type === 'base_plus_km' && (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="delivery_fixed_price_base">Precio Base (Primer Km) (Gs)</Label>
+                  <Label htmlFor="delivery_fixed_price_base">Precio Base (Primer Km) ($)</Label>
                   <Input
                     id="delivery_fixed_price_base"
                     type="number"
@@ -397,7 +397,7 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="delivery_additional_per_km">Precio Adicional por Km (Gs)</Label>
+                  <Label htmlFor="delivery_additional_per_km">Precio Adicional por Km ($)</Label>
                   <Input
                     id="delivery_additional_per_km"
                     type="number"

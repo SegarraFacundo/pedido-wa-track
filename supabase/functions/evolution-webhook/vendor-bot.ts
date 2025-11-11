@@ -1019,7 +1019,7 @@ async function ejecutarHerramienta(
               }
               
               deliveryCost = Math.round(deliveryCost);
-              console.log(`🚚 Delivery cost: ${deliveryCost} Gs (Type: ${pricingType}, Distance: ${distanceResult}km)`);
+              console.log(`🚚 Delivery cost: ${deliveryCost} $ (Type: ${pricingType}, Distance: ${distanceResult}km)`);
             }
           }
 
@@ -1153,11 +1153,11 @@ async function ejecutarHerramienta(
         confirmacion += `🏪 Negocio: ${context.selected_vendor_name}\n`;
 
         if (deliveryCost > 0) {
-          confirmacion += `🛒 Subtotal: Gs ${Math.round(subtotal).toLocaleString("es-PY")}\n`;
-          confirmacion += `🚚 Delivery (${deliveryDistance.toFixed(1)} km): Gs ${Math.round(deliveryCost).toLocaleString("es-PY")}\n`;
-          confirmacion += `💰 Total: Gs ${Math.round(total).toLocaleString("es-PY")}\n`;
+          confirmacion += `🛒 Subtotal: $ ${Math.round(subtotal).toLocaleString("es-PY")}\n`;
+          confirmacion += `🚚 Delivery (${deliveryDistance.toFixed(1)} km): $ ${Math.round(deliveryCost).toLocaleString("es-PY")}\n`;
+          confirmacion += `💰 Total: $ ${Math.round(total).toLocaleString("es-PY")}\n`;
         } else {
-          confirmacion += `💰 Total: Gs ${Math.round(total).toLocaleString("es-PY")}\n`;
+          confirmacion += `💰 Total: $ ${Math.round(total).toLocaleString("es-PY")}\n`;
         }
 
         confirmacion += `📍 Dirección: ${context.delivery_address}\n`;
@@ -1923,13 +1923,13 @@ Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
           if (distance <= 1) {
             costExplanation = `Precio base (dentro del primer km)`;
           } else {
-            costExplanation = `Gs ${Math.round(basePrice).toLocaleString("es-PY")} (base) + Gs ${Math.round(additionalDistance * additionalPerKm).toLocaleString("es-PY")} (${additionalDistance.toFixed(2)} km adicionales × Gs ${Math.round(additionalPerKm).toLocaleString("es-PY")})`;
+            costExplanation = `$ ${Math.round(basePrice).toLocaleString("es-PY")} (base) + $ ${Math.round(additionalDistance * additionalPerKm).toLocaleString("es-PY")} (${additionalDistance.toFixed(2)} km adicionales × $ ${Math.round(additionalPerKm).toLocaleString("es-PY")})`;
           }
         } else {
           // per_km
           const pricePerKm = vendor.delivery_price_per_km || 0;
           deliveryCost = distance * pricePerKm;
-          costExplanation = `${distance.toFixed(1)} km × Gs ${Math.round(pricePerKm).toLocaleString("es-PY")}`;
+          costExplanation = `${distance.toFixed(1)} km × $ ${Math.round(pricePerKm).toLocaleString("es-PY")}`;
         }
 
         deliveryCost = Math.round(deliveryCost);
@@ -1938,7 +1938,7 @@ Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
           return `✅ ¡${vendor.name} hace delivery a tu zona!\n\n📏 Distancia: ${distance.toFixed(1)} km\n\n💰 El delivery está incluido en el precio total sin costo adicional. 🎉`;
         }
 
-        let response = `✅ ¡${vendor.name} hace delivery a tu zona!\n\n📏 Distancia: ${distance.toFixed(1)} km\n💰 Costo del delivery: Gs ${deliveryCost.toLocaleString("es-PY")}`;
+        let response = `✅ ¡${vendor.name} hace delivery a tu zona!\n\n📏 Distancia: ${distance.toFixed(1)} km\n💰 Costo del delivery: $ ${deliveryCost.toLocaleString("es-PY")}`;
         
         if (costExplanation && pricingType !== 'fixed') {
           response += `\n   (${costExplanation})`;
