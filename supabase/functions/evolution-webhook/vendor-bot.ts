@@ -834,39 +834,53 @@ async function ejecutarHerramienta(
 
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (uuidRegex.test(args.vendor_id)) {
-          const { data } = await supabase.from("vendors").select("id, name").eq("id", args.vendor_id).maybeSingle();
+          console.log(`🔎 Searching vendor by UUID: ${args.vendor_id}`);
+          const { data, error: vendorError } = await supabase.from("vendors").select("id, name, is_active, payment_status").eq("id", args.vendor_id).maybeSingle();
+          if (vendorError) console.error("Error finding vendor by ID:", vendorError);
           vendor = data;
         } else {
           const cleanedName = args.vendor_id.replace(/[-_]/g, " ").trim();
-          const { data } = await supabase
+          console.log(`🔎 Searching vendor by name: "${cleanedName}"`);
+          const { data, error: vendorError } = await supabase
             .from("vendors")
-            .select("id, name")
+            .select("id, name, is_active, payment_status")
             .ilike("name", `%${cleanedName}%`)
             .maybeSingle();
+          if (vendorError) console.error("Error finding vendor by name:", vendorError);
           vendor = data;
           if (vendor) vendorId = vendor.id;
         }
 
         if (!vendor) {
+          console.log(`❌ Vendor not found: ${args.vendor_id}`);
           return "No encontré ese negocio. Por favor usá el ID exacto que te mostré en la lista de locales abiertos.";
         }
 
-        console.log(`✅ Using vendor_id: ${vendor.id} (${vendor.name})`);
+        console.log(`✅ Vendor found: ${vendor.id} (${vendor.name}) - Active: ${vendor.is_active}, Payment: ${vendor.payment_status}`);
 
         // Guardar correctamente el negocio (siempre UUID real)
         context.selected_vendor_id = vendor.id;
         context.selected_vendor_name = vendor.name;
         context.cart = []; // Limpieza de carrito al abrir nuevo menú
 
-        // Buscar productos del negocio
-        const { data: products, error } = await supabase
+        // Buscar productos del negocio - LOG DETALLADO
+        console.log(`🛍️ Fetching products for vendor_id: ${vendor.id}`);
+        const { data: products, error: productsError } = await supabase
           .from("products")
           .select("*")
           .eq("vendor_id", vendor.id)
           .eq("is_available", true);
 
-        if (error || !products?.length) {
-          return `No encontré productos disponibles para "${vendor.name}" en este momento.`;
+        if (productsError) {
+          console.error(`❌ Error fetching products:`, productsError);
+          return `Hubo un error al buscar los productos de "${vendor.name}". Por favor intentá de nuevo.`;
+        }
+
+        console.log(`📦 Products found: ${products?.length || 0}`);
+        
+        if (!products || products.length === 0) {
+          console.log(`⚠️ No products available for vendor: ${vendor.name} (${vendor.id})`);
+          return `${vendor.name} no tiene productos disponibles en este momento. 😔\n\nPodés buscar otros negocios con productos disponibles.`;
         }
 
         let menu = `📋 *Menú de ${vendor.name}*\n\n`;
@@ -877,6 +891,7 @@ async function ejecutarHerramienta(
           menu += `\n`;
         }
 
+        console.log(`✅ Menu generated successfully with ${products.length} products`);
         return menu;
       }
 
