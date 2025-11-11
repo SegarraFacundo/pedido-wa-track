@@ -81,6 +81,29 @@ export function VendorPaymentSettings({ vendorId }: VendorPaymentSettingsProps) 
   };
 
   const saveSettings = async () => {
+    // Validar que si transferencia está activa, tenga todos los datos
+    if (settings.transferencia.activo) {
+      const { alias, cbu, titular } = settings.transferencia;
+      if (!alias || !cbu || !titular) {
+        toast({
+          title: 'Datos incompletos',
+          description: 'Para activar transferencia bancaria, completá Alias, CBU/CVU y Titular',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      // Validar que no estén vacíos después de trim
+      if (alias.trim() === '' || cbu.trim() === '' || titular.trim() === '') {
+        toast({
+          title: 'Datos incompletos',
+          description: 'Ningún campo puede estar vacío',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       const { error } = await supabase

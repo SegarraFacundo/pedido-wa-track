@@ -1397,6 +1397,7 @@ async function ejecutarHerramienta(
 
         const paymentSettings = vendor.payment_settings || {};
         const metodosDisponibles: string[] = [];
+        let datosTransferencia = "";
 
         // Verificar cada método
         if (paymentSettings.efectivo === true) {
@@ -1405,6 +1406,15 @@ async function ejecutarHerramienta(
 
         if (paymentSettings.transferencia?.activo === true) {
           metodosDisponibles.push("- Transferencia bancaria 🏦");
+          
+          // Agregar datos de transferencia si están disponibles
+          const { alias, cbu, titular } = paymentSettings.transferencia;
+          if (alias && cbu && titular) {
+            datosTransferencia = `\n\n📋 *Datos para transferencia:*\n` +
+              `• Alias: ${alias}\n` +
+              `• CBU/CVU: ${cbu}\n` +
+              `• Titular: ${titular}`;
+          }
         }
 
         if (paymentSettings.mercadoPago?.activo === true) {
@@ -1419,7 +1429,7 @@ async function ejecutarHerramienta(
           ? "Tenés disponible el siguiente método de pago:"
           : "Tenés disponibles los siguientes métodos de pago:";
 
-        return `${textoMetodos}\n\n${metodosDisponibles.join("\n")}\n\n¿Te gustaría confirmar el pedido con ${metodosDisponibles.length === 1 ? 'este método' : 'alguno de estos métodos'}? 😊`;
+        return `${textoMetodos}\n\n${metodosDisponibles.join("\n")}${datosTransferencia}\n\n¿Te gustaría confirmar el pedido con ${metodosDisponibles.length === 1 ? 'este método' : 'alguno de estos métodos'}? 😊`;
       }
 
       case "hablar_con_vendedor": {
@@ -2222,10 +2232,12 @@ REGLAS GENERALES:
 - NUNCA menciones métodos de pago que el negocio no tiene habilitados
 - NUNCA digas "efectivo, transferencia o mercadopago" sin verificar primero
 - Si el cliente confirma dirección → PRIMERO ver_metodos_pago, DESPUÉS preguntar cuál prefiere
+- La herramienta ver_metodos_pago YA incluye los datos bancarios (alias, CBU, titular) cuando transferencia está disponible
+- NO necesitás consultar los datos por separado - ver_metodos_pago devuelve TODO
 - Ejemplos:
-  ✅ Cliente: "confirmo dirección" → ver_metodos_pago + mostrar opciones REALES
+  ✅ Cliente: "confirmo dirección" → ver_metodos_pago + mostrar opciones REALES (incluye datos bancarios si aplica)
   ❌ "¿Qué método de pago preferís? (efectivo, transferencia o mercadopago)" SIN llamar a ver_metodos_pago
-  ✅ Respuesta correcta: "Tenés disponible: - Efectivo 💵\n- Transferencia bancaria 🏦"
+  ✅ Respuesta correcta: "Tenés disponible: - Efectivo 💵\n- Transferencia bancaria 🏦\n\n📋 Datos para transferencia:\n• Alias: negocio.mp\n• CBU/CVU: 0000003..."
 
 FLUJO OBLIGATORIO:
 1. Cliente busca algo → buscar_productos o ver_locales_abiertos
