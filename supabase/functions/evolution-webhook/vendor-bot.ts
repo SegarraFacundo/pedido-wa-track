@@ -2104,6 +2104,35 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     // Cargar contexto
     const context = await getContext(normalizedPhone, supabase);
     
+    // 🧹 LIMPIAR CONTEXTO si hay un pedido entregado o cancelado
+    if (context.selected_vendor_id || context.cart.length > 0) {
+      console.log('🔍 Checking if there are completed orders to clear context...');
+      
+      const { data: completedOrders } = await supabase
+        .from('orders')
+        .select('id, status, created_at')
+        .eq('customer_phone', normalizedPhone)
+        .in('status', ['delivered', 'cancelled'])
+        .order('created_at', { ascending: false })
+        .limit(1);
+      
+      if (completedOrders && completedOrders.length > 0) {
+        const completedOrder = completedOrders[0];
+        console.log(`✅ Found completed order: ${completedOrder.id} (${completedOrder.status})`);
+        
+        // Limpiar el carrito y vendor del contexto
+        context.cart = [];
+        context.selected_vendor_id = undefined;
+        context.selected_vendor_name = undefined;
+        context.payment_method = undefined;
+        context.delivery_address = undefined;
+        context.pending_order_id = undefined;
+        
+        await saveContext(context, supabase);
+        console.log('🧹 Context cleared due to completed order');
+      }
+    }
+    
     // 📄 MANEJO ESPECIAL: Comprobante recibido
     if (message === 'comprobante_recibido' && imageUrl && context.pending_order_id) {
       console.log('💳 Processing payment receipt for order:', context.pending_order_id);
