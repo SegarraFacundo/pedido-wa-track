@@ -318,6 +318,18 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
     type: "function",
     function: {
+      name: "ver_metodos_pago",
+      description: "Obtiene los métodos de pago habilitados por el vendedor seleccionado. OBLIGATORIO usar antes de confirmar pedido para mostrar opciones reales disponibles.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "hablar_con_vendedor",
       description:
         "Permite al cliente hablar directamente con el vendedor. Usa el negocio que el cliente tiene seleccionado en el contexto actual.",
@@ -1365,6 +1377,51 @@ async function ejecutarHerramienta(
         return `✅ Pedido #${args.order_id.substring(0, 8)} cancelado.\n📝 Motivo: ${args.motivo}\n\nEl vendedor ha sido notificado.`;
       }
 
+      case "ver_metodos_pago": {
+        // Verificar que hay un negocio seleccionado
+        if (!context.selected_vendor_id) {
+          return "Primero tenés que elegir un negocio. ¿Querés ver los negocios disponibles?";
+        }
+
+        // Obtener payment_settings del vendedor
+        const { data: vendor, error: vendorError } = await supabase
+          .from("vendors")
+          .select("id, name, payment_settings")
+          .eq("id", context.selected_vendor_id)
+          .single();
+
+        if (vendorError || !vendor) {
+          console.error("Error fetching vendor payment settings:", vendorError);
+          return "Hubo un problema al obtener los métodos de pago del negocio.";
+        }
+
+        const paymentSettings = vendor.payment_settings || {};
+        const metodosDisponibles: string[] = [];
+
+        // Verificar cada método
+        if (paymentSettings.efectivo === true) {
+          metodosDisponibles.push("- Efectivo 💵");
+        }
+
+        if (paymentSettings.transferencia?.activo === true) {
+          metodosDisponibles.push("- Transferencia bancaria 🏦");
+        }
+
+        if (paymentSettings.mercadoPago?.activo === true) {
+          metodosDisponibles.push("- MercadoPago 💳");
+        }
+
+        if (metodosDisponibles.length === 0) {
+          return `⚠️ ${vendor.name} todavía no configuró métodos de pago. Por favor contactá directamente con el negocio.`;
+        }
+
+        const textoMetodos = metodosDisponibles.length === 1 
+          ? "Tenés disponible el siguiente método de pago:"
+          : "Tenés disponibles los siguientes métodos de pago:";
+
+        return `${textoMetodos}\n\n${metodosDisponibles.join("\n")}\n\n¿Te gustaría confirmar el pedido con ${metodosDisponibles.length === 1 ? 'este método' : 'alguno de estos métodos'}? 😊`;
+      }
+
       case "hablar_con_vendedor": {
         console.log("🔄 Switching to vendor chat mode");
 
@@ -1925,7 +1982,7 @@ Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
           context.user_latitude = 0; // Marca como manual
           context.user_longitude = 0;
 
-          return `✅ Voy a usar esta dirección para tu pedido: ${direccionCompleta}\n\n⚠️ Esta dirección NO fue validada con GPS. El negocio confirmará si hace delivery ahí. 📍\n\n¿Qué método de pago preferís? (efectivo, transferencia o mercadopago)`;
+          return `✅ Voy a usar esta dirección para tu pedido: ${direccionCompleta}\n\n⚠️ Esta dirección NO fue validada con GPS. El negocio confirmará si hace delivery ahí. 📍`;
         }
       }
 
@@ -2159,6 +2216,16 @@ REGLAS GENERALES:
   Ejemplos: "quiero hablar con el vendedor", "necesito consultar algo", "tengo una duda para el negocio"
   
 ⚠️ IMPORTANTE: Si el carrito tiene productos, dirección y método de pago, y el cliente confirma → SIEMPRE usar crear_pedido
+
+⚠️ MÉTODOS DE PAGO (CRÍTICO):
+- Antes de confirmar un pedido o preguntar por método de pago, SIEMPRE usá ver_metodos_pago
+- NUNCA menciones métodos de pago que el negocio no tiene habilitados
+- NUNCA digas "efectivo, transferencia o mercadopago" sin verificar primero
+- Si el cliente confirma dirección → PRIMERO ver_metodos_pago, DESPUÉS preguntar cuál prefiere
+- Ejemplos:
+  ✅ Cliente: "confirmo dirección" → ver_metodos_pago + mostrar opciones REALES
+  ❌ "¿Qué método de pago preferís? (efectivo, transferencia o mercadopago)" SIN llamar a ver_metodos_pago
+  ✅ Respuesta correcta: "Tenés disponible: - Efectivo 💵\n- Transferencia bancaria 🏦"
 
 FLUJO OBLIGATORIO:
 1. Cliente busca algo → buscar_productos o ver_locales_abiertos
