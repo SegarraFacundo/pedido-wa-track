@@ -62,6 +62,19 @@ export function OrderCard({ order, onStatusChange, onOpenChat, isVendorView = fa
 
       if (error) throw error;
 
+      // Enviar notificación al cliente
+      try {
+        await supabase.functions.invoke('send-whatsapp-notification', {
+          body: {
+            orderId: order.id,
+            phoneNumber: order.customerPhone,
+            message: `✅ ¡Tu pago ha sido confirmado!\n\nPedido: #${order.id.slice(0, 8)}\nEstado: ${statusConfig[order.status].label}\n\n¡Gracias por tu compra! 😊`
+          }
+        });
+      } catch (notifyError) {
+        console.error('Error sending notification:', notifyError);
+      }
+
       toast.success('Pago marcado como recibido');
       window.location.reload();
     } catch (error) {
@@ -85,6 +98,19 @@ export function OrderCard({ order, onStatusChange, onOpenChat, isVendorView = fa
         .eq('id', order.id);
 
       if (error) throw error;
+
+      // Enviar notificación al cliente
+      try {
+        await supabase.functions.invoke('send-whatsapp-notification', {
+          body: {
+            orderId: order.id,
+            phoneNumber: order.customerPhone,
+            message: `⚠️ Hay un problema con tu pago\n\nPedido: #${order.id.slice(0, 8)}\n\nPor favor, verificá tu comprobante de pago o contactá con nosotros. 📞`
+          }
+        });
+      } catch (notifyError) {
+        console.error('Error sending notification:', notifyError);
+      }
 
       toast.success('Pago marcado como pendiente');
       window.location.reload();
