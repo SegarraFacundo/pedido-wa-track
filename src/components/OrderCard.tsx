@@ -220,21 +220,31 @@ export function OrderCard({ order, onStatusChange, onOpenChat, isVendorView = fa
                 <span className="text-sm font-semibold capitalize">{paymentMethod}</span>
               </div>
               
-              {order.payment_receipt_url && (
+              {/* Comprobante - Mostrar siempre para transferencia */}
+              {(paymentMethod === 'transferencia' || paymentMethod === 'mercadopago') && (
                 <div>
                   <h4 className="font-semibold text-sm text-muted-foreground mb-2 flex items-center gap-2">
                     <FileText className="h-4 w-4" />
                     Comprobante de Pago
                   </h4>
-                  <a 
-                    href={order.payment_receipt_url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 p-3 bg-primary/10 rounded-md hover:bg-primary/20 transition-colors"
-                  >
-                    <Image className="h-5 w-5 text-primary" />
-                    <span className="text-sm text-primary font-medium">Ver comprobante</span>
-                  </a>
+                  {order.payment_receipt_url ? (
+                    <a 
+                      href={order.payment_receipt_url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 p-3 bg-primary/10 rounded-md hover:bg-primary/20 transition-colors"
+                    >
+                      <Image className="h-5 w-5 text-primary" />
+                      <span className="text-sm text-primary font-medium">Ver comprobante</span>
+                    </a>
+                  ) : (
+                    <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md">
+                      <FileText className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                      <span className="text-sm text-amber-700 dark:text-amber-300">
+                        El cliente aún no envió el comprobante
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
               
