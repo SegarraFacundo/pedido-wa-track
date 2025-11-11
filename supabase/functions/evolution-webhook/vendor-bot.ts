@@ -404,6 +404,32 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
     type: "function",
     function: {
+      name: "calificar_plataforma",
+      description:
+        "Registra una reseña sobre la plataforma Lapacho en general. Permite al cliente calificar su experiencia general con el servicio de Lapacho (1-5 estrellas) y agregar comentarios opcionales.",
+      parameters: {
+        type: "object",
+        properties: {
+          rating: {
+            type: "number",
+            description: "Calificación general de la plataforma Lapacho (1-5 estrellas). REQUERIDO.",
+          },
+          comment: {
+            type: "string",
+            description: "Comentario o sugerencia sobre la plataforma. Opcional.",
+          },
+          customer_name: {
+            type: "string",
+            description: "Nombre del cliente (opcional, si no se proporciona se usa el teléfono)",
+          },
+        },
+        required: ["rating"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "guardar_direccion",
       description: "Guarda la ubicación actual del usuario con un nombre específico para usarla en futuros pedidos.",
       parameters: {
@@ -1510,6 +1536,34 @@ async function ejecutarHerramienta(
         return respuesta;
       }
 
+      case "calificar_plataforma": {
+        // Validar calificación
+        if (!args.rating || args.rating < 1 || args.rating > 5) {
+          return "Por favor proporciona una calificación válida entre 1 y 5 estrellas.";
+        }
+
+        // Insertar reseña de plataforma
+        const { error } = await supabase.from("platform_reviews").insert({
+          user_type: "customer",
+          reviewer_phone: context.phone,
+          reviewer_name: args.customer_name || context.phone,
+          rating: args.rating,
+          comment: args.comment || null,
+        });
+
+        if (error) {
+          console.error("Error saving platform review:", error);
+          return "Hubo un error al guardar tu reseña. Por favor intenta de nuevo.";
+        }
+
+        let respuesta = "🌟 *¡Gracias por tu reseña de Lapacho!*\n\n";
+        respuesta += `⭐ Tu calificación: ${args.rating}/5\n`;
+        if (args.comment) respuesta += `\n💬 Comentario: "${args.comment}"\n`;
+        respuesta += "\n¡Tu opinión nos ayuda a mejorar la plataforma! 😊";
+
+        return respuesta;
+      }
+
       case "crear_ticket_soporte": {
         const prioridad = args.prioridad || "normal";
 
@@ -1574,6 +1628,10 @@ async function ejecutarHerramienta(
 • Ver mis direcciones guardadas
 • Usar una dirección guardada
 • Borrar o renombrar direcciones
+
+⭐ *CALIFICAR*
+• Calificar mi pedido
+• Calificar la plataforma Lapacho
 
 💬 *SOPORTE*
 • Hablar con un vendedor
@@ -2053,8 +2111,9 @@ REGLAS GENERALES:
 10. SOLO podés agregar productos que aparecen en el menú que mostraste
 11. Si el cliente pregunta por el estado de un pedido, usá ver_estado_pedido
 12. Si el cliente pide ayuda o pregunta qué puede hacer, usá mostrar_menu_ayuda
-13. Cuando el cliente quiera calificar su experiencia, usá registrar_calificacion
-14. NUNCA muestres múltiples menús en una sola respuesta - solo UN menú a la vez
+13. Cuando el cliente quiera calificar su experiencia de pedido, usá registrar_calificacion
+14. Cuando el cliente quiera calificar la plataforma Lapacho en general, usá calificar_plataforma
+15. NUNCA muestres múltiples menús en una sola respuesta - solo UN menú a la vez
 
 ⚠️ PRODUCTOS Y CARRITO (CRÍTICO):
 - SIEMPRE INTENTÁ AGREGAR AL CARRITO cuando el cliente pida productos

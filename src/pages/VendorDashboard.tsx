@@ -10,11 +10,13 @@ import { VendorOffersManager } from '@/components/VendorOffersManager';
 import { VendorReviews } from '@/components/VendorReviews';
 import { VendorDirectChat } from '@/components/VendorDirectChat';
 import { VendorSupportTickets } from '@/components/VendorSupportTickets';
+import { VendorPaymentSettings } from '@/components/VendorPaymentSettings';
+import { PlatformReviewForm } from '@/components/PlatformReviewForm';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Package, Clock, Settings, LayoutDashboard, Tag, Star, MessageCircle, LifeBuoy } from 'lucide-react';
+import { Loader2, Package, Clock, Settings, LayoutDashboard, Tag, Star, MessageCircle, LifeBuoy, CreditCard, Heart } from 'lucide-react';
 import { PWAInstallPrompt } from '@/components/PWAInstallPrompt';
 import lapachoIcon from "@/assets/lapacho-icon.png";
 
@@ -27,6 +29,17 @@ export default function VendorDashboard() {
 
   useEffect(() => {
     checkAuth();
+    
+    // Check if MercadoPago was just connected
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('mp_connected') === 'true') {
+      toast({
+        title: 'MercadoPago conectado',
+        description: 'Tu cuenta de MercadoPago se conectó exitosamente',
+      });
+      // Clean URL
+      window.history.replaceState({}, '', '/vendor');
+    }
   }, []);
 
   const checkAuth = async () => {
@@ -151,6 +164,10 @@ export default function VendorDashboard() {
               <Clock className="h-4 w-4" />
               <span className="hidden sm:inline">Horarios</span>
             </TabsTrigger>
+            <TabsTrigger value="payments" className="flex items-center gap-1">
+              <CreditCard className="h-4 w-4" />
+              <span className="hidden sm:inline">Pagos</span>
+            </TabsTrigger>
             <TabsTrigger value="settings" className="flex items-center gap-1">
               <Settings className="h-4 w-4" />
               <span className="hidden sm:inline">Ajustes</span>
@@ -158,6 +175,10 @@ export default function VendorDashboard() {
             <TabsTrigger value="support" className="flex items-center gap-1">
               <LifeBuoy className="h-4 w-4" />
               <span className="hidden sm:inline">Soporte</span>
+            </TabsTrigger>
+            <TabsTrigger value="review" className="flex items-center gap-1">
+              <Heart className="h-4 w-4" />
+              <span className="hidden sm:inline">Calificar</span>
             </TabsTrigger>
           </TabsList>
 
@@ -185,12 +206,24 @@ export default function VendorDashboard() {
             <VendorHoursManager vendorId={vendor.id} />
           </TabsContent>
 
+          <TabsContent value="payments">
+            <VendorPaymentSettings vendorId={vendor.id} />
+          </TabsContent>
+
           <TabsContent value="settings">
             <VendorSettings vendorId={vendor.id} />
           </TabsContent>
 
           <TabsContent value="support">
             <VendorSupportTickets vendorId={vendor.id} />
+          </TabsContent>
+
+          <TabsContent value="review">
+            <PlatformReviewForm 
+              userType="vendor"
+              defaultName={vendor.name}
+              defaultPhone={vendor.phone}
+            />
           </TabsContent>
         </Tabs>
       </div>

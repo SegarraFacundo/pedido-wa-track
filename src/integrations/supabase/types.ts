@@ -203,6 +203,55 @@ export type Database = {
         }
         Relationships: []
       }
+      mercadopago_token_refresh_log: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          id: string
+          refreshed_at: string | null
+          success: boolean
+          vendor_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          refreshed_at?: string | null
+          success: boolean
+          vendor_id: string
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          refreshed_at?: string | null
+          success?: boolean
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercadopago_token_refresh_log_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "public_vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercadopago_token_refresh_log_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercadopago_token_refresh_log_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           content: string
@@ -463,6 +512,42 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           name?: string
+        }
+        Relationships: []
+      }
+      platform_reviews: {
+        Row: {
+          comment: string | null
+          created_at: string | null
+          id: string
+          rating: number
+          reviewer_email: string | null
+          reviewer_name: string
+          reviewer_phone: string
+          updated_at: string | null
+          user_type: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string | null
+          id?: string
+          rating: number
+          reviewer_email?: string | null
+          reviewer_name: string
+          reviewer_phone: string
+          updated_at?: string | null
+          user_type: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string | null
+          id?: string
+          rating?: number
+          reviewer_email?: string | null
+          reviewer_name?: string
+          reviewer_phone?: string
+          updated_at?: string | null
+          user_type?: string
         }
         Relationships: []
       }
@@ -1241,6 +1326,7 @@ export type Database = {
           name: string
           next_payment_due: string | null
           opening_time: string | null
+          payment_settings: Json | null
           payment_status: string | null
           phone: string
           rating: number | null
@@ -1274,6 +1360,7 @@ export type Database = {
           name: string
           next_payment_due?: string | null
           opening_time?: string | null
+          payment_settings?: Json | null
           payment_status?: string | null
           phone: string
           rating?: number | null
@@ -1307,6 +1394,7 @@ export type Database = {
           name?: string
           next_payment_due?: string | null
           opening_time?: string | null
+          payment_settings?: Json | null
           payment_status?: string | null
           phone?: string
           rating?: number | null
