@@ -820,13 +820,9 @@ async function ejecutarHerramienta(
       case "ver_menu_negocio": {
         console.log(`🔍 ver_menu_negocio called with vendor_id: "${args.vendor_id}"`);
 
-        // 🔄 Limpiar contexto si el usuario cambia de negocio
-        if (context.selected_vendor_id && context.selected_vendor_id !== args.vendor_id) {
-          console.log("🔄 Nuevo negocio seleccionado, limpiando carrito y contexto anterior...");
-          context.cart = [];
-          context.selected_vendor_id = undefined;
-          context.selected_vendor_name = undefined;
-        }
+        // ⚠️ NOTA: Ya NO limpiamos automáticamente el carrito aquí
+        // El bot debe preguntar primero al usuario si quiere cancelar su pedido actual
+        // y solo después llamar a vaciar_carrito explícitamente
 
         // Buscar vendor (por ID o nombre)
         let vendorId = args.vendor_id;
@@ -858,10 +854,10 @@ async function ejecutarHerramienta(
 
         console.log(`✅ Vendor found: ${vendor.id} (${vendor.name}) - Active: ${vendor.is_active}, Payment: ${vendor.payment_status}`);
 
-        // Guardar correctamente el negocio (siempre UUID real)
+        // Guardar el negocio seleccionado (siempre UUID real)
         context.selected_vendor_id = vendor.id;
         context.selected_vendor_name = vendor.name;
-        context.cart = []; // Limpieza de carrito al abrir nuevo menú
+        // NO limpiamos el carrito aquí - debe hacerse con vaciar_carrito explícitamente
 
         // Buscar productos del negocio - LOG DETALLADO
         console.log(`🛍️ Fetching products for vendor_id: ${vendor.id}`);
@@ -2118,17 +2114,23 @@ REGLAS GENERALES:
 4. ⚠️ NUNCA inventes productos, precios o información que no existe en la base de datos
 5. Si no sabés algo, decilo y preguntá
 6. Cuando el cliente busque algo, usá la herramienta buscar_productos
-8. ⚠️ CRÍTICO - VER MENÚ: Cuando el cliente pida ver un menú (ej: "ver menú", "mostrar menú", "menú de X"):
+8. ⚠️ CRÍTICO - VER MENÚ Y CAMBIO DE NEGOCIO:
+   
+   **Si el cliente pide ver menú de un negocio DIFERENTE al que tiene en contexto:**
+   - ⚠️ PRIMERO: Avisale que tiene un pedido/carrito activo con otro negocio
+   - Preguntale: "Tenés un pedido activo con [negocio actual]. ¿Querés cancelarlo para ver el menú de [nuevo negocio]?"
+   - Si confirma cancelación → vaciar carrito y cambiar contexto
+   - Si NO confirma → mantener contexto actual
+   
+   **Si NO hay negocio en contexto o es el mismo negocio:**
    - SIEMPRE debes usar la herramienta ver_menu_negocio
    - NUNCA respondas sin consultar la herramienta primero
-   - Si especifica un negocio diferente al del contexto → buscar ese negocio y usar ver_menu_negocio
-   - Si NO especifica negocio y NO hay contexto → Preguntale "¿De cuál negocio querés ver el menú?"
-   - Si NO especifica pero YA hay negocio en contexto → usar ver_menu_negocio con ese negocio
-   - Ejemplos:
-     ✅ "ver menú" (sin contexto) → Preguntar cuál negocio
-     ✅ "ver menú" (con contexto de "Pizzería X") → ver_menu_negocio de Pizzería X
-     ✅ "menú de la farmacia" → Buscar "farmacia" y usar ver_menu_negocio
-     ✅ "mostrame el menú del restaurant" → Buscar "restaurant" y usar ver_menu_negocio
+   
+   Ejemplos:
+   ✅ "ver menú" (sin contexto) → Preguntar cuál negocio
+   ✅ "ver menú" (con contexto de "Pizzería X") → ver_menu_negocio de Pizzería X
+   ✅ "menú de la farmacia" (contexto actual: "Lapacho Restaurant") → "Tenés un pedido activo con Lapacho Restaurant. ¿Querés cancelarlo para ver el menú de la farmacia?"
+   ✅ Usuario confirma cancelación → vaciar carrito y ver_menu_negocio de farmacia
 9. Cuando uses ver_menu_negocio, los datos que devuelve son EN TIEMPO REAL - no memorices productos ni precios
 10. SOLO podés agregar productos que aparecen en el menú que mostraste
 11. Si el cliente pregunta por el estado de un pedido, usá ver_estado_pedido
