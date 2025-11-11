@@ -155,9 +155,14 @@ serve(async (req) => {
     const messageText = data.message?.conversation ||
       data.message?.extendedTextMessage?.text ||
       data.message?.imageMessage?.caption ||
-      data.message?.videoMessage?.caption || '';
+      data.message?.videoMessage?.caption ||
+      data.message?.documentMessage?.caption || '';
 
+    // Detectar tanto imágenes como documentos (PDFs) para comprobantes
     const imageUrl = data.message?.imageMessage?.url || null;
+    const documentUrl = data.message?.documentMessage?.url || null;
+    const documentMimeType = data.message?.documentMessage?.mimetype || null;
+    const documentFileName = data.message?.documentMessage?.fileName || null;
 
     // 📍 Detectar si el usuario envió su ubicación
     const locationMessage = data.message?.locationMessage;
@@ -285,8 +290,8 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
     const vendorData = await getVendorData(normalizedPhone);
     const session = await getOrCreateSession(normalizedPhone);
 
-    // --- Si el usuario envía comprobante ---
-    if (imageUrl && !vendorData) {
+    // --- Si el usuario envía comprobante (imagen o PDF) ---
+    if ((imageUrl || documentUrl) && !vendorData) {
       const { data: userSession } = await supabase
         .from('user_sessions')
         .select('previous_state, last_bot_message')
@@ -310,19 +315,47 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
       }
 
       if (isAwaitingReceipt) {
-        console.log('Processing payment receipt image for:', normalizedPhone);
+        console.log('Processing payment receipt (image/document) for:', normalizedPhone);
 
         try {
-          const imageResponse = await fetch(imageUrl);
-          const imageBlob = await imageResponse.blob();
-          const fileName = `${normalizedPhone}-${Date.now()}.jpg`;
+          // Determinar qué URL usar y el tipo de archivo
+          const fileUrl = imageUrl || documentUrl;
+          const isDocument = !!documentUrl;
+          
+          console.log('📄 File details:', {
+            isDocument,
+            fileName: documentFileName,
+            mimeType: documentMimeType,
+            url: fileUrl
+          });
+
+          const fileResponse = await fetch(fileUrl!);
+          const fileBlob = await fileResponse.blob();
+          
+          // Determinar extensión según el tipo
+          let extension = 'jpg';
+          let contentType = 'image/jpeg';
+          
+          if (isDocument) {
+            if (documentMimeType?.includes('pdf')) {
+              extension = 'pdf';
+              contentType = 'application/pdf';
+            } else if (documentMimeType?.includes('image')) {
+              extension = documentFileName?.split('.').pop() || 'jpg';
+              contentType = documentMimeType;
+            }
+          }
+          
+          const fileName = `${normalizedPhone}-${Date.now()}.${extension}`;
           const filePath = `receipts/${fileName}`;
+
+          console.log('📤 Uploading to storage:', { fileName, filePath, contentType });
 
           const { error: uploadError } = await supabase
             .storage
             .from('payment-receipts')
-            .upload(filePath, imageBlob, {
-              contentType: 'image/jpeg',
+            .upload(filePath, fileBlob, {
+              contentType: contentType,
               upsert: false
             });
 
