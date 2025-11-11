@@ -54,6 +54,9 @@ export function useRealtimeOrders(vendorId?: string) {
           deliveryPersonPhone: order.delivery_person_phone,
           payment_receipt_url: order.payment_receipt_url,
           address_is_manual: order.address_is_manual || false,
+          payment_status: order.payment_status,
+          payment_method: order.payment_method,
+          paid_at: order.paid_at ? new Date(order.paid_at) : undefined,
           // Masked fields for vendor view
           customerNameMasked: order.customer_name?.substring(0, 3) + '***',
           customerPhoneMasked: '****' + order.customer_phone?.slice(-4),
@@ -125,6 +128,9 @@ export function useRealtimeOrders(vendorId?: string) {
                   deliveryPersonPhone: data.delivery_person_phone,
                   payment_receipt_url: data.payment_receipt_url,
                   address_is_manual: data.address_is_manual || false,
+                  payment_status: data.payment_status,
+                  payment_method: data.payment_method,
+                  paid_at: data.paid_at ? new Date(data.paid_at) : undefined,
                   customerNameMasked: data.customer_name?.substring(0, 3) + '***',
                   customerPhoneMasked: '****' + data.customer_phone?.slice(-4),
                   addressSimplified: data.address?.split(',')[0]
@@ -161,7 +167,10 @@ export function useRealtimeOrders(vendorId?: string) {
                       updatedAt: new Date(payload.new.updated_at),
                       deliveryPersonName: payload.new.delivery_person_name,
                       deliveryPersonPhone: payload.new.delivery_person_phone,
-                      notes: payload.new.notes
+                      notes: payload.new.notes,
+                      payment_status: payload.new.payment_status,
+                      payment_method: payload.new.payment_method,
+                      paid_at: payload.new.paid_at ? new Date(payload.new.paid_at) : undefined
                     }
                   : order
               ));

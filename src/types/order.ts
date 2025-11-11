@@ -37,6 +37,9 @@ export interface Order {
   deliveryPersonPhone?: string;
   payment_receipt_url?: string;
   address_is_manual?: boolean;  // Nueva: indica si la dirección fue ingresada manualmente
+  payment_status?: string;  // Estado de pago: 'pending', 'paid', etc.
+  payment_method?: string;  // Método de pago: 'efectivo', 'transferencia', 'mercadopago'
+  paid_at?: Date;  // Fecha y hora del pago
   // Masked fields for vendor view
   customerNameMasked?: string;
   customerPhoneMasked?: string;

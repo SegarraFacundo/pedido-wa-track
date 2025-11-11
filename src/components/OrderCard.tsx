@@ -2,10 +2,12 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Order, OrderItem, OrderStatus } from "@/types/order";
-import { Image, FileText, Clock, MapPin, Phone, User, MessageCircle } from "lucide-react";
+import { Image, FileText, Clock, MapPin, Phone, User, MessageCircle, DollarSign, CheckCircle, XCircle, CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { OrderCancellationDialog } from "./OrderCancellationDialog";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface OrderCardProps {
   order: Order;
@@ -39,25 +41,102 @@ const getNextStatus = (currentStatus: OrderStatus): OrderStatus | null => {
 
 export function OrderCard({ order, onStatusChange, onOpenChat, isVendorView = false }: OrderCardProps) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [isUpdatingPayment, setIsUpdatingPayment] = useState(false);
   const nextStatus = getNextStatus(order.status);
   
   // Debug logging
   console.log('OrderCard - order.items:', order.items);
   console.log('OrderCard - items length:', order.items?.length);
   
+  const handleMarkAsPaid = async () => {
+    try {
+      setIsUpdatingPayment(true);
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          payment_status: 'paid',
+          paid_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', order.id);
+
+      if (error) throw error;
+
+      toast.success('Pago marcado como recibido');
+      window.location.reload();
+    } catch (error) {
+      console.error('Error marking as paid:', error);
+      toast.error('Error al actualizar el estado de pago');
+    } finally {
+      setIsUpdatingPayment(false);
+    }
+  };
+  
+  const handleMarkAsUnpaid = async () => {
+    try {
+      setIsUpdatingPayment(true);
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          payment_status: 'pending',
+          paid_at: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', order.id);
+
+      if (error) throw error;
+
+      toast.success('Pago marcado como pendiente');
+      window.location.reload();
+    } catch (error) {
+      console.error('Error marking as unpaid:', error);
+      toast.error('Error al actualizar el estado de pago');
+    } finally {
+      setIsUpdatingPayment(false);
+    }
+  };
+  
+  const paymentStatus = order.payment_status || 'pending';
+  const paymentMethod = order.payment_method || 'No especificado';
+  
   return (
     <Card className="hover:shadow-lg transition-shadow duration-200">
       <CardHeader className="pb-3">
-        <div className="flex justify-between items-start">
-          <div>
+        <div className="flex justify-between items-start gap-2">
+          <div className="flex-1">
             <h3 className="font-semibold text-lg">Pedido #{order.id.slice(0, 8)}</h3>
             <p className="text-sm text-muted-foreground">
               {new Date(order.createdAt).toLocaleString('es-AR')}
             </p>
           </div>
-          <Badge className={cn("font-medium", statusConfig[order.status].className)}>
-            {statusConfig[order.status].label}
-          </Badge>
+          <div className="flex flex-col gap-1 items-end">
+            <Badge className={cn("font-medium", statusConfig[order.status].className)}>
+              {statusConfig[order.status].label}
+            </Badge>
+            {isVendorView && (
+              <Badge 
+                variant="outline" 
+                className={cn(
+                  "font-medium",
+                  paymentStatus === 'paid' 
+                    ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800" 
+                    : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800"
+                )}
+              >
+                {paymentStatus === 'paid' ? (
+                  <>
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Pagado
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-3 w-3 mr-1" />
+                    No pagado
+                  </>
+                )}
+              </Badge>
+            )}
+          </div>
         </div>
       </CardHeader>
       
@@ -130,33 +209,67 @@ export function OrderCard({ order, onStatusChange, onOpenChat, isVendorView = fa
             </div>
           </div>
           
-          {/* Comprobante de pago */}
-          {isVendorView && order.payment_receipt_url && (
-            <div className="mt-3 pt-3 border-t">
-              <h4 className="font-semibold text-sm text-muted-foreground mb-2 flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Comprobante de Pago
-              </h4>
-              <a 
-                href={order.payment_receipt_url} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 p-2 bg-primary/10 rounded-md hover:bg-primary/20 transition-colors"
-              >
-                <Image className="h-4 w-4 text-primary" />
-                <span className="text-sm text-primary font-medium">Ver comprobante</span>
-              </a>
-              {order.status !== 'delivered' && order.status !== 'cancelled' && (
-                <Button
-                  size="sm"
-                  className="w-full mt-2 bg-green-600 hover:bg-green-700 text-white"
-                  onClick={() => {
-                    // TODO: Agregar lógica para marcar como pagado
-                    console.log('Marcar como pagado:', order.id);
-                  }}
-                >
-                  ✓ Confirmar pago recibido
-                </Button>
+          {/* Información de pago */}
+          {isVendorView && (
+            <div className="mt-3 pt-3 border-t space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Método de pago:</span>
+                </div>
+                <span className="text-sm font-semibold capitalize">{paymentMethod}</span>
+              </div>
+              
+              {order.payment_receipt_url && (
+                <div>
+                  <h4 className="font-semibold text-sm text-muted-foreground mb-2 flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Comprobante de Pago
+                  </h4>
+                  <a 
+                    href={order.payment_receipt_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 p-3 bg-primary/10 rounded-md hover:bg-primary/20 transition-colors"
+                  >
+                    <Image className="h-5 w-5 text-primary" />
+                    <span className="text-sm text-primary font-medium">Ver comprobante</span>
+                  </a>
+                </div>
+              )}
+              
+              {order.status !== 'cancelled' && (
+                <div className="flex gap-2">
+                  {paymentStatus !== 'paid' && (
+                    <Button
+                      size="sm"
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                      onClick={handleMarkAsPaid}
+                      disabled={isUpdatingPayment}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-1" />
+                      Marcar como pagado
+                    </Button>
+                  )}
+                  {paymentStatus === 'paid' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 border-amber-300 text-amber-700 hover:bg-amber-50"
+                      onClick={handleMarkAsUnpaid}
+                      disabled={isUpdatingPayment}
+                    >
+                      <XCircle className="h-4 w-4 mr-1" />
+                      Marcar como no pagado
+                    </Button>
+                  )}
+                </div>
+              )}
+              
+              {paymentStatus === 'paid' && order.paid_at && (
+                <p className="text-xs text-muted-foreground">
+                  Pagado: {new Date(order.paid_at).toLocaleString('es-AR')}
+                </p>
               )}
             </div>
           )}
