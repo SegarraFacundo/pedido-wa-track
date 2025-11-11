@@ -17,3 +17,18 @@ verify_jwt = false
 
 [functions.notify-vendor]
 verify_jwt = false
+
+[functions.mercadopago-oauth-callback]
+verify_jwt = false
+
+[functions.get-mercadopago-auth-url]
+verify_jwt = false
+
+[functions.generate-payment-link]
+verify_jwt = false
+
+[functions.mercadopago-webhook]
+verify_jwt = false
+
+[functions.refresh-mercadopago-tokens]
+verify_jwt = false
