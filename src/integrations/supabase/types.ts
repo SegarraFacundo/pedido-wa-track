@@ -203,6 +203,55 @@ export type Database = {
         }
         Relationships: []
       }
+      mercadopago_token_refresh_log: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          id: string
+          refreshed_at: string | null
+          success: boolean
+          vendor_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          refreshed_at?: string | null
+          success: boolean
+          vendor_id: string
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          refreshed_at?: string | null
+          success?: boolean
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercadopago_token_refresh_log_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "public_vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercadopago_token_refresh_log_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercadopago_token_refresh_log_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           content: string
@@ -1241,6 +1290,7 @@ export type Database = {
           name: string
           next_payment_due: string | null
           opening_time: string | null
+          payment_settings: Json | null
           payment_status: string | null
           phone: string
           rating: number | null
@@ -1274,6 +1324,7 @@ export type Database = {
           name: string
           next_payment_due?: string | null
           opening_time?: string | null
+          payment_settings?: Json | null
           payment_status?: string | null
           phone: string
           rating?: number | null
@@ -1307,6 +1358,7 @@ export type Database = {
           name?: string
           next_payment_due?: string | null
           opening_time?: string | null
+          payment_settings?: Json | null
           payment_status?: string | null
           phone?: string
           rating?: number | null
