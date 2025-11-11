@@ -318,32 +318,72 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
         console.log('Processing payment receipt (image/document) for:', normalizedPhone);
 
         try {
-          // Determinar qué URL usar y el tipo de archivo
-          const fileUrl = imageUrl || documentUrl;
-          const isDocument = !!documentUrl;
+          const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL');
+          const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
+          const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
           
-          console.log('📄 File details:', {
-            isDocument,
-            fileName: documentFileName,
-            mimeType: documentMimeType,
-            url: fileUrl
-          });
-
-          const fileResponse = await fetch(fileUrl!);
-          const fileBlob = await fileResponse.blob();
-          
-          // Determinar extensión según el tipo
+          let fileBlob: Blob;
           let extension = 'jpg';
           let contentType = 'image/jpeg';
           
-          if (isDocument) {
+          // Si es un documento (PDF), usar Evolution API para desencriptarlo
+          if (documentUrl) {
+            console.log('📄 Processing document via Evolution API');
+            
+            const base64Response = await fetch(
+              `${evolutionApiUrl}/chat/getBase64FromMediaMessage/${instanceName}`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'apikey': evolutionApiKey!
+                },
+                body: JSON.stringify({
+                  message: {
+                    key: data.key,
+                    message: data.message
+                  },
+                  convertToMp4: false
+                })
+              }
+            );
+
+            if (!base64Response.ok) {
+              throw new Error('No se pudo obtener el documento de WhatsApp');
+            }
+
+            const base64Result = await base64Response.json();
+            console.log('📦 Document base64 received, length:', base64Result.base64?.length);
+
+            if (!base64Result?.base64) {
+              throw new Error('No se recibió el documento en formato base64');
+            }
+
+            // Convertir base64 a Blob
+            const binaryString = atob(base64Result.base64);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i);
+            }
+            fileBlob = new Blob([bytes]);
+            
+            // Determinar tipo y extensión
             if (documentMimeType?.includes('pdf')) {
               extension = 'pdf';
               contentType = 'application/pdf';
-            } else if (documentMimeType?.includes('image')) {
-              extension = documentFileName?.split('.').pop() || 'jpg';
-              contentType = documentMimeType;
+            } else if (documentFileName) {
+              extension = documentFileName.split('.').pop() || 'pdf';
+              contentType = documentMimeType || 'application/octet-stream';
             }
+          } else if (imageUrl) {
+            // Para imágenes, usar fetch directo (ya funcionan)
+            console.log('📸 Processing image directly');
+            const fileResponse = await fetch(imageUrl);
+            fileBlob = await fileResponse.blob();
+            extension = 'jpg';
+            contentType = 'image/jpeg';
+          } else {
+            throw new Error('No file URL provided');
           }
           
           const fileName = `${normalizedPhone}-${Date.now()}.${extension}`;
