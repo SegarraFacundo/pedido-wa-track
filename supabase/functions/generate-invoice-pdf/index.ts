@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-import PDFDocument from "npm:pdfkit@0.15.0";
+import { PDFDocument, rgb, StandardFonts } from "https://cdn.skypack.dev/pdf-lib@1.17.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -100,144 +100,192 @@ serve(async (req: Request) => {
 });
 
 async function generateInvoicePDF(data: InvoiceData): Promise<Uint8Array> {
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: "A4", margin: 50 });
-    const chunks: Uint8Array[] = [];
-
-    doc.on("data", (chunk: Uint8Array) => chunks.push(chunk));
-    doc.on("end", () => resolve(Buffer.concat(chunks)));
-    doc.on("error", reject);
-
-    // Header
-    doc
-      .fontSize(24)
-      .font("Helvetica-Bold")
-      .text("FACTURA DE COMISIONES", { align: "center" })
-      .moveDown(0.5);
-
-    // Invoice info
-    doc
-      .fontSize(10)
-      .font("Helvetica")
-      .text(`Factura N°: ${data.invoice_number}`, { align: "right" })
-      .text(
-        `Fecha de emisión: ${new Date().toLocaleDateString("es-AR")}`,
-        { align: "right" }
-      )
-      .moveDown(1);
-
-    // Vendor info
-    doc
-      .fontSize(12)
-      .font("Helvetica-Bold")
-      .text("DATOS DEL VENDOR")
-      .moveDown(0.3);
-
-    doc
-      .fontSize(10)
-      .font("Helvetica")
-      .text(`Nombre: ${data.vendor_name}`)
-      .text(`Teléfono: ${data.vendor_phone}`)
-      .moveDown(1);
-
-    // Period info
-    doc
-      .fontSize(12)
-      .font("Helvetica-Bold")
-      .text("PERÍODO DE FACTURACIÓN")
-      .moveDown(0.3);
-
-    doc
-      .fontSize(10)
-      .font("Helvetica")
-      .text(
-        `Desde: ${new Date(data.period_start).toLocaleDateString("es-AR")}`
-      )
-      .text(`Hasta: ${new Date(data.period_end).toLocaleDateString("es-AR")}`)
-      .moveDown(1);
-
-    // Table header
-    doc.fontSize(12).font("Helvetica-Bold").text("DETALLE DE COMISIONES");
-    doc.moveDown(0.5);
-
-    const tableTop = doc.y;
-    const tableHeaders = [
-      { label: "Fecha", x: 50, width: 80 },
-      { label: "Pedido", x: 130, width: 100 },
-      { label: "Total Pedido", x: 230, width: 100 },
-      { label: "Comisión", x: 330, width: 100 },
-    ];
-
-    // Draw table header
-    doc.fontSize(9).font("Helvetica-Bold");
-    tableHeaders.forEach((header) => {
-      doc.text(header.label, header.x, tableTop, {
-        width: header.width,
-        align: "left",
-      });
-    });
-
-    doc
-      .moveTo(50, tableTop + 15)
-      .lineTo(550, tableTop + 15)
-      .stroke();
-
-    // Draw table rows
-    let currentY = tableTop + 25;
-    doc.fontSize(8).font("Helvetica");
-
-    data.items.forEach((item, index) => {
-      if (currentY > 700) {
-        doc.addPage();
-        currentY = 50;
-      }
-
-      const date = new Date(item.created_at).toLocaleDateString("es-AR", {
-        day: "2-digit",
-        month: "2-digit",
-      });
-      const orderId = item.order_id.substring(0, 8);
-      const orderTotal = `$ ${Number(item.order_total).toLocaleString("es-AR")}`;
-      const commission = `$ ${Number(item.commission_amount).toLocaleString("es-AR")}`;
-
-      doc.text(date, 50, currentY, { width: 80 });
-      doc.text(orderId, 130, currentY, { width: 100 });
-      doc.text(orderTotal, 230, currentY, { width: 100, align: "right" });
-      doc.text(commission, 330, currentY, { width: 100, align: "right" });
-
-      currentY += 20;
-    });
-
-    // Draw line before total
-    doc
-      .moveTo(50, currentY)
-      .lineTo(550, currentY)
-      .stroke();
-
-    currentY += 15;
-
-    // Total
-    doc
-      .fontSize(14)
-      .font("Helvetica-Bold")
-      .text(
-        `TOTAL A PAGAR: $ ${Number(data.total_amount).toLocaleString("es-AR")}`,
-        330,
-        currentY,
-        { width: 200, align: "right" }
-      );
-
-    // Footer
-    doc
-      .fontSize(8)
-      .font("Helvetica")
-      .text(
-        "Esta factura corresponde a las comisiones generadas durante el período especificado.",
-        50,
-        750,
-        { align: "center", width: 500 }
-      );
-
-    doc.end();
+  // Create a new PDF document
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage([595.28, 841.89]); // A4 size
+  const { width, height } = page.getSize();
+  
+  // Load fonts
+  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  
+  let yPosition = height - 50;
+  
+  // Header - Title
+  page.drawText("FACTURA DE COMISIONES", {
+    x: width / 2 - 120,
+    y: yPosition,
+    size: 24,
+    font: fontBold,
+    color: rgb(0, 0, 0),
   });
+  
+  yPosition -= 40;
+  
+  // Invoice info (right aligned)
+  page.drawText(`Factura N°: ${data.invoice_number}`, {
+    x: width - 200,
+    y: yPosition,
+    size: 10,
+    font: font,
+  });
+  
+  yPosition -= 15;
+  
+  page.drawText(`Fecha: ${new Date().toLocaleDateString("es-AR")}`, {
+    x: width - 200,
+    y: yPosition,
+    size: 10,
+    font: font,
+  });
+  
+  yPosition -= 30;
+  
+  // Vendor info
+  page.drawText("DATOS DEL VENDOR", {
+    x: 50,
+    y: yPosition,
+    size: 12,
+    font: fontBold,
+  });
+  
+  yPosition -= 20;
+  
+  page.drawText(`Nombre: ${data.vendor_name}`, {
+    x: 50,
+    y: yPosition,
+    size: 10,
+    font: font,
+  });
+  
+  yPosition -= 15;
+  
+  page.drawText(`Teléfono: ${data.vendor_phone}`, {
+    x: 50,
+    y: yPosition,
+    size: 10,
+    font: font,
+  });
+  
+  yPosition -= 30;
+  
+  // Period info
+  page.drawText("PERÍODO DE FACTURACIÓN", {
+    x: 50,
+    y: yPosition,
+    size: 12,
+    font: fontBold,
+  });
+  
+  yPosition -= 20;
+  
+  const periodStart = new Date(data.period_start).toLocaleDateString("es-AR");
+  const periodEnd = new Date(data.period_end).toLocaleDateString("es-AR");
+  
+  page.drawText(`Desde: ${periodStart}`, {
+    x: 50,
+    y: yPosition,
+    size: 10,
+    font: font,
+  });
+  
+  yPosition -= 15;
+  
+  page.drawText(`Hasta: ${periodEnd}`, {
+    x: 50,
+    y: yPosition,
+    size: 10,
+    font: font,
+  });
+  
+  yPosition -= 30;
+  
+  // Table header
+  page.drawText("DETALLE DE COMISIONES", {
+    x: 50,
+    y: yPosition,
+    size: 12,
+    font: fontBold,
+  });
+  
+  yPosition -= 25;
+  
+  // Table headers
+  page.drawText("Fecha", { x: 50, y: yPosition, size: 9, font: fontBold });
+  page.drawText("Pedido", { x: 130, y: yPosition, size: 9, font: fontBold });
+  page.drawText("Total Pedido", { x: 230, y: yPosition, size: 9, font: fontBold });
+  page.drawText("Comisión", { x: 380, y: yPosition, size: 9, font: fontBold });
+  
+  yPosition -= 5;
+  
+  // Draw line
+  page.drawLine({
+    start: { x: 50, y: yPosition },
+    end: { x: width - 50, y: yPosition },
+    thickness: 1,
+    color: rgb(0, 0, 0),
+  });
+  
+  yPosition -= 15;
+  
+  // Table rows
+  for (const item of data.items) {
+    if (yPosition < 100) {
+      // Add new page if needed
+      const newPage = pdfDoc.addPage([595.28, 841.89]);
+      yPosition = height - 50;
+    }
+    
+    const date = new Date(item.created_at).toLocaleDateString("es-AR", {
+      day: "2-digit",
+      month: "2-digit",
+    });
+    const orderId = item.order_id.substring(0, 8);
+    const orderTotal = `$ ${Number(item.order_total).toLocaleString("es-AR")}`;
+    const commission = `$ ${Number(item.commission_amount).toLocaleString("es-AR")}`;
+    
+    page.drawText(date, { x: 50, y: yPosition, size: 8, font: font });
+    page.drawText(orderId, { x: 130, y: yPosition, size: 8, font: font });
+    page.drawText(orderTotal, { x: 230, y: yPosition, size: 8, font: font });
+    page.drawText(commission, { x: 380, y: yPosition, size: 8, font: font });
+    
+    yPosition -= 15;
+  }
+  
+  yPosition -= 10;
+  
+  // Draw line before total
+  page.drawLine({
+    start: { x: 50, y: yPosition },
+    end: { x: width - 50, y: yPosition },
+    thickness: 1,
+    color: rgb(0, 0, 0),
+  });
+  
+  yPosition -= 20;
+  
+  // Total
+  const totalText = `TOTAL A PAGAR: $ ${Number(data.total_amount).toLocaleString("es-AR")}`;
+  page.drawText(totalText, {
+    x: width - 250,
+    y: yPosition,
+    size: 14,
+    font: fontBold,
+  });
+  
+  // Footer
+  page.drawText(
+    "Esta factura corresponde a las comisiones generadas durante el período especificado.",
+    {
+      x: 50,
+      y: 50,
+      size: 8,
+      font: font,
+      maxWidth: width - 100,
+    }
+  );
+  
+  // Save the PDF
+  const pdfBytes = await pdfDoc.save();
+  return pdfBytes;
 }
