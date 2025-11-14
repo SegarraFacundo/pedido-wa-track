@@ -575,6 +575,34 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
       } catch (error) {
         console.error('❌ Error transcribing audio:', error);
 
+        // Limpiar contexto parcialmente para evitar confusión
+        try {
+          const { data: userSession } = await supabase
+            .from('user_sessions')
+            .select('last_bot_message')
+            .eq('phone', normalizedPhone)
+            .maybeSingle();
+
+          if (userSession?.last_bot_message) {
+            const context = JSON.parse(userSession.last_bot_message);
+            if (context.conversation_history && context.conversation_history.length > 0) {
+              const lastUserMessage = context.conversation_history[context.conversation_history.length - 1];
+              if (lastUserMessage?.role === 'user') {
+                // Eliminar el último mensaje del usuario que falló
+                context.conversation_history.pop();
+                console.log('🧹 Cleaned last user message from context after audio error');
+                
+                await supabase.from('user_sessions').upsert({
+                  phone: normalizedPhone,
+                  last_bot_message: JSON.stringify(context)
+                }, { onConflict: 'phone' });
+              }
+            }
+          }
+        } catch (contextError) {
+          console.error('Error cleaning context:', contextError);
+        }
+
         // Enviar mensaje de error al usuario
         await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
           method: 'POST',
@@ -585,7 +613,7 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
           },
           body: JSON.stringify({
             number: chatId,
-            text: 'Lo siento, no pude entender tu mensaje de voz. Por favor, intenta enviarlo de nuevo o escribe tu mensaje.'
+            text: 'Disculpá, tuve un problema procesando tu audio. ¿Podés intentar de nuevo o escribir tu mensaje? 😊'
           }),
         });
 
