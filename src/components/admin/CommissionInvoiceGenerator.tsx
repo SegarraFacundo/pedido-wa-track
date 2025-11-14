@@ -254,7 +254,7 @@ export default function CommissionInvoiceGenerator() {
       if (error) throw error;
 
       // Create blob and download
-      const blob = await data.blob();
+      const blob = new Blob([data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
