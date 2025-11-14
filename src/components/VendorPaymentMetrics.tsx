@@ -168,7 +168,7 @@ export function VendorPaymentMetrics({ vendorId }: VendorPaymentMetricsProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-              ₲ {metrics.totalCollected.toLocaleString('es-PY')}
+              $ {metrics.totalCollected.toLocaleString('es-AR')}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               {metrics.paid.count} pagos confirmados
@@ -186,7 +186,7 @@ export function VendorPaymentMetrics({ vendorId }: VendorPaymentMetricsProps) {
               {metrics.pending.count}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              ₲ {metrics.pending.total.toLocaleString('es-PY')}
+              $ {metrics.pending.total.toLocaleString('es-AR')}
             </p>
           </CardContent>
         </Card>
@@ -201,7 +201,7 @@ export function VendorPaymentMetrics({ vendorId }: VendorPaymentMetricsProps) {
               {metrics.paid.count}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              ₲ {metrics.paid.total.toLocaleString('es-PY')}
+              $ {metrics.paid.total.toLocaleString('es-AR')}
             </p>
           </CardContent>
         </Card>
@@ -216,7 +216,7 @@ export function VendorPaymentMetrics({ vendorId }: VendorPaymentMetricsProps) {
               {metrics.failed.count}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              ₲ {metrics.failed.total.toLocaleString('es-PY')}
+              $ {metrics.failed.total.toLocaleString('es-AR')}
             </p>
           </CardContent>
         </Card>
@@ -264,7 +264,7 @@ export function VendorPaymentMetrics({ vendorId }: VendorPaymentMetricsProps) {
                   </div>
                   <div className="text-right">
                     <div className="text-lg font-semibold">
-                      ₲ {Number(payment.amount).toLocaleString('es-PY')}
+                      $ {Number(payment.amount).toLocaleString('es-AR')}
                     </div>
                   </div>
                 </div>
