@@ -196,7 +196,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: "agregar_al_carrito",
       description:
-        "Agrega uno o más productos al carrito del cliente. CRÍTICO: Debes usar el UUID EXACTO del product_id que aparece en el menú mostrado con ver_menu_negocio. NUNCA inventes IDs ni uses nombres como IDs. Ejemplo: si el menú muestra 'ID: 123e4567-e89b-12d3-a456-426614174000', usa ese UUID completo.",
+        "Agrega uno o más productos al carrito del cliente. Usa el nombre exacto del producto tal como aparece en el menú mostrado con ver_menu_negocio.",
       parameters: {
         type: "object",
         properties: {
@@ -211,7 +211,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
               properties: {
                 product_id: {
                   type: "string",
-                  description: "UUID EXACTO del producto mostrado en el menú. Ejemplo: '123e4567-e89b-12d3-a456-426614174000'. NUNCA uses nombres o slugs como 'pizza_pepperoni' o 'ibuprofeno_400mg'."
+                  description: "Nombre del producto tal como aparece en el menú (la función lo buscará automáticamente por nombre)"
                 },
                 product_name: { 
                   type: "string",
@@ -920,10 +920,9 @@ async function ejecutarHerramienta(
           return `${vendor.name} no tiene productos disponibles en este momento. 😔\n\nPodés buscar otros negocios con productos disponibles.`;
         }
 
-        let menu = `📋 *Menú de ${vendor.name}*\n\n⚠️ Para pedir, usá el ID exacto que aparece debajo de cada producto\n\n`;
+        let menu = `📋 *Menú de ${vendor.name}*\n\n`;
         for (const [i, p] of products.entries()) {
-          menu += `${i + 1}. *${p.name}* - $${p.price}\n`;
-          menu += `   🆔 ID: ${p.id}\n`;
+          menu += `${i + 1}. *${p.name}* - $${Math.round(p.price).toLocaleString("es-PY")}\n`;
           if (p.category) menu += `   🏷️ ${Array.isArray(p.category) ? p.category.join(", ") : p.category}\n`;
           if (p.description) menu += `   📝 ${p.description}\n`;
           menu += `\n`;
@@ -2220,23 +2219,26 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     // Cargar contexto
     const context = await getContext(normalizedPhone, supabase);
     
-    // 🧹 LIMPIAR CONTEXTO si hay un pedido entregado/cancelado O si el vendor ya no existe
+    // 🧹 LIMPIAR CONTEXTO si hay un pedido entregado/cancelado DEL MISMO VENDOR O si el vendor ya no existe
     if (context.selected_vendor_id || context.cart.length > 0) {
       console.log('🔍 Validating context data...');
       let shouldClearContext = false;
       
-      // Verificar si hay pedidos completados
-      const { data: completedOrders } = await supabase
-        .from('orders')
-        .select('id, status, created_at')
-        .eq('customer_phone', normalizedPhone)
-        .in('status', ['delivered', 'cancelled'])
-        .order('created_at', { ascending: false })
-        .limit(1);
-      
-      if (completedOrders && completedOrders.length > 0) {
-        console.log(`✅ Found completed order: ${completedOrders[0].id} (${completedOrders[0].status})`);
-        shouldClearContext = true;
+      // Verificar si hay pedidos completados DEL MISMO VENDOR
+      if (context.selected_vendor_id) {
+        const { data: completedOrders } = await supabase
+          .from('orders')
+          .select('id, status, created_at, vendor_id')
+          .eq('customer_phone', normalizedPhone)
+          .eq('vendor_id', context.selected_vendor_id)
+          .in('status', ['delivered', 'cancelled'])
+          .order('created_at', { ascending: false })
+          .limit(1);
+        
+        if (completedOrders && completedOrders.length > 0) {
+          console.log(`✅ Found completed order from same vendor: ${completedOrders[0].id} (${completedOrders[0].status})`);
+          shouldClearContext = true;
+        }
       }
       
       // Verificar si el vendor del contexto todavía existe y está activo
@@ -2404,28 +2406,25 @@ REGLAS GENERALES:
 15. NUNCA muestres múltiples menús en una sola respuesta - solo UN menú a la vez
 
 ⚠️ PRODUCTOS Y CARRITO (CRÍTICO):
-🚨 **USA SOLO LOS IDs EXACTOS DEL MENÚ** 🚨
+✅ **USA LOS NOMBRES EXACTOS DE LOS PRODUCTOS DEL MENÚ**
 - Cuando muestres el menú con ver_menu_negocio, vas a recibir algo así:
   "1. Ibuprofeno 400mg - $18000
-      ID: 123e4567-e89b-12d3-a456-426614174000"
-- Para agregar productos al carrito, DEBÉS usar el ID EXACTO que aparece en el menú
-- ❌ NUNCA inventes IDs como "ibuprofeno_400mg" o "pizza_pepperoni"
-- ❌ NUNCA uses nombres como IDs
-- ✅ SIEMPRE copiá el UUID completo: "123e4567-e89b-12d3-a456-426614174000"
+      🏷️ Analgésicos"
+- Para agregar productos al carrito, DEBÉS usar el nombre EXACTO que aparece en el menú
+- ✅ SIEMPRE copiá el nombre completo como aparece: "Ibuprofeno 400mg"
+- ❌ NUNCA modifiques el nombre del producto
 
 Ejemplos CORRECTOS:
 ✅ Cliente: "quiero 2 ibuprofenos"
-   Menú mostrado: "1. Ibuprofeno 400mg - $18000
-                    ID: 123e4567-e89b-12d3-a456-426614174000"
-   → agregar_al_carrito con product_id="123e4567-e89b-12d3-a456-426614174000", quantity=2
+   Menú mostrado: "1. Ibuprofeno 400mg - $18000"
+   → agregar_al_carrito con product_id="Ibuprofeno 400mg", product_name="Ibuprofeno 400mg", quantity=2, price=18000
 
 ✅ Cliente: "un agua"
-   Menú mostrado: "5. Agua Mineral - $5000
-                    ID: 789abc12-e89b-12d3-a456-426614174999"
-   → agregar_al_carrito con product_id="789abc12-e89b-12d3-a456-426614174999", quantity=1
+   Menú mostrado: "5. Agua Mineral - $5000"
+   → agregar_al_carrito con product_id="Agua Mineral", product_name="Agua Mineral", quantity=1, price=5000
 
 Ejemplos INCORRECTOS:
-❌ agregar_al_carrito con product_id="ibuprofeno_400mg"
+❌ agregar_al_carrito con product_id="ibuprofeno" (falta "400mg")
 ❌ agregar_al_carrito con product_id="Ibuprofeno"
 ❌ agregar_al_carrito con product_id="agua_mineral"
 
