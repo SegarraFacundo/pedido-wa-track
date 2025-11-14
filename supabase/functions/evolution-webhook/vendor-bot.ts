@@ -196,29 +196,41 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: "agregar_al_carrito",
       description:
-        "Agrega uno o más productos al carrito del cliente. IMPORTANTE: Si el cliente pide productos de un negocio diferente al actual, primero notificale que se vaciará el carrito anterior.",
+        "Agrega uno o más productos al carrito del cliente. CRÍTICO: Debes usar el UUID EXACTO del product_id que aparece en el menú mostrado con ver_menu_negocio. NUNCA inventes IDs ni uses nombres como IDs. Ejemplo: si el menú muestra 'ID: 123e4567-e89b-12d3-a456-426614174000', usa ese UUID completo.",
       parameters: {
         type: "object",
         properties: {
           vendor_id: {
             type: "string",
-            description: "ID del negocio del que son los productos",
+            description: "ID del negocio (UUID). Opcional si ya hay un negocio en el contexto.",
           },
           items: {
             type: "array",
             items: {
               type: "object",
               properties: {
-                product_id: { type: "string" },
-                product_name: { type: "string" },
-                quantity: { type: "number" },
-                price: { type: "number" },
+                product_id: {
+                  type: "string",
+                  description: "UUID EXACTO del producto mostrado en el menú. Ejemplo: '123e4567-e89b-12d3-a456-426614174000'. NUNCA uses nombres o slugs como 'pizza_pepperoni' o 'ibuprofeno_400mg'."
+                },
+                product_name: { 
+                  type: "string",
+                  description: "Nombre del producto tal como aparece en el menú"
+                },
+                quantity: { 
+                  type: "number",
+                  description: "Cantidad solicitada por el cliente"
+                },
+                price: { 
+                  type: "number",
+                  description: "Precio unitario del producto tal como aparece en el menú"
+                },
               },
               required: ["product_id", "product_name", "quantity", "price"],
             },
           },
         },
-        required: ["vendor_id", "items"],
+        required: ["items"],
       },
     },
   },
@@ -908,9 +920,10 @@ async function ejecutarHerramienta(
           return `${vendor.name} no tiene productos disponibles en este momento. 😔\n\nPodés buscar otros negocios con productos disponibles.`;
         }
 
-        let menu = `📋 *Menú de ${vendor.name}*\n\n`;
+        let menu = `📋 *Menú de ${vendor.name}*\n\n⚠️ Para pedir, usá el ID exacto que aparece debajo de cada producto\n\n`;
         for (const [i, p] of products.entries()) {
-          menu += `${i + 1}. *${p.name}* - $${p.price}\n   ID: ${p.id}\n`;
+          menu += `${i + 1}. *${p.name}* - $${p.price}\n`;
+          menu += `   🆔 ID: ${p.id}\n`;
           if (p.category) menu += `   🏷️ ${Array.isArray(p.category) ? p.category.join(", ") : p.category}\n`;
           if (p.description) menu += `   📝 ${p.description}\n`;
           menu += `\n`;
@@ -2391,14 +2404,37 @@ REGLAS GENERALES:
 15. NUNCA muestres múltiples menús en una sola respuesta - solo UN menú a la vez
 
 ⚠️ PRODUCTOS Y CARRITO (CRÍTICO):
-- SIEMPRE INTENTÁ AGREGAR AL CARRITO cuando el cliente pida productos
-- Si el cliente ya vio el menú anteriormente en la conversación, PODÉS agregar productos sin volver a mostrarlo
-- Usá el nombre del producto que el cliente menciona (ej: "agua mineral", "pizza pepperoni") - el sistema buscará el producto por nombre
-- Si el cliente pide algo que NO existe → Decile que NO lo tenés y mostrá alternativas del menú
-- Ejemplos:
-  ✅ Cliente: "un agua mineral" → agregar_al_carrito con product_id="agua_mineral" (el sistema resolverá el UUID)
-  ✅ Cliente: "pizza pepperoni" → agregar_al_carrito con product_id="pizza_pepperoni"
-  ❌ Cliente: "quiero cerveza" (y no hay cerveza en menú) → "No tenemos cerveza, pero tengo otras bebidas..."
+🚨 **USA SOLO LOS IDs EXACTOS DEL MENÚ** 🚨
+- Cuando muestres el menú con ver_menu_negocio, vas a recibir algo así:
+  "1. Ibuprofeno 400mg - $18000
+      ID: 123e4567-e89b-12d3-a456-426614174000"
+- Para agregar productos al carrito, DEBÉS usar el ID EXACTO que aparece en el menú
+- ❌ NUNCA inventes IDs como "ibuprofeno_400mg" o "pizza_pepperoni"
+- ❌ NUNCA uses nombres como IDs
+- ✅ SIEMPRE copiá el UUID completo: "123e4567-e89b-12d3-a456-426614174000"
+
+Ejemplos CORRECTOS:
+✅ Cliente: "quiero 2 ibuprofenos"
+   Menú mostrado: "1. Ibuprofeno 400mg - $18000
+                    ID: 123e4567-e89b-12d3-a456-426614174000"
+   → agregar_al_carrito con product_id="123e4567-e89b-12d3-a456-426614174000", quantity=2
+
+✅ Cliente: "un agua"
+   Menú mostrado: "5. Agua Mineral - $5000
+                    ID: 789abc12-e89b-12d3-a456-426614174999"
+   → agregar_al_carrito con product_id="789abc12-e89b-12d3-a456-426614174999", quantity=1
+
+Ejemplos INCORRECTOS:
+❌ agregar_al_carrito con product_id="ibuprofeno_400mg"
+❌ agregar_al_carrito con product_id="Ibuprofeno"
+❌ agregar_al_carrito con product_id="agua_mineral"
+
+⚠️ VENDOR_ID:
+- Cuando uses ver_menu_negocio, el vendor_id se guarda automáticamente en el contexto
+- NO necesitás pasar vendor_id en agregar_al_carrito (se usa el del contexto automáticamente)
+- Si el contexto no tiene vendor_id, primero mostrá el menú con ver_menu_negocio
+
+Si el cliente pide algo que NO existe en el menú → Decile que NO lo tenés y mostrá alternativas
 
 ⚠️ CREAR PEDIDO vs HABLAR CON VENDEDOR:
 - CREAR PEDIDO (crear_pedido): cuando el cliente confirma que TODO está correcto (carrito, dirección, pago)
