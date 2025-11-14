@@ -74,7 +74,6 @@ export async function saveContext(context: ConversationContext, supabase: any): 
     {
       phone: context.phone,
       last_bot_message: JSON.stringify(context),
-      last_message_at: new Date().toISOString(),
       user_latitude: context.user_latitude,
       user_longitude: context.user_longitude,
     },

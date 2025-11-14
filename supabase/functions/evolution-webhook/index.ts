@@ -47,7 +47,6 @@ interface UserSession {
   phone: string;
   in_vendor_chat: boolean;
   assigned_vendor?: string;
-  last_message_at: string;
   created_at: string;
 }
 
@@ -74,7 +73,6 @@ async function getOrCreateSession(phoneNumber: string): Promise<UserSession> {
   const newSession: UserSession = {
     phone: phoneNumber,
     in_vendor_chat: false,
-    last_message_at: new Date().toISOString(),
     created_at: new Date().toISOString(),
   };
 

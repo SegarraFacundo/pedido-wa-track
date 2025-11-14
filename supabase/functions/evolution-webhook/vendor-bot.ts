@@ -1665,7 +1665,6 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
             user_longitude: undefined,
             pending_location_decision: false,
           }),
-          last_message_at: new Date().toISOString(),
         })
         .eq('phone', normalizedPhone);
       
