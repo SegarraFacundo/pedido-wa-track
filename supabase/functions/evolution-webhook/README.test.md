@@ -1,6 +1,15 @@
 # Tests para Evolution Webhook
 
-## Ejecutar Tests
+## CI/CD con GitHub Actions
+
+Este proyecto está configurado con GitHub Actions para ejecutar tests automáticamente en cada commit y pull request. El workflow:
+- ✅ Ejecuta todos los tests unitarios
+- ✅ Genera reportes de cobertura
+- ✅ Sube estadísticas a Codecov (opcional)
+
+Ver configuración en `.github/workflows/test.yml`
+
+## Ejecutar Tests Localmente
 
 Para ejecutar los tests unitarios del bot:
 

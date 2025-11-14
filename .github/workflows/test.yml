@@ -1,0 +1,40 @@
+name: Run Tests
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+
+      - name: Run utils tests
+        run: deno test supabase/functions/evolution-webhook/utils.test.ts --allow-env
+
+      - name: Run context tests
+        run: deno test supabase/functions/evolution-webhook/context.test.ts --allow-env
+
+      - name: Run all edge function tests
+        run: deno test supabase/functions/evolution-webhook/ --allow-env
+
+      - name: Generate coverage
+        run: |
+          deno test supabase/functions/evolution-webhook/ --allow-env --coverage=coverage
+          deno coverage coverage --lcov > coverage.lcov
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.lcov
+          fail_ci_if_error: false
