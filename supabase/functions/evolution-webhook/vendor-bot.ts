@@ -687,6 +687,25 @@ async function ejecutarHerramienta(
 
         context.pending_order_id = order.id;
 
+        // 💳 Crear registro de pago en order_payments
+        const { error: paymentError } = await supabase
+          .from("order_payments")
+          .insert({
+            order_id: order.id,
+            amount: total,
+            payment_method_name: context.payment_method,
+            status: 'pending',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+
+        if (paymentError) {
+          console.error("⚠️ Error creating payment record:", paymentError);
+          // No bloqueamos el flujo si falla el pago, pero lo registramos
+        } else {
+          console.log("✅ Payment record created for order:", order.id);
+        }
+
         // 📧 Notificar al vendedor sobre el nuevo pedido
         try {
           console.log("📨 Sending new order notification to vendor:", context.selected_vendor_id);
