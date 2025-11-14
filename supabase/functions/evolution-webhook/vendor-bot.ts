@@ -1627,6 +1627,36 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
   console.log("🤖 AI Bot START - Phone:", normalizedPhone, "Message:", message, "ImageUrl:", imageUrl);
 
   try {
+    // 🔄 COMANDO DE REINICIO: Detectar palabras clave para limpiar memoria
+    const resetCommands = ['reiniciar', 'empezar de nuevo', 'borrar todo', 'limpiar memoria', 'reset', 'comenzar de nuevo', 'nuevo pedido', 'empezar'];
+    const normalizedMessage = message.toLowerCase().trim();
+    
+    if (resetCommands.some(cmd => normalizedMessage.includes(cmd))) {
+      console.log('🔄 Reset command detected, clearing user memory...');
+      
+      // Limpiar toda la memoria del usuario
+      const { error } = await supabase
+        .from('user_sessions')
+        .update({
+          last_bot_message: JSON.stringify({
+            phone: normalizedPhone,
+            cart: [],
+            conversation_history: [],
+            user_latitude: undefined,
+            user_longitude: undefined,
+            pending_location_decision: false,
+          }),
+          last_message_at: new Date().toISOString(),
+        })
+        .eq('phone', normalizedPhone);
+      
+      if (error) {
+        console.error('Error clearing memory:', error);
+      }
+      
+      return '🔄 ¡Listo! Borré toda tu memoria de conversación.\n\n¡Empecemos de nuevo! ¿Qué estás buscando hoy? 😊';
+    }
+    
     // Cargar contexto
     const context = await getContext(normalizedPhone, supabase);
     
