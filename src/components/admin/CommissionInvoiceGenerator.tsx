@@ -3,10 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { FileText, Download, CheckCircle, XCircle, Calendar, Loader2 } from "lucide-react";
+import { FileText, Download, CheckCircle, XCircle, Calendar, Loader2, Mail, MessageCircle, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface VendorCommissionSummary {
   vendor_id: string;
@@ -41,6 +43,9 @@ export default function CommissionInvoiceGenerator() {
   const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [generatingPeriod, setGeneratingPeriod] = useState(false);
+  const [sendingInvoice, setSendingInvoice] = useState<string | null>(null);
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [vendorEmail, setVendorEmail] = useState("");
 
   useEffect(() => {
     fetchData();
@@ -239,6 +244,112 @@ export default function CommissionInvoiceGenerator() {
     }).format(amount);
   };
 
+  const downloadPDF = async (invoiceId: string, invoiceNumber: string) => {
+    try {
+      setSendingInvoice(invoiceId);
+      const { data, error } = await supabase.functions.invoke('generate-invoice-pdf', {
+        body: { invoice_id: invoiceId }
+      });
+
+      if (error) throw error;
+
+      // Create blob and download
+      const blob = await data.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Factura-${invoiceNumber}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast.success('PDF descargado exitosamente');
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      toast.error('Error al descargar el PDF');
+    } finally {
+      setSendingInvoice(null);
+    }
+  };
+
+  const sendByEmail = async (invoiceId: string) => {
+    if (!vendorEmail) {
+      toast.error('Por favor ingresa un email');
+      return;
+    }
+
+    try {
+      setSendingInvoice(invoiceId);
+      const { error } = await supabase.functions.invoke('send-invoice-email', {
+        body: { invoice_id: invoiceId, vendor_email: vendorEmail }
+      });
+
+      if (error) throw error;
+
+      toast.success('Factura enviada por email exitosamente');
+      setShowEmailDialog(false);
+      setVendorEmail('');
+    } catch (error) {
+      console.error('Error sending email:', error);
+      toast.error('Error al enviar el email');
+    } finally {
+      setSendingInvoice(null);
+    }
+  };
+
+  const sendByWhatsApp = async (invoiceId: string) => {
+    try {
+      setSendingInvoice(invoiceId);
+      const { error } = await supabase.functions.invoke('send-invoice-whatsapp', {
+        body: { invoice_id: invoiceId }
+      });
+
+      if (error) throw error;
+
+      toast.success('Factura enviada por WhatsApp exitosamente');
+    } catch (error) {
+      console.error('Error sending WhatsApp:', error);
+      toast.error('Error al enviar por WhatsApp');
+    } finally {
+      setSendingInvoice(null);
+    }
+  };
+
+  const sendByBoth = async (invoiceId: string) => {
+    if (!vendorEmail) {
+      toast.error('Por favor ingresa un email');
+      return;
+    }
+
+    try {
+      setSendingInvoice(invoiceId);
+      
+      // Send by email
+      const { error: emailError } = await supabase.functions.invoke('send-invoice-email', {
+        body: { invoice_id: invoiceId, vendor_email: vendorEmail }
+      });
+
+      if (emailError) throw emailError;
+
+      // Send by WhatsApp
+      const { error: whatsappError } = await supabase.functions.invoke('send-invoice-whatsapp', {
+        body: { invoice_id: invoiceId }
+      });
+
+      if (whatsappError) throw whatsappError;
+
+      toast.success('Factura enviada por email y WhatsApp');
+      setShowEmailDialog(false);
+      setVendorEmail('');
+    } catch (error) {
+      console.error('Error sending invoice:', error);
+      toast.error('Error al enviar la factura');
+    } finally {
+      setSendingInvoice(null);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline", label: string }> = {
       pending: { variant: "outline", label: "Pendiente" },
@@ -354,6 +465,40 @@ export default function CommissionInvoiceGenerator() {
                       <Button
                         size="sm"
                         variant="outline"
+                        onClick={() => downloadPDF(invoice.id, invoice.invoice_number)}
+                        disabled={sendingInvoice === invoice.id}
+                        title="Descargar PDF"
+                      >
+                        {sendingInvoice === invoice.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedInvoice(invoice);
+                          setShowEmailDialog(true);
+                        }}
+                        disabled={sendingInvoice === invoice.id}
+                        title="Enviar por Email"
+                      >
+                        <Mail className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => sendByWhatsApp(invoice.id)}
+                        disabled={sendingInvoice === invoice.id}
+                        title="Enviar por WhatsApp"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
                         onClick={() => setSelectedInvoice(invoice)}
                       >
                         <FileText className="h-4 w-4" />
@@ -376,8 +521,56 @@ export default function CommissionInvoiceGenerator() {
         </CardContent>
       </Card>
 
+      {/* Email Dialog */}
+      <Dialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enviar Factura por Email</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="email">Email del Vendor</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="vendor@ejemplo.com"
+                value={vendorEmail}
+                onChange={(e) => setVendorEmail(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => selectedInvoice && sendByEmail(selectedInvoice.id)}
+                disabled={!vendorEmail || !!sendingInvoice}
+                className="flex-1"
+              >
+                {sendingInvoice ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Mail className="mr-2 h-4 w-4" />
+                )}
+                Solo Email
+              </Button>
+              <Button
+                onClick={() => selectedInvoice && sendByBoth(selectedInvoice.id)}
+                disabled={!vendorEmail || !!sendingInvoice}
+                variant="default"
+                className="flex-1"
+              >
+                {sendingInvoice ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="mr-2 h-4 w-4" />
+                )}
+                Email + WhatsApp
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Invoice Details Dialog */}
-      <Dialog open={!!selectedInvoice} onOpenChange={() => setSelectedInvoice(null)}>
+      <Dialog open={!!selectedInvoice && !showEmailDialog} onOpenChange={() => setSelectedInvoice(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Detalle de Factura</DialogTitle>
