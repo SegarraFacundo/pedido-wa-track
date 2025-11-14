@@ -62,7 +62,7 @@ export default function AdminPaymentMetrics() {
       if (commissionsError) throw commissionsError;
 
       // Fetch invoices with vendor names
-      const { data: invoices, error: invoicesError } = await supabase
+      const { data: invoices, error: invoicesError } = await (supabase as any)
         .from('commission_invoices')
         .select(`
           *,
