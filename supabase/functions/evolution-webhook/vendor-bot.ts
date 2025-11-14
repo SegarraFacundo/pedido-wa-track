@@ -929,6 +929,11 @@ async function ejecutarHerramienta(
         }
 
         console.log(`✅ Menu generated successfully with ${products.length} products`);
+        
+        // 💾 IMPORTANTE: Guardar el contexto después de seleccionar el negocio
+        await saveContext(normalizedPhone, context, supabase);
+        console.log(`💾 Context saved with vendor: ${vendor.name} (${vendor.id})`);
+        
         return menu;
       }
 
