@@ -11,6 +11,7 @@ export function normalizeArgentinePhone(phone: string): string {
   }
   if (cleaned.startsWith("9") && cleaned.length === 11) return "54" + cleaned;
   if (!cleaned.startsWith("54") && cleaned.length === 10) return "549" + cleaned;
+  if (!cleaned.startsWith("54") && cleaned.length === 9) return "549" + cleaned;
   if (cleaned.length > 13) return normalizeArgentinePhone(cleaned.slice(-13));
 
   return cleaned;
