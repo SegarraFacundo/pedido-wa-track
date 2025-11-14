@@ -109,7 +109,7 @@ export default function CommissionInvoiceGenerator() {
   };
 
   const fetchRecentInvoices = async () => {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('commission_invoices')
       .select(`
         id,
@@ -147,13 +147,13 @@ export default function CommissionInvoiceGenerator() {
       // For each vendor with pending commissions
       for (const vendor of vendorSummaries) {
         // Generate invoice number
-        const { data: invoiceNumber, error: invoiceNumError } = await supabase
+        const { data: invoiceNumber, error: invoiceNumError } = await (supabase as any)
           .rpc('generate_invoice_number');
 
         if (invoiceNumError) throw invoiceNumError;
 
         // Create invoice
-        const { data: invoice, error: invoiceError } = await supabase
+        const { data: invoice, error: invoiceError } = await (supabase as any)
           .from('commission_invoices')
           .insert({
             vendor_id: vendor.vendor_id,
@@ -169,12 +169,12 @@ export default function CommissionInvoiceGenerator() {
         if (invoiceError) throw invoiceError;
 
         // Link commission items to invoice
-        const invoiceItems = vendor.commission_details.map(detail => ({
+        const invoiceItems = vendor.commission_details.map((detail: any) => ({
           invoice_id: invoice.id,
           commission_id: detail.id
         }));
 
-        const { error: itemsError } = await supabase
+        const { error: itemsError } = await (supabase as any)
           .from('commission_invoice_items')
           .insert(invoiceItems);
 
@@ -202,7 +202,7 @@ export default function CommissionInvoiceGenerator() {
 
   const markInvoiceAsPaid = async (invoiceId: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('commission_invoices')
         .update({ 
           status: 'paid',
@@ -213,13 +213,13 @@ export default function CommissionInvoiceGenerator() {
       if (error) throw error;
 
       // Update related commissions to 'paid'
-      const { data: items } = await supabase
+      const { data: items } = await (supabase as any)
         .from('commission_invoice_items')
         .select('commission_id')
         .eq('invoice_id', invoiceId);
 
       if (items) {
-        const commissionIds = items.map(item => item.commission_id);
+        const commissionIds = items.map((item: any) => item.commission_id);
         await supabase
           .from('vendor_commissions')
           .update({ status: 'paid' })
