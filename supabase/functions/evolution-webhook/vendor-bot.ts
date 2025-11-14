@@ -45,6 +45,9 @@ interface ConversationContext {
 // ==================== GESTIÓN DE CONTEXTO ====================
 
 async function getContext(phone: string, supabase: any): Promise<ConversationContext> {
+  console.log("📂 ========== LOADING CONTEXT ==========");
+  console.log("📞 Phone:", phone);
+  
   const { data } = await supabase.from("user_sessions").select("*").eq("phone", phone).maybeSingle();
 
   // Obtener ubicación del usuario si existe
@@ -54,6 +57,12 @@ async function getContext(phone: string, supabase: any): Promise<ConversationCon
   if (data?.last_bot_message) {
     try {
       const saved = JSON.parse(data.last_bot_message);
+      console.log("✅ Context loaded from DB:");
+      console.log("🛒 Cart items:", saved.cart?.length || 0);
+      console.log("🏪 Vendor ID:", saved.selected_vendor_id);
+      console.log("🏪 Vendor Name:", saved.selected_vendor_name);
+      console.log("📍 User location:", userLatitude && userLongitude ? `${userLatitude}, ${userLongitude}` : "Not set");
+      
       return {
         phone,
         cart: saved.cart || [],
@@ -69,10 +78,11 @@ async function getContext(phone: string, supabase: any): Promise<ConversationCon
         conversation_history: saved.conversation_history || [],
       };
     } catch (e) {
-      console.error("Error parsing context:", e);
+      console.error("❌ Error parsing context:", e);
     }
   }
 
+  console.log("ℹ️ No context found, creating new context");
   return {
     phone,
     cart: [],
@@ -101,12 +111,15 @@ async function saveContext(context: ConversationContext, supabase: any): Promise
     conversation_history: context.conversation_history,
   };
 
-  console.log("💾 Saving context:", {
-    phone: context.phone,
-    cartItems: context.cart.length,
-    cartPreview: context.cart.map((i) => `${i.product_name} x${i.quantity}`).join(", ") || "empty",
-    vendorId: context.selected_vendor_id,
-  });
+  console.log("💾 ========== SAVING CONTEXT ==========");
+  console.log("📞 Phone:", context.phone);
+  console.log("🛒 Cart items:", context.cart.length);
+  console.log("📦 Cart preview:", context.cart.map((i) => `${i.product_name} x${i.quantity}`).join(", ") || "empty");
+  console.log("🏪 Vendor ID:", context.selected_vendor_id);
+  console.log("🏪 Vendor Name:", context.selected_vendor_name);
+  console.log("📍 Delivery address:", context.delivery_address);
+  console.log("💳 Payment method:", context.payment_method);
+  console.log("🆔 Pending order:", context.pending_order_id);
 
   await supabase.from("user_sessions").upsert(
     {
@@ -117,6 +130,8 @@ async function saveContext(context: ConversationContext, supabase: any): Promise
     },
     { onConflict: "phone" },
   );
+  
+  console.log("✅ Context saved successfully");
 }
 
 // ==================== DEFINICIÓN DE HERRAMIENTAS ====================
@@ -830,7 +845,8 @@ async function ejecutarHerramienta(
 
 
       case "ver_menu_negocio": {
-        console.log(`🔍 ver_menu_negocio called with vendor_id: "${args.vendor_id}"`);
+        console.log(`🔍 ========== VER MENU NEGOCIO ==========`);
+        console.log(`📝 Args vendor_id: "${args.vendor_id}"`);
 
         // ⚠️ NOTA: Ya NO limpiamos automáticamente el carrito aquí
         // El bot debe preguntar primero al usuario si quiere cancelar su pedido actual
@@ -869,6 +885,7 @@ async function ejecutarHerramienta(
         // Guardar el negocio seleccionado (siempre UUID real)
         context.selected_vendor_id = vendor.id;
         context.selected_vendor_name = vendor.name;
+        console.log(`💾 Context updated - Vendor: ${context.selected_vendor_name} (${context.selected_vendor_id})`);
         // NO limpiamos el carrito aquí - debe hacerse con vaciar_carrito explícitamente
 
         // Buscar productos del negocio - LOG DETALLADO
@@ -905,47 +922,89 @@ async function ejecutarHerramienta(
 
       case "agregar_al_carrito": {
         const items = args.items as CartItem[];
-        console.log("🛒 agregar_al_carrito called:", items);
+        console.log("🛒 ========== AGREGAR AL CARRITO ==========");
+        console.log("📦 Items to add:", JSON.stringify(items, null, 2));
+        console.log("🔍 Context state:", {
+          selected_vendor_id: context.selected_vendor_id,
+          selected_vendor_name: context.selected_vendor_name,
+          cart_items: context.cart.length,
+          args_vendor_id: args.vendor_id
+        });
 
-        // Normalizar vendor_id - SIEMPRE validar contra BD
-        let vendorId = context.selected_vendor_id || args.vendor_id;
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        
+        // SIEMPRE usar el vendor del contexto si existe
+        let vendorId: string | undefined = context.selected_vendor_id;
         let vendor: any = null;
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-        if (uuidRegex.test(vendorId)) {
-          // Buscar por UUID y validar que existe y está activo
-          const { data, error } = await supabase
+        // Caso 1: Si hay vendor en contexto, validarlo en BD
+        if (vendorId) {
+          console.log(`✅ Using vendor from context: ${vendorId} (${context.selected_vendor_name})`);
+          const { data, error: vendorError } = await supabase
             .from("vendors")
             .select("id, name, is_active, payment_status")
             .eq("id", vendorId)
             .maybeSingle();
           
-          if (error) console.error("Error finding vendor:", error);
-          vendor = data;
-        } else {
-          // Buscar por nombre
-          const cleanedName = (vendorId || args.vendor_id).replace(/[-_]/g, " ").trim();
-          const { data, error } = await supabase
-            .from("vendors")
-            .select("id, name, is_active, payment_status")
-            .ilike("name", `%${cleanedName}%`)
-            .maybeSingle();
-          
-          if (error) console.error("Error finding vendor:", error);
-          vendor = data;
+          if (vendorError) {
+            console.error("❌ Error finding vendor by context ID:", vendorError);
+          } else if (data) {
+            vendor = data;
+            console.log(`✅ Vendor found from context: ${vendor.name} (Active: ${vendor.is_active}, Payment: ${vendor.payment_status})`);
+          } else {
+            console.error(`❌ Vendor ${vendorId} from context not found in database`);
+          }
         }
         
+        // Caso 2: Si no hay vendor en contexto, intentar con args.vendor_id
+        if (!vendor && args.vendor_id) {
+          console.log(`⚠️ No vendor in context or vendor not found, trying args.vendor_id: "${args.vendor_id}"`);
+          
+          if (uuidRegex.test(args.vendor_id)) {
+            console.log(`🔍 Searching vendor by UUID from args: ${args.vendor_id}`);
+            const { data, error: vendorError } = await supabase
+              .from("vendors")
+              .select("id, name, is_active, payment_status")
+              .eq("id", args.vendor_id)
+              .maybeSingle();
+            if (vendorError) {
+              console.error("❌ Error finding vendor by UUID:", vendorError);
+            } else {
+              vendor = data;
+              console.log(`📦 Vendor found by UUID:`, vendor);
+            }
+          } else {
+            console.log(`🔍 Searching vendor by name from args: "${args.vendor_id}"`);
+            const cleanedName = (args.vendor_id || "").replace(/[-_]/g, " ").trim();
+            const { data, error: vendorError } = await supabase
+              .from("vendors")
+              .select("id, name, is_active, payment_status")
+              .ilike("name", `%${cleanedName}%`)
+              .maybeSingle();
+            if (vendorError) {
+              console.error("❌ Error finding vendor by name:", vendorError);
+            } else {
+              vendor = data;
+              console.log(`📦 Vendor found by name:`, vendor);
+            }
+          }
+        }
+
         // Validar que el vendor existe y está activo
         if (!vendor) {
-          return `❌ No encontré el negocio "${args.vendor_id || context.selected_vendor_name}".\n\nPor favor pedime ver los negocios disponibles para elegir uno.`;
+          console.error(`❌ ===== VENDOR NOT FOUND =====`);
+          console.error(`Context vendor_id: ${context.selected_vendor_id}`);
+          console.error(`Context vendor_name: ${context.selected_vendor_name}`);
+          console.error(`Args vendor_id: ${args.vendor_id}`);
+          return `❌ No pude encontrar el negocio para agregar productos.\n\n💡 Posibles causas:\n- El negocio cerró temporalmente\n- Hubo un error de conexión\n\nPor favor pedime ver los negocios disponibles de nuevo:\n"Ver locales abiertos"`;
         }
         
         if (!vendor.is_active || vendor.payment_status !== 'active') {
+          console.error(`❌ Vendor ${vendor.name} is not available (Active: ${vendor.is_active}, Payment: ${vendor.payment_status})`);
           return `❌ El negocio "${vendor.name}" no está disponible en este momento.\n\nPor favor elegí otro negocio de los disponibles.`;
         }
-        
+
         vendorId = vendor.id;
+        console.log(`✅ ===== VENDOR VALIDATED: ${vendor.name} (${vendorId}) =====`);
 
         // 🧹 Si el carrito es de otro negocio, vaciarlo
         if (context.cart.length > 0 && context.selected_vendor_id && vendorId !== context.selected_vendor_id) {
