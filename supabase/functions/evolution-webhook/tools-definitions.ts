@@ -62,7 +62,7 @@ export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: "agregar_al_carrito",
       description:
-        "Agrega uno o más productos al carrito del cliente. Usa el nombre exacto del producto tal como aparece en el menú mostrado con ver_menu_negocio.",
+        "Agrega uno o más productos al carrito del cliente. ⚠️ CRÍTICO: SOLO usar si ya llamaste a ver_menu_negocio antes para mostrar el menú REAL. Si no hay selected_vendor_id en el contexto, PRIMERO debes llamar ver_menu_negocio. Usa el nombre exacto del producto tal como aparece en el menú mostrado.",
       parameters: {
         type: "object",
         properties: {

@@ -418,7 +418,23 @@ async function ejecutarHerramienta(
           console.error(`Context vendor_id: ${context.selected_vendor_id}`);
           console.error(`Context vendor_name: ${context.selected_vendor_name}`);
           console.error(`Args vendor_id: ${args.vendor_id}`);
-          return `❌ No pude encontrar el negocio para agregar productos.\n\n💡 Posibles causas:\n- El negocio cerró temporalmente\n- Hubo un error de conexión\n\nPor favor pedime ver los negocios disponibles de nuevo:\n"Ver locales abiertos"`;
+          
+          // Buscar si hay mención de vendor en el historial reciente
+          const recentMessages = context.conversation_history.slice(-5);
+          const vendorMentioned = recentMessages.some((msg: any) => 
+            msg.role === 'assistant' && (
+              msg.content.includes('Heladería') || 
+              msg.content.includes('Farmacia') ||
+              msg.content.includes('negocio') || 
+              msg.content.includes('local')
+            )
+          );
+          
+          if (vendorMentioned && context.selected_vendor_name) {
+            return `⚠️ Parece que mencionaste *${context.selected_vendor_name}* pero necesito mostrar el menú primero para poder agregar productos.\n\n¿Querés que te muestre el menú de *${context.selected_vendor_name}*? Así podés elegir qué productos agregar. 😊`;
+          }
+          
+          return `❌ No pude encontrar el negocio para agregar productos.\n\n💡 Posibles causas:\n- No seleccionaste un negocio todavía\n- El negocio cerró temporalmente\n\nPor favor pedime ver los negocios disponibles:\n"Ver locales abiertos"`;
         }
         
         if (!vendor.is_active || vendor.payment_status !== 'active') {
@@ -1891,6 +1907,17 @@ Ejemplos INCORRECTOS:
 - Cuando uses ver_menu_negocio, el vendor_id se guarda automáticamente en el contexto
 - NO necesitás pasar vendor_id en agregar_al_carrito (se usa el del contexto automáticamente)
 - Si el contexto no tiene vendor_id, primero mostrá el menú con ver_menu_negocio
+
+⚠️ REGLA CRÍTICA - NUNCA SUGERIR PRODUCTOS SIN MENÚ PRIMERO:
+- PROHIBIDO absolutamente sugerir productos específicos si NO has llamado a ver_menu_negocio antes
+- Si el cliente menciona productos pero NO tienes selected_vendor_id en el contexto:
+  1. PRIMERO llamá a ver_menu_negocio para obtener el menú REAL
+  2. DESPUÉS confirmá si los productos que mencionó están disponibles
+- Esta regla aplica SIEMPRE, incluso si el cliente parece saber qué productos quiere
+- Ejemplo INCORRECTO:
+  ❌ Cliente: "quiero helados" → Bot: "¿Te gustaría que agregue dos helados de chocolate?" (SIN haber mostrado menú)
+- Ejemplo CORRECTO:
+  ✅ Cliente: "quiero helados" → Bot llama ver_locales_abiertos → Cliente: "la heladería italiana" → Bot DEBE llamar ver_menu_negocio → Muestra menú real → "¿Qué helados te gustaría pedir?"
 
 Si el cliente pide algo que NO existe en el menú → Decile que NO lo tenés y mostrá alternativas
 
