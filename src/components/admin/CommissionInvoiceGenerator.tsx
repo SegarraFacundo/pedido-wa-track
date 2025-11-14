@@ -231,9 +231,9 @@ export default function CommissionInvoiceGenerator() {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PY', {
+    return new Intl.NumberFormat('es-AR', {
       style: 'currency',
-      currency: 'PYG',
+      currency: 'ARS',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);
@@ -339,14 +339,14 @@ export default function CommissionInvoiceGenerator() {
                   <div className="flex-1">
                     <div className="font-medium">{invoice.vendor_name}</div>
                     <div className="text-sm text-muted-foreground">
-                      {invoice.invoice_number} • {new Date(invoice.period_start).toLocaleDateString('es-PY')} - {new Date(invoice.period_end).toLocaleDateString('es-PY')}
+                      {invoice.invoice_number} • {new Date(invoice.period_start).toLocaleDateString('es-AR')} - {new Date(invoice.period_end).toLocaleDateString('es-AR')}
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-right">
                       <div className="font-semibold">{formatCurrency(invoice.total_amount)}</div>
                       <div className="text-xs text-muted-foreground">
-                        {new Date(invoice.generated_at).toLocaleDateString('es-PY')}
+                        {new Date(invoice.generated_at).toLocaleDateString('es-AR')}
                       </div>
                     </div>
                     {getStatusBadge(invoice.status)}
@@ -396,7 +396,7 @@ export default function CommissionInvoiceGenerator() {
                 <div>
                   <p className="text-sm text-muted-foreground">Período</p>
                   <p className="font-medium">
-                    {new Date(selectedInvoice.period_start).toLocaleDateString('es-PY')} - {new Date(selectedInvoice.period_end).toLocaleDateString('es-PY')}
+                    {new Date(selectedInvoice.period_start).toLocaleDateString('es-AR')} - {new Date(selectedInvoice.period_end).toLocaleDateString('es-AR')}
                   </p>
                 </div>
                 <div>
