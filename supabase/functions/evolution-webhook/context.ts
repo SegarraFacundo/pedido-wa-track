@@ -52,9 +52,9 @@ export async function getContext(phone: string, supabase: any): Promise<Conversa
 }
 
 export async function saveContext(context: ConversationContext, supabase: any): Promise<void> {
-  // Mantener solo últimas 20 interacciones para no saturar
-  if (context.conversation_history.length > 20) {
-    context.conversation_history = context.conversation_history.slice(-20);
+  // Mantener solo últimas 10 interacciones para evitar delirios
+  if (context.conversation_history.length > 10) {
+    context.conversation_history = context.conversation_history.slice(-10);
   }
 
   console.log("💾 ========== SAVING CONTEXT ==========");
