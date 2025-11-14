@@ -907,31 +907,55 @@ async function ejecutarHerramienta(
         const items = args.items as CartItem[];
         console.log("🛒 agregar_al_carrito called:", items);
 
-        // Normalizar vendor_id
+        // Normalizar vendor_id - SIEMPRE validar contra BD
         let vendorId = context.selected_vendor_id || args.vendor_id;
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        
+        let vendor: any = null;
 
-        if (!uuidRegex.test(vendorId)) {
-          const cleanedName = vendorId.replace(/[-_]/g, " ").trim();
-          const { data: vendor } = await supabase
+        if (uuidRegex.test(vendorId)) {
+          // Buscar por UUID y validar que existe y está activo
+          const { data, error } = await supabase
             .from("vendors")
-            .select("id, name")
+            .select("id, name, is_active, payment_status")
+            .eq("id", vendorId)
+            .maybeSingle();
+          
+          if (error) console.error("Error finding vendor:", error);
+          vendor = data;
+        } else {
+          // Buscar por nombre
+          const cleanedName = (vendorId || args.vendor_id).replace(/[-_]/g, " ").trim();
+          const { data, error } = await supabase
+            .from("vendors")
+            .select("id, name, is_active, payment_status")
             .ilike("name", `%${cleanedName}%`)
             .maybeSingle();
-          if (!vendor) return `No encontré el negocio "${args.vendor_id}".`;
-          vendorId = vendor.id;
+          
+          if (error) console.error("Error finding vendor:", error);
+          vendor = data;
         }
+        
+        // Validar que el vendor existe y está activo
+        if (!vendor) {
+          return `❌ No encontré el negocio "${args.vendor_id || context.selected_vendor_name}".\n\nPor favor pedime ver los negocios disponibles para elegir uno.`;
+        }
+        
+        if (!vendor.is_active || vendor.payment_status !== 'active') {
+          return `❌ El negocio "${vendor.name}" no está disponible en este momento.\n\nPor favor elegí otro negocio de los disponibles.`;
+        }
+        
+        vendorId = vendor.id;
 
         // 🧹 Si el carrito es de otro negocio, vaciarlo
         if (context.cart.length > 0 && context.selected_vendor_id && vendorId !== context.selected_vendor_id) {
           console.log(`🗑️ Cambiaste de negocio: ${context.selected_vendor_id} → ${vendorId}. Vaciando carrito.`);
           context.cart = [];
-          context.selected_vendor_id = vendorId;
-          const { data: vendor } = await supabase.from("vendors").select("name").eq("id", vendorId).single();
-          context.selected_vendor_name = vendor?.name || "Negocio";
-        } else {
-          context.selected_vendor_id = vendorId;
         }
+        
+        // Actualizar vendor seleccionado (ya validado)
+        context.selected_vendor_id = vendorId;
+        context.selected_vendor_name = vendor.name;
 
         // Resolver productos
         const resolvedItems: CartItem[] = [];
@@ -1088,24 +1112,44 @@ async function ejecutarHerramienta(
           }
         }
 
-        // 🚫 Verificar si el usuario ya tiene un pedido activo
-        const { data: activeOrder } = await supabase
+        // 🚫 Verificar si el usuario ya tiene un pedido activo (SIEMPRE desde BD)
+        const { data: activeOrders } = await supabase
           .from("orders")
           .select("id, status, vendor_id")
           .eq("customer_phone", context.phone)
           .in("status", ["pending", "confirmed", "preparing", "ready", "delivering"])
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .order("created_at", { ascending: false });
 
-        if (activeOrder) {
-          const { data: vendor } = await supabase
-            .from("vendors")
-            .select("name")
-            .eq("id", activeOrder.vendor_id)
-            .single();
-
-          return `⚠️ Ya tenés un pedido en curso (#${activeOrder.id.substring(0, 8)}) con ${vendor?.name || "un negocio"} en estado "${activeOrder.status}".\n\nPor favor esperá a que se complete o cancele ese pedido antes de hacer uno nuevo.`;
+        if (activeOrders && activeOrders.length > 0) {
+          // Validar que el vendor del pedido activo todavía existe
+          const validActiveOrders = [];
+          
+          for (const order of activeOrders) {
+            const { data: vendor } = await supabase
+              .from("vendors")
+              .select("id, name, is_active")
+              .eq("id", order.vendor_id)
+              .maybeSingle();
+            
+            if (vendor && vendor.is_active) {
+              validActiveOrders.push({ ...order, vendor_name: vendor.name });
+            } else {
+              // El vendor ya no existe, cancelar pedido automáticamente
+              console.log(`⚠️ Vendor ${order.vendor_id} no longer exists, auto-cancelling order ${order.id}`);
+              await supabase
+                .from("orders")
+                .update({ 
+                  status: "cancelled",
+                  notes: "Pedido cancelado automáticamente: negocio ya no disponible"
+                })
+                .eq("id", order.id);
+            }
+          }
+          
+          if (validActiveOrders.length > 0) {
+            const order = validActiveOrders[0];
+            return `⚠️ Ya tenés un pedido en curso (#${order.id.substring(0, 8)}) con ${order.vendor_name} en estado "${order.status}".\n\nPor favor esperá a que se complete o cancele ese pedido antes de hacer uno nuevo.`;
+          }
         }
 
         // Validar que la dirección y método de pago estén presentes
@@ -2104,10 +2148,12 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     // Cargar contexto
     const context = await getContext(normalizedPhone, supabase);
     
-    // 🧹 LIMPIAR CONTEXTO si hay un pedido entregado o cancelado
+    // 🧹 LIMPIAR CONTEXTO si hay un pedido entregado/cancelado O si el vendor ya no existe
     if (context.selected_vendor_id || context.cart.length > 0) {
-      console.log('🔍 Checking if there are completed orders to clear context...');
+      console.log('🔍 Validating context data...');
+      let shouldClearContext = false;
       
+      // Verificar si hay pedidos completados
       const { data: completedOrders } = await supabase
         .from('orders')
         .select('id, status, created_at')
@@ -2117,10 +2163,27 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         .limit(1);
       
       if (completedOrders && completedOrders.length > 0) {
-        const completedOrder = completedOrders[0];
-        console.log(`✅ Found completed order: ${completedOrder.id} (${completedOrder.status})`);
+        console.log(`✅ Found completed order: ${completedOrders[0].id} (${completedOrders[0].status})`);
+        shouldClearContext = true;
+      }
+      
+      // Verificar si el vendor del contexto todavía existe y está activo
+      if (context.selected_vendor_id && !shouldClearContext) {
+        const { data: vendor } = await supabase
+          .from('vendors')
+          .select('id, name, is_active, payment_status')
+          .eq('id', context.selected_vendor_id)
+          .maybeSingle();
         
-        // Limpiar el carrito y vendor del contexto
+        if (!vendor || !vendor.is_active || vendor.payment_status !== 'active') {
+          console.log(`⚠️ Vendor in context no longer exists or is inactive: ${context.selected_vendor_id}`);
+          shouldClearContext = true;
+        }
+      }
+      
+      // Limpiar contexto si es necesario
+      if (shouldClearContext) {
+        console.log('🧹 Clearing context...');
         context.cart = [];
         context.selected_vendor_id = undefined;
         context.selected_vendor_name = undefined;
@@ -2129,7 +2192,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         context.pending_order_id = undefined;
         
         await saveContext(context, supabase);
-        console.log('🧹 Context cleared due to completed order');
+        console.log('✅ Context cleared');
       }
     }
     
