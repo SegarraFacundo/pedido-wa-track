@@ -247,14 +247,25 @@ export default function CommissionInvoiceGenerator() {
   const downloadPDF = async (invoiceId: string, invoiceNumber: string) => {
     try {
       setSendingInvoice(invoiceId);
-      const { data, error } = await supabase.functions.invoke('generate-invoice-pdf', {
-        body: { invoice_id: invoiceId }
-      });
+      
+      // Make a direct fetch call to get the PDF as blob
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(
+        `https://ilhpiarkmwdjvrfqhyhi.supabase.co/functions/v1/generate-invoice-pdf`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ invoice_id: invoiceId })
+        }
+      );
 
-      if (error) throw error;
+      if (!response.ok) throw new Error('Error al generar PDF');
 
-      // Create blob and download
-      const blob = new Blob([data], { type: 'application/pdf' });
+      // Get the PDF as blob
+      const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
