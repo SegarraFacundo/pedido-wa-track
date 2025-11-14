@@ -12,6 +12,8 @@ import SupportPanel from "@/components/admin/SupportPanel";
 import { PlatformReviewsPanel } from "@/components/admin/PlatformReviewsPanel";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { EvolutionConfig } from "@/components/EvolutionConfig";
+import AdminPaymentMetrics from "@/components/admin/AdminPaymentMetrics";
+import CommissionInvoiceGenerator from "@/components/admin/CommissionInvoiceGenerator";
 import lapachoLogo from "@/assets/lapacho-logo.png";
 import lapachoIcon from "@/assets/lapacho-icon.png";
 
@@ -97,30 +99,38 @@ export default function Admin() {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue="vendors" className="w-full">
-          <TabsList className="grid w-full grid-cols-6 mb-8">
+          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-8 mb-8">
             <TabsTrigger value="vendors">
               <Store className="mr-2 h-4 w-4" />
-              Negocios
+              <span className="hidden sm:inline">Negocios</span>
             </TabsTrigger>
             <TabsTrigger value="commissions">
               <DollarSign className="mr-2 h-4 w-4" />
-              Comisiones
+              <span className="hidden sm:inline">Comisiones</span>
+            </TabsTrigger>
+            <TabsTrigger value="metrics">
+              <BarChart3 className="mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">Métricas</span>
+            </TabsTrigger>
+            <TabsTrigger value="invoices">
+              <BarChart3 className="mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">Facturación</span>
             </TabsTrigger>
             <TabsTrigger value="reports">
               <BarChart3 className="mr-2 h-4 w-4" />
-              Reportes
+              <span className="hidden sm:inline">Reportes</span>
             </TabsTrigger>
             <TabsTrigger value="reviews">
               <Star className="mr-2 h-4 w-4" />
-              Reseñas
+              <span className="hidden sm:inline">Reseñas</span>
             </TabsTrigger>
             <TabsTrigger value="support">
               <Headphones className="mr-2 h-4 w-4" />
-              Soporte
+              <span className="hidden sm:inline">Soporte</span>
             </TabsTrigger>
-            <TabsTrigger value="ai">
+            <TabsTrigger value="evolution">
               <Bot className="mr-2 h-4 w-4" />
-              Agente IA
+              <span className="hidden sm:inline">Agente IA</span>
             </TabsTrigger>
           </TabsList>
 
@@ -130,6 +140,14 @@ export default function Admin() {
 
           <TabsContent value="commissions">
             <CommissionManagement />
+          </TabsContent>
+
+          <TabsContent value="metrics">
+            <AdminPaymentMetrics />
+          </TabsContent>
+
+          <TabsContent value="invoices">
+            <CommissionInvoiceGenerator />
           </TabsContent>
 
           <TabsContent value="reports">
@@ -144,7 +162,7 @@ export default function Admin() {
             <SupportPanel />
           </TabsContent>
 
-          <TabsContent value="ai">
+          <TabsContent value="evolution">
             <EvolutionConfig />
           </TabsContent>
         </Tabs>
