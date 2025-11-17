@@ -19,11 +19,13 @@ export async function getContext(phone: string, supabase: any): Promise<Conversa
       console.log("🛒 Cart items:", saved.cart?.length || 0);
       console.log("🏪 Vendor ID:", saved.selected_vendor_id);
       console.log("🏪 Vendor Name:", saved.selected_vendor_name);
+      console.log("🔄 Order State:", saved.order_state || "idle");
       console.log("📍 User location:", userLatitude && userLongitude ? `${userLatitude}, ${userLongitude}` : "Not set");
       
       return {
         phone,
         cart: saved.cart || [],
+        order_state: saved.order_state || "idle",
         selected_vendor_id: saved.selected_vendor_id,
         selected_vendor_name: saved.selected_vendor_name,
         delivery_address: saved.delivery_address,
@@ -44,6 +46,7 @@ export async function getContext(phone: string, supabase: any): Promise<Conversa
   return {
     phone,
     cart: [],
+    order_state: "idle",
     user_latitude: userLatitude,
     user_longitude: userLongitude,
     pending_location_decision: false,
@@ -58,6 +61,7 @@ export async function saveContext(context: ConversationContext, supabase: any): 
   }
 
   console.log("💾 ========== SAVING CONTEXT ==========");
+  console.log("🔄 Order State:", context.order_state || "idle");
   console.log("🏪 Vendor ID:", context.selected_vendor_id);
   console.log("📦 Cart preview:", context.cart.length === 0 ? "empty" : `${context.cart.length} items`);
   console.log("📍 Delivery address:", context.delivery_address);
