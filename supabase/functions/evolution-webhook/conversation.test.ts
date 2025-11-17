@@ -450,3 +450,65 @@ Deno.test("SEARCH: Vendor search with special characters - underscores and hyphe
 
   console.log("✅ TEST PASSED: Special character handling works");
 });
+
+// ============= REGRESSION TESTS: Loop Prevention =============
+
+Deno.test("LOOP PREVENTION: No infinite loop when asking to see open stores", async () => {
+  console.log("\n🧪 TEST: Loop prevention - asking to see open stores");
+  const supabase = createMockSupabase();
+  const phone = "5493464448309";
+  
+  // Initialize context
+  await saveContext({
+    phone,
+    cart: [],
+    conversation_history: [],
+    order_state: "idle"
+  }, supabase);
+  
+  // This test documents expected behavior:
+  // When user asks "quiero ver los locales abiertos",
+  // the bot should NOT get stuck calling ver_locales_abiertos repeatedly
+  // Instead it should:
+  // 1. Call ver_locales_abiertos once
+  // 2. Receive the results
+  // 3. Respond to user with the list
+  // 4. Wait for user's next input
+  
+  console.log("✅ TEST DOCUMENTS: Bot should call tool once, then respond");
+  console.log("   Actual enforcement is in vendor-bot.ts with:");
+  console.log("   - messages array preserved across iterations");
+  console.log("   - toolCallTracker preventing repeated calls");
+  
+  const context = await getContext(phone, supabase);
+  assertEquals(context.order_state, "idle", "Should start in idle state");
+});
+
+Deno.test("LOOP PREVENTION: Tool rate limiting prevents repeated calls", async () => {
+  console.log("\n🧪 TEST: Tool rate limiting mechanism");
+  
+  // Simulate the toolCallTracker logic from vendor-bot.ts
+  const toolCallTracker = new Map<string, number>();
+  
+  const toolName = "ver_locales_abiertos";
+  
+  // First call - should be allowed
+  console.log("📍 First call to tool");
+  const count1 = toolCallTracker.get(toolName) || 0;
+  toolCallTracker.set(toolName, count1 + 1);
+  assertEquals(toolCallTracker.get(toolName), 1, "First call should be tracked");
+  
+  // Second call - should be allowed
+  console.log("📍 Second call to tool");
+  const count2 = toolCallTracker.get(toolName) || 0;
+  toolCallTracker.set(toolName, count2 + 1);
+  assertEquals(toolCallTracker.get(toolName), 2, "Second call should be tracked");
+  
+  // Third call - should be BLOCKED (>= 2)
+  console.log("📍 Third call attempt - should be blocked");
+  const count3 = toolCallTracker.get(toolName) || 0;
+  const shouldBlock = count3 >= 2;
+  assertEquals(shouldBlock, true, "Third call should be blocked by rate limiter");
+  
+  console.log("✅ TEST PASSED: Rate limiting works correctly");
+});

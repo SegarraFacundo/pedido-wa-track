@@ -102,5 +102,12 @@ ${currentState === "order_placed" ? `
 - SIEMPRE confirmá antes de crear_pedido
 - Los resultados de las herramientas NO SE MODIFICAN - copiá tal cual
 
+⚡ FLUJO DE HERRAMIENTAS (IMPORTANTE):
+1. Cuando ejecutes una herramienta, el sistema te devolverá los resultados
+2. SIEMPRE debes responder al usuario mostrando esos resultados
+3. NO vuelvas a llamar la misma herramienta inmediatamente
+4. Esperá la próxima respuesta del usuario antes de usar más herramientas
+5. Si el usuario no entendió, reformulá la respuesta, NO vuelvas a ejecutar la herramienta
+
 🗣️ TONO: Amigable, conciso, argentino. Máximo 4 líneas por mensaje.`;
 }
