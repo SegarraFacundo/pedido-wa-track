@@ -76,6 +76,112 @@ export type Database = {
         }
         Relationships: []
       }
+      commission_invoice_items: {
+        Row: {
+          commission_id: string
+          created_at: string | null
+          id: string
+          invoice_id: string
+        }
+        Insert: {
+          commission_id: string
+          created_at?: string | null
+          id?: string
+          invoice_id: string
+        }
+        Update: {
+          commission_id?: string
+          created_at?: string | null
+          id?: string
+          invoice_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commission_invoice_items_commission_id_fkey"
+            columns: ["commission_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_commissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commission_invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "commission_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commission_invoices: {
+        Row: {
+          created_at: string | null
+          generated_at: string
+          id: string
+          invoice_number: string
+          notes: string | null
+          paid_at: string | null
+          payment_proof_url: string | null
+          period_end: string
+          period_start: string
+          status: string
+          total_amount: number
+          updated_at: string | null
+          vendor_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          generated_at?: string
+          id?: string
+          invoice_number: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_proof_url?: string | null
+          period_end: string
+          period_start: string
+          status?: string
+          total_amount?: number
+          updated_at?: string | null
+          vendor_id: string
+        }
+        Update: {
+          created_at?: string | null
+          generated_at?: string
+          id?: string
+          invoice_number?: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_proof_url?: string | null
+          period_end?: string
+          period_start?: string
+          status?: string
+          total_amount?: number
+          updated_at?: string | null
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commission_invoices_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "public_vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commission_invoices_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commission_invoices_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commission_settings: {
         Row: {
           commission_percentage: number | null
@@ -1682,6 +1788,7 @@ export type Database = {
         Returns: boolean
       }
       cleanup_old_sessions: { Args: never; Returns: number }
+      generate_invoice_number: { Args: never; Returns: string }
       get_masked_phone: { Args: { phone: string }; Returns: string }
       get_order_customer_details: {
         Args: { order_id_param: string }
