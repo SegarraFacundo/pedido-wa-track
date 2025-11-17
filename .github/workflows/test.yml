@@ -25,6 +25,9 @@ jobs:
       - name: Run context tests
         run: deno test supabase/functions/evolution-webhook/context.test.ts --allow-env
 
+      - name: Run conversation integration tests
+        run: deno test supabase/functions/evolution-webhook/conversation.test.ts --allow-env
+
       - name: Run all edge function tests
         run: deno test supabase/functions/evolution-webhook/ --allow-env
 
