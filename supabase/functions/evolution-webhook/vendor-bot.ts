@@ -573,7 +573,13 @@ async function ejecutarHerramienta(
         // Esta herramienta permite reemplazar el carrito completo
         // Útil para correcciones: "quiero 2 cocas y 1 alfajor"
         
+        console.log(`🔄 ========== MODIFYING CART COMPLETELY ==========`);
+        console.log(`   Current vendor: ${context.selected_vendor_name} (${context.selected_vendor_id})`);
+        console.log(`   Current cart items: ${context.cart.length}`);
+        console.log(`   Order state: ${context.order_state}`);
+        
         if (!context.selected_vendor_id) {
+          console.log(`❌ No vendor selected - cannot modify cart`);
           return "⚠️ Primero necesito que elijas un negocio.";
         }
 
@@ -620,6 +626,9 @@ async function ejecutarHerramienta(
           response += `• ${item.product_name} x${item.quantity} - $${item.price * item.quantity}\n`;
         });
         response += `\n💰 Total: $${total}\n\n¿Está correcto?`;
+        
+        console.log(`✅ Cart modified - Vendor preserved: ${context.selected_vendor_id}`);
+        console.log(`================================================`);
         
         return response;
       }
@@ -1935,16 +1944,23 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     const context = await getContext(normalizedPhone, supabase);
     
     // 🧹 LIMPIAR CONTEXTO si hay un pedido ACTIVO del mismo vendor O si el vendor ya no existe
+    // SOLO limpiamos si el usuario está en estados seguros (idle/order_placed)
+    // NO limpiamos si está en medio de un flujo activo
     if (context.selected_vendor_id || context.cart.length > 0) {
       console.log('🔍 Validating context data...');
       console.log(`   Current vendor: ${context.selected_vendor_id} (${context.selected_vendor_name})`);
       console.log(`   Cart items: ${context.cart.length}`);
       console.log(`   Order state: ${context.order_state}`);
+      console.log(`   Pending order: ${context.pending_order_id}`);
       let shouldClearContext = false;
       
       // Verificar si hay pedidos ACTIVOS del mismo vendor en las últimas 24h
-      // Solo limpiamos si hay un pedido activo (no completado) para evitar duplicados
-      if (context.selected_vendor_id) {
+      // SOLO limpiamos si el usuario está comenzando un nuevo flujo (idle/order_placed)
+      // NO limpiamos si está en medio de hacer un pedido
+      const safeStates = ['idle', 'order_placed'];
+      const isInSafeState = !context.order_state || safeStates.includes(context.order_state);
+      
+      if (context.selected_vendor_id && isInSafeState) {
         const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
         
         const { data: activeOrders, error: ordersError } = await supabase
@@ -1963,13 +1979,21 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         
         if (activeOrders && activeOrders.length > 0) {
           const activeOrder = activeOrders[0];
-          console.log(`⚠️ Found active order from same vendor: ${activeOrder.id} (${activeOrder.status})`);
-          console.log(`   Created: ${activeOrder.created_at}`);
-          console.log(`   This indicates a duplicate order attempt or abandoned order`);
-          shouldClearContext = true;
+          
+          // ⭐ EXCEPCIÓN: Si es el pedido que estamos procesando, NO limpiar
+          if (activeOrder.id !== context.pending_order_id) {
+            console.log(`⚠️ Found active order from same vendor: ${activeOrder.id} (${activeOrder.status})`);
+            console.log(`   Created: ${activeOrder.created_at}`);
+            console.log(`   This indicates a duplicate order attempt`);
+            shouldClearContext = true;
+          } else {
+            console.log(`✅ Active order found but it's the current pending order - OK`);
+          }
         } else {
-          console.log(`✅ No active orders found - OK to continue with current context`);
+          console.log(`✅ No active orders found - OK to continue`);
         }
+      } else if (context.selected_vendor_id && !isInSafeState) {
+        console.log(`⏭️ Skipping active order check - user is in active flow (${context.order_state})`);
       }
       
       // Verificar si el vendor del contexto todavía existe y está activo
@@ -1988,16 +2012,23 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       
       // Limpiar contexto si es necesario
       if (shouldClearContext) {
-        console.log('🧹 Clearing context...');
+        console.log('🧹 ========== CLEARING CONTEXT ==========');
+        console.log(`   Reason: Found duplicate active order`);
+        console.log(`   Current state: ${context.order_state}`);
+        console.log(`   Vendor: ${context.selected_vendor_name} (${context.selected_vendor_id})`);
+        console.log(`   Cart items: ${context.cart.length}`);
+        console.log('========================================');
+        
         context.cart = [];
         context.selected_vendor_id = undefined;
         context.selected_vendor_name = undefined;
         context.payment_method = undefined;
         context.delivery_address = undefined;
         context.pending_order_id = undefined;
+        context.order_state = 'idle';
         
         await saveContext(context, supabase);
-        console.log('✅ Context cleared');
+        console.log('✅ Context cleared - user can start fresh');
       }
     }
     
