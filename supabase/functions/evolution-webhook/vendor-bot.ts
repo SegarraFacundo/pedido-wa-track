@@ -1744,25 +1744,41 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     // Cargar contexto
     const context = await getContext(normalizedPhone, supabase);
     
-    // 🧹 LIMPIAR CONTEXTO si hay un pedido entregado/cancelado DEL MISMO VENDOR O si el vendor ya no existe
+    // 🧹 LIMPIAR CONTEXTO si hay un pedido ACTIVO del mismo vendor O si el vendor ya no existe
     if (context.selected_vendor_id || context.cart.length > 0) {
       console.log('🔍 Validating context data...');
+      console.log(`   Current vendor: ${context.selected_vendor_id} (${context.selected_vendor_name})`);
+      console.log(`   Cart items: ${context.cart.length}`);
+      console.log(`   Order state: ${context.order_state}`);
       let shouldClearContext = false;
       
-      // Verificar si hay pedidos completados DEL MISMO VENDOR
+      // Verificar si hay pedidos ACTIVOS del mismo vendor en las últimas 24h
+      // Solo limpiamos si hay un pedido activo (no completado) para evitar duplicados
       if (context.selected_vendor_id) {
-        const { data: completedOrders } = await supabase
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        
+        const { data: activeOrders, error: ordersError } = await supabase
           .from('orders')
           .select('id, status, created_at, vendor_id')
           .eq('customer_phone', normalizedPhone)
           .eq('vendor_id', context.selected_vendor_id)
-          .in('status', ['delivered', 'cancelled'])
+          .in('status', ['pending', 'preparing', 'ready', 'in_transit'])  // Solo pedidos activos
+          .gte('created_at', twentyFourHoursAgo)  // Solo últimas 24h
           .order('created_at', { ascending: false })
           .limit(1);
         
-        if (completedOrders && completedOrders.length > 0) {
-          console.log(`✅ Found completed order from same vendor: ${completedOrders[0].id} (${completedOrders[0].status})`);
+        if (ordersError) {
+          console.error('❌ Error checking active orders:', ordersError);
+        }
+        
+        if (activeOrders && activeOrders.length > 0) {
+          const activeOrder = activeOrders[0];
+          console.log(`⚠️ Found active order from same vendor: ${activeOrder.id} (${activeOrder.status})`);
+          console.log(`   Created: ${activeOrder.created_at}`);
+          console.log(`   This indicates a duplicate order attempt or abandoned order`);
           shouldClearContext = true;
+        } else {
+          console.log(`✅ No active orders found - OK to continue with current context`);
         }
       }
       

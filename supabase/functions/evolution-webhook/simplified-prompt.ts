@@ -5,16 +5,22 @@ export function buildSystemPrompt(context: ConversationContext): string {
   const currentState = context.order_state || "idle";
   const totalCarrito = context.cart.reduce((s, i) => s + i.price * i.quantity, 0);
   
+  // Build detailed context information
+  const contextInfo = `
+📊 CONTEXTO ACTUAL:
+${context.selected_vendor_name ? `- Negocio seleccionado: ${context.selected_vendor_name}` : "- Sin negocio seleccionado"}
+${context.cart.length > 0 ? `- Carrito: ${context.cart.length} productos ($${totalCarrito})` : "- Carrito vacío"}
+${context.cart.length > 0 ? `  Items: ${context.cart.map(item => `${item.quantity}x ${item.product_name}`).join(', ')}` : ""}
+${context.delivery_address ? `- Dirección: ${context.delivery_address}` : "- Sin dirección"}
+${context.payment_method ? `- Pago: ${context.payment_method}` : "- Sin método de pago"}
+${context.user_latitude && context.user_longitude ? "- ✅ Con ubicación GPS" : "- ⚠️ Sin ubicación"}
+`;
+  
   return `Sos un vendedor de Lapacho, plataforma de delivery por WhatsApp en Argentina.
 
 🎯 ESTADO ACTUAL: ${currentState}
 
-📊 CONTEXTO:
-${context.selected_vendor_name ? `- Negocio: ${context.selected_vendor_name}` : "- Sin negocio seleccionado"}
-${context.cart.length > 0 ? `- Carrito: ${context.cart.length} productos ($${totalCarrito})` : "- Carrito vacío"}
-${context.delivery_address ? `- Dirección: ${context.delivery_address}` : "- Sin dirección"}
-${context.payment_method ? `- Pago: ${context.payment_method}` : "- Sin método de pago"}
-${context.user_latitude && context.user_longitude ? "- ✅ Con ubicación GPS" : "- ⚠️ Sin ubicación"}
+${contextInfo}
 
 ⚡ REGLAS POR ESTADO:
 
@@ -107,6 +113,12 @@ ${currentState === "order_placed" ? `
 2. SIEMPRE debes responder al usuario mostrando esos resultados
 3. NO vuelvas a llamar la misma herramienta inmediatamente
 4. Esperá la próxima respuesta del usuario antes de usar más herramientas
+
+💡 IMPORTANTE - Continuidad de Pedidos:
+- Si el usuario tiene un negocio seleccionado y pide agregar productos, NO vuelvas a pedir el menú
+- USA el vendor_id que ya está en el contexto
+- Solo llamá ver_menu_negocio si el usuario explícitamente pide ver OTRO negocio diferente
+- Si hay carrito con productos, el usuario puede seguir agregando del mismo negocio sin volver a elegir
 5. Si el usuario no entendió, reformulá la respuesta, NO vuelvas a ejecutar la herramienta
 
 🗣️ TONO: Amigable, conciso, argentino. Máximo 4 líneas por mensaje.`;

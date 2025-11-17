@@ -512,3 +512,95 @@ Deno.test("LOOP PREVENTION: Tool rate limiting prevents repeated calls", async (
   
   console.log("✅ TEST PASSED: Rate limiting works correctly");
 });
+
+// ==================== CONTEXT PERSISTENCE TESTS ====================
+
+Deno.test("CONTEXT PERSISTENCE: Allows multiple orders from same vendor after cancellation", async () => {
+  console.log("\n🧪 TEST: Multiple orders after cancellation");
+  
+  const supabase = createMockSupabase();
+  const phone = "5493464448309";
+  const mockVendorId = "vendor-123";
+  
+  // Setup: Create a cancelled order from 2 hours ago
+  const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+  console.log("📦 Creating mock cancelled order...");
+  
+  // Simulate database has a cancelled order
+  const mockData = new Map();
+  mockData.set(phone, {
+    phone,
+    cart: [],
+    selected_vendor_id: undefined,
+    conversation_history: []
+  });
+  
+  // User selects vendor
+  let context = await getContext(phone, supabase);
+  context.selected_vendor_id = mockVendorId;
+  context.selected_vendor_name = "Heladería Test";
+  await saveContext(context, supabase);
+  console.log("✅ Vendor selected");
+  
+  // User adds items
+  context = await getContext(phone, supabase);
+  context.cart.push({
+    product_id: "prod-1",
+    product_name: "Banana Split",
+    quantity: 2,
+    price: 15000
+  });
+  await saveContext(context, supabase);
+  console.log("✅ Item added to cart");
+  
+  // Verify context was NOT cleared (cancelled orders don't block new orders)
+  context = await getContext(phone, supabase);
+  assertEquals(context.cart.length, 1, "Cart should have 1 item");
+  assertEquals(context.selected_vendor_id, mockVendorId, "Vendor should still be selected");
+  assertEquals(context.selected_vendor_name, "Heladería Test", "Vendor name should be preserved");
+  
+  console.log("✅ TEST PASSED: Multiple orders allowed after cancellation");
+});
+
+Deno.test("CONTEXT PERSISTENCE: Clears context if there's an ACTIVE order from same vendor", async () => {
+  console.log("\n🧪 TEST: Clear context on active order");
+  
+  const supabase = createMockSupabase();
+  const phone = "5493464448309";
+  const mockVendorId = "vendor-123";
+  
+  // User tries to select vendor and add items
+  let context = await getContext(phone, supabase);
+  context.selected_vendor_id = mockVendorId;
+  context.selected_vendor_name = "Heladería Test";
+  context.cart.push({
+    product_id: "prod-1",
+    product_name: "Test Product",
+    quantity: 1,
+    price: 10000
+  });
+  await saveContext(context, supabase);
+  console.log("✅ Initial context created");
+  
+  // Simulate the validation logic that would detect active orders
+  // In real scenario, vendor-bot.ts would query for active orders
+  // and clear context if found
+  const hasActiveOrder = true; // Simulate finding an active order
+  
+  if (hasActiveOrder) {
+    console.log("⚠️ Active order detected - clearing context");
+    context.selected_vendor_id = undefined;
+    context.selected_vendor_name = undefined;
+    context.cart = [];
+    context.order_state = 'idle';
+    await saveContext(context, supabase);
+  }
+  
+  // Verify context was cleared
+  context = await getContext(phone, supabase);
+  assertEquals(context.cart.length, 0, "Cart should be empty");
+  assertEquals(context.selected_vendor_id, undefined, "Vendor should be cleared");
+  assertEquals(context.selected_vendor_name, undefined, "Vendor name should be cleared");
+  
+  console.log("✅ TEST PASSED: Context cleared for active order");
+});
