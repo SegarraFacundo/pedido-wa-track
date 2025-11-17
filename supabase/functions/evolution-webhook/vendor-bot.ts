@@ -350,8 +350,10 @@ async function ejecutarHerramienta(
 
         console.log(`✅ Menu generated successfully with ${products.length} products`);
         
-        // 🚀 Después de mostrar el menú, habilitar agregar productos
+        // 🚀 STATE TRANSITION: viewing_menu → adding_items
+        const oldState = context.order_state || "idle";
         context.order_state = "adding_items";
+        console.log(`🔄 STATE TRANSITION: ${oldState} → adding_items (menu shown, ready to add products)`);
 
         // 💾 IMPORTANTE: Guardar el contexto después de seleccionar el negocio
         await saveContext(context, supabase);
@@ -1760,16 +1762,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       apiKey: Deno.env.get("OPENAI_API_KEY"),
     });
 
-    // 🎯 Prompt del sistema simplificado y basado en estados
-    const systemPrompt = buildSystemPrompt(context);
-
-    // Preparar mensajes para la API
-    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-      { role: "system", content: systemPrompt },
-      ...context.conversation_history.slice(-15), // Últimos 15 mensajes para no saturar
-    ];
-
-    console.log("🔄 Calling OpenAI with", messages.length, "messages...");
+    console.log("🔄 Starting conversation loop...");
 
     let continueLoop = true;
     let finalResponse = "";
@@ -1780,6 +1773,17 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     while (continueLoop && iterationCount < MAX_ITERATIONS) {
       iterationCount++;
       console.log(`🔁 Iteration ${iterationCount}...`);
+
+      // 🎯 CRÍTICO: Reconstruir system prompt en cada iteración
+      // Esto asegura que refleje el estado actualizado del contexto después de ejecutar herramientas
+      const systemPrompt = buildSystemPrompt(context);
+      console.log(`📋 System prompt built for state: ${context.order_state || "idle"}`);
+
+      // Preparar mensajes para la API (se reconstruyen en cada iteración)
+      const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+        { role: "system", content: systemPrompt },
+        ...context.conversation_history.slice(-15), // Últimos 15 mensajes para no saturar
+      ];
 
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
