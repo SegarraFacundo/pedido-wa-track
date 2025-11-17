@@ -369,14 +369,13 @@ async function ejecutarHerramienta(
           console.log(`   New vendor: ${vendor.name} (${vendor.id})`);
           console.log(`   Cart items: ${context.cart.length}`);
           
-          // Guardar el cambio pendiente
+          // Guardar el cambio pendiente (pero NO cambiar el estado)
           context.pending_vendor_change = {
             new_vendor_id: vendor.id,
             new_vendor_name: vendor.name
           };
           
-          // Cambiar a estado de confirmación
-          context.order_state = "confirming_vendor_change";
+          // Mantener el estado en "shopping" - el cambio se confirmará después
           await saveContext(context, supabase);
           
           const currentTotal = context.cart.reduce((s, i) => s + i.price * i.quantity, 0);
@@ -1918,6 +1917,48 @@ Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
   }
 }
 
+// ==================== HELPER FUNCTIONS ====================
+
+// Helper function para registrar analytics de cambio de vendor
+async function trackVendorChange(
+  context: ConversationContext,
+  action: 'confirmed' | 'cancelled',
+  supabase: any
+) {
+  try {
+    const hashPhone = async (phone: string): Promise<string> => {
+      const msgBuffer = new TextEncoder().encode(phone);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    };
+    
+    const phoneHash = await hashPhone(context.phone);
+    const cartTotal = context.cart.reduce((s, i) => s + i.price * i.quantity, 0);
+    
+    await supabase
+      .from('vendor_change_analytics')
+      .insert({
+        user_phone_hash: phoneHash,
+        action,
+        current_vendor_id: context.selected_vendor_id,
+        current_vendor_name: context.selected_vendor_name || 'Unknown',
+        pending_vendor_id: context.pending_vendor_change!.new_vendor_id,
+        pending_vendor_name: context.pending_vendor_change!.new_vendor_name,
+        cart_items_count: context.cart.length,
+        cart_total_amount: cartTotal,
+        order_state: context.order_state,
+        metadata: {
+          cart_items: context.cart.map(i => ({ name: i.product_name, qty: i.quantity }))
+        }
+      });
+    
+    console.log(`📊 Analytics: User ${action} vendor change`);
+  } catch (error) {
+    console.error('📊 Analytics error:', error);
+  }
+}
+
 // ==================== AGENTE PRINCIPAL ====================
 
 export async function handleVendorBot(message: string, phone: string, supabase: any, imageUrl?: string): Promise<string> {
@@ -2088,70 +2129,27 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     });
 
     // 🔄 MANEJO ESPECIAL: Confirmación de cambio de negocio
-    if (context.order_state === "confirming_vendor_change") {
-      const userResponse = userMessage.toLowerCase().trim();
-      
-      // Helper function to hash phone for analytics privacy
-      const hashPhone = async (phone: string): Promise<string> => {
-        const msgBuffer = new TextEncoder().encode(phone);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-      };
+    // Si hay un pending_vendor_change, el usuario debe confirmar sí/no
+    if (context.pending_vendor_change) {
+      const userResponse = message.toLowerCase().trim();
       
       // ✅ Usuario confirma el cambio
-      if (userResponse.match(/^(s[ií]|si|yes|dale|ok|confirmo|cambio|cambiar)/)) {
+      if (userResponse.match(/^(s[ií]|si|yes|dale|ok|confirmo|cambio)/)) {
         console.log(`✅ User confirmed vendor change`);
         
-        const oldVendor = context.selected_vendor_name;
-        const oldVendorId = context.selected_vendor_id;
-        const newVendor = context.pending_vendor_change!.new_vendor_name;
-        const newVendorId = context.pending_vendor_change!.new_vendor_id;
-        const cartTotal = context.cart.reduce((s, i) => s + i.price * i.quantity, 0);
-        const cartItemsCount = context.cart.length;
+        // Registrar analytics
+        await trackVendorChange(context, 'confirmed', supabase);
         
-        // 📊 Track analytics - Usuario CONFIRMÓ el cambio
-        try {
-          const phoneHash = await hashPhone(context.phone);
-          const { error: analyticsError } = await supabase
-            .from('vendor_change_analytics')
-            .insert({
-              user_phone_hash: phoneHash,
-              action: 'confirmed',
-              current_vendor_id: oldVendorId,
-              current_vendor_name: oldVendor || 'Unknown',
-              pending_vendor_id: newVendorId,
-              pending_vendor_name: newVendor,
-              cart_items_count: cartItemsCount,
-              cart_total_amount: cartTotal,
-              order_state: context.order_state,
-              metadata: {
-                cart_items: context.cart.map(i => ({ name: i.product_name, qty: i.quantity }))
-              }
-            });
-          
-          if (analyticsError) {
-            console.error('📊 Error tracking vendor change confirmation:', analyticsError);
-          } else {
-            console.log(`📊 Analytics tracked: User confirmed change from ${oldVendor} to ${newVendor}`);
-          }
-        } catch (error) {
-          console.error('📊 Error in analytics tracking:', error);
-        }
-        
-        // Vaciar carrito
+        // Aplicar cambio
         context.cart = [];
-        
-        // Aplicar cambio de negocio
-        context.selected_vendor_id = newVendorId;
-        context.selected_vendor_name = newVendor;
+        context.selected_vendor_id = context.pending_vendor_change.new_vendor_id;
+        context.selected_vendor_name = context.pending_vendor_change.new_vendor_name;
         context.pending_vendor_change = undefined;
         context.order_state = "shopping";
         
         await saveContext(context, supabase);
-        console.log(`✅ Vendor change applied: ${oldVendor} → ${newVendor}`);
         
-        // Forzar llamada a ver_menu_negocio
+        // Mostrar menú del nuevo negocio
         const menuResult = await ejecutarHerramienta(
           "ver_menu_negocio",
           { vendor_id: context.selected_vendor_id },
@@ -2159,65 +2157,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
           supabase
         );
         
-        // Agregar respuesta al historial
-        context.conversation_history.push({
-          role: "assistant",
-          content: `✅ Perfecto! Cambié tu pedido a *${newVendor}*.\n\n${menuResult}`
-        });
-        
-        return `✅ Perfecto! Cambié tu pedido a *${newVendor}*.\n\n${menuResult}`;
-      }
-      
-      // ❌ Usuario cancela el cambio
-      if (userResponse.match(/^(no|nop|cancel[ao]|mantene|qued[ao])/)) {
-        console.log(`❌ User cancelled vendor change`);
-        
-        const oldVendor = context.selected_vendor_name;
-        const oldVendorId = context.selected_vendor_id;
-        const pendingVendor = context.pending_vendor_change!.new_vendor_name;
-        const pendingVendorId = context.pending_vendor_change!.new_vendor_id;
-        const cartTotal = context.cart.reduce((s, i) => s + i.price * i.quantity, 0);
-        const cartItemsCount = context.cart.length;
-        
-        // 📊 Track analytics - Usuario CANCELÓ el cambio
-        try {
-          const phoneHash = await hashPhone(context.phone);
-          const { error: analyticsError } = await supabase
-            .from('vendor_change_analytics')
-            .insert({
-              user_phone_hash: phoneHash,
-              action: 'cancelled',
-              current_vendor_id: oldVendorId!,
-              current_vendor_name: oldVendor || 'Unknown',
-              pending_vendor_id: pendingVendorId,
-              pending_vendor_name: pendingVendor,
-              cart_items_count: cartItemsCount,
-              cart_total_amount: cartTotal,
-              order_state: context.order_state,
-              metadata: {
-                cart_items: context.cart.map(i => ({ name: i.product_name, qty: i.quantity }))
-              }
-            });
-          
-          if (analyticsError) {
-            console.error('📊 Error tracking vendor change cancellation:', analyticsError);
-          } else {
-            console.log(`📊 Analytics tracked: User cancelled change, kept ${oldVendor}`);
-          }
-        } catch (error) {
-          console.error('📊 Error in analytics tracking:', error);
-        }
-        
-        context.pending_vendor_change = undefined;
-        context.order_state = "shopping";
-        
-        await saveContext(context, supabase);
-        
-        const currentTotal = context.cart.reduce((s, i) => s + i.price * i.quantity, 0);
-        const response = `✅ Perfecto, mantenemos tu pedido de *${oldVendor}*.\n\n` +
-                        `🛒 Carrito actual: ${context.cart.length} productos ($${currentTotal})\n\n` +
-                        `¿Querés agregar algo más o ya confirmamos el pedido?`;
-        
+        const response = `✅ Perfecto! Cambié tu pedido a *${context.selected_vendor_name}*.\n\n${menuResult}`;
         context.conversation_history.push({
           role: "assistant",
           content: response
@@ -2226,8 +2166,27 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         return response;
       }
       
-      // Usuario no dio respuesta clara
-      const clarification = `No entendí tu respuesta. ¿Querés cambiar de negocio?\n\n✅ Responde "sí"\n❌ Responde "no"`;
+      // ❌ Usuario cancela el cambio
+      if (userResponse.match(/^(no|nop|cancel|mantene|qued)/)) {
+        console.log(`❌ User cancelled vendor change`);
+        
+        // Registrar analytics
+        await trackVendorChange(context, 'cancelled', supabase);
+        
+        context.pending_vendor_change = undefined;
+        await saveContext(context, supabase);
+        
+        const response = `👍 Perfecto, seguimos con tu pedido de *${context.selected_vendor_name}*.\n\n¿Qué más querés agregar?`;
+        context.conversation_history.push({
+          role: "assistant",
+          content: response
+        });
+        
+        return response;
+      }
+      
+      // Respuesta no clara, repetir pregunta
+      const clarification = `No entendí tu respuesta. ¿Querés cambiar a *${context.pending_vendor_change.new_vendor_name}*?\n\nRespondé *"sí"* para cambiar o *"no"* para mantener tu pedido actual de *${context.selected_vendor_name}*.`;
       context.conversation_history.push({
         role: "assistant",
         content: clarification

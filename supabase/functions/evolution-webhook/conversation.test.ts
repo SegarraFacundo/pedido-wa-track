@@ -239,14 +239,14 @@ Deno.test("EDGE CASE: User tries to change vendor with active cart - CONFIRM", a
     new_vendor_id: "vendor-b-uuid",
     new_vendor_name: "Burger King"
   };
-  context.order_state = "confirming_vendor_change";
+  // El estado se mantiene en "shopping", no cambia a un estado especial
   await saveContext(context, supabase);
-  console.log("✅ State changed to confirming_vendor_change");
+  console.log("✅ pending_vendor_change set, state remains in shopping");
   
   // 3. Usuario confirma el cambio
   console.log("\n📍 Step 3: User confirms vendor change");
   context = await getContext(phone, supabase);
-  assertEquals(context.order_state, "confirming_vendor_change");
+  assertEquals(context.pending_vendor_change !== undefined, true, "Should have pending vendor change");
   
   // Simular confirmación - vaciar carrito y cambiar vendor
   context.cart = []; // Se vacía
@@ -287,9 +287,9 @@ Deno.test("EDGE CASE: User tries to change vendor with active cart - CANCEL", as
     new_vendor_id: "vendor-b-uuid",
     new_vendor_name: "Burger King"
   };
-  context.order_state = "confirming_vendor_change";
+  // El estado se mantiene en "shopping"
   await saveContext(context, supabase);
-  console.log("✅ State set to confirming_vendor_change");
+  console.log("✅ pending_vendor_change set, state remains in shopping");
   
   // 2. Usuario cancela el cambio
   console.log("\n📍 Step 2: User cancels vendor change");
