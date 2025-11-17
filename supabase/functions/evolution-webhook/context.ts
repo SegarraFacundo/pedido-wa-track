@@ -16,10 +16,10 @@ export async function getContext(phone: string, supabase: any): Promise<Conversa
     try {
       const saved = JSON.parse(data.last_bot_message);
       console.log("✅ Context loaded from DB:");
+      console.log("🔄 Order State:", saved.order_state || "idle");
       console.log("🛒 Cart items:", saved.cart?.length || 0);
       console.log("🏪 Vendor ID:", saved.selected_vendor_id);
       console.log("🏪 Vendor Name:", saved.selected_vendor_name);
-      console.log("🔄 Order State:", saved.order_state || "idle");
       console.log("📍 User location:", userLatitude && userLongitude ? `${userLatitude}, ${userLongitude}` : "Not set");
       
       return {
@@ -42,7 +42,7 @@ export async function getContext(phone: string, supabase: any): Promise<Conversa
     }
   }
 
-  console.log("ℹ️ No context found, creating new context");
+  console.log("ℹ️ No context found, creating new context with state: idle");
   return {
     phone,
     cart: [],
