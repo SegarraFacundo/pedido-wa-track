@@ -1,6 +1,6 @@
 import type { ConversationContext } from "./types.ts";
 
-// Sistema de prompt simplificado basado en estados
+// Sistema de prompt simplificado con flujo de estados mejorado
 export function buildSystemPrompt(context: ConversationContext): string {
   const currentState = context.order_state || "idle";
   const totalCarrito = context.cart.reduce((s, i) => s + i.price * i.quantity, 0);
@@ -25,29 +25,30 @@ ${contextInfo}
 ⚡ REGLAS POR ESTADO:
 
 ${currentState === "idle" ? `
-📍 ESTADO: IDLE (Inicio)
+📍 ESTADO: IDLE (Inicio/Sin pedido activo)
 - Solo podés usar: buscar_productos, ver_locales_abiertos
 - El usuario debe elegir qué busca o ver locales disponibles
-- Responde de forma amigable y sugerí opciones
+- Responde de forma amigable y sugerí opciones populares
+- Después de mostrar locales/productos → cambiar a "browsing"
 ` : ""}
 
 ${currentState === "browsing" ? `
-🔍 ESTADO: BROWSING (Explorando)
+🔍 ESTADO: BROWSING (Explorando negocios)
 - El usuario está viendo negocios disponibles
 - Esperá que el usuario ELIJA UN NEGOCIO específico
 - SOLO DESPUÉS llamá ver_menu_negocio con el ID del negocio elegido
 - NO llames ver_menu_negocio hasta que el usuario elija
+- Una vez elegido → cambiar a "shopping"
 ` : ""}
 
-${currentState === "viewing_menu" ? `
-📋 ESTADO: VIEWING MENU (Viendo Menú)
-- Llamá ver_menu_negocio si todavía no lo hiciste
-- Mostrale el menú completo al usuario
-- Pasás a "adding_items" automáticamente después
-` : ""}
-
-  ${currentState === "adding_items" ? `
-🛒 ESTADO: ADDING ITEMS (Agregando al Carrito)
+${currentState === "shopping" ? `
+🛒 ESTADO: SHOPPING (Comprando/Armando pedido)
+Este estado maneja TODO el proceso de compra hasta que el usuario confirme:
+- Ver menú del negocio seleccionado
+- Agregar productos al carrito
+- Modificar cantidades
+- Revisar carrito
+- Cambiar de negocio (si quiere)
 
 ⚠️ IMPORTANTE: Solo llamá agregar_al_carrito UNA VEZ por cada petición del usuario
 - NO llames agregar_al_carrito múltiples veces para el mismo producto
@@ -56,78 +57,106 @@ ${currentState === "viewing_menu" ? `
 🔄 CORRECCIONES:
 - Si el usuario dice "me equivoqué", "quiero cambiar", "mejor quiero X" → USA modificar_carrito_completo
 - Ejemplo: "quiero 2 cocas y 1 alfajor" → modificar_carrito_completo({ items: [{ product_name: "coca cola", quantity: 2 }, { product_name: "alfajor", quantity: 1 }] })
-- NO intentes hacer múltiples llamadas a agregar/quitar para correcciones
 - La herramienta modificar_carrito_completo hace TODO en una sola operación
 
-- Después de agregar → Preguntá "¿Querés agregar algo más o confirmar el pedido?"
-- Si el usuario quiere más productos → Volvé a llamar agregar_al_carrito
-- Si el usuario confirma → Pasá a "reviewing_cart"
+🔄 CAMBIO DE NEGOCIO:
+- Si el usuario quiere cambiar de negocio con carrito activo → Preguntá si está seguro
+- Si confirma → Limpiar carrito y volver a "browsing"
+
+✅ CONFIRMAR PEDIDO:
+- Cuando el usuario diga "confirmar", "listo", "eso es todo" → Pedí dirección
+- Una vez tenga dirección → cambiar a "needs_address" o directamente a "checkout" si ya tiene dirección
 ` : ""}
 
-${currentState === "reviewing_cart" ? `
-✅ ESTADO: REVIEWING CART (Revisando)
-- Mostrá el resumen del carrito con ver_carrito
-- Preguntá si confirma o quiere cambiar algo
-- Si confirma → Pedí dirección de entrega
+${currentState === "needs_address" ? `
+📍 ESTADO: NEEDS ADDRESS (Necesita dirección)
+- Pedí al usuario que comparta su ubicación GPS usando el 📍 botón de WhatsApp
+- Alternativa: puede escribir su dirección manualmente
+- Una vez recibida la dirección → cambiar a "checkout"
+- Si quiere cambiar algo del pedido → volver a "shopping"
 ` : ""}
 
-${currentState === "collecting_address" ? `
-📍 ESTADO: COLLECTING ADDRESS (Pidiendo Dirección)
-- Pedí al usuario que comparta su ubicación GPS (📍 botón de WhatsApp)
-- Alternativa: dirección manual
-- Una vez recibida → Pedí método de pago
-` : ""}
+${currentState === "checkout" ? `
+💳 ESTADO: CHECKOUT (Procesando pago)
 
-${currentState === "collecting_payment" ? `
-💳 ESTADO: COLLECTING PAYMENT (Pidiendo Pago)
-
-🚨 REGLAS OBLIGATORIAS (NO NEGOCIABLES):
+🚨 REGLAS OBLIGATORIAS:
 1️⃣ PRIMERO: Llamá ver_metodos_pago - SIN EXCEPCIONES
-2️⃣ NUNCA preguntes "¿efectivo, transferencia o mercado pago?" sin haber llamado ver_metodos_pago primero
+2️⃣ NUNCA preguntes por métodos sin haber llamado ver_metodos_pago primero
 3️⃣ SOLO mostrá los métodos que ver_metodos_pago devuelva
 4️⃣ SI el usuario elige un método que NO está en la lista → rechazalo y mostrá las opciones reales
-5️⃣ Una vez que el usuario elija un método VÁLIDO → guardalo y pasá a "confirming_order"
+5️⃣ Una vez que el usuario elija un método VÁLIDO → llamá confirmar_pedido
+
+DESPUÉS DE CONFIRMAR:
+- El estado cambiará automáticamente según el método de pago:
+  • Efectivo → "order_pending_cash"
+  • Transferencia → "order_pending_transfer"
+  • MercadoPago → "order_pending_mp"
 
 ❌ PROHIBIDO:
 - Inventar métodos de pago
 - Asumir que todos los métodos están disponibles
-- Pasar a confirming_order sin un método válido
-- Llamar crear_pedido directamente
+- Llamar crear_pedido sin un método válido
 
 ✅ FLUJO CORRECTO:
 1. Llamar ver_metodos_pago
 2. Mostrar SOLO los métodos devueltos
 3. Esperar elección del usuario
 4. Validar que la elección está en la lista
-5. Guardar método y pasar a confirming_order
+5. Guardar método y llamar crear_pedido
+6. El sistema cambiará automáticamente al estado correspondiente según el pago
 ` : ""}
 
-${currentState === "confirming_order" ? `
-📝 ESTADO: CONFIRMING ORDER (Confirmando)
-- ⚠️ OBLIGATORIO: Mostrá resumen COMPLETO primero (negocio, productos, total, dirección, pago)
-- ⚠️ OBLIGATORIO: Preguntá explícitamente: "¿Confirmás el pedido?"
-- ⚠️ IMPORTANTE: NO llames crear_pedido hasta que el usuario responda "sí", "confirmo", "dale", etc.
-- Si el usuario responde SÍ → Entonces llamá crear_pedido
-- Si el usuario responde NO → Volvé a "reviewing_cart"
-- NUNCA llames crear_pedido automáticamente sin esperar respuesta del usuario
-` : ""}
-
-${currentState === "confirming_vendor_change" ? `
-🔄 ESTADO: CONFIRMING VENDOR CHANGE (Confirmando Cambio)
-- El usuario tiene carrito activo y quiere cambiar de negocio
-- DEBE confirmar si quiere vaciar el carrito actual
-- Si dice "sí"/"confirmo"/"dale" → vaciar_carrito + ver_menu_negocio con nuevo vendor
-- Si dice "no"/"cancelo" → mantener carrito actual, volver a "adding_items"
-- NO uses NINGUNA otra herramienta hasta que el usuario responda
-- Responde: Espera respuesta clara (sí/no)
-` : ""}
-
-${currentState === "order_placed" ? `
-✅ ESTADO: ORDER PLACED (Pedido Creado)
+${currentState === "order_pending_cash" ? `
+💵 ESTADO: ORDER PENDING CASH (Esperando pago en efectivo)
 - El pedido fue creado exitosamente
+- Pago en efectivo al momento de la entrega
 - Dale el número de seguimiento al usuario
-- Preguntá si necesita algo más
-- Si empieza nuevo pedido → Volvé a "idle"
+- Informá que debe pagar en efectivo cuando llegue el delivery
+- Si quiere hacer otro pedido → cambiar a "idle"
+` : ""}
+
+${currentState === "order_pending_transfer" ? `
+📱 ESTADO: ORDER PENDING TRANSFER (Esperando comprobante)
+- El pedido fue creado, esperando comprobante de transferencia
+- Dale los datos bancarios al usuario
+- Pedí que envíe el comprobante de transferencia
+- Una vez recibido el comprobante → cambiar a "order_confirmed"
+- Si quiere cancelar → cambiar a "order_cancelled"
+` : ""}
+
+${currentState === "order_pending_mp" ? `
+💳 ESTADO: ORDER PENDING MP (Esperando pago MercadoPago)
+- El pedido fue creado con link de pago de MercadoPago
+- Dale el link de pago al usuario
+- Esperá confirmación del pago por webhook
+- Una vez confirmado → cambiar a "order_confirmed"
+- Si quiere cancelar → cambiar a "order_cancelled"
+` : ""}
+
+${currentState === "order_confirmed" ? `
+✅ ESTADO: ORDER CONFIRMED (Pedido confirmado)
+- El pago fue validado exitosamente
+- El negocio está preparando el pedido
+- Informá al usuario que su pedido está en proceso
+- Dale tiempo estimado de entrega si está disponible
+- Si el pedido es entregado → cambiar a "order_completed"
+- Si quiere cancelar (aún es posible) → cambiar a "order_cancelled"
+` : ""}
+
+${currentState === "order_completed" ? `
+🎉 ESTADO: ORDER COMPLETED (Pedido entregado)
+- El pedido fue entregado exitosamente
+- Preguntá si todo estuvo bien
+- Sugerí dejar una reseña del negocio
+- Si quiere hacer nuevo pedido → cambiar a "idle"
+` : ""}
+
+${currentState === "order_cancelled" ? `
+❌ ESTADO: ORDER CANCELLED (Pedido cancelado)
+- El pedido fue cancelado
+- Explicá el motivo si está disponible
+- Preguntá si quiere hacer un nuevo pedido
+- Para nuevo pedido → cambiar a "idle"
 ` : ""}
 
 🔒 REGLAS CRÍTICAS:

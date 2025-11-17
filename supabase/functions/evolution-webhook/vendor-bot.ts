@@ -1,5 +1,6 @@
 import OpenAI from "https://esm.sh/openai@4.77.3";
 import type { ConversationContext, CartItem } from "./types.ts";
+import { getPendingStateForPayment } from "./types.ts";
 import { normalizeArgentinePhone } from "./utils.ts";
 import { getContext, saveContext } from "./context.ts";
 import { tools } from "./tools-definitions.ts";
@@ -423,10 +424,10 @@ async function ejecutarHerramienta(
 
         console.log(`✅ Menu generated successfully with ${products.length} products`);
         
-        // 🚀 STATE TRANSITION: viewing_menu → adding_items
+        // 🚀 STATE TRANSITION: browsing → shopping
         const oldState = context.order_state || "idle";
-        context.order_state = "adding_items";
-        console.log(`🔄 STATE TRANSITION: ${oldState} → adding_items (menu shown, ready to add products)`);
+        context.order_state = "shopping";
+        console.log(`🔄 STATE TRANSITION: ${oldState} → shopping (menu shown, ready to shop)`);
 
         // 💾 IMPORTANTE: Guardar el contexto después de seleccionar el negocio
         await saveContext(context, supabase);
@@ -446,16 +447,16 @@ async function ejecutarHerramienta(
           cart_items: context.cart.length,
         });
 
-        // 🔒 STATE VALIDATION: MUST be in "adding_items" state
-        if (context.order_state !== "adding_items") {
+        // 🔒 STATE VALIDATION: MUST be in "shopping" state
+        if (context.order_state !== "shopping") {
           console.error(`❌ INVALID STATE: Cannot add to cart in state "${context.order_state}"`);
           return `⚠️ Para agregar productos, primero necesito mostrarte el menú.\n\n¿De qué negocio querés ver el menú?`;
         }
 
         // ⚠️ VALIDACIÓN CRÍTICA: No se puede agregar sin vendor seleccionado
         if (!context.selected_vendor_id) {
-          console.error(`❌ CRITICAL: No selected_vendor_id in context despite being in adding_items state`);
-          context.order_state = "viewing_menu";
+          console.error(`❌ CRITICAL: No selected_vendor_id in context despite being in shopping state`);
+          context.order_state = "shopping";
           await saveContext(context, supabase);
           return `⚠️ Necesito que elijas un negocio primero. ¿Cuál negocio te interesa?`;
         }
@@ -958,14 +959,27 @@ async function ejecutarHerramienta(
         confirmacion += `📍 Dirección: ${context.delivery_address}\n`;
         confirmacion += `💳 Pago: ${context.payment_method}\n\n`;
 
-        if (context.payment_method === "transferencia") {
+        // 🔄 STATE TRANSITION: Asignar estado según método de pago
+        const newState = getPendingStateForPayment(context.payment_method);
+        const oldState = context.order_state || "checkout";
+        context.order_state = newState;
+        console.log(`🔄 STATE TRANSITION: ${oldState} → ${newState} (order created with ${context.payment_method})`);
+
+        if (context.payment_method.toLowerCase().includes("transferencia")) {
+          confirmacion += `📱 *Datos para transferencia:*\n\n`;
           confirmacion += `Por favor enviá el comprobante de pago para confirmar el pedido.`;
+        } else if (context.payment_method.toLowerCase().includes("efectivo")) {
+          confirmacion += `💵 Pagás en efectivo al recibir el pedido.\n\n`;
+          confirmacion += `El delivery te contactará pronto. 🚚`;
+        } else if (context.payment_method.toLowerCase().includes("mercadopago")) {
+          // TODO: Aquí se podría generar el link de pago de MercadoPago si está configurado
+          confirmacion += `💳 Link de pago de MercadoPago será enviado próximamente.`;
         }
 
         // Limpiar carrito después de crear pedido
         context.cart = [];
         context.last_order_id = order.id;
-        await updateContext(context.phone, context, supabase);
+        await saveContext(context, supabase);
 
         return confirmacion;
       }
@@ -1955,9 +1969,9 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       let shouldClearContext = false;
       
       // Verificar si hay pedidos ACTIVOS del mismo vendor en las últimas 24h
-      // SOLO limpiamos si el usuario está comenzando un nuevo flujo (idle/order_placed)
+      // SOLO limpiamos si el usuario está comenzando un nuevo flujo (idle/order_completed/order_cancelled)
       // NO limpiamos si está en medio de hacer un pedido
-      const safeStates = ['idle', 'order_placed'];
+      const safeStates = ['idle', 'order_completed', 'order_cancelled'];
       const isInSafeState = !context.order_state || safeStates.includes(context.order_state);
       
       if (context.selected_vendor_id && isInSafeState) {
@@ -2132,7 +2146,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         context.selected_vendor_id = newVendorId;
         context.selected_vendor_name = newVendor;
         context.pending_vendor_change = undefined;
-        context.order_state = "viewing_menu";
+        context.order_state = "shopping";
         
         await saveContext(context, supabase);
         console.log(`✅ Vendor change applied: ${oldVendor} → ${newVendor}`);
@@ -2195,7 +2209,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         }
         
         context.pending_vendor_change = undefined;
-        context.order_state = "adding_items";
+        context.order_state = "shopping";
         
         await saveContext(context, supabase);
         
