@@ -9,6 +9,7 @@ export type OrderState =
   | "collecting_address"// Pidiendo dirección
   | "collecting_payment"// Pidiendo método de pago
   | "confirming_order"  // Confirmación final
+  | "confirming_vendor_change" // Confirmando cambio de negocio con carrito activo
   | "order_placed";     // Pedido creado exitosamente
 
 export interface CartItem {
@@ -31,5 +32,9 @@ export interface ConversationContext {
   user_latitude?: number;
   user_longitude?: number;
   pending_location_decision?: boolean;
+  pending_vendor_change?: {
+    new_vendor_id: string;
+    new_vendor_name: string;
+  };
   conversation_history: Array<{ role: "user" | "assistant" | "system"; content: string }>;
 }

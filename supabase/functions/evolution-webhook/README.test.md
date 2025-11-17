@@ -128,3 +128,50 @@ Cuando agregues nuevas funciones:
 3. Usa `Deno.test()` para cada caso de prueba
 4. Mockea dependencias externas (Supabase, APIs)
 5. Actualiza este README
+
+---
+
+## Flujo de Cambio de Negocio con Carrito Activo
+
+**Escenario**: Usuario tiene productos en el carrito de un negocio y quiere ver el menú de otro negocio.
+
+**Flujo correcto**:
+1. **Usuario**: "Quiero ver Burger King"
+2. **Bot detecta**: Carrito activo de "Pizzería A" con 2 productos ($1000)
+3. **Bot pregunta**: 
+   ```
+   ⚠️ Atención
+   
+   Tenés 2 productos en el carrito de Pizzería A (Total: $1000).
+   
+   Si cambias a Burger King, se vaciará tu carrito actual.
+   
+   ¿Querés cambiar de negocio?
+   ✅ Responde "sí" para cambiar
+   ❌ Responde "no" para quedarte con tu pedido actual
+   ```
+4. **Opción A - Usuario confirma**: "Sí"
+   - Bot vacía el carrito
+   - Bot muestra menú de Burger King
+   - Estado: `confirming_vendor_change` → `viewing_menu`
+   
+5. **Opción B - Usuario cancela**: "No"
+   - Bot mantiene el carrito de Pizzería A
+   - Bot confirma: "✅ Perfecto, mantenemos tu pedido de Pizzería A"
+   - Estado: `confirming_vendor_change` → `adding_items`
+
+**Estados involucrados**:
+- `adding_items` → `confirming_vendor_change` → `viewing_menu` (si confirma)
+- `adding_items` → `confirming_vendor_change` → `adding_items` (si cancela)
+
+**Validaciones implementadas**:
+- ✅ Detección temprana en `ver_menu_negocio`
+- ✅ Confirmación explícita del usuario
+- ✅ Preservación del carrito si cancela
+- ✅ Limpieza segura del carrito si confirma
+- ✅ Validación de seguridad en `agregar_al_carrito` para detectar estados inconsistentes
+
+**Tests relacionados**:
+- `EDGE CASE: User tries to change vendor with active cart - CONFIRM`
+- `EDGE CASE: User tries to change vendor with active cart - CANCEL`
+- `EDGE CASE: No confirmation needed when cart is empty`

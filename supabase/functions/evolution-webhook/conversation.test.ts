@@ -210,3 +210,138 @@ Deno.test("INTEGRATION: Cart should clear when starting new order", async () => 
 
   console.log("✅ TEST PASSED: Cart cleared successfully for new order");
 });
+
+Deno.test("EDGE CASE: User tries to change vendor with active cart - CONFIRM", async () => {
+  const supabase = createMockSupabase();
+  const phone = "+5491112345678";
+  
+  console.log("\n🧪 TEST: Vendor change with cart - User CONFIRMS");
+  
+  // 1. Usuario selecciona Vendor A y agrega productos
+  console.log("\n📍 Step 1: User adds items to cart from Vendor A");
+  let context = await getContext(phone, supabase);
+  context.selected_vendor_id = "vendor-a-uuid";
+  context.selected_vendor_name = "Pizzería A";
+  context.order_state = "adding_items";
+  context.cart = [
+    { product_id: "pizza-1", product_name: "Pizza Napolitana", quantity: 2, price: 500 }
+  ];
+  await saveContext(context, supabase);
+  console.log("✅ Cart created with 1 item from Vendor A");
+  
+  // 2. Usuario intenta ver menú de Vendor B - debería pedir confirmación
+  console.log("\n📍 Step 2: User tries to view menu of Vendor B");
+  context = await getContext(phone, supabase);
+  assertEquals(context.cart.length, 1, "Cart should still have items");
+  
+  // Simular detección de cambio de vendor y pedir confirmación
+  context.pending_vendor_change = {
+    new_vendor_id: "vendor-b-uuid",
+    new_vendor_name: "Burger King"
+  };
+  context.order_state = "confirming_vendor_change";
+  await saveContext(context, supabase);
+  console.log("✅ State changed to confirming_vendor_change");
+  
+  // 3. Usuario confirma el cambio
+  console.log("\n📍 Step 3: User confirms vendor change");
+  context = await getContext(phone, supabase);
+  assertEquals(context.order_state, "confirming_vendor_change");
+  
+  // Simular confirmación - vaciar carrito y cambiar vendor
+  context.cart = []; // Se vacía
+  context.selected_vendor_id = "vendor-b-uuid";
+  context.selected_vendor_name = "Burger King";
+  context.pending_vendor_change = undefined;
+  context.order_state = "viewing_menu";
+  await saveContext(context, supabase);
+  console.log("✅ Vendor changed, cart cleared");
+  
+  // 4. Verificar estado final
+  console.log("\n📍 Step 4: Verify final state");
+  context = await getContext(phone, supabase);
+  assertEquals(context.cart.length, 0, "Cart should be empty after confirmation");
+  assertEquals(context.selected_vendor_id, "vendor-b-uuid", "Vendor should change to B");
+  assertEquals(context.selected_vendor_name, "Burger King");
+  assertEquals(context.order_state, "viewing_menu");
+  assertEquals(context.pending_vendor_change, undefined);
+  console.log("✅ All assertions passed");
+});
+
+Deno.test("EDGE CASE: User tries to change vendor with active cart - CANCEL", async () => {
+  const supabase = createMockSupabase();
+  const phone = "+5491112345678";
+  
+  console.log("\n🧪 TEST: Vendor change with cart - User CANCELS");
+  
+  // 1. Setup: carrito activo con vendor A
+  console.log("\n📍 Step 1: Setup cart with Vendor A");
+  let context = await getContext(phone, supabase);
+  context.selected_vendor_id = "vendor-a-uuid";
+  context.selected_vendor_name = "Pizzería A";
+  context.order_state = "adding_items";
+  context.cart = [
+    { product_id: "pizza-1", product_name: "Pizza Napolitana", quantity: 2, price: 500 }
+  ];
+  context.pending_vendor_change = {
+    new_vendor_id: "vendor-b-uuid",
+    new_vendor_name: "Burger King"
+  };
+  context.order_state = "confirming_vendor_change";
+  await saveContext(context, supabase);
+  console.log("✅ State set to confirming_vendor_change");
+  
+  // 2. Usuario cancela el cambio
+  console.log("\n📍 Step 2: User cancels vendor change");
+  context = await getContext(phone, supabase);
+  context.pending_vendor_change = undefined;
+  context.order_state = "adding_items";
+  await saveContext(context, supabase);
+  console.log("✅ Vendor change cancelled");
+  
+  // 3. Verificar que el carrito se mantuvo
+  console.log("\n📍 Step 3: Verify cart preserved");
+  context = await getContext(phone, supabase);
+  assertEquals(context.cart.length, 1, "Cart should be preserved");
+  assertEquals(context.cart[0].product_name, "Pizza Napolitana");
+  assertEquals(context.selected_vendor_id, "vendor-a-uuid", "Vendor should not change");
+  assertEquals(context.selected_vendor_name, "Pizzería A");
+  assertEquals(context.order_state, "adding_items");
+  assertEquals(context.pending_vendor_change, undefined);
+  console.log("✅ All assertions passed - cart and vendor preserved");
+});
+
+Deno.test("EDGE CASE: No confirmation needed when cart is empty", async () => {
+  const supabase = createMockSupabase();
+  const phone = "+5491112345678";
+  
+  console.log("\n🧪 TEST: Change vendor with empty cart - No confirmation");
+  
+  // 1. Usuario selecciona Vendor A (sin agregar productos)
+  console.log("\n📍 Step 1: Select Vendor A with empty cart");
+  let context = await getContext(phone, supabase);
+  context.selected_vendor_id = "vendor-a-uuid";
+  context.selected_vendor_name = "Pizzería A";
+  context.order_state = "viewing_menu";
+  context.cart = []; // Carrito vacío
+  await saveContext(context, supabase);
+  console.log("✅ Vendor A selected, cart empty");
+  
+  // 2. Usuario cambia a Vendor B - NO debería pedir confirmación
+  console.log("\n📍 Step 2: Change to Vendor B (should work directly)");
+  context = await getContext(phone, supabase);
+  context.selected_vendor_id = "vendor-b-uuid";
+  context.selected_vendor_name = "Burger King";
+  context.order_state = "viewing_menu";
+  await saveContext(context, supabase);
+  console.log("✅ Vendor changed directly without confirmation");
+  
+  // 3. Verificar estado final
+  console.log("\n📍 Step 3: Verify final state");
+  context = await getContext(phone, supabase);
+  assertEquals(context.selected_vendor_id, "vendor-b-uuid");
+  assertEquals(context.selected_vendor_name, "Burger King");
+  assertEquals(context.cart.length, 0);
+  assertEquals(context.pending_vendor_change, undefined, "Should not have pending change");
+  console.log("✅ All assertions passed");
+});

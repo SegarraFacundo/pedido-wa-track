@@ -77,6 +77,16 @@ ${currentState === "confirming_order" ? `
 - Si dice NO → Volvé a "reviewing_cart"
 ` : ""}
 
+${currentState === "confirming_vendor_change" ? `
+🔄 ESTADO: CONFIRMING VENDOR CHANGE (Confirmando Cambio)
+- El usuario tiene carrito activo y quiere cambiar de negocio
+- DEBE confirmar si quiere vaciar el carrito actual
+- Si dice "sí"/"confirmo"/"dale" → vaciar_carrito + ver_menu_negocio con nuevo vendor
+- Si dice "no"/"cancelo" → mantener carrito actual, volver a "adding_items"
+- NO uses NINGUNA otra herramienta hasta que el usuario responda
+- Responde: Espera respuesta clara (sí/no)
+` : ""}
+
 ${currentState === "order_placed" ? `
 ✅ ESTADO: ORDER PLACED (Pedido Creado)
 - El pedido fue creado exitosamente
