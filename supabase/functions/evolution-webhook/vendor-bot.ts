@@ -1134,15 +1134,18 @@ async function ejecutarHerramienta(
 
         const paymentSettings = vendor.payment_settings || {};
         const metodosDisponibles: string[] = [];
+        const availableKeys: string[] = []; // ⭐ Para guardar las keys en el contexto
         let datosTransferencia = "";
 
         // Verificar cada método
         if (paymentSettings.efectivo === true) {
           metodosDisponibles.push("- Efectivo 💵");
+          availableKeys.push("efectivo");
         }
 
         if (paymentSettings.transferencia?.activo === true) {
           metodosDisponibles.push("- Transferencia bancaria 🏦");
+          availableKeys.push("transferencia");
           
           // Agregar datos de transferencia si están disponibles
           const { alias, cbu, titular } = paymentSettings.transferencia;
@@ -1156,11 +1159,17 @@ async function ejecutarHerramienta(
 
         if (paymentSettings.mercadoPago?.activo === true) {
           metodosDisponibles.push("- MercadoPago 💳");
+          availableKeys.push("mercadopago");
         }
 
         if (metodosDisponibles.length === 0) {
           return `⚠️ ${vendor.name} todavía no configuró métodos de pago. Por favor contactá directamente con el negocio.`;
         }
+
+        // ⭐ GUARDAR EN CONTEXTO
+        context.payment_methods_fetched = true;
+        context.available_payment_methods = availableKeys;
+        console.log(`✅ Payment methods saved to context: ${availableKeys.join(", ")}`);
 
         const textoMetodos = metodosDisponibles.length === 1 
           ? "Tenés disponible el siguiente método de pago:"
