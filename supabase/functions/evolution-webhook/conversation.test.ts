@@ -1275,3 +1275,75 @@ Deno.test("PAYMENT VALIDATION: Context stores correct payment keys", async () =>
   
   console.log("✅ TEST PASSED: Payment method keys stored correctly");
 });
+
+test("CONTEXT PRESERVATION: No debe borrar vendor_id durante correcciones de carrito", async () => {
+  const context = createTestContext("5493464448309");
+  context.selected_vendor_id = mockVendorId;
+  context.selected_vendor_name = "Test Vendor";
+  context.order_state = "adding_items";
+  context.cart = [
+    { product_id: "uuid-1", product_name: "Coca Cola", quantity: 1, price: 2500 }
+  ];
+  
+  // Simular que hay un pedido activo reciente
+  const mockSupabaseWithActiveOrder = createMockSupabase();
+  const originalFrom = mockSupabaseWithActiveOrder.from;
+  
+  mockSupabaseWithActiveOrder.from = (table: string) => {
+    if (table === "orders") {
+      return {
+        select: () => ({
+          eq: (col: string, val: any) => {
+            if (col === "customer_phone") {
+              return {
+                eq: (col2: string, val2: any) => {
+                  if (col2 === "vendor_id") {
+                    return {
+                      in: () => ({
+                        gte: () => ({
+                          order: () => ({
+                            limit: () => Promise.resolve({
+                              data: [{ 
+                                id: "order-123", 
+                                status: "pending", 
+                                created_at: new Date().toISOString(),
+                                vendor_id: mockVendorId
+                              }],
+                              error: null
+                            })
+                          })
+                        })
+                      })
+                    };
+                  }
+                  return { in: () => ({}) };
+                }
+              };
+            }
+            return { eq: () => ({}) };
+          }
+        })
+      };
+    }
+    return originalFrom(table);
+  };
+  
+  // Usuario corrige el carrito
+  const response = await ejecutarHerramienta(
+    "modificar_carrito_completo",
+    {
+      items: [
+        { product_name: "coca cola", quantity: 2 }
+      ]
+    },
+    context,
+    mockSupabaseWithActiveOrder
+  );
+  
+  // ✅ El vendor_id DEBE estar preservado porque el usuario está en "adding_items"
+  assertEquals(context.selected_vendor_id, mockVendorId, "Vendor ID should be preserved during cart correction");
+  assertEquals(context.selected_vendor_name, "Test Vendor", "Vendor name should be preserved");
+  assertEquals(context.order_state, "adding_items", "Order state should remain adding_items");
+  
+  console.log("✅ TEST PASSED: Vendor ID preserved during cart correction with active order");
+});
