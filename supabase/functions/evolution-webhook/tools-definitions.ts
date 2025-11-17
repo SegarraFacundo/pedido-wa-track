@@ -64,6 +64,37 @@ su ID exacto, primero llamá a ver_locales_abiertos para obtener la lista con ID
   {
     type: "function",
     function: {
+      name: "modificar_carrito_completo",
+      description: "Reemplaza el carrito completo con los productos especificados. USAR SOLO cuando el usuario dice 'me equivoqué', 'quiero cambiar todo' o hace correcciones significativas. Más eficiente que agregar/quitar productos uno por uno.",
+      parameters: {
+        type: "object",
+        properties: {
+          items: {
+            type: "array",
+            description: "Array de productos con sus cantidades finales (no incrementales)",
+            items: {
+              type: "object",
+              properties: {
+                product_name: {
+                  type: "string",
+                  description: "Nombre del producto (ej: 'coca cola', 'alfajor')",
+                },
+                quantity: {
+                  type: "number",
+                  description: "Cantidad TOTAL deseada (no cuánto agregar/quitar)",
+                },
+              },
+              required: ["product_name", "quantity"],
+            },
+          },
+        },
+        required: ["items"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "agregar_al_carrito",
       description:
         "Agrega uno o más productos al carrito del cliente. ⚠️ CRÍTICO: SOLO usar si ya llamaste a ver_menu_negocio antes para mostrar el menú REAL. Si no hay selected_vendor_id en el contexto, PRIMERO debes llamar ver_menu_negocio. Usa el nombre exacto del producto tal como aparece en el menú mostrado.",

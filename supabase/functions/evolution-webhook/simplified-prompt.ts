@@ -46,12 +46,19 @@ ${currentState === "viewing_menu" ? `
 - Pasás a "adding_items" automáticamente después
 ` : ""}
 
-${currentState === "adding_items" ? `
+  ${currentState === "adding_items" ? `
 🛒 ESTADO: ADDING ITEMS (Agregando al Carrito)
-- ⚠️ IMPORTANTE: Solo llamá agregar_al_carrito UNA VEZ por cada petición del usuario
+
+⚠️ IMPORTANTE: Solo llamá agregar_al_carrito UNA VEZ por cada petición del usuario
 - NO llames agregar_al_carrito múltiples veces para el mismo producto
-- El usuario dice "dame una coca" → Llamá agregar_al_carrito({ items: [{ product_name: "coca cola", quantity: 1, ... }] }) UNA SOLA VEZ
-- Si el usuario pide múltiples cosas en un mensaje → Podés incluirlas todas en UN SOLO llamado a agregar_al_carrito
+- El usuario dice "dame una coca" → Llamá agregar_al_carrito UNA SOLA VEZ
+
+🔄 CORRECCIONES:
+- Si el usuario dice "me equivoqué", "quiero cambiar", "mejor quiero X" → USA modificar_carrito_completo
+- Ejemplo: "quiero 2 cocas y 1 alfajor" → modificar_carrito_completo({ items: [{ product_name: "coca cola", quantity: 2 }, { product_name: "alfajor", quantity: 1 }] })
+- NO intentes hacer múltiples llamadas a agregar/quitar para correcciones
+- La herramienta modificar_carrito_completo hace TODO en una sola operación
+
 - Después de agregar → Preguntá "¿Querés agregar algo más o confirmar el pedido?"
 - Si el usuario quiere más productos → Volvé a llamar agregar_al_carrito
 - Si el usuario confirma → Pasá a "reviewing_cart"
