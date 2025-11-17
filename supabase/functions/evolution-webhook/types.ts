@@ -29,6 +29,7 @@ export interface ConversationContext {
   payment_method?: string;
   payment_receipt_url?: string;
   pending_order_id?: string;
+  last_order_id?: string;
   user_latitude?: number;
   user_longitude?: number;
   pending_location_decision?: boolean;

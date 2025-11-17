@@ -869,6 +869,8 @@ async function ejecutarHerramienta(
 
         // Limpiar carrito después de crear pedido
         context.cart = [];
+        context.last_order_id = order.id;
+        await updateContext(context.phone, context, supabase);
 
         return confirmacion;
       }
@@ -978,14 +980,67 @@ async function ejecutarHerramienta(
           return "Por favor proporciona un motivo detallado para la cancelación (mínimo 10 caracteres).";
         }
 
+        let orderId = args.order_id;
+        
+        // Si no se proporcionó order_id, usar el último pedido del contexto
+        if (!orderId && context.last_order_id) {
+          console.log(`📦 Using last_order_id from context: ${context.last_order_id}`);
+          orderId = context.last_order_id;
+        }
+        
+        // Si no hay order_id, buscar el último pedido del usuario
+        if (!orderId) {
+          console.log(`🔍 No order_id provided, searching for user's most recent order`);
+          const { data: recentOrders, error: searchError } = await supabase
+            .from("orders")
+            .select("id, status, created_at")
+            .eq("customer_phone", context.phone)
+            .in("status", ["pending", "preparing", "confirmed"])
+            .order("created_at", { ascending: false })
+            .limit(1);
+          
+          if (searchError || !recentOrders || recentOrders.length === 0) {
+            console.warn(`❌ No recent active orders found for ${context.phone}`);
+            return "No encontré ningún pedido activo para cancelar. ¿Podrías verificar el número de pedido?";
+          }
+          
+          orderId = recentOrders[0].id;
+          console.log(`✅ Found recent order: ${orderId}`);
+        }
+        
+        // Si es un ID corto (8 caracteres), buscar por coincidencia parcial
+        if (orderId && orderId.length === 8) {
+          console.log(`🔍 Short ID provided (${orderId}), searching by prefix`);
+          const { data: matchingOrders, error: prefixError } = await supabase
+            .from("orders")
+            .select("id")
+            .eq("customer_phone", context.phone)
+            .ilike("id", `${orderId}%`)
+            .limit(1);
+          
+          if (prefixError || !matchingOrders || matchingOrders.length === 0) {
+            return `No encontré un pedido con ID #${orderId}`;
+          }
+          
+          orderId = matchingOrders[0].id;
+          console.log(`✅ Matched partial ID to full UUID: ${orderId}`);
+        }
+
         const { data: order, error: fetchError } = await supabase
           .from("orders")
           .select("*")
-          .eq("id", args.order_id)
+          .eq("id", orderId)
           .single();
 
         if (fetchError || !order) {
-          return "No encontré ese pedido.";
+          console.error(`❌ Order not found: ${orderId}`, fetchError);
+          return "No encontré ese pedido. Por favor verificá el número de pedido.";
+        }
+
+        // Verificar que el pedido pertenece al usuario
+        if (order.customer_phone !== context.phone) {
+          console.warn(`⚠️ Order ${orderId} does not belong to ${context.phone}`);
+          return "Este pedido no te pertenece.";
         }
 
         if (order.status === "cancelled") {
@@ -999,7 +1054,7 @@ async function ejecutarHerramienta(
         const { error: updateError } = await supabase
           .from("orders")
           .update({ status: "cancelled" })
-          .eq("id", args.order_id);
+          .eq("id", orderId);
 
         if (updateError) {
           return "Hubo un error al cancelar el pedido. Intenta de nuevo.";
@@ -1007,7 +1062,7 @@ async function ejecutarHerramienta(
 
         // Registrar historial
         await supabase.from("order_status_history").insert({
-          order_id: args.order_id,
+          order_id: orderId,
           status: "cancelled",
           changed_by: "customer",
           reason: args.motivo,
@@ -1017,7 +1072,7 @@ async function ejecutarHerramienta(
         try {
           await supabase.functions.invoke("notify-vendor", {
             body: {
-              orderId: args.order_id,
+              orderId: orderId,
               eventType: "order_cancelled",
             },
           });

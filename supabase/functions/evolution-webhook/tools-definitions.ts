@@ -195,20 +195,20 @@ su ID exacto, primero llamá a ver_locales_abiertos para obtener la lista con ID
     type: "function",
     function: {
       name: "cancelar_pedido",
-      description: "Cancela un pedido. SIEMPRE requerir y registrar el motivo de cancelación.",
+      description: "⚠️ Cancela un pedido. Si no se proporciona order_id, cancela el último pedido del usuario. SIEMPRE requerir y registrar el motivo de cancelación detallado.",
       parameters: {
         type: "object",
         properties: {
           order_id: {
             type: "string",
-            description: "ID del pedido a cancelar",
+            description: "ID del pedido a cancelar (opcional - si no se proporciona, usa el último pedido del usuario. También acepta IDs parciales de 8 caracteres como 'a29eecaa')",
           },
           motivo: {
             type: "string",
-            description: "Motivo detallado de la cancelación (OBLIGATORIO)",
+            description: "Motivo detallado de la cancelación (OBLIGATORIO, mínimo 10 caracteres)",
           },
         },
-        required: ["order_id", "motivo"],
+        required: ["motivo"],
       },
     },
   },
