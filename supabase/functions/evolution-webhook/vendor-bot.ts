@@ -314,6 +314,35 @@ async function ejecutarHerramienta(
 
         console.log(`✅ Vendor found: ${vendor.id} (${vendor.name}) - Active: ${vendor.is_active}, Payment: ${vendor.payment_status}`);
 
+        // ✅ VALIDACIÓN: ¿Hay carrito activo de OTRO negocio?
+        if (context.cart.length > 0 && 
+            context.selected_vendor_id && 
+            context.selected_vendor_id !== vendor.id) {
+          
+          console.log(`⚠️ User trying to change vendor with active cart`);
+          console.log(`   Current vendor: ${context.selected_vendor_name} (${context.selected_vendor_id})`);
+          console.log(`   New vendor: ${vendor.name} (${vendor.id})`);
+          console.log(`   Cart items: ${context.cart.length}`);
+          
+          // Guardar el cambio pendiente
+          context.pending_vendor_change = {
+            new_vendor_id: vendor.id,
+            new_vendor_name: vendor.name
+          };
+          
+          // Cambiar a estado de confirmación
+          context.order_state = "confirming_vendor_change";
+          await saveContext(context, supabase);
+          
+          const currentTotal = context.cart.reduce((s, i) => s + i.price * i.quantity, 0);
+          return `⚠️ *Atención*\n\n` +
+                 `Tenés ${context.cart.length} productos en el carrito de *${context.selected_vendor_name}* (Total: $${currentTotal}).\n\n` +
+                 `Si cambias a *${vendor.name}*, se vaciará tu carrito actual.\n\n` +
+                 `¿Querés cambiar de negocio?\n` +
+                 `✅ Responde "sí" para cambiar\n` +
+                 `❌ Responde "no" para quedarte con tu pedido actual`;
+        }
+
         // Guardar el negocio seleccionado (siempre UUID real)
         context.selected_vendor_id = vendor.id;
         context.selected_vendor_name = vendor.name;
@@ -419,10 +448,16 @@ async function ejecutarHerramienta(
 
         console.log(`✅ ===== VENDOR VALIDATED: ${vendor.name} (${vendorId}) =====`);
 
-        // 🧹 Si el carrito es de otro negocio (no debería pasar porque ver_menu_negocio ya maneja esto)
-        if (context.cart.length > 0 && context.selected_vendor_id && vendorId !== context.selected_vendor_id) {
-          console.log(`🗑️ Cambiaste de negocio: ${context.selected_vendor_id} → ${vendorId}. Vaciando carrito.`);
-          context.cart = [];
+        // 🚨 VALIDACIÓN DE SEGURIDAD: Esto NO debería pasar nunca
+        // (ver_menu_negocio ya maneja el cambio de vendor con confirmación)
+        if (context.cart.length > 0 && 
+            context.selected_vendor_id && 
+            vendorId !== context.selected_vendor_id) {
+          console.error(`🚨 CRITICAL: Cart has items from different vendor!`);
+          console.error(`   Cart vendor: ${context.selected_vendor_id}`);
+          console.error(`   Trying to add from: ${vendorId}`);
+          return `⚠️ Error interno: Detecté productos de otro negocio en el carrito. ` +
+                 `Por favor vacía el carrito con "vaciar carrito" antes de agregar productos de otro negocio.`;
         }
 
         // Resolver productos
@@ -1756,6 +1791,78 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       role: "user",
       content: message,
     });
+
+    // 🔄 MANEJO ESPECIAL: Confirmación de cambio de negocio
+    if (context.order_state === "confirming_vendor_change") {
+      const userResponse = userMessage.toLowerCase().trim();
+      
+      // ✅ Usuario confirma el cambio
+      if (userResponse.match(/^(s[ií]|si|yes|dale|ok|confirmo|cambio|cambiar)/)) {
+        console.log(`✅ User confirmed vendor change`);
+        
+        const oldVendor = context.selected_vendor_name;
+        const newVendor = context.pending_vendor_change!.new_vendor_name;
+        
+        // Vaciar carrito
+        context.cart = [];
+        
+        // Aplicar cambio de negocio
+        context.selected_vendor_id = context.pending_vendor_change!.new_vendor_id;
+        context.selected_vendor_name = context.pending_vendor_change!.new_vendor_name;
+        context.pending_vendor_change = undefined;
+        context.order_state = "viewing_menu";
+        
+        await saveContext(context, supabase);
+        console.log(`✅ Vendor change applied: ${oldVendor} → ${newVendor}`);
+        
+        // Forzar llamada a ver_menu_negocio
+        const menuResult = await ejecutarHerramienta(
+          "ver_menu_negocio",
+          { vendor_id: context.selected_vendor_id },
+          context,
+          supabase
+        );
+        
+        // Agregar respuesta al historial
+        context.conversation_history.push({
+          role: "assistant",
+          content: `✅ Perfecto! Cambié tu pedido a *${newVendor}*.\n\n${menuResult}`
+        });
+        
+        return `✅ Perfecto! Cambié tu pedido a *${newVendor}*.\n\n${menuResult}`;
+      }
+      
+      // ❌ Usuario cancela el cambio
+      if (userResponse.match(/^(no|nop|cancel[ao]|mantene|qued[ao])/)) {
+        console.log(`❌ User cancelled vendor change`);
+        
+        const oldVendor = context.selected_vendor_name;
+        context.pending_vendor_change = undefined;
+        context.order_state = "adding_items";
+        
+        await saveContext(context, supabase);
+        
+        const currentTotal = context.cart.reduce((s, i) => s + i.price * i.quantity, 0);
+        const response = `✅ Perfecto, mantenemos tu pedido de *${oldVendor}*.\n\n` +
+                        `🛒 Carrito actual: ${context.cart.length} productos ($${currentTotal})\n\n` +
+                        `¿Querés agregar algo más o ya confirmamos el pedido?`;
+        
+        context.conversation_history.push({
+          role: "assistant",
+          content: response
+        });
+        
+        return response;
+      }
+      
+      // Usuario no dio respuesta clara
+      const clarification = `No entendí tu respuesta. ¿Querés cambiar de negocio?\n\n✅ Responde "sí"\n❌ Responde "no"`;
+      context.conversation_history.push({
+        role: "assistant",
+        content: clarification
+      });
+      return clarification;
+    }
 
     // Inicializar OpenAI
     const openai = new OpenAI({
