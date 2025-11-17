@@ -1995,28 +1995,32 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     let finalResponse = "";
     let iterationCount = 0;
     const MAX_ITERATIONS = 5; // Prevenir loops infinitos
+    
+    // 🛡️ Rate limiting por herramienta - prevenir loops infinitos
+    const toolCallTracker = new Map<string, number>();
+
+    // 🎯 CRÍTICO: Construir mensajes UNA SOLA VEZ antes del loop
+    // Esto asegura que los tool calls previos y sus resultados se preserven
+    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+      { role: "system", content: buildSystemPrompt(context) },
+      ...context.conversation_history.slice(-15), // Últimos 15 mensajes para no saturar
+    ];
 
     // Loop de conversación con tool calling
     while (continueLoop && iterationCount < MAX_ITERATIONS) {
       iterationCount++;
-      console.log(`🔁 Iteration ${iterationCount}...`);
+      console.log(`🔁 Iteration ${iterationCount}/${MAX_ITERATIONS}`);
+      console.log(`📝 Messages count: ${messages.length}, Last 3 roles:`, messages.slice(-3).map(m => m.role));
+      console.log(`🎯 Current state: ${context.order_state || "idle"}`);
 
-      // 🎯 CRÍTICO: Reconstruir system prompt en cada iteración
-      // Esto asegura que refleje el estado actualizado del contexto después de ejecutar herramientas
-      const systemPrompt = buildSystemPrompt(context);
-      console.log(`📋 System prompt built for state: ${context.order_state || "idle"}`);
-
-      // Preparar mensajes para la API (se reconstruyen en cada iteración)
-      const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-        { role: "system", content: systemPrompt },
-        ...context.conversation_history.slice(-15), // Últimos 15 mensajes para no saturar
-      ];
+      // 🔄 Actualizar SOLO el system prompt (primer mensaje) con el estado actualizado
+      messages[0] = { role: "system", content: buildSystemPrompt(context) };
 
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: messages,
         tools: tools,
-        temperature: 0.3,
+        temperature: 0.5, // ⬆️ Aumentado de 0.3 para evitar loops determinísticos
         max_tokens: 800,
       });
 
@@ -2029,25 +2033,42 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
 
       // Si hay tool calls, ejecutarlos
       if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
+        // 📌 Agregar mensaje del asistente con tool calls
         messages.push(assistantMessage);
 
         for (const toolCall of assistantMessage.tool_calls) {
           const toolName = toolCall.function.name;
           const toolArgs = JSON.parse(toolCall.function.arguments);
-          console.log(`🔧 Executing tool: ${toolName}`, toolArgs);
+          
+          // 🛡️ Rate limiting: Prevenir que la misma herramienta se llame múltiples veces
+          const callCount = toolCallTracker.get(toolName) || 0;
+          if (callCount >= 2) {
+            console.warn(`⚠️ Tool ${toolName} called ${callCount} times, forcing text response`);
+            continueLoop = false;
+            finalResponse = "Disculpá, tuve un problema. ¿Podés reformular tu pedido?";
+            break;
+          }
+          toolCallTracker.set(toolName, callCount + 1);
+          
+          console.log(`🔧 Executing tool: ${toolName} (call #${callCount + 1})`, toolArgs);
 
           const toolResult = await ejecutarHerramienta(toolName, toolArgs, context, supabase);
-          console.log(`✅ Tool result preview:`, toolResult.slice(0, 100));
+          console.log(`✅ Tool ${toolName} result preview:`, toolResult.slice(0, 100));
 
+          // 📌 Agregar resultado de la herramienta
           messages.push({
             role: "tool",
             tool_call_id: toolCall.id,
             content: toolResult,
           });
         }
+        
+        // Si se detectó loop, salir
+        if (!continueLoop) {
+          break;
+        }
 
         // 💾 CRÍTICO: Guardar contexto después de ejecutar todas las herramientas
-        // Esto asegura que modificaciones como selected_vendor_id se preserven
         console.log(`💾 Saving context after tool execution - vendor_id: ${context.selected_vendor_id}`);
         await saveContext(context, supabase);
 
@@ -2056,10 +2077,9 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
 
       // Si no hay tool calls, es la respuesta final
-      console.log("❌ No tool calls - AI responding directly");
-      console.log("   Message content:", assistantMessage.content?.slice(0, 200));
+      console.log("✅ No tool calls - AI responding with text");
+      console.log("   Content preview:", assistantMessage.content?.slice(0, 200));
       finalResponse = assistantMessage.content || "Perdón, no entendí. ¿Podés repetir?";
-      console.log("✅ Final response ready:", finalResponse.slice(0, 100));
       continueLoop = false;
     }
 
