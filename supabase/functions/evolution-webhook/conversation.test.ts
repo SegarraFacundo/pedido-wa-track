@@ -222,7 +222,7 @@ Deno.test("EDGE CASE: User tries to change vendor with active cart - CONFIRM", a
   let context = await getContext(phone, supabase);
   context.selected_vendor_id = "vendor-a-uuid";
   context.selected_vendor_name = "Pizzería A";
-  context.order_state = "adding_items";
+  context.order_state = "shopping";
   context.cart = [
     { product_id: "pizza-1", product_name: "Pizza Napolitana", quantity: 2, price: 500 }
   ];
@@ -253,7 +253,7 @@ Deno.test("EDGE CASE: User tries to change vendor with active cart - CONFIRM", a
   context.selected_vendor_id = "vendor-b-uuid";
   context.selected_vendor_name = "Burger King";
   context.pending_vendor_change = undefined;
-  context.order_state = "viewing_menu";
+  context.order_state = "shopping";
   await saveContext(context, supabase);
   console.log("✅ Vendor changed, cart cleared");
   
@@ -263,7 +263,7 @@ Deno.test("EDGE CASE: User tries to change vendor with active cart - CONFIRM", a
   assertEquals(context.cart.length, 0, "Cart should be empty after confirmation");
   assertEquals(context.selected_vendor_id, "vendor-b-uuid", "Vendor should change to B");
   assertEquals(context.selected_vendor_name, "Burger King");
-  assertEquals(context.order_state, "viewing_menu");
+  assertEquals(context.order_state, "shopping");
   assertEquals(context.pending_vendor_change, undefined);
   console.log("✅ All assertions passed");
 });
@@ -279,7 +279,7 @@ Deno.test("EDGE CASE: User tries to change vendor with active cart - CANCEL", as
   let context = await getContext(phone, supabase);
   context.selected_vendor_id = "vendor-a-uuid";
   context.selected_vendor_name = "Pizzería A";
-  context.order_state = "adding_items";
+  context.order_state = "shopping";
   context.cart = [
     { product_id: "pizza-1", product_name: "Pizza Napolitana", quantity: 2, price: 500 }
   ];
@@ -295,7 +295,7 @@ Deno.test("EDGE CASE: User tries to change vendor with active cart - CANCEL", as
   console.log("\n📍 Step 2: User cancels vendor change");
   context = await getContext(phone, supabase);
   context.pending_vendor_change = undefined;
-  context.order_state = "adding_items";
+  context.order_state = "shopping";
   await saveContext(context, supabase);
   console.log("✅ Vendor change cancelled");
   
@@ -306,7 +306,7 @@ Deno.test("EDGE CASE: User tries to change vendor with active cart - CANCEL", as
   assertEquals(context.cart[0].product_name, "Pizza Napolitana");
   assertEquals(context.selected_vendor_id, "vendor-a-uuid", "Vendor should not change");
   assertEquals(context.selected_vendor_name, "Pizzería A");
-  assertEquals(context.order_state, "adding_items");
+  assertEquals(context.order_state, "shopping");
   assertEquals(context.pending_vendor_change, undefined);
   console.log("✅ All assertions passed - cart and vendor preserved");
 });
@@ -322,7 +322,7 @@ Deno.test("EDGE CASE: No confirmation needed when cart is empty", async () => {
   let context = await getContext(phone, supabase);
   context.selected_vendor_id = "vendor-a-uuid";
   context.selected_vendor_name = "Pizzería A";
-  context.order_state = "viewing_menu";
+  context.order_state = "shopping";
   context.cart = []; // Carrito vacío
   await saveContext(context, supabase);
   console.log("✅ Vendor A selected, cart empty");
@@ -332,7 +332,7 @@ Deno.test("EDGE CASE: No confirmation needed when cart is empty", async () => {
   context = await getContext(phone, supabase);
   context.selected_vendor_id = "vendor-b-uuid";
   context.selected_vendor_name = "Burger King";
-  context.order_state = "viewing_menu";
+  context.order_state = "shopping";
   await saveContext(context, supabase);
   console.log("✅ Vendor changed directly without confirmation");
   
@@ -633,7 +633,7 @@ Deno.test("PAYMENT VALIDATION: Should reject invalid payment methods", async () 
   context.delivery_address = "Test Address 123";
   context.user_latitude = -33.0;
   context.user_longitude = -60.0;
-  context.order_state = "confirming_order";
+  context.order_state = "checkout";
   await saveContext(context, supabase);
   
   console.log("📍 Attempting to create order with invalid payment method (mercadopago)");
@@ -697,7 +697,7 @@ Deno.test("PAYMENT VALIDATION: Should accept valid payment methods", async () =>
   context.delivery_address = "Test Address 123";
   context.user_latitude = -33.0;
   context.user_longitude = -60.0;
-  context.order_state = "confirming_order";
+  context.order_state = "checkout";
   await saveContext(context, supabase);
   
   console.log("📍 Creating order with valid payment method (efectivo)");
@@ -732,17 +732,17 @@ Deno.test("CONFIRMATION: Prompt should require explicit user confirmation", asyn
   const supabase = createMockSupabase();
   const phone = "5493464448311";
   
-  // Setup context in confirming_order state
+  // Setup context in checkout state
   const context = await getContext(phone, supabase);
   context.selected_vendor_id = "vendor-confirm-test";
   context.selected_vendor_name = "Test Vendor";
   context.cart = [{ product_id: "prod-1", product_name: "Helado", quantity: 1, price: 3000 }];
   context.delivery_address = "Test Address 123";
   context.payment_method = "efectivo";
-  context.order_state = "confirming_order";
+  context.order_state = "checkout";
   await saveContext(context, supabase);
   
-  console.log("📍 Building system prompt for confirming_order state");
+  console.log("📍 Building system prompt for checkout state");
   
   // Import buildSystemPrompt
   const promptModule = await import("./simplified-prompt.ts");
@@ -784,7 +784,7 @@ Deno.test("CART: quitar_producto_carrito debe funcionar con nombre parcial", asy
       { product_id: "uuid-123", product_name: "Alfajor Chocotorta Triple", quantity: 2, price: 1000 },
       { product_id: "uuid-456", product_name: "Coca Cola 1,5 Litros", quantity: 1, price: 2500 }
     ],
-    order_state: "adding_items",
+    order_state: "shopping",
     selected_vendor_id: "vendor-123",
     selected_vendor_name: "Test Vendor",
     conversation_history: []
@@ -816,7 +816,7 @@ Deno.test("CART: quitar_producto_carrito debe remover completamente si quantity 
     cart: [
       { product_id: "uuid-123", product_name: "Alfajor Chocotorta Triple", quantity: 1, price: 1000 }
     ],
-    order_state: "adding_items",
+    order_state: "shopping",
     selected_vendor_id: "vendor-123",
     selected_vendor_name: "Test Vendor",
     conversation_history: []
@@ -845,7 +845,7 @@ Deno.test("CART: agregar_al_carrito no debe duplicar items", async () => {
   const context: ConversationContext = {
     phone: "5493464448309",
     cart: [],
-    order_state: "adding_items",
+    order_state: "shopping",
     selected_vendor_id: mockVendorId,
     selected_vendor_name: "Test Vendor",
     conversation_history: []
@@ -1119,7 +1119,7 @@ Deno.test("PAYMENT VALIDATION: ver_metodos_pago debe guardar métodos en el cont
   
   const context = await getContext(phone, supabase);
   context.selected_vendor_id = mockVendorId;
-  context.order_state = "collecting_payment";
+  context.order_state = "checkout";
   
   // Mock vendor with specific payment settings
   supabase.from = (table: string) => {
@@ -1229,7 +1229,7 @@ Deno.test("PAYMENT VALIDATION: Context stores correct payment keys", async () =>
   
   const context = await getContext(phone, supabase);
   context.selected_vendor_id = mockVendorId;
-  context.order_state = "collecting_payment";
+  context.order_state = "checkout";
   
   // Mock vendor with only efectivo
   supabase.from = (table: string) => {
@@ -1280,7 +1280,7 @@ test("CONTEXT PRESERVATION: No debe borrar vendor_id durante correcciones de car
   const context = createTestContext("5493464448309");
   context.selected_vendor_id = mockVendorId;
   context.selected_vendor_name = "Test Vendor";
-  context.order_state = "adding_items";
+  context.order_state = "shopping";
   context.cart = [
     { product_id: "uuid-1", product_name: "Coca Cola", quantity: 1, price: 2500 }
   ];
@@ -1340,10 +1340,10 @@ test("CONTEXT PRESERVATION: No debe borrar vendor_id durante correcciones de car
     mockSupabaseWithActiveOrder
   );
   
-  // ✅ El vendor_id DEBE estar preservado porque el usuario está en "adding_items"
+  // ✅ El vendor_id DEBE estar preservado porque el usuario está en "shopping"
   assertEquals(context.selected_vendor_id, mockVendorId, "Vendor ID should be preserved during cart correction");
   assertEquals(context.selected_vendor_name, "Test Vendor", "Vendor name should be preserved");
-  assertEquals(context.order_state, "adding_items", "Order state should remain adding_items");
+  assertEquals(context.order_state, "shopping", "Order state should remain shopping");
   
   console.log("✅ TEST PASSED: Vendor ID preserved during cart correction with active order");
 });

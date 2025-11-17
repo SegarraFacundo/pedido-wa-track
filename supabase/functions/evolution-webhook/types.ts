@@ -1,16 +1,55 @@
 // ==================== INTERFACES ====================
 
+// ==================== ORDER STATE FLOW ====================
+// Flujo simplificado con estados claros y validación de transiciones
+
 export type OrderState = 
-  | "idle"              // Sin pedido activo
-  | "browsing"          // Viendo negocios/buscando
-  | "viewing_menu"      // Viendo menú específico
-  | "adding_items"      // Agregando productos al carrito
-  | "reviewing_cart"    // Revisando carrito antes de confirmar
-  | "collecting_address"// Pidiendo dirección
-  | "collecting_payment"// Pidiendo método de pago
-  | "confirming_order"  // Confirmación final
-  | "confirming_vendor_change" // Confirmando cambio de negocio con carrito activo
-  | "order_placed";     // Pedido creado exitosamente
+  | "idle"                    // Sin pedido activo, usuario puede explorar
+  | "browsing"                // Viendo negocios disponibles
+  | "shopping"                // Agregando productos al carrito (merge de viewing_menu, adding_items, reviewing_cart)
+  | "needs_address"           // Necesita proporcionar dirección de entrega
+  | "checkout"                // Seleccionando método de pago
+  | "order_pending_cash"      // Pedido creado, esperando pago en efectivo al delivery
+  | "order_pending_transfer"  // Pedido creado, esperando comprobante de transferencia
+  | "order_pending_mp"        // Pedido creado, esperando confirmación de MercadoPago
+  | "order_confirmed"         // Pedido confirmado con pago validado
+  | "order_completed"         // Pedido entregado exitosamente
+  | "order_cancelled";        // Pedido cancelado
+
+// Valid state transitions
+export const STATE_TRANSITIONS: Record<OrderState, OrderState[]> = {
+  idle: ["browsing", "shopping"],
+  browsing: ["idle", "shopping"],
+  shopping: ["idle", "browsing", "needs_address", "order_cancelled"],
+  needs_address: ["shopping", "checkout", "order_cancelled"],
+  checkout: ["shopping", "needs_address", "order_pending_cash", "order_pending_transfer", "order_pending_mp", "order_cancelled"],
+  order_pending_cash: ["order_confirmed", "order_cancelled"],
+  order_pending_transfer: ["order_confirmed", "order_cancelled"],
+  order_pending_mp: ["order_confirmed", "order_cancelled"],
+  order_confirmed: ["order_completed", "order_cancelled"],
+  order_completed: ["idle"],
+  order_cancelled: ["idle"]
+};
+
+// Validate if a state transition is allowed
+export function canTransitionTo(from: OrderState | undefined, to: OrderState): boolean {
+  if (!from) return to === "idle" || to === "browsing";
+  
+  const allowedTransitions = STATE_TRANSITIONS[from];
+  return allowedTransitions?.includes(to) ?? false;
+}
+
+// Helper to get pending state based on payment method
+export function getPendingStateForPayment(paymentMethod: string): OrderState {
+  const normalized = paymentMethod.toLowerCase();
+  
+  if (normalized.includes("efectivo")) return "order_pending_cash";
+  if (normalized.includes("transferencia")) return "order_pending_transfer";
+  if (normalized.includes("mercadopago") || normalized.includes("mercado pago")) return "order_pending_mp";
+  
+  // Default to transfer if unknown
+  return "order_pending_transfer";
+}
 
 export interface CartItem {
   product_id: string;
