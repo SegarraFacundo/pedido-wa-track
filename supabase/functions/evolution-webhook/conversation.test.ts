@@ -1169,6 +1169,57 @@ Deno.test("PAYMENT VALIDATION: ver_metodos_pago debe guardar métodos en el cont
   console.log("✅ TEST PASSED: Payment methods correctly saved to context");
 });
 
+Deno.test("CART CORRECTION: modificar_carrito_completo debe reemplazar el carrito completamente", async () => {
+  console.log("\n🧪 TEST: Cart complete replacement");
+  
+  const supabase = createMockSupabase();
+  const phone = "5493464448309";
+  const mockVendorId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+  
+  const context = await getContext(phone, supabase);
+  context.selected_vendor_id = mockVendorId;
+  context.cart = [
+    { product_id: "uuid-1", product_name: "Coca Cola", quantity: 1, price: 2500 },
+    { product_id: "uuid-2", product_name: "Alfajor", quantity: 2, price: 1000 }
+  ];
+  
+  // Mock product search
+  supabase.from = (table: string) => {
+    if (table === "products") {
+      return {
+        select: () => ({
+          ilike: (field: string, value: string) => ({
+            eq: () => ({
+              eq: () => ({
+                maybeSingle: async () => {
+                  if (value.includes("coca")) {
+                    return { data: { id: "uuid-1", name: "Coca Cola", price: 2500 }, error: null };
+                  }
+                  return { data: null, error: null };
+                }
+              })
+            })
+          })
+        })
+      };
+    }
+    return createMockSupabase().from(table);
+  };
+  
+  const response = await ejecutarHerramienta(
+    "modificar_carrito_completo",
+    { items: [{ product_name: "coca cola", quantity: 2 }] },
+    context,
+    supabase
+  );
+  
+  console.log("📦 Response:", response);
+  console.log("🛒 New cart:", context.cart);
+  
+  assertEquals(response.includes("Corregí tu pedido"), true, "Should confirm correction");
+  assertEquals(context.cart.length > 0, true, "Cart should not be empty");
+});
+
 Deno.test("PAYMENT VALIDATION: Context stores correct payment keys", async () => {
   console.log("\n🧪 TEST: Validate payment method keys format");
   

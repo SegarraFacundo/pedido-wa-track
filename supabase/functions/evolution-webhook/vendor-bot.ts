@@ -569,6 +569,61 @@ async function ejecutarHerramienta(
         return carrito;
       }
 
+      case "modificar_carrito_completo": {
+        // Esta herramienta permite reemplazar el carrito completo
+        // Útil para correcciones: "quiero 2 cocas y 1 alfajor"
+        
+        if (!context.selected_vendor_id) {
+          return "⚠️ Primero necesito que elijas un negocio.";
+        }
+
+        const newCart: CartItem[] = [];
+        
+        for (const item of args.items) {
+          // Buscar producto por nombre
+          const { data: product } = await supabase
+            .from("products")
+            .select("id, name, price")
+            .ilike("name", `%${item.product_name}%`)
+            .eq("vendor_id", context.selected_vendor_id)
+            .eq("is_available", true)
+            .maybeSingle();
+          
+          if (product) {
+            newCart.push({
+              product_id: product.id,
+              product_name: product.name,
+              quantity: item.quantity,
+              price: product.price,
+            });
+          } else {
+            console.log(`⚠️ Product not found: ${item.product_name}`);
+          }
+        }
+        
+        if (newCart.length === 0) {
+          return "❌ No encontré ninguno de esos productos en este negocio.";
+        }
+        
+        // Reemplazar carrito completo
+        context.cart = newCart;
+        
+        const total = context.cart.reduce((s, i) => s + i.price * i.quantity, 0);
+        
+        console.log("✅ Cart replaced completely");
+        context.cart.forEach(item => {
+          console.log(`   - ${item.product_name} x${item.quantity}`);
+        });
+        
+        let response = "✅ Corregí tu pedido:\n\n";
+        context.cart.forEach(item => {
+          response += `• ${item.product_name} x${item.quantity} - $${item.price * item.quantity}\n`;
+        });
+        response += `\n💰 Total: $${total}\n\n¿Está correcto?`;
+        
+        return response;
+      }
+
       case "vaciar_carrito": {
         context.cart = [];
         return "🗑️ Carrito vaciado";
@@ -2145,7 +2200,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     let continueLoop = true;
     let finalResponse = "";
     let iterationCount = 0;
-    const MAX_ITERATIONS = 5; // Prevenir loops infinitos
+    const MAX_ITERATIONS = 8; // Aumentado para permitir operaciones complejas // Prevenir loops infinitos
     
     // 🛡️ Rate limiting por herramienta - prevenir loops infinitos
     const toolCallTracker = new Map<string, number>();
@@ -2160,8 +2215,10 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     // Loop de conversación con tool calling
     while (continueLoop && iterationCount < MAX_ITERATIONS) {
       iterationCount++;
-      console.log(`🔁 Iteration ${iterationCount}/${MAX_ITERATIONS}`);
-      console.log(`📝 Messages count: ${messages.length}, Last 3 roles:`, messages.slice(-3).map(m => m.role));
+    console.log(`🔁 Iteration ${iterationCount}/${MAX_ITERATIONS}`);
+    console.log(`📝 Messages count: ${messages.length}, Last 3 roles:`, messages.slice(-3).map(m => m.role));
+    console.log(`🎯 Current state: ${context.order_state || "idle"}`);
+    console.log(`🛒 Cart items: ${context.cart.length}`);
       console.log(`🎯 Current state: ${context.order_state || "idle"}`);
 
       // 🔄 Actualizar SOLO el system prompt (primer mensaje) con el estado actualizado
