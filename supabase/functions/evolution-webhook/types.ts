@@ -1,5 +1,16 @@
 // ==================== INTERFACES ====================
 
+export type OrderState = 
+  | "idle"              // Sin pedido activo
+  | "browsing"          // Viendo negocios/buscando
+  | "viewing_menu"      // Viendo menú específico
+  | "adding_items"      // Agregando productos al carrito
+  | "reviewing_cart"    // Revisando carrito antes de confirmar
+  | "collecting_address"// Pidiendo dirección
+  | "collecting_payment"// Pidiendo método de pago
+  | "confirming_order"  // Confirmación final
+  | "order_placed";     // Pedido creado exitosamente
+
 export interface CartItem {
   product_id: string;
   product_name: string;
@@ -10,6 +21,7 @@ export interface CartItem {
 export interface ConversationContext {
   phone: string;
   cart: CartItem[];
+  order_state?: OrderState;
   selected_vendor_id?: string;
   selected_vendor_name?: string;
   delivery_address?: string;

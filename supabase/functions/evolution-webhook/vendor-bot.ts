@@ -18,6 +18,12 @@ async function ejecutarHerramienta(
   try {
     switch (toolName) {
       case "buscar_productos": {
+        // 🔄 STATE TRANSITION: idle/browsing → browsing
+        const oldState = context.order_state || "idle";
+        context.order_state = "browsing";
+        console.log(`🔄 STATE: ${oldState} → browsing (buscar_productos)`);
+        await saveContext(context, supabase);
+
         // Si el usuario tiene ubicación, usar función de filtrado por radio
         if (context.user_latitude && context.user_longitude) {
           console.log(`📍 User has location, filtering by delivery radius`);
@@ -266,6 +272,13 @@ async function ejecutarHerramienta(
         console.log(`🔍 ========== VER MENU NEGOCIO ==========`);
         console.log(`📝 Args vendor_id: "${args.vendor_id}"`);
 
+        // 🔄 STATE VALIDATION: Debe estar en browsing o viewing_menu
+        const currentState = context.order_state || "idle";
+        if (currentState === "idle") {
+          context.order_state = "browsing";
+          await saveContext(context, supabase);
+        }
+
         // ⚠️ NOTA: Ya NO limpiamos automáticamente el carrito aquí
         // El bot debe preguntar primero al usuario si quiere cancelar su pedido actual
         // y solo después llamar a vaciar_carrito explícitamente
@@ -348,17 +361,24 @@ async function ejecutarHerramienta(
         console.log("🛒 ========== AGREGAR AL CARRITO ==========");
         console.log("📦 Items to add:", JSON.stringify(items, null, 2));
         console.log("🔍 Context state:", {
+          order_state: context.order_state,
           selected_vendor_id: context.selected_vendor_id,
           selected_vendor_name: context.selected_vendor_name,
           cart_items: context.cart.length,
-          args_vendor_id: args.vendor_id
         });
 
-        // ⚠️ VALIDACIÓN CRÍTICA PRIMERA: No se puede agregar al carrito sin haber mostrado el menú primero
+        // 🔒 STATE VALIDATION: MUST be in "adding_items" state
+        if (context.order_state !== "adding_items") {
+          console.error(`❌ INVALID STATE: Cannot add to cart in state "${context.order_state}"`);
+          return `⚠️ Para agregar productos, primero necesito mostrarte el menú.\n\n¿De qué negocio querés ver el menú?`;
+        }
+
+        // ⚠️ VALIDACIÓN CRÍTICA: No se puede agregar sin vendor seleccionado
         if (!context.selected_vendor_id) {
-          console.error(`❌ CRITICAL: Attempting to add to cart without selected_vendor_id in context`);
-          console.error(`This means ver_menu_negocio was not called first!`);
-          return `⚠️ Para poder agregar productos, primero necesito mostrarte el menú del negocio.\n\n¿De qué negocio querés ver el menú?`;
+          console.error(`❌ CRITICAL: No selected_vendor_id in context despite being in adding_items state`);
+          context.order_state = "viewing_menu";
+          await saveContext(context, supabase);
+          return `⚠️ Necesito que elijas un negocio primero. ¿Cuál negocio te interesa?`;
         }
 
         // SIEMPRE usar el vendor del contexto (que fue establecido por ver_menu_negocio)
