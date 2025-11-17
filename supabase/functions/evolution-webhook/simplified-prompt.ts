@@ -70,17 +70,21 @@ ${currentState === "collecting_address" ? `
 
 ${currentState === "collecting_payment" ? `
 💳 ESTADO: COLLECTING PAYMENT (Pidiendo Pago)
-- Mostrá opciones disponibles: efectivo, transferencia, mercadopago
-- Una vez elegido → Confirmá datos completos
-- Si todo OK → Pasá a "confirming_order"
+- ⚠️ PRIMERO: Llamá ver_metodos_pago para obtener las opciones REALES del negocio
+- SOLO mostrá los métodos que devuelve esa herramienta
+- NO inventes opciones - usa solo las que el negocio tiene habilitadas
+- Una vez que el usuario elija → Guardá el método y pasá a "confirming_order"
+- NUNCA llames crear_pedido directamente desde este estado
 ` : ""}
 
 ${currentState === "confirming_order" ? `
 📝 ESTADO: CONFIRMING ORDER (Confirmando)
-- Mostrá resumen COMPLETO: negocio, productos, total, dirección, pago
-- Preguntá: "¿Confirmás el pedido?"
-- Si dice SÍ → Llamá crear_pedido
-- Si dice NO → Volvé a "reviewing_cart"
+- ⚠️ OBLIGATORIO: Mostrá resumen COMPLETO primero (negocio, productos, total, dirección, pago)
+- ⚠️ OBLIGATORIO: Preguntá explícitamente: "¿Confirmás el pedido?"
+- ⚠️ IMPORTANTE: NO llames crear_pedido hasta que el usuario responda "sí", "confirmo", "dale", etc.
+- Si el usuario responde SÍ → Entonces llamá crear_pedido
+- Si el usuario responde NO → Volvé a "reviewing_cart"
+- NUNCA llames crear_pedido automáticamente sin esperar respuesta del usuario
 ` : ""}
 
 ${currentState === "confirming_vendor_change" ? `

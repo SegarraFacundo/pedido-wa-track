@@ -709,6 +709,46 @@ async function ejecutarHerramienta(
           return "Por favor seleccioná un método de pago (efectivo, transferencia o mercadopago).";
         }
 
+        // ⚠️ VALIDAR que el método de pago esté habilitado por el vendor
+        console.log("💳 Validating payment method...");
+        const { data: vendorForPayment, error: vendorPaymentError } = await supabase
+          .from("vendors")
+          .select("id, name, payment_settings")
+          .eq("id", context.selected_vendor_id)
+          .single();
+
+        if (vendorPaymentError || !vendorForPayment) {
+          console.error("❌ Error fetching vendor for payment validation:", vendorPaymentError);
+          return "Hubo un problema al validar el método de pago. Por favor intentá de nuevo.";
+        }
+
+        const paymentSettings = vendorForPayment.payment_settings || {};
+        const metodoSolicitado = args.metodo_pago.toLowerCase();
+
+        console.log(`   Requested payment method: ${metodoSolicitado}`);
+        console.log(`   Vendor payment settings:`, paymentSettings);
+
+        // Verificar si el método está habilitado
+        let metodoValido = false;
+
+        if (metodoSolicitado === "efectivo" && paymentSettings.efectivo === true) {
+          metodoValido = true;
+        } else if (metodoSolicitado === "transferencia" && paymentSettings.transferencia?.activo === true) {
+          metodoValido = true;
+        } else if (metodoSolicitado === "mercadopago" && paymentSettings.mercadoPago?.activo === true) {
+          metodoValido = true;
+        }
+
+        console.log(`   Payment method valid: ${metodoValido}`);
+
+        if (!metodoValido) {
+          console.warn(`❌ Invalid payment method attempted: ${metodoSolicitado} for vendor ${vendorForPayment.name}`);
+          return `⚠️ El método de pago "${metodoSolicitado}" no está disponible en ${vendorForPayment.name}.\n\n` +
+                 `Por favor usá ver_metodos_pago para ver las opciones reales disponibles.`;
+        }
+
+        console.log(`✅ Payment method validated: ${metodoSolicitado} is enabled for ${vendorForPayment.name}`);
+
         context.delivery_address = args.direccion;
         context.payment_method = args.metodo_pago;
 

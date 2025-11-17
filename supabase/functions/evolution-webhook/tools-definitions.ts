@@ -216,7 +216,7 @@ su ID exacto, primero llamá a ver_locales_abiertos para obtener la lista con ID
     type: "function",
     function: {
       name: "ver_metodos_pago",
-      description: "Obtiene los métodos de pago habilitados por el vendedor seleccionado. OBLIGATORIO usar antes de confirmar pedido para mostrar opciones reales disponibles.",
+      description: "⚠️ OBLIGATORIO: Obtiene los métodos de pago REALES habilitados por el vendedor seleccionado. DEBES llamar esta herramienta ANTES de pedir al usuario que elija un método de pago. NO asumas que todos los métodos están disponibles. SOLO muestra al usuario las opciones que esta herramienta devuelva.",
       parameters: {
         type: "object",
         properties: {},

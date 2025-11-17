@@ -604,3 +604,170 @@ Deno.test("CONTEXT PERSISTENCE: Clears context if there's an ACTIVE order from s
   
   console.log("✅ TEST PASSED: Context cleared for active order");
 });
+
+// ==================== PAYMENT VALIDATION TESTS ====================
+
+Deno.test("PAYMENT VALIDATION: Should reject invalid payment methods", async () => {
+  console.log("\n🧪 TEST: Payment method validation");
+  
+  const supabase = createMockSupabase();
+  const phone = "5493464448309";
+  
+  // Setup vendor with only efectivo enabled
+  const mockVendorId = "vendor-payment-test";
+  supabase.mockData.set(`vendors-${mockVendorId}`, {
+    id: mockVendorId,
+    name: "Test Vendor",
+    payment_settings: {
+      efectivo: true,
+      transferencia: { activo: false },
+      mercadoPago: { activo: false }
+    }
+  });
+  
+  // Setup context with selected vendor and cart
+  const context = await getContext(phone, supabase);
+  context.selected_vendor_id = mockVendorId;
+  context.selected_vendor_name = "Test Vendor";
+  context.cart = [{ product_id: "prod-1", product_name: "Helado", quantity: 1, price: 3000 }];
+  context.delivery_address = "Test Address 123";
+  context.user_latitude = -33.0;
+  context.user_longitude = -60.0;
+  context.order_state = "confirming_order";
+  await saveContext(context, supabase);
+  
+  console.log("📍 Attempting to create order with invalid payment method (mercadopago)");
+  
+  // Import ejecutarHerramienta
+  const vendorBotModule = await import("./vendor-bot.ts");
+  const ejecutarHerramienta = vendorBotModule.ejecutarHerramienta;
+  
+  // Try to create order with mercadopago (not enabled)
+  const result = await ejecutarHerramienta(
+    "crear_pedido",
+    { direccion: "Test Address 123", metodo_pago: "mercadopago" },
+    context,
+    supabase
+  );
+  
+  console.log("📦 Result:", result);
+  
+  // Verify rejection
+  assertEquals(
+    result.includes("no está disponible"),
+    true,
+    "Should reject invalid payment method"
+  );
+  assertEquals(
+    result.includes("ver_metodos_pago"),
+    true,
+    "Should suggest using ver_metodos_pago"
+  );
+  
+  console.log("✅ TEST PASSED: Invalid payment methods are rejected");
+});
+
+Deno.test("PAYMENT VALIDATION: Should accept valid payment methods", async () => {
+  console.log("\n🧪 TEST: Valid payment method acceptance");
+  
+  const supabase = createMockSupabase();
+  const phone = "5493464448310";
+  
+  // Setup vendor with efectivo enabled
+  const mockVendorId = "vendor-valid-payment";
+  supabase.mockData.set(`vendors-${mockVendorId}`, {
+    id: mockVendorId,
+    name: "Test Vendor Valid",
+    latitude: -33.0,
+    longitude: -60.0,
+    delivery_pricing_type: "fixed",
+    delivery_fixed_price: 500,
+    payment_settings: {
+      efectivo: true,
+      transferencia: { activo: false },
+      mercadoPago: { activo: false }
+    }
+  });
+  
+  // Setup context
+  const context = await getContext(phone, supabase);
+  context.selected_vendor_id = mockVendorId;
+  context.selected_vendor_name = "Test Vendor Valid";
+  context.cart = [{ product_id: "prod-1", product_name: "Helado", quantity: 1, price: 3000 }];
+  context.delivery_address = "Test Address 123";
+  context.user_latitude = -33.0;
+  context.user_longitude = -60.0;
+  context.order_state = "confirming_order";
+  await saveContext(context, supabase);
+  
+  console.log("📍 Creating order with valid payment method (efectivo)");
+  
+  // Import ejecutarHerramienta
+  const vendorBotModule = await import("./vendor-bot.ts");
+  const ejecutarHerramienta = vendorBotModule.ejecutarHerramienta;
+  
+  // Create order with efectivo (enabled)
+  const result = await ejecutarHerramienta(
+    "crear_pedido",
+    { direccion: "Test Address 123", metodo_pago: "efectivo" },
+    context,
+    supabase
+  );
+  
+  console.log("📦 Result:", result);
+  
+  // Verify success (should not contain error messages)
+  assertEquals(
+    result.includes("no está disponible"),
+    false,
+    "Should not reject valid payment method"
+  );
+  
+  console.log("✅ TEST PASSED: Valid payment methods are accepted");
+});
+
+Deno.test("CONFIRMATION: Prompt should require explicit user confirmation", async () => {
+  console.log("\n🧪 TEST: Explicit confirmation requirement in prompt");
+  
+  const supabase = createMockSupabase();
+  const phone = "5493464448311";
+  
+  // Setup context in confirming_order state
+  const context = await getContext(phone, supabase);
+  context.selected_vendor_id = "vendor-confirm-test";
+  context.selected_vendor_name = "Test Vendor";
+  context.cart = [{ product_id: "prod-1", product_name: "Helado", quantity: 1, price: 3000 }];
+  context.delivery_address = "Test Address 123";
+  context.payment_method = "efectivo";
+  context.order_state = "confirming_order";
+  await saveContext(context, supabase);
+  
+  console.log("📍 Building system prompt for confirming_order state");
+  
+  // Import buildSystemPrompt
+  const promptModule = await import("./simplified-prompt.ts");
+  const buildSystemPrompt = promptModule.buildSystemPrompt;
+  
+  const prompt = buildSystemPrompt(context);
+  
+  console.log("📦 Checking prompt content...");
+  
+  // Verify prompt contains explicit instructions
+  assertEquals(
+    prompt.includes("OBLIGATORIO: Mostrá resumen COMPLETO"),
+    true,
+    "Prompt should require showing complete summary"
+  );
+  assertEquals(
+    prompt.includes("NO llames crear_pedido hasta que el usuario responda"),
+    true,
+    "Prompt should prohibit calling crear_pedido without response"
+  );
+  assertEquals(
+    prompt.includes("NUNCA llames crear_pedido automáticamente"),
+    true,
+    "Prompt should explicitly forbid automatic order creation"
+  );
+  
+  console.log("✅ TEST PASSED: Prompt requires explicit confirmation");
+});
