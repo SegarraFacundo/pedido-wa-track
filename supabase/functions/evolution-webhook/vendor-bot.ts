@@ -349,6 +349,9 @@ async function ejecutarHerramienta(
 
         console.log(`✅ Menu generated successfully with ${products.length} products`);
         
+        // 🚀 Después de mostrar el menú, habilitar agregar productos
+        context.order_state = "adding_items";
+
         // 💾 IMPORTANTE: Guardar el contexto después de seleccionar el negocio
         await saveContext(context, supabase);
         console.log(`💾 Context saved with vendor: ${vendor.name} (${vendor.id})`);
