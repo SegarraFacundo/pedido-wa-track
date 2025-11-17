@@ -122,13 +122,13 @@ su ID exacto, primero llamá a ver_locales_abiertos para obtener la lista con ID
     type: "function",
     function: {
       name: "quitar_producto_carrito",
-      description: "Quita un producto específico del carrito",
+      description: "Quita UNA UNIDAD de un producto del carrito. Si el producto tiene múltiples unidades, solo decrementa la cantidad. Si tiene 1 unidad, lo remueve completamente. Puedes usar el nombre del producto o su ID.",
       parameters: {
         type: "object",
         properties: {
           product_id: {
             type: "string",
-            description: "ID del producto a quitar",
+            description: "ID o NOMBRE del producto a quitar (ej: 'alfajor', 'coca cola', o el UUID completo)",
           },
         },
         required: ["product_id"],

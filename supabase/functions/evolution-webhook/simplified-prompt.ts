@@ -48,10 +48,13 @@ ${currentState === "viewing_menu" ? `
 
 ${currentState === "adding_items" ? `
 🛒 ESTADO: ADDING ITEMS (Agregando al Carrito)
-- Ya mostraste el menú → El usuario puede agregar productos
-- Solo usá agregar_al_carrito con productos del menú mostrado
-- El usuario puede agregar más, quitar, o confirmar carrito
-- Cuando el usuario diga "listo", "confirmo", "es todo" → preguntá por dirección
+- ⚠️ IMPORTANTE: Solo llamá agregar_al_carrito UNA VEZ por cada petición del usuario
+- NO llames agregar_al_carrito múltiples veces para el mismo producto
+- El usuario dice "dame una coca" → Llamá agregar_al_carrito({ items: [{ product_name: "coca cola", quantity: 1, ... }] }) UNA SOLA VEZ
+- Si el usuario pide múltiples cosas en un mensaje → Podés incluirlas todas en UN SOLO llamado a agregar_al_carrito
+- Después de agregar → Preguntá "¿Querés agregar algo más o confirmar el pedido?"
+- Si el usuario quiere más productos → Volvé a llamar agregar_al_carrito
+- Si el usuario confirma → Pasá a "reviewing_cart"
 ` : ""}
 
 ${currentState === "reviewing_cart" ? `
