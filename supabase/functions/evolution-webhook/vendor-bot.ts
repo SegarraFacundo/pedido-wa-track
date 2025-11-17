@@ -1080,7 +1080,7 @@ async function ejecutarHerramienta(
           console.error("Error notifying vendor about cancellation:", notifyError);
         }
 
-        return `✅ Pedido #${args.order_id.substring(0, 8)} cancelado.\n📝 Motivo: ${args.motivo}\n\nEl vendedor ha sido notificado.`;
+        return `✅ Pedido #${orderId.substring(0, 8)} cancelado.\n📝 Motivo: ${args.motivo}\n\nEl vendedor ha sido notificado.`;
       }
 
       case "ver_metodos_pago": {
