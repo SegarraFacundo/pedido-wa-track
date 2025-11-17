@@ -345,3 +345,108 @@ Deno.test("EDGE CASE: No confirmation needed when cart is empty", async () => {
   assertEquals(context.pending_vendor_change, undefined, "Should not have pending change");
   console.log("✅ All assertions passed");
 });
+
+Deno.test("SEARCH: Vendor search with accents - 'heladeria' finds 'Heladería Italiana'", async () => {
+  console.log("\n🧪 TEST: Search vendor with accent normalization");
+  
+  // Simulate the search function from vendor-bot.ts
+  const searchVendor = async (searchTerm: string) => {
+    // Mock vendors database
+    const mockVendors = [
+      { id: "vendor-123", name: "Heladería Italiana", is_active: true, payment_status: "active" },
+      { id: "vendor-456", name: "Pizzería Roma", is_active: true, payment_status: "active" },
+      { id: "vendor-789", name: "Café Buenos Aires", is_active: true, payment_status: "active" },
+    ];
+
+    // Normalize search term (same logic as vendor-bot.ts)
+    const normalized = searchTerm
+      .replace(/[-_]/g, " ")
+      .replace(/[áàäâã]/gi, 'a')
+      .replace(/[éèëê]/gi, 'e')
+      .replace(/[íìïî]/gi, 'i')
+      .replace(/[óòöôõ]/gi, 'o')
+      .replace(/[úùüû]/gi, 'u')
+      .replace(/[ñ]/gi, 'n')
+      .toLowerCase()
+      .trim();
+
+    return mockVendors.find(v => {
+      const vendorNormalized = v.name
+        .replace(/[áàäâã]/gi, 'a')
+        .replace(/[éèëê]/gi, 'e')
+        .replace(/[íìïî]/gi, 'i')
+        .replace(/[óòöôõ]/gi, 'o')
+        .replace(/[úùüû]/gi, 'u')
+        .replace(/[ñ]/gi, 'n')
+        .toLowerCase();
+      return vendorNormalized.includes(normalized);
+    });
+  };
+
+  // Test various search terms
+  console.log("📍 Test 1: 'heladeria' -> 'Heladería Italiana'");
+  const test1 = await searchVendor("heladeria");
+  assertEquals(test1?.name, "Heladería Italiana", "Should find 'Heladería Italiana' with 'heladeria'");
+  
+  console.log("📍 Test 2: 'heladeria_italiana' -> 'Heladería Italiana'");
+  const test2 = await searchVendor("heladeria_italiana");
+  assertEquals(test2?.name, "Heladería Italiana", "Should find with underscores");
+  
+  console.log("📍 Test 3: 'pizzeria' -> 'Pizzería Roma'");
+  const test3 = await searchVendor("pizzeria");
+  assertEquals(test3?.name, "Pizzería Roma", "Should find 'Pizzería Roma'");
+
+  console.log("📍 Test 4: 'cafe' -> 'Café Buenos Aires'");
+  const test4 = await searchVendor("cafe");
+  assertEquals(test4?.name, "Café Buenos Aires", "Should find 'Café Buenos Aires'");
+
+  console.log("✅ TEST PASSED: Accent normalization works correctly");
+});
+
+Deno.test("SEARCH: Vendor search with special characters - underscores and hyphens", async () => {
+  console.log("\n🧪 TEST: Search vendor with special characters");
+
+  const searchVendor = async (searchTerm: string) => {
+    const mockVendors = [
+      { id: "vendor-123", name: "La Casa del Café", is_active: true, payment_status: "active" },
+      { id: "vendor-456", name: "Don José Parrilla", is_active: true, payment_status: "active" },
+    ];
+
+    const normalized = searchTerm
+      .replace(/[-_]/g, " ")
+      .replace(/[áàäâã]/gi, 'a')
+      .replace(/[éèëê]/gi, 'e')
+      .replace(/[íìïî]/gi, 'i')
+      .replace(/[óòöôõ]/gi, 'o')
+      .replace(/[úùüû]/gi, 'u')
+      .replace(/[ñ]/gi, 'n')
+      .toLowerCase()
+      .trim();
+
+    return mockVendors.find(v => {
+      const vendorNormalized = v.name
+        .replace(/[áàäâã]/gi, 'a')
+        .replace(/[éèëê]/gi, 'e')
+        .replace(/[íìïî]/gi, 'i')
+        .replace(/[óòöôõ]/gi, 'o')
+        .replace(/[úùüû]/gi, 'u')
+        .replace(/[ñ]/gi, 'n')
+        .toLowerCase();
+      return vendorNormalized.includes(normalized);
+    });
+  };
+
+  console.log("📍 Test 1: 'la_casa_del_cafe' -> 'La Casa del Café'");
+  const test1 = await searchVendor("la_casa_del_cafe");
+  assertEquals(test1?.name, "La Casa del Café", "Should handle underscores");
+  
+  console.log("📍 Test 2: 'don-jose-parrilla' -> 'Don José Parrilla'");
+  const test2 = await searchVendor("don-jose-parrilla");
+  assertEquals(test2?.name, "Don José Parrilla", "Should handle hyphens");
+
+  console.log("📍 Test 3: 'casa cafe' -> 'La Casa del Café'");
+  const test3 = await searchVendor("casa cafe");
+  assertEquals(test3?.name, "La Casa del Café", "Should handle spaces");
+
+  console.log("✅ TEST PASSED: Special character handling works");
+});

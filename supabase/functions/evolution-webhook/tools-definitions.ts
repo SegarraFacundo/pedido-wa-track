@@ -44,13 +44,17 @@ export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "ver_menu_negocio",
-      description: "Obtiene el menú completo de un negocio específico con todos sus productos y precios",
+      description: `Obtiene el menú completo de un negocio específico con todos sus productos y precios.
+      
+⚠️ IMPORTANTE: USA EL ID EXACTO (UUID) que devuelve ver_locales_abiertos.
+NO inventes IDs en formato snake_case. Si el usuario menciona un negocio pero no tenés 
+su ID exacto, primero llamá a ver_locales_abiertos para obtener la lista con IDs reales.`,
       parameters: {
         type: "object",
         properties: {
           vendor_id: {
             type: "string",
-            description: "ID del negocio",
+            description: "ID del negocio (UUID) - usar el ID exacto de ver_locales_abiertos",
           },
         },
         required: ["vendor_id"],

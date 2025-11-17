@@ -284,33 +284,77 @@ async function ejecutarHerramienta(
         // El bot debe preguntar primero al usuario si quiere cancelar su pedido actual
         // y solo después llamar a vaciar_carrito explícitamente
 
-        // Buscar vendor (por ID o nombre)
-        let vendorId = args.vendor_id;
-        let vendor: any = null;
-
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        if (uuidRegex.test(args.vendor_id)) {
-          console.log(`🔎 Searching vendor by UUID: ${args.vendor_id}`);
-          const { data, error: vendorError } = await supabase.from("vendors").select("id, name, is_active, payment_status").eq("id", args.vendor_id).maybeSingle();
-          if (vendorError) console.error("Error finding vendor by ID:", vendorError);
-          vendor = data;
-        } else {
-          const cleanedName = args.vendor_id.replace(/[-_]/g, " ").trim();
-          console.log(`🔎 Searching vendor by name: "${cleanedName}"`);
-          const { data, error: vendorError } = await supabase
-            .from("vendors")
+        // Búsqueda robusta de vendor con múltiples estrategias
+        const searchVendor = async (searchTerm: string) => {
+          // 1. Si es un UUID válido, búsqueda directa
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          if (uuidRegex.test(searchTerm)) {
+            console.log("🔍 Búsqueda por UUID:", searchTerm);
+            const { data } = await supabase.from("vendors")
+              .select("id, name, is_active, payment_status")
+              .eq("id", searchTerm).maybeSingle();
+            if (data) {
+              console.log("✅ Vendor encontrado por UUID:", data.name);
+              return data;
+            }
+          }
+          
+          // 2. Limpiar y búsqueda exacta con ILIKE
+          const cleaned = searchTerm.replace(/[-_]/g, " ").trim();
+          console.log("🔍 Búsqueda exacta con:", cleaned);
+          
+          let { data } = await supabase.from("vendors")
             .select("id, name, is_active, payment_status")
-            .ilike("name", `%${cleanedName}%`)
+            .ilike("name", `%${cleaned}%`)
+            .eq("is_active", true)
             .maybeSingle();
-          if (vendorError) console.error("Error finding vendor by name:", vendorError);
-          vendor = data;
-          if (vendor) vendorId = vendor.id;
-        }
+          if (data) {
+            console.log("✅ Vendor encontrado por coincidencia exacta:", data.name);
+            return data;
+          }
+          
+          // 3. Normalizar acentos manualmente como fallback
+          console.log("🔍 Búsqueda con normalización de acentos");
+          const normalized = cleaned
+            .replace(/[áàäâã]/gi, 'a')
+            .replace(/[éèëê]/gi, 'e')
+            .replace(/[íìïî]/gi, 'i')
+            .replace(/[óòöôõ]/gi, 'o')
+            .replace(/[úùüû]/gi, 'u')
+            .replace(/[ñ]/gi, 'n')
+            .toLowerCase();
+          
+          // Buscar en todos los vendors activos y normalizar nombres
+          const { data: allVendors } = await supabase.from("vendors")
+            .select("id, name, is_active, payment_status")
+            .eq("is_active", true);
+          
+          const found = allVendors?.find(v => {
+            const vendorNormalized = v.name
+              .replace(/[áàäâã]/gi, 'a')
+              .replace(/[éèëê]/gi, 'e')
+              .replace(/[íìïî]/gi, 'i')
+              .replace(/[óòöôõ]/gi, 'o')
+              .replace(/[úùüû]/gi, 'u')
+              .replace(/[ñ]/gi, 'n')
+              .toLowerCase();
+            return vendorNormalized.includes(normalized);
+          });
+          
+          if (found) {
+            console.log("✅ Vendor encontrado por normalización:", found.name);
+          }
+          return found;
+        };
 
+        const vendor = await searchVendor(args.vendor_id);
+        
         if (!vendor) {
           console.log(`❌ Vendor not found: ${args.vendor_id}`);
           return "No encontré ese negocio. Por favor usá el ID exacto que te mostré en la lista de locales abiertos.";
         }
+        
+        const vendorId = vendor.id;
 
         console.log(`✅ Vendor found: ${vendor.id} (${vendor.name}) - Active: ${vendor.is_active}, Payment: ${vendor.payment_status}`);
 
