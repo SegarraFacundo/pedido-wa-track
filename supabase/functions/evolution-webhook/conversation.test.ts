@@ -1107,3 +1107,120 @@ Deno.test("CANCELATION: Finds most recent order if no order_id provided", async 
   
   console.log("✅ TEST PASSED: Automatically finds recent order");
 });
+
+// ==================== PAYMENT METHOD VALIDATION TESTS ====================
+
+Deno.test("PAYMENT VALIDATION: ver_metodos_pago debe guardar métodos en el contexto", async () => {
+  console.log("\n🧪 TEST: ver_metodos_pago saves payment methods to context");
+  
+  const supabase = createMockSupabase();
+  const phone = "5493464448309";
+  const mockVendorId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+  
+  const context = await getContext(phone, supabase);
+  context.selected_vendor_id = mockVendorId;
+  context.order_state = "collecting_payment";
+  
+  // Mock vendor with specific payment settings
+  supabase.from = (table: string) => {
+    if (table === "vendors") {
+      return {
+        select: () => ({
+          eq: () => ({
+            single: () => Promise.resolve({
+              data: {
+                id: mockVendorId,
+                name: "Test Vendor",
+                payment_settings: {
+                  efectivo: true,
+                  mercadoPago: { activo: false },
+                  transferencia: { activo: true, alias: "test.alias", cbu: "1234567890", titular: "Test" }
+                }
+              },
+              error: null
+            })
+          })
+        })
+      };
+    }
+    return {
+      select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: null }) }) }),
+      upsert: () => Promise.resolve({ error: null })
+    };
+  };
+
+  const botModule = await import("./vendor-bot.ts");
+  
+  await botModule.executeToolCall(
+    {
+      name: "ver_metodos_pago",
+      arguments: JSON.stringify({})
+    },
+    context,
+    supabase
+  );
+
+  assertEquals(context.payment_methods_fetched, true, "payment_methods_fetched should be true");
+  assertEquals(context.available_payment_methods?.includes("efectivo"), true, "Should include efectivo");
+  assertEquals(context.available_payment_methods?.includes("transferencia"), true, "Should include transferencia");
+  assertEquals(context.available_payment_methods?.includes("mercadopago"), false, "Should NOT include mercadopago");
+  
+  console.log(`✅ Payment methods saved: ${context.available_payment_methods?.join(", ")}`);
+  console.log("✅ TEST PASSED: Payment methods correctly saved to context");
+});
+
+Deno.test("PAYMENT VALIDATION: Context stores correct payment keys", async () => {
+  console.log("\n🧪 TEST: Validate payment method keys format");
+  
+  const supabase = createMockSupabase();
+  const phone = "5493464448309";
+  const mockVendorId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+  
+  const context = await getContext(phone, supabase);
+  context.selected_vendor_id = mockVendorId;
+  context.order_state = "collecting_payment";
+  
+  // Mock vendor with only efectivo
+  supabase.from = (table: string) => {
+    if (table === "vendors") {
+      return {
+        select: () => ({
+          eq: () => ({
+            single: () => Promise.resolve({
+              data: {
+                id: mockVendorId,
+                name: "Cash Only Vendor",
+                payment_settings: {
+                  efectivo: true,
+                  mercadoPago: { activo: false },
+                  transferencia: { activo: false }
+                }
+              },
+              error: null
+            })
+          })
+        })
+      };
+    }
+    return {
+      select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: null }) }) }),
+      upsert: () => Promise.resolve({ error: null })
+    };
+  };
+
+  const botModule = await import("./vendor-bot.ts");
+  
+  await botModule.executeToolCall(
+    {
+      name: "ver_metodos_pago",
+      arguments: JSON.stringify({})
+    },
+    context,
+    supabase
+  );
+
+  assertEquals(context.available_payment_methods?.length, 1, "Should have exactly 1 payment method");
+  assertEquals(context.available_payment_methods?.[0], "efectivo", "Should be 'efectivo'");
+  
+  console.log("✅ TEST PASSED: Payment method keys stored correctly");
+});

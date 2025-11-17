@@ -73,11 +73,26 @@ ${currentState === "collecting_address" ? `
 
 ${currentState === "collecting_payment" ? `
 💳 ESTADO: COLLECTING PAYMENT (Pidiendo Pago)
-- ⚠️ PRIMERO: Llamá ver_metodos_pago para obtener las opciones REALES del negocio
-- SOLO mostrá los métodos que devuelve esa herramienta
-- NO inventes opciones - usa solo las que el negocio tiene habilitadas
-- Una vez que el usuario elija → Guardá el método y pasá a "confirming_order"
-- NUNCA llames crear_pedido directamente desde este estado
+
+🚨 REGLAS OBLIGATORIAS (NO NEGOCIABLES):
+1️⃣ PRIMERO: Llamá ver_metodos_pago - SIN EXCEPCIONES
+2️⃣ NUNCA preguntes "¿efectivo, transferencia o mercado pago?" sin haber llamado ver_metodos_pago primero
+3️⃣ SOLO mostrá los métodos que ver_metodos_pago devuelva
+4️⃣ SI el usuario elige un método que NO está en la lista → rechazalo y mostrá las opciones reales
+5️⃣ Una vez que el usuario elija un método VÁLIDO → guardalo y pasá a "confirming_order"
+
+❌ PROHIBIDO:
+- Inventar métodos de pago
+- Asumir que todos los métodos están disponibles
+- Pasar a confirming_order sin un método válido
+- Llamar crear_pedido directamente
+
+✅ FLUJO CORRECTO:
+1. Llamar ver_metodos_pago
+2. Mostrar SOLO los métodos devueltos
+3. Esperar elección del usuario
+4. Validar que la elección está en la lista
+5. Guardar método y pasar a confirming_order
 ` : ""}
 
 ${currentState === "confirming_order" ? `

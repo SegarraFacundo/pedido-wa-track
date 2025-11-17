@@ -37,5 +37,7 @@ export interface ConversationContext {
     new_vendor_id: string;
     new_vendor_name: string;
   };
+  payment_methods_fetched?: boolean;
+  available_payment_methods?: string[];
   conversation_history: Array<{ role: "user" | "assistant" | "system"; content: string }>;
 }
