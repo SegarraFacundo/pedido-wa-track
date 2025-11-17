@@ -772,6 +772,109 @@ Deno.test("CONFIRMATION: Prompt should require explicit user confirmation", asyn
   console.log("✅ TEST PASSED: Prompt requires explicit confirmation");
 });
 
+// ==================== CART ITEM REMOVAL TESTS ====================
+
+Deno.test("CART: quitar_producto_carrito debe funcionar con nombre parcial", async () => {
+  console.log("\n🧪 TEST: Remove cart item by partial name");
+  
+  const supabase = createMockSupabase();
+  const context: ConversationContext = {
+    phone: "5493464448309",
+    cart: [
+      { product_id: "uuid-123", product_name: "Alfajor Chocotorta Triple", quantity: 2, price: 1000 },
+      { product_id: "uuid-456", product_name: "Coca Cola 1,5 Litros", quantity: 1, price: 2500 }
+    ],
+    order_state: "adding_items",
+    selected_vendor_id: "vendor-123",
+    selected_vendor_name: "Test Vendor",
+    conversation_history: []
+  };
+
+  const response = await ejecutarHerramienta(
+    "quitar_producto_carrito",
+    { product_id: "alfajor" },
+    context,
+    supabase
+  );
+
+  console.log("Response:", response);
+  console.log("Cart after removal:", context.cart);
+
+  expect(response).toContain("Quité");
+  const alfajorItem = context.cart.find(i => i.product_name.includes("Alfajor"));
+  expect(alfajorItem?.quantity).toBe(1); // Decremented from 2 to 1
+  
+  console.log("✅ TEST PASSED: Cart item quantity decremented correctly");
+});
+
+Deno.test("CART: quitar_producto_carrito debe remover completamente si quantity es 1", async () => {
+  console.log("\n🧪 TEST: Remove cart item completely when quantity is 1");
+  
+  const supabase = createMockSupabase();
+  const context: ConversationContext = {
+    phone: "5493464448309",
+    cart: [
+      { product_id: "uuid-123", product_name: "Alfajor Chocotorta Triple", quantity: 1, price: 1000 }
+    ],
+    order_state: "adding_items",
+    selected_vendor_id: "vendor-123",
+    selected_vendor_name: "Test Vendor",
+    conversation_history: []
+  };
+
+  const response = await ejecutarHerramienta(
+    "quitar_producto_carrito",
+    { product_id: "alfajor" },
+    context,
+    supabase
+  );
+
+  console.log("Response:", response);
+  console.log("Cart after removal:", context.cart);
+
+  expect(response).toContain("Quité");
+  expect(context.cart.length).toBe(0); // Removed completely
+  
+  console.log("✅ TEST PASSED: Cart item removed completely");
+});
+
+Deno.test("CART: agregar_al_carrito no debe duplicar items", async () => {
+  console.log("\n🧪 TEST: Add item to cart without duplication");
+  
+  const supabase = createMockSupabase();
+  const context: ConversationContext = {
+    phone: "5493464448309",
+    cart: [],
+    order_state: "adding_items",
+    selected_vendor_id: mockVendorId,
+    selected_vendor_name: "Test Vendor",
+    conversation_history: []
+  };
+
+  // Simulate AI adding "one coca" ONCE
+  await ejecutarHerramienta(
+    "agregar_al_carrito",
+    {
+      items: [
+        { product_id: "prod-456", product_name: "Coca Cola 1.5L", quantity: 1, price: 2500 }
+      ]
+    },
+    context,
+    supabase
+  );
+
+  console.log("Cart after adding:", context.cart);
+
+  // Verify only 1 unit
+  const cocaItem = context.cart.find(i => i.product_name.includes("Coca"));
+  expect(cocaItem?.quantity).toBe(1);
+  expect(context.cart.length).toBe(1);
+  
+  console.log("✅ TEST PASSED: Cart item added without duplication");
+});
+
+// ==================== ORDER CANCELLATION TESTS ====================
+
 Deno.test("CANCELATION: Can cancel last order without providing order_id", async () => {
   console.log("\n🧪 TEST: Cancel last order without order_id");
   

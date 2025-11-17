@@ -540,6 +540,16 @@ async function ejecutarHerramienta(
         }
 
         const total = context.cart.reduce((s, i) => s + i.price * i.quantity, 0);
+        
+        // 🔍 LOGGING: Mostrar estado final del carrito para debugging
+        console.log("🛒 ===== CART AFTER ADDING =====");
+        console.log(`📦 Total items: ${context.cart.length}`);
+        context.cart.forEach(item => {
+          console.log(`   - ${item.product_name} x${item.quantity} ($${item.price} c/u)`);
+        });
+        console.log(`💰 Cart total: $${total}`);
+        console.log("================================");
+        
         return `✅ Productos agregados al carrito de ${context.selected_vendor_name}.\n💰 Total actual: $${total}`;
       }
 
@@ -565,12 +575,33 @@ async function ejecutarHerramienta(
       }
 
       case "quitar_producto_carrito": {
-        const index = context.cart.findIndex((item) => item.product_id === args.product_id);
+        const searchTerm = args.product_id.toLowerCase();
+        
+        // Buscar por UUID o por nombre parcial
+        const index = context.cart.findIndex((item) => 
+          item.product_id === args.product_id || 
+          item.product_name.toLowerCase().includes(searchTerm)
+        );
+        
         if (index !== -1) {
-          const removed = context.cart.splice(index, 1)[0];
-          return `Quité ${removed.product_name} del carrito`;
+          const item = context.cart[index];
+          
+          // Si tiene más de 1 unidad, solo decrementar
+          if (item.quantity > 1) {
+            item.quantity -= 1;
+            console.log(`📦 Decreased ${item.product_name} quantity to ${item.quantity}`);
+            return `✅ Quité una unidad de ${item.product_name}. Ahora tenés ${item.quantity} en el carrito.`;
+          } else {
+            // Si solo hay 1, remover completamente
+            const removed = context.cart.splice(index, 1)[0];
+            console.log(`📦 Removed ${removed.product_name} from cart completely`);
+            return `✅ Quité ${removed.product_name} del carrito.`;
+          }
         }
-        return "Producto no encontrado en el carrito";
+        
+        console.warn(`❌ Product not found in cart: ${args.product_id}`);
+        console.log(`🛒 Current cart:`, context.cart.map(i => `${i.product_name} (${i.product_id})`));
+        return "❌ No encontré ese producto en el carrito. ¿Querés que te muestre lo que tenés en el carrito?";
       }
 
       case "crear_pedido": {
