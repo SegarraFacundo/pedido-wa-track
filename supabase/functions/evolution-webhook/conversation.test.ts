@@ -771,3 +771,236 @@ Deno.test("CONFIRMATION: Prompt should require explicit user confirmation", asyn
   
   console.log("✅ TEST PASSED: Prompt requires explicit confirmation");
 });
+
+Deno.test("CANCELATION: Can cancel last order without providing order_id", async () => {
+  console.log("\n🧪 TEST: Cancel last order without order_id");
+  
+  const supabase = createMockSupabase();
+  const phone = "5493464448312";
+  const orderId = "a29eecaa-1234-5678-90ab-cdef12345678";
+  
+  // Setup context with last_order_id
+  const context = await getContext(phone, supabase);
+  context.last_order_id = orderId;
+  await saveContext(context, supabase);
+  
+  console.log(`📍 Context has last_order_id: ${orderId}`);
+  
+  // Mock order lookup
+  supabase.from = (table: string) => {
+    if (table === "orders") {
+      return {
+        select: () => ({
+          eq: () => ({
+            single: () => Promise.resolve({
+              data: {
+                id: orderId,
+                customer_phone: phone,
+                status: "pending",
+                total: 5000,
+              },
+              error: null
+            })
+          })
+        }),
+        update: () => ({
+          eq: () => Promise.resolve({ error: null })
+        })
+      };
+    }
+    if (table === "order_status_history") {
+      return {
+        insert: () => Promise.resolve({ error: null })
+      };
+    }
+    return {
+      select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: null }) }) }),
+      upsert: () => Promise.resolve({ error: null })
+    };
+  };
+  
+  // Import tool execution
+  const botModule = await import("./vendor-bot.ts");
+  
+  console.log("🚀 Executing cancelar_pedido without order_id");
+  
+  // This should use context.last_order_id
+  const result = await botModule.executeToolCall(
+    {
+      name: "cancelar_pedido",
+      arguments: JSON.stringify({
+        motivo: "El negocio no tiene mercado pago disponible"
+      })
+    },
+    context,
+    supabase
+  );
+  
+  console.log(`📦 Result: ${result}`);
+  
+  assertEquals(
+    result.includes("cancelado"),
+    true,
+    "Should confirm cancellation"
+  );
+  
+  console.log("✅ TEST PASSED: Can cancel without order_id using context");
+});
+
+Deno.test("CANCELATION: Can cancel using 8-character partial ID", async () => {
+  console.log("\n🧪 TEST: Cancel using partial ID");
+  
+  const supabase = createMockSupabase();
+  const phone = "5493464448313";
+  const fullId = "a29eecaa-1234-5678-90ab-cdef12345678";
+  const partialId = "a29eecaa";
+  
+  const context = await getContext(phone, supabase);
+  await saveContext(context, supabase);
+  
+  console.log(`📍 Attempting to cancel with partial ID: ${partialId}`);
+  
+  // Mock partial ID search
+  supabase.from = (table: string) => {
+    if (table === "orders") {
+      const chainable = {
+        select: () => chainable,
+        eq: () => chainable,
+        ilike: () => chainable,
+        limit: () => Promise.resolve({
+          data: [{ id: fullId }],
+          error: null
+        }),
+        single: () => Promise.resolve({
+          data: {
+            id: fullId,
+            customer_phone: phone,
+            status: "pending",
+            total: 5000,
+          },
+          error: null
+        }),
+        update: () => ({
+          eq: () => Promise.resolve({ error: null })
+        })
+      };
+      return chainable;
+    }
+    if (table === "order_status_history") {
+      return {
+        insert: () => Promise.resolve({ error: null })
+      };
+    }
+    return {
+      select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: null }) }) }),
+      upsert: () => Promise.resolve({ error: null })
+    };
+  };
+  
+  const botModule = await import("./vendor-bot.ts");
+  
+  console.log("🚀 Executing cancelar_pedido with partial ID");
+  
+  const result = await botModule.executeToolCall(
+    {
+      name: "cancelar_pedido",
+      arguments: JSON.stringify({
+        order_id: partialId,
+        motivo: "Cambié de opinión sobre el pedido completo"
+      })
+    },
+    context,
+    supabase
+  );
+  
+  console.log(`📦 Result: ${result}`);
+  
+  assertEquals(
+    result.includes("cancelado"),
+    true,
+    "Should cancel using partial ID"
+  );
+  
+  console.log("✅ TEST PASSED: Can cancel with 8-char partial ID");
+});
+
+Deno.test("CANCELATION: Finds most recent order if no order_id provided", async () => {
+  console.log("\n🧪 TEST: Find recent order automatically");
+  
+  const supabase = createMockSupabase();
+  const phone = "5493464448314";
+  const recentOrderId = "recent-order-123";
+  
+  const context = await getContext(phone, supabase);
+  // No last_order_id in context
+  await saveContext(context, supabase);
+  
+  console.log("📍 No last_order_id in context, should search recent orders");
+  
+  // Mock recent order search
+  supabase.from = (table: string) => {
+    if (table === "orders") {
+      const chainable = {
+        select: () => chainable,
+        eq: () => chainable,
+        in: () => chainable,
+        order: () => chainable,
+        limit: () => Promise.resolve({
+          data: [{ 
+            id: recentOrderId,
+            status: "pending",
+            created_at: new Date().toISOString()
+          }],
+          error: null
+        }),
+        single: () => Promise.resolve({
+          data: {
+            id: recentOrderId,
+            customer_phone: phone,
+            status: "pending",
+            total: 3000,
+          },
+          error: null
+        }),
+        update: () => ({
+          eq: () => Promise.resolve({ error: null })
+        })
+      };
+      return chainable;
+    }
+    if (table === "order_status_history") {
+      return {
+        insert: () => Promise.resolve({ error: null })
+      };
+    }
+    return {
+      select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: null }) }) }),
+      upsert: () => Promise.resolve({ error: null })
+    };
+  };
+  
+  const botModule = await import("./vendor-bot.ts");
+  
+  console.log("🚀 Executing cancelar_pedido without any order_id");
+  
+  const result = await botModule.executeToolCall(
+    {
+      name: "cancelar_pedido",
+      arguments: JSON.stringify({
+        motivo: "No quiero el pedido más reciente que hice"
+      })
+    },
+    context,
+    supabase
+  );
+  
+  console.log(`📦 Result: ${result}`);
+  
+  assertEquals(
+    result.includes("cancelado"),
+    true,
+    "Should find and cancel most recent order"
+  );
+  
+  console.log("✅ TEST PASSED: Automatically finds recent order");
+});
