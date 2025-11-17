@@ -1796,19 +1796,60 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     if (context.order_state === "confirming_vendor_change") {
       const userResponse = userMessage.toLowerCase().trim();
       
+      // Helper function to hash phone for analytics privacy
+      const hashPhone = async (phone: string): Promise<string> => {
+        const msgBuffer = new TextEncoder().encode(phone);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      };
+      
       // ✅ Usuario confirma el cambio
       if (userResponse.match(/^(s[ií]|si|yes|dale|ok|confirmo|cambio|cambiar)/)) {
         console.log(`✅ User confirmed vendor change`);
         
         const oldVendor = context.selected_vendor_name;
+        const oldVendorId = context.selected_vendor_id;
         const newVendor = context.pending_vendor_change!.new_vendor_name;
+        const newVendorId = context.pending_vendor_change!.new_vendor_id;
+        const cartTotal = context.cart.reduce((s, i) => s + i.price * i.quantity, 0);
+        const cartItemsCount = context.cart.length;
+        
+        // 📊 Track analytics - Usuario CONFIRMÓ el cambio
+        try {
+          const phoneHash = await hashPhone(context.phone);
+          const { error: analyticsError } = await supabase
+            .from('vendor_change_analytics')
+            .insert({
+              user_phone_hash: phoneHash,
+              action: 'confirmed',
+              current_vendor_id: oldVendorId,
+              current_vendor_name: oldVendor || 'Unknown',
+              pending_vendor_id: newVendorId,
+              pending_vendor_name: newVendor,
+              cart_items_count: cartItemsCount,
+              cart_total_amount: cartTotal,
+              order_state: context.order_state,
+              metadata: {
+                cart_items: context.cart.map(i => ({ name: i.product_name, qty: i.quantity }))
+              }
+            });
+          
+          if (analyticsError) {
+            console.error('📊 Error tracking vendor change confirmation:', analyticsError);
+          } else {
+            console.log(`📊 Analytics tracked: User confirmed change from ${oldVendor} to ${newVendor}`);
+          }
+        } catch (error) {
+          console.error('📊 Error in analytics tracking:', error);
+        }
         
         // Vaciar carrito
         context.cart = [];
         
         // Aplicar cambio de negocio
-        context.selected_vendor_id = context.pending_vendor_change!.new_vendor_id;
-        context.selected_vendor_name = context.pending_vendor_change!.new_vendor_name;
+        context.selected_vendor_id = newVendorId;
+        context.selected_vendor_name = newVendor;
         context.pending_vendor_change = undefined;
         context.order_state = "viewing_menu";
         
@@ -1837,6 +1878,41 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         console.log(`❌ User cancelled vendor change`);
         
         const oldVendor = context.selected_vendor_name;
+        const oldVendorId = context.selected_vendor_id;
+        const pendingVendor = context.pending_vendor_change!.new_vendor_name;
+        const pendingVendorId = context.pending_vendor_change!.new_vendor_id;
+        const cartTotal = context.cart.reduce((s, i) => s + i.price * i.quantity, 0);
+        const cartItemsCount = context.cart.length;
+        
+        // 📊 Track analytics - Usuario CANCELÓ el cambio
+        try {
+          const phoneHash = await hashPhone(context.phone);
+          const { error: analyticsError } = await supabase
+            .from('vendor_change_analytics')
+            .insert({
+              user_phone_hash: phoneHash,
+              action: 'cancelled',
+              current_vendor_id: oldVendorId!,
+              current_vendor_name: oldVendor || 'Unknown',
+              pending_vendor_id: pendingVendorId,
+              pending_vendor_name: pendingVendor,
+              cart_items_count: cartItemsCount,
+              cart_total_amount: cartTotal,
+              order_state: context.order_state,
+              metadata: {
+                cart_items: context.cart.map(i => ({ name: i.product_name, qty: i.quantity }))
+              }
+            });
+          
+          if (analyticsError) {
+            console.error('📊 Error tracking vendor change cancellation:', analyticsError);
+          } else {
+            console.log(`📊 Analytics tracked: User cancelled change, kept ${oldVendor}`);
+          }
+        } catch (error) {
+          console.error('📊 Error in analytics tracking:', error);
+        }
+        
         context.pending_vendor_change = undefined;
         context.order_state = "adding_items";
         

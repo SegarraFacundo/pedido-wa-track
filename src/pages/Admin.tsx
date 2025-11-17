@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Store, DollarSign, BarChart3, LogOut, Headphones, Bot, Star } from "lucide-react";
+import { Store, DollarSign, BarChart3, LogOut, Headphones, Bot, Star, TrendingUp } from "lucide-react";
 import VendorManagement from "@/components/admin/VendorManagement";
 import CommissionManagement from "@/components/admin/CommissionManagement";
 import CommissionReports from "@/components/admin/CommissionReports";
@@ -14,6 +14,7 @@ import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { EvolutionConfig } from "@/components/EvolutionConfig";
 import AdminPaymentMetrics from "@/components/admin/AdminPaymentMetrics";
 import CommissionInvoiceGenerator from "@/components/admin/CommissionInvoiceGenerator";
+import { VendorChangeAnalytics } from "@/components/admin/VendorChangeAnalytics";
 import lapachoLogo from "@/assets/lapacho-logo.png";
 import lapachoIcon from "@/assets/lapacho-icon.png";
 
@@ -99,7 +100,7 @@ export default function Admin() {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue="vendors" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-8 mb-8">
+          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-9 mb-8">
             <TabsTrigger value="vendors">
               <Store className="mr-2 h-4 w-4" />
               <span className="hidden sm:inline">Negocios</span>
@@ -111,6 +112,10 @@ export default function Admin() {
             <TabsTrigger value="metrics">
               <BarChart3 className="mr-2 h-4 w-4" />
               <span className="hidden sm:inline">Métricas</span>
+            </TabsTrigger>
+            <TabsTrigger value="analytics">
+              <TrendingUp className="mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">Analytics</span>
             </TabsTrigger>
             <TabsTrigger value="invoices">
               <BarChart3 className="mr-2 h-4 w-4" />
@@ -144,6 +149,10 @@ export default function Admin() {
 
           <TabsContent value="metrics">
             <AdminPaymentMetrics />
+          </TabsContent>
+
+          <TabsContent value="analytics">
+            <VendorChangeAnalytics />
           </TabsContent>
 
           <TabsContent value="invoices">
