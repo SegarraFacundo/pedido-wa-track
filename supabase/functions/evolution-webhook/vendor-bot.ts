@@ -2304,34 +2304,6 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       
       return clarificationResponse;
     }
-      
-      // ❌ Usuario cancela el cambio
-      if (userResponse.match(/^(no|nop|cancel|mantene|qued)/)) {
-        console.log(`❌ User cancelled vendor change`);
-        
-        // Registrar analytics
-        await trackVendorChange(context, 'cancelled', supabase);
-        
-        context.pending_vendor_change = undefined;
-        await saveContext(context, supabase);
-        
-        const response = `👍 Perfecto, seguimos con tu pedido de *${context.selected_vendor_name}*.\n\n¿Qué más querés agregar?`;
-        context.conversation_history.push({
-          role: "assistant",
-          content: response
-        });
-        
-        return response;
-      }
-      
-      // Respuesta no clara, repetir pregunta
-      const clarification = `No entendí tu respuesta. ¿Querés cambiar a *${context.pending_vendor_change.new_vendor_name}*?\n\nRespondé *"sí"* para cambiar o *"no"* para mantener tu pedido actual de *${context.selected_vendor_name}*.`;
-      context.conversation_history.push({
-        role: "assistant",
-        content: clarification
-      });
-      return clarification;
-    }
 
     // Inicializar OpenAI
     const openai = new OpenAI({
