@@ -22,6 +22,13 @@ ${context.user_latitude && context.user_longitude ? "- ✅ Con ubicación GPS" :
 
 ${contextInfo}
 
+🚚 REGLAS DE DELIVERY:
+- El costo de delivery es FIJO por pedido, no depende de la distancia
+- NO pidas ubicación GPS al cliente para calcular delivery
+- El cliente puede escribir su dirección de texto directamente
+- El negocio validará manualmente si hace delivery a esa zona después de recibir el pedido
+- SIEMPRE incluí el costo de delivery en el total del pedido
+
 ⚡ REGLAS POR ESTADO:
 
 ${currentState === "idle" ? `
