@@ -55,6 +55,33 @@ export function VendorPaymentSettings({ vendorId }: VendorPaymentSettingsProps) 
     loadSettings();
   }, [vendorId]);
 
+  // Detectar callbacks de MercadoPago
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const mpConnected = params.get('mp_connected');
+    const mpError = params.get('mp_error');
+
+    if (mpConnected === 'true') {
+      toast({
+        title: '¡MercadoPago conectado!',
+        description: 'Tu cuenta de MercadoPago se conectó exitosamente',
+      });
+      loadSettings(); // Recargar settings para ver la conexión
+      // Limpiar URL
+      window.history.replaceState({}, '', '/vendor');
+    }
+
+    if (mpError) {
+      toast({
+        title: 'Error al conectar MercadoPago',
+        description: decodeURIComponent(mpError),
+        variant: 'destructive',
+      });
+      // Limpiar URL
+      window.history.replaceState({}, '', '/vendor');
+    }
+  }, []);
+
   const loadSettings = async () => {
     try {
       const { data, error } = await supabase
@@ -131,10 +158,8 @@ export function VendorPaymentSettings({ vendorId }: VendorPaymentSettingsProps) 
 
   const connectMercadoPago = async () => {
     try {
-      const redirectUri = `${window.location.origin}/vendor`;
-      
       const { data, error } = await supabase.functions.invoke('get-mercadopago-auth-url', {
-        body: { vendorId, redirectUri },
+        body: { vendorId },
       });
 
       if (error) throw error;

@@ -972,8 +972,25 @@ async function ejecutarHerramienta(
         console.log(`🔄 STATE TRANSITION: ${oldState} → ${newState} (order created with ${context.payment_method})`);
 
         if (context.payment_method.toLowerCase().includes("transferencia")) {
-          confirmacion += `📱 *Datos para transferencia:*\n\n`;
-          confirmacion += `Por favor enviá el comprobante de pago para confirmar el pedido.`;
+          // Obtener datos de transferencia del vendor
+          const { data: vendorData } = await supabase
+            .from("vendors")
+            .select("payment_settings")
+            .eq("id", context.selected_vendor_id)
+            .single();
+          
+          const transferData = vendorData?.payment_settings?.transferencia;
+          
+          if (transferData && transferData.activo) {
+            confirmacion += `📱 *Datos para transferencia:*\n\n`;
+            confirmacion += `• *Alias:* ${transferData.alias}\n`;
+            confirmacion += `• *CBU/CVU:* ${transferData.cbu}\n`;
+            confirmacion += `• *Titular:* ${transferData.titular}\n\n`;
+            confirmacion += `¿Confirmás que deseas proceder con la *transferencia bancaria* para completar tu pedido? 😊\n\n`;
+            confirmacion += `Respondé *"sí"* para confirmar o *"no"* para cancelar.`;
+          } else {
+            confirmacion += `⚠️ Hubo un problema al obtener los datos de transferencia. Por favor contactá al negocio.`;
+          }
         } else if (context.payment_method.toLowerCase().includes("efectivo")) {
           confirmacion += `💵 Pagás en efectivo al recibir el pedido.\n\n`;
           confirmacion += `El delivery te contactará pronto. 🚚`;
@@ -2173,22 +2190,120 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         
         await saveContext(context, supabase);
         
-        // Mostrar menú del nuevo negocio
-        const menuResult = await ejecutarHerramienta(
-          "ver_menu_negocio",
-          { vendor_id: context.selected_vendor_id },
-          context,
-          supabase
-        );
+        // Respuesta del bot
+        const response = `✅ Listo, cambiamos a ${context.selected_vendor_name}.\n\n¿Qué querés pedir?`;
         
-        const response = `✅ Perfecto! Cambié tu pedido a *${context.selected_vendor_name}*.\n\n${menuResult}`;
         context.conversation_history.push({
           role: "assistant",
-          content: response
+          content: response,
         });
+        await saveContext(context, supabase);
         
         return response;
       }
+      
+      // ❌ Usuario rechaza el cambio
+      if (userResponse.match(/^(no|nop|cancel|cancela)/)) {
+        console.log(`❌ User rejected vendor change`);
+        
+        // Registrar analytics
+        await trackVendorChange(context, 'cancelled', supabase);
+        
+        // Mantener todo igual
+        context.pending_vendor_change = undefined;
+        await saveContext(context, supabase);
+        
+        const response = `Ok, seguimos con ${context.selected_vendor_name}. ¿Qué más querés agregar al pedido?`;
+        
+        context.conversation_history.push({
+          role: "assistant",
+          content: response,
+        });
+        await saveContext(context, supabase);
+        
+        return response;
+      }
+      
+      // Si la respuesta no es clara, volver a preguntar
+      const clarificationResponse = `Por favor confirmá si querés cambiar de negocio.\n\nRespondé *"sí"* para cambiar a ${context.pending_vendor_change.new_vendor_name} o *"no"* para seguir con ${context.selected_vendor_name}.`;
+      
+      context.conversation_history.push({
+        role: "assistant",
+        content: clarificationResponse,
+      });
+      await saveContext(context, supabase);
+      
+      return clarificationResponse;
+    }
+
+    // 🔄 MANEJO ESPECIAL: Confirmación de transferencia bancaria
+    if (context.order_state === "order_pending_transfer") {
+      const userResponse = message.toLowerCase().trim();
+      
+      // ✅ Usuario confirma la transferencia
+      if (userResponse.match(/^(s[ií]|si|yes|dale|ok|confirmo|listo|perfecto)/)) {
+        console.log(`✅ User confirmed bank transfer payment`);
+        
+        context.order_state = "order_confirmed";
+        await saveContext(context, supabase);
+        
+        const response = `✅ ¡Perfecto! Tu pedido está confirmado.\n\n` +
+                        `📸 Ahora enviame el *comprobante de transferencia* para que el negocio pueda procesar tu pedido.\n\n` +
+                        `Podés enviar una foto o captura del comprobante. 📱`;
+        
+        context.conversation_history.push({
+          role: "assistant",
+          content: response,
+        });
+        await saveContext(context, supabase);
+        
+        return response;
+      }
+      
+      // ❌ Usuario cancela el pedido
+      if (userResponse.match(/^(no|nop|cancel|cancela|cancelar)/)) {
+        console.log(`❌ User cancelled order during transfer confirmation`);
+        
+        // Cancelar el pedido si existe
+        if (context.pending_order_id) {
+          await supabase
+            .from("orders")
+            .update({ status: "cancelled" })
+            .eq("id", context.pending_order_id);
+        }
+        
+        context.order_state = "idle";
+        context.pending_order_id = undefined;
+        context.cart = [];
+        context.selected_vendor_id = undefined;
+        context.selected_vendor_name = undefined;
+        context.payment_method = undefined;
+        context.delivery_address = undefined;
+        await saveContext(context, supabase);
+        
+        const response = `Pedido cancelado. ¿En qué más puedo ayudarte? 😊`;
+        
+        context.conversation_history.push({
+          role: "assistant",
+          content: response,
+        });
+        await saveContext(context, supabase);
+        
+        return response;
+      }
+      
+      // Si la respuesta no es clara, recordar que debe confirmar
+      const clarificationResponse = `Por favor confirmá si vas a hacer la transferencia bancaria.\n\n` +
+                                    `Respondé *"sí"* para confirmar o *"no"* para cancelar el pedido.`;
+      
+      context.conversation_history.push({
+        role: "assistant",
+        content: clarificationResponse,
+      });
+      await saveContext(context, supabase);
+      
+      return clarificationResponse;
+    }
       
       // ❌ Usuario cancela el cambio
       if (userResponse.match(/^(no|nop|cancel|mantene|qued)/)) {
