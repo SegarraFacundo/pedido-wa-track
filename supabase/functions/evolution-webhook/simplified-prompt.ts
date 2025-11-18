@@ -121,16 +121,21 @@ DESPUÉS DE CONFIRMAR:
 ` : ""}
 
   ${currentState === "order_pending_transfer" ? `
-📱 ESTADO: ORDER PENDING TRANSFER (Esperando comprobante)
-- El pedido fue creado, esperando comprobante de transferencia
-- Dale los datos bancarios al usuario
-- Pedí que envíe el comprobante de transferencia
-- Una vez recibido el comprobante → cambiar a "order_confirmed"
+📱 ESTADO: ORDER PENDING TRANSFER (Esperando confirmación y comprobante)
+
+🔄 FLUJO:
+1. Ya le mostraste los datos bancarios (alias, CBU, titular)
+2. AHORA espera que el usuario confirme con "sí", "ok", "dale", etc.
+3. Si confirma → El sistema cambiará automáticamente a "order_confirmed" y explicará que debe enviar el comprobante
+4. Si dice "no" o "cancelar" → El sistema cancelará el pedido automáticamente
+
+⚠️ NO vuelvas a pedir confirmación si ya lo hiciste
+⚠️ La lógica de confirmación está manejada automáticamente por el sistema
 
 📊 CONSULTAR ESTADO:
 - Si el usuario pregunta "cómo va mi pedido", "estado", "dónde está" → llamá ver_estado_pedido (sin order_id, usará automáticamente el contexto)
 
-- Si quiere cancelar → cambiar a "order_cancelled"
+- Si quiere hacer otro pedido → cambiar a "idle"
 ` : ""}
 
   ${currentState === "order_pending_mp" ? `

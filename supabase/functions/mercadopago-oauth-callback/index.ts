@@ -21,10 +21,14 @@ serve(async (req) => {
 
     if (error) {
       console.error('OAuth error:', error);
-      return new Response(
-        JSON.stringify({ error: 'Authorization failed', details: error }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      const appUrl = Deno.env.get('APP_URL') || 'https://tu-app.lovable.app';
+      return new Response(null, {
+        status: 302,
+        headers: {
+          ...corsHeaders,
+          'Location': `${appUrl}/vendor?mp_error=${encodeURIComponent('Autorización cancelada o denegada')}`,
+        },
+      });
     }
 
     if (!code || !state) {
@@ -127,19 +131,24 @@ serve(async (req) => {
     console.log('MercadoPago connected successfully for vendor:', vendorId);
 
     // Redirect to vendor dashboard with success message
+    const appUrl = Deno.env.get('APP_URL') || 'https://tu-app.lovable.app';
     return new Response(null, {
       status: 302,
       headers: {
         ...corsHeaders,
-        'Location': `/vendor?mp_connected=true`,
+        'Location': `${appUrl}/vendor?mp_connected=true`,
       },
     });
 
   } catch (error) {
     console.error('Error in MercadoPago OAuth callback:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    const appUrl = Deno.env.get('APP_URL') || 'https://tu-app.lovable.app';
+    return new Response(null, {
+      status: 302,
+      headers: {
+        ...corsHeaders,
+        'Location': `${appUrl}/vendor?mp_error=${encodeURIComponent(error.message)}`,
+      },
+    });
   }
 });
