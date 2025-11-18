@@ -994,9 +994,11 @@ async function ejecutarHerramienta(
           confirmacion += `💵 Pagás en efectivo al recibir el pedido.\n\n`;
           confirmacion += `El delivery te contactará pronto. 🚚`;
         } else if (context.payment_method.toLowerCase().includes("mercadopago")) {
-          confirmacion += `💳 Generando link de pago de MercadoPago...\n\n`;
+          // 🔗 Generar link de pago ANTES de armar el mensaje (forzar envío automático)
+          let paymentLinkGenerated = false;
+          let paymentLinkUrl = "";
+          let paymentErrorMsg = "";
           
-          // 🔗 Generar link de pago de MercadoPago
           try {
             console.log("💳 Generating MercadoPago payment link for order:", order.id);
             const { data: paymentData, error: paymentError } = await supabase.functions.invoke("generate-payment-link", {
@@ -1005,35 +1007,44 @@ async function ejecutarHerramienta(
 
             if (paymentError) {
               console.error("❌ Error generating payment link:", paymentError);
-              confirmacion += `⚠️ Hubo un problema al generar el link de pago. El negocio te contactará para coordinar el pago.`;
+              paymentErrorMsg = "⚠️ Hubo un problema al generar el link de pago. El negocio te contactará.";
             } else if (paymentData?.success && paymentData?.payment_link) {
               console.log("✅ MercadoPago payment link generated:", paymentData.payment_link);
-              confirmacion += `🔗 *Link de pago:*\n${paymentData.payment_link}\n\n`;
-              confirmacion += `👆 Tocá el link para completar tu pago de forma segura con MercadoPago.`;
+              paymentLinkGenerated = true;
+              paymentLinkUrl = paymentData.payment_link;
             } else if (paymentData?.available_methods) {
               // MercadoPago no está configurado, mostrar métodos alternativos
               console.log("⚠️ MercadoPago not configured, showing alternative methods");
-              confirmacion += `⚠️ MercadoPago no está disponible en este momento.\n\n`;
-              confirmacion += `Métodos de pago alternativos:\n\n`;
+              paymentErrorMsg = "⚠️ MercadoPago no está disponible en este momento.\n\n";
+              paymentErrorMsg += "Métodos de pago alternativos:\n\n";
               
               for (const method of paymentData.available_methods) {
                 if (method.method === 'transferencia') {
-                  confirmacion += `📱 *Transferencia bancaria:*\n`;
-                  confirmacion += `• Alias: ${method.details.alias}\n`;
-                  confirmacion += `• CBU/CVU: ${method.details.cbu}\n`;
-                  confirmacion += `• Titular: ${method.details.titular}\n`;
-                  confirmacion += `• Monto: $${method.details.amount}\n\n`;
+                  paymentErrorMsg += `📱 *Transferencia bancaria:*\n`;
+                  paymentErrorMsg += `• Alias: ${method.details.alias}\n`;
+                  paymentErrorMsg += `• CBU/CVU: ${method.details.cbu}\n`;
+                  paymentErrorMsg += `• Titular: ${method.details.titular}\n`;
+                  paymentErrorMsg += `• Monto: $${method.details.amount}\n\n`;
                 } else if (method.method === 'efectivo') {
-                  confirmacion += `💵 *Efectivo:* ${method.details.message}\n\n`;
+                  paymentErrorMsg += `💵 *Efectivo:* ${method.details.message}\n\n`;
                 }
               }
-              confirmacion += `Por favor elegí uno de estos métodos para continuar.`;
             } else {
-              confirmacion += `⚠️ No se pudo generar el link de pago. El negocio te contactará para coordinar.`;
+              paymentErrorMsg = "⚠️ No se pudo generar el link de pago. El negocio te contactará para coordinar.";
             }
           } catch (paymentException) {
             console.error("💥 Exception generating payment link:", paymentException);
-            confirmacion += `⚠️ Error al procesar el pago. El negocio te contactará.`;
+            paymentErrorMsg = "⚠️ Error al procesar el pago. El negocio te contactará.";
+          }
+          
+          // ✅ FORZAR inclusión del link en el mensaje (independiente del modelo de IA)
+          if (paymentLinkGenerated) {
+            confirmacion += `💳 *¡Link de pago listo!*\n\n`;
+            confirmacion += `🔗 ${paymentLinkUrl}\n\n`;
+            confirmacion += `👆 Tocá el link para pagar de forma segura con MercadoPago.\n\n`;
+            confirmacion += `Una vez que completes el pago, recibirás la confirmación automáticamente. 😊`;
+          } else {
+            confirmacion += paymentErrorMsg;
           }
         }
 
