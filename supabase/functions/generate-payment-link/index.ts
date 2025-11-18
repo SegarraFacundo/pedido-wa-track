@@ -50,12 +50,39 @@ serve(async (req) => {
       console.log('Creating MercadoPago preference...');
       
       const items = Array.isArray(order.items) ? order.items : [];
+      
+      // 💰 Calcular subtotal de productos
+      const subtotal = items.reduce((sum: number, item: any) => 
+        sum + (parseFloat(item.price || 0) * (item.quantity || 1)), 0
+      );
+      console.log('📊 Subtotal calculated:', subtotal);
+      
+      // 🚚 Calcular costo de delivery (total - subtotal)
+      const deliveryCost = parseFloat(order.total) - subtotal;
+      console.log('🚚 Delivery cost calculated:', deliveryCost);
+      console.log('💵 Order total:', order.total);
+      
+      // 📦 Construir items de MercadoPago con cantidades correctas
+      const mpItems = items.map((item: any) => ({
+        title: item.product_name || item.name || 'Producto',
+        quantity: item.quantity || 1,
+        unit_price: parseFloat(item.price || 0),
+      }));
+      
+      // ✅ Agregar delivery como item adicional si es > 0
+      if (deliveryCost > 0) {
+        mpItems.push({
+          title: '🚚 Costo de Delivery',
+          quantity: 1,
+          unit_price: parseFloat(deliveryCost.toFixed(2)),
+        });
+        console.log('✅ Delivery added as separate item:', deliveryCost.toFixed(2));
+      }
+      
+      console.log('📋 Items to send to MercadoPago:', JSON.stringify(mpItems, null, 2));
+      
       const preferenceData = {
-        items: items.map((item: any) => ({
-          title: item.name || 'Producto',
-          quantity: item.quantity || 1,
-          unit_price: item.price || 0,
-        })),
+        items: mpItems,
         payer: {
           name: order.customer_name,
           phone: {
