@@ -192,16 +192,16 @@ su ID exacto, primero llamá a ver_locales_abiertos para obtener la lista con ID
     type: "function",
     function: {
       name: "ver_estado_pedido",
-      description: "Consulta el estado actual de un pedido",
+      description: "Consulta el estado actual de un pedido. Si no se proporciona order_id, usa automáticamente el último pedido del usuario del contexto.",
       parameters: {
         type: "object",
         properties: {
           order_id: {
             type: "string",
-            description: "ID del pedido a consultar",
+            description: "ID del pedido a consultar (opcional - si no se proporciona, usa el último pedido del contexto)",
           },
         },
-        required: ["order_id"],
+        required: [],
       },
     },
   },
