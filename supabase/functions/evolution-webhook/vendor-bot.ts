@@ -680,10 +680,20 @@ async function ejecutarHerramienta(
           currentState: context.order_state,
         });
         
-        // ⚠️ VALIDACIÓN: No permitir crear pedido si no está en estado checkout
-        if (context.order_state !== "checkout") {
-          console.error(`❌ Attempt to create order from invalid state: ${context.order_state}`);
+        // ⚠️ VALIDACIÓN: Permitir crear pedido si tiene todos los requisitos
+        // Estado debe ser "checkout" O tener método de pago válido desde "shopping"
+        const hasValidPaymentMethod = args.metodo_pago && 
+          ["efectivo", "transferencia bancaria", "mercadopago"].includes(args.metodo_pago.toLowerCase());
+        
+        if (context.order_state !== "checkout" && !hasValidPaymentMethod) {
+          console.error(`❌ Attempt to create order without payment method. State: ${context.order_state}`);
           return "⚠️ Primero necesito que confirmes tu método de pago. ¿Querés pagar en efectivo, transferencia o con MercadoPago?";
+        }
+        
+        // Si viene desde "shopping" con método de pago, cambiar a "checkout"
+        if (context.order_state === "shopping" && hasValidPaymentMethod) {
+          console.log(`✅ Auto-transitioning from shopping to checkout with payment method: ${args.metodo_pago}`);
+          context.order_state = "checkout";
         }
 
         if (context.cart.length === 0) {
@@ -2240,8 +2250,25 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     if (context.order_state === "order_pending_transfer") {
       const userResponse = message.toLowerCase().trim();
       
+      // 🔄 Ignorar menciones repetidas de "transferencia" - el usuario ya lo eligió
+      if (userResponse.match(/transfer/i) && !userResponse.match(/^(s[ií]|si|yes|dale|ok|confirmo|no|nop|cancel)/)) {
+        console.log(`ℹ️ User mentioned "transferencia" again - reminding about confirmation`);
+        const reminder = `Ya seleccionaste transferencia bancaria como método de pago. 👍\n\n` +
+                        `Solo necesito que *confirmes* si querés continuar con el pedido.\n\n` +
+                        `Respondé:\n` +
+                        `• *"Sí"* para confirmar el pedido\n` +
+                        `• *"No"* para cancelar`;
+        
+        context.conversation_history.push({
+          role: "assistant",
+          content: reminder,
+        });
+        
+        return reminder;
+      }
+      
       // ✅ Usuario confirma la transferencia
-      if (userResponse.match(/^(s[ií]|si|yes|dale|ok|confirmo|listo|perfecto)/)) {
+      if (userResponse.match(/^(s[ií]|si|yes|dale|ok|confirmo|listo|perfecto|continua|continuar)/)) {
         console.log(`✅ User confirmed bank transfer payment`);
         
         context.order_state = "order_confirmed";

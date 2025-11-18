@@ -65,8 +65,9 @@ Este estado maneja TODO el proceso de compra hasta que el usuario confirme:
 
 ✅ CONFIRMAR PEDIDO:
 - Cuando el usuario diga "confirmar", "listo", "eso es todo" → Pedí dirección
-- Una vez tenga dirección → pasar al flujo de pago (preguntar método de pago)
-- ⚠️ NUNCA llames crear_pedido sin estar en estado "checkout" con método de pago validado
+- Una vez tenga dirección → preguntar método de pago
+- Cuando elija método de pago → llamar a crear_pedido con el método elegido
+- El sistema cambiará automáticamente a estado "checkout" si todo está correcto
 ` : ""}
 
 ${currentState === "needs_address" ? `
@@ -125,12 +126,14 @@ DESPUÉS DE CONFIRMAR:
 
 🔄 FLUJO:
 1. Ya le mostraste los datos bancarios (alias, CBU, titular)
-2. AHORA espera que el usuario confirme con "sí", "ok", "dale", etc.
+2. AHORA espera que el usuario confirme con "sí", "ok", "dale", "continúa", etc.
 3. Si confirma → El sistema cambiará automáticamente a "order_confirmed" y explicará que debe enviar el comprobante
 4. Si dice "no" o "cancelar" → El sistema cancelará el pedido automáticamente
 
-⚠️ NO vuelvas a pedir confirmación si ya lo hiciste
-⚠️ La lógica de confirmación está manejada automáticamente por el sistema
+⚠️ IMPORTANTE: 
+- Si el usuario menciona "transferencia" de nuevo, recordale que YA lo eligió y que solo necesita confirmar con "sí" o "no"
+- NO vuelvas a pedir confirmación si ya lo hiciste
+- La lógica de confirmación está manejada automáticamente por el sistema
 
 📊 CONSULTAR ESTADO:
 - Si el usuario pregunta "cómo va mi pedido", "estado", "dónde está" → llamá ver_estado_pedido (sin order_id, usará automáticamente el contexto)
