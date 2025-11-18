@@ -781,8 +781,26 @@ async function ejecutarHerramienta(
         // 🚫 Verificar si el usuario ya tiene un pedido activo (SIEMPRE desde BD)
         const { data: activeOrders } = await supabase
           .from("orders")
-          .select("id, status, vendor_id")
+          .select("id, status, vendor_id, created_at")
           .eq("customer_phone", context.phone)
+          .in("status", ["pending", "confirmed", "preparing"])
+          .gte("created_at", new Date(Date.now() - 60000).toISOString()) // Últimos 60 segundos
+          .order("created_at", { ascending: false });
+
+        if (activeOrders && activeOrders.length > 0) {
+          const recentOrder = activeOrders[0];
+          
+          // Si hay un pedido muy reciente (menos de 60 segundos) con el mismo vendor, evitar duplicación
+          if (recentOrder.vendor_id === context.selected_vendor_id) {
+            console.warn(`⚠️ Duplicate order attempt detected. Using existing order: ${recentOrder.id}`);
+            context.pending_order_id = recentOrder.id;
+            context.last_order_id = recentOrder.id;
+            
+            return `✅ Ya tenés un pedido activo (#${recentOrder.id.substring(0, 8)}).\n\n` +
+                   `📊 Podés consultar su estado diciendo "estado del pedido".\n\n` +
+                   `Si querés hacer otro pedido, esperá a que este se complete. 😊`;
+          }
+        }
           .in("status", ["pending", "confirmed", "preparing", "ready", "delivering"])
           .order("created_at", { ascending: false });
 
@@ -1011,8 +1029,47 @@ async function ejecutarHerramienta(
           confirmacion += `💵 Pagás en efectivo al recibir el pedido.\n\n`;
           confirmacion += `El delivery te contactará pronto. 🚚`;
         } else if (context.payment_method.toLowerCase().includes("mercadopago")) {
-          // TODO: Aquí se podría generar el link de pago de MercadoPago si está configurado
-          confirmacion += `💳 Link de pago de MercadoPago será enviado próximamente.`;
+          confirmacion += `💳 Generando link de pago de MercadoPago...\n\n`;
+          
+          // 🔗 Generar link de pago de MercadoPago
+          try {
+            console.log("💳 Generating MercadoPago payment link for order:", order.id);
+            const { data: paymentData, error: paymentError } = await supabase.functions.invoke("generate-payment-link", {
+              body: { orderId: order.id },
+            });
+
+            if (paymentError) {
+              console.error("❌ Error generating payment link:", paymentError);
+              confirmacion += `⚠️ Hubo un problema al generar el link de pago. El negocio te contactará para coordinar el pago.`;
+            } else if (paymentData?.success && paymentData?.payment_link) {
+              console.log("✅ MercadoPago payment link generated:", paymentData.payment_link);
+              confirmacion += `🔗 *Link de pago:*\n${paymentData.payment_link}\n\n`;
+              confirmacion += `👆 Tocá el link para completar tu pago de forma segura con MercadoPago.`;
+            } else if (paymentData?.available_methods) {
+              // MercadoPago no está configurado, mostrar métodos alternativos
+              console.log("⚠️ MercadoPago not configured, showing alternative methods");
+              confirmacion += `⚠️ MercadoPago no está disponible en este momento.\n\n`;
+              confirmacion += `Métodos de pago alternativos:\n\n`;
+              
+              for (const method of paymentData.available_methods) {
+                if (method.method === 'transferencia') {
+                  confirmacion += `📱 *Transferencia bancaria:*\n`;
+                  confirmacion += `• Alias: ${method.details.alias}\n`;
+                  confirmacion += `• CBU/CVU: ${method.details.cbu}\n`;
+                  confirmacion += `• Titular: ${method.details.titular}\n`;
+                  confirmacion += `• Monto: $${method.details.amount}\n\n`;
+                } else if (method.method === 'efectivo') {
+                  confirmacion += `💵 *Efectivo:* ${method.details.message}\n\n`;
+                }
+              }
+              confirmacion += `Por favor elegí uno de estos métodos para continuar.`;
+            } else {
+              confirmacion += `⚠️ No se pudo generar el link de pago. El negocio te contactará para coordinar.`;
+            }
+          } catch (paymentException) {
+            console.error("💥 Exception generating payment link:", paymentException);
+            confirmacion += `⚠️ Error al procesar el pago. El negocio te contactará.`;
+          }
         }
 
         // Limpiar carrito después de crear pedido
