@@ -734,32 +734,20 @@ async function ejecutarHerramienta(
 
             if (!distError && distanceResult !== null) {
               deliveryDistance = distanceResult;
-              console.log(`📏 Distance: ${distanceResult}km, Max: ${vendor.delivery_radius_km}km`);
-
-              if (distanceResult > vendor.delivery_radius_km) {
-                return `😔 Lo siento, ${vendor.name} no hace delivery a tu ubicación.\n\n📍 Tu ubicación está a ${distanceResult.toFixed(1)} km del local.\n🚗 Radio de cobertura: ${vendor.delivery_radius_km} km\n\n💡 Podés buscar otros negocios más cercanos o actualizar tu ubicación.`;
-              }
-
-              // Calcular costo de delivery según el tipo de pricing
-              const pricingType = vendor.delivery_pricing_type || 'per_km';
-              
-              if (pricingType === 'fixed') {
-                deliveryCost = vendor.delivery_fixed_price || 0;
-              } else if (pricingType === 'base_plus_km') {
-                const basePrice = vendor.delivery_fixed_price || 0;
-                const additionalPerKm = vendor.delivery_additional_per_km || 0;
-                const additionalDistance = Math.max(0, distanceResult - 1);
-                deliveryCost = basePrice + (additionalDistance * additionalPerKm);
-              } else {
-                // per_km
-                if (vendor.delivery_price_per_km && vendor.delivery_price_per_km > 0) {
-                  deliveryCost = distanceResult * vendor.delivery_price_per_km;
-                }
-              }
-              
-              deliveryCost = Math.round(deliveryCost);
-              console.log(`🚚 Delivery cost: ${deliveryCost} $ (Type: ${pricingType}, Distance: ${distanceResult}km)`);
+              console.log(`📏 Distance: ${distanceResult}km`);
             }
+
+            // 🚚 DELIVERY FIJO: Siempre usar precio fijo sin validar radio
+            // El negocio validará manualmente si hace delivery a esa zona
+            deliveryCost = vendor.delivery_fixed_price || 0;
+            deliveryCost = Math.round(deliveryCost);
+            console.log(`🚚 Delivery cost (fixed): ${deliveryCost} $`);
+          } else {
+            // Sin GPS, igual aplicar delivery fijo
+            deliveryCost = vendor.delivery_fixed_price || 0;
+            deliveryCost = Math.round(deliveryCost);
+            console.log(`🚚 Delivery cost (fixed, no GPS): ${deliveryCost} $`);
+          }
           }
 
           // ⚠️ CRÍTICO: SIEMPRE usar la dirección del contexto si existe
@@ -952,18 +940,22 @@ async function ejecutarHerramienta(
 
         let confirmacion = `✅ ¡Pedido creado exitosamente!\n\n`;
         confirmacion += `📦 Pedido #${order.id.substring(0, 8)}\n`;
-        confirmacion += `🏪 Negocio: ${context.selected_vendor_name}\n`;
+        confirmacion += `🏪 Negocio: ${context.selected_vendor_name}\n\n`;
 
-        if (deliveryCost > 0) {
-          confirmacion += `🛒 Subtotal: $ ${Math.round(subtotal).toLocaleString("es-PY")}\n`;
-          confirmacion += `🚚 Delivery (${deliveryDistance.toFixed(1)} km): $ ${Math.round(deliveryCost).toLocaleString("es-PY")}\n`;
-          confirmacion += `💰 Total: $ ${Math.round(total).toLocaleString("es-PY")}\n`;
-        } else {
-          confirmacion += `💰 Total: $ ${Math.round(total).toLocaleString("es-PY")}\n`;
-        }
+        // SIEMPRE mostrar desglose con delivery
+        confirmacion += `🛒 Subtotal: $ ${Math.round(subtotal).toLocaleString("es-PY")}\n`;
+        confirmacion += `🚚 Delivery: $ ${Math.round(deliveryCost).toLocaleString("es-PY")}\n`;
+        confirmacion += `💰 Total: $ ${Math.round(total).toLocaleString("es-PY")}\n\n`;
 
         confirmacion += `📍 Dirección: ${context.delivery_address}\n`;
-        confirmacion += `💳 Pago: ${context.payment_method}\n\n`;
+        confirmacion += `💳 Pago: ${context.payment_method}\n`;
+        
+        // Aviso sobre confirmación de zona
+        if (deliveryCost > 0) {
+          confirmacion += `\n📌 *Nota:* El negocio confirmará si hace delivery a tu zona.\n`;
+        }
+        
+        confirmacion += `\n`;
 
         // 🔄 STATE TRANSITION: Asignar estado según método de pago
         const newState = getPendingStateForPayment(context.payment_method);
