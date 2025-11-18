@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
-import { Store, MessageSquare, ChartBar, Headphones, CreditCard, Bot, BarChart3, Zap, Clock, Shield } from "lucide-react";
+import { Store, MessageSquare, ChartBar, Headphones, CreditCard, Bot, BarChart3, Zap, Clock, Shield, Users } from "lucide-react";
 import lapachoLogo from '@/assets/lapacho-logo.png';
 
 export default function Landing() {
