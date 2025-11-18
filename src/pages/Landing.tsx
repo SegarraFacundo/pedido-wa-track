@@ -1,9 +1,8 @@
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Store, Headphones, Shield, Zap, Users } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
-import lapachoLogo from "@/assets/lapacho-logo.png";
-import lapachoIcon from "@/assets/lapacho-icon.png";
+import { Store, MessageSquare, ChartBar, Headphones, CreditCard, Bot, BarChart3, Zap, Clock, Shield } from "lucide-react";
+import lapachoLogo from '@/assets/lapacho-logo.png';
 
 export default function Landing() {
   const navigate = useNavigate();
@@ -18,19 +17,15 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-gradient-subtle">
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-sm shadow-sm border-b sticky top-0 z-40">
+      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 justify-center md:justify-start flex-1 md:flex-initial">
-              <img src={lapachoIcon} alt="Lapacho" className="h-8 md:hidden" />
-              <img src={lapachoLogo} alt="Lapacho Logo" className="h-12 hidden md:block" />
-              <span className="text-xl font-bold md:hidden">Lapacho</span>
+            <div className="flex items-center gap-3">
+              <img src={lapachoLogo} alt="Lapacho Logo" className="h-10" />
             </div>
             <div className="flex items-center gap-4">
-              <Button variant="ghost" onClick={() => navigate('/soporte')}>
-                Soporte
-              </Button>
-              <Button variant="outline" onClick={() => navigate('/plataforma')}>
+              <Button variant="ghost" onClick={() => navigate('/ayuda')}>Ayuda</Button>
+              <Button variant="outline" onClick={() => navigate('/vendor-auth')}>
                 <Store className="h-4 w-4 mr-2" />
                 Acceso Vendedores
               </Button>

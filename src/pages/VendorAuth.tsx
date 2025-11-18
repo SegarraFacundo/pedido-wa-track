@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { User } from '@supabase/supabase-js';
+import { MessageSquare } from 'lucide-react';
 import lapachoIcon from '@/assets/lapacho-icon.png';
 
 export default function VendorAuth() {
@@ -263,90 +264,34 @@ export default function VendorAuth() {
             <img src={lapachoIcon} alt="Lapacho" className="h-20 w-auto" />
           </div>
           <CardTitle>Panel de Vendedor</CardTitle>
-          <CardDescription>
-            Accede a tu panel para gestionar pedidos
-          </CardDescription>
+          <CardDescription>Accede a tu panel para gestionar pedidos y tu negocio</CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="signin" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="signin">Iniciar Sesión</TabsTrigger>
-              <TabsTrigger value="signup">Registrarse</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="signin">
-              <form onSubmit={handleSignIn} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="signin-email">Email</Label>
-                  <Input
-                    id="signin-email"
-                    type="email"
-                    placeholder="vendedor@ejemplo.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signin-password">Contraseña</Label>
-                  <Input
-                    id="signin-password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
-                </Button>
-              </form>
-            </TabsContent>
-            
-            <TabsContent value="signup">
-              <form onSubmit={handleSignUp} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="vendor-name">Nombre del Negocio</Label>
-                  <Input
-                    id="vendor-name"
-                    type="text"
-                    placeholder="Mi Restaurante"
-                    value={vendorName}
-                    onChange={(e) => setVendorName(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-email">Email</Label>
-                  <Input
-                    id="signup-email"
-                    type="email"
-                    placeholder="vendedor@ejemplo.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-password">Contraseña</Label>
-                  <Input
-                    id="signup-password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    minLength={6}
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? 'Creando cuenta...' : 'Crear Cuenta'}
-                </Button>
-                <p className="text-sm text-muted-foreground text-center">
-                  Después de registrarte, verifica tu email para activar tu cuenta.
-                </p>
-              </form>
-            </TabsContent>
-          </Tabs>
+          <form onSubmit={handleSignIn} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" type="email" placeholder="vendedor@ejemplo.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Contraseña</Label>
+              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+            </Button>
+          </form>
+          <div className="mt-6 pt-6 border-t">
+            <p className="text-sm text-center text-muted-foreground mb-4">¿No tienes una cuenta de vendedor?</p>
+            <Button variant="outline" className="w-full" onClick={() => {
+              const whatsappNumber = '5493464448309';
+              const message = encodeURIComponent('Hola, quiero registrar mi negocio en Lapacho');
+              window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');
+            }}>
+              <MessageSquare className="mr-2 h-4 w-4" />
+              Contactar para Registrarse
+            </Button>
+          </div>
+          <Button variant="ghost" className="w-full mt-4" onClick={() => navigate('/')}>Volver al Inicio</Button>
         </CardContent>
       </Card>
     </div>

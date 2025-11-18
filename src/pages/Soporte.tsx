@@ -33,7 +33,7 @@ export default function Soporte() {
         .from('user_roles')
         .select('role')
         .eq('user_id', session.user.id)
-        .eq('role', 'admin');
+        .in('role', ['admin', 'soporte']);
 
       if (error || !roles || roles.length === 0) {
         toast({
@@ -94,19 +94,20 @@ export default function Soporte() {
             <Headphones className="h-16 w-16 text-primary mx-auto mb-6" />
             <h2 className="text-2xl font-bold mb-4">Panel de Soporte</h2>
             <p className="text-muted-foreground mb-6">
-              Para acceder al panel de soporte necesitas iniciar sesión con una cuenta autorizada.
+              No tienes permisos para acceder al panel de soporte.
             </p>
             <div className="space-y-3">
               <Button 
-                onClick={() => navigate('/admin-auth')} 
+                onClick={handleSignOut} 
+                variant="outline"
                 className="w-full"
                 size="lg"
               >
-                Iniciar Sesión
+                Cerrar Sesión
               </Button>
               <Button 
                 onClick={() => navigate('/')} 
-                variant="outline"
+                variant="ghost"
                 className="w-full"
               >
                 Volver al Inicio
