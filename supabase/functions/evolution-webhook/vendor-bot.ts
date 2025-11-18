@@ -682,8 +682,14 @@ async function ejecutarHerramienta(
         
         // ⚠️ VALIDACIÓN: Permitir crear pedido si tiene todos los requisitos
         // Estado debe ser "checkout" O tener método de pago válido desde "shopping"
-        const hasValidPaymentMethod = args.metodo_pago && 
-          ["efectivo", "transferencia bancaria", "mercadopago"].includes(args.metodo_pago.toLowerCase());
+        const normalized = args.metodo_pago?.toLowerCase().trim() || "";
+        const hasValidPaymentMethod = args.metodo_pago && (
+          normalized === "efectivo" || 
+          normalized === "transferencia" ||
+          normalized === "transferencia bancaria" ||
+          normalized === "mercadopago" ||
+          normalized === "mercado pago"
+        );
         
         if (context.order_state !== "checkout" && !hasValidPaymentMethod) {
           console.error(`❌ Attempt to create order without payment method. State: ${context.order_state}`);
