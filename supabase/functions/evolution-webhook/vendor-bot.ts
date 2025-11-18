@@ -742,12 +742,6 @@ async function ejecutarHerramienta(
             deliveryCost = vendor.delivery_fixed_price || 0;
             deliveryCost = Math.round(deliveryCost);
             console.log(`🚚 Delivery cost (fixed): ${deliveryCost} $`);
-          } else {
-            // Sin GPS, igual aplicar delivery fijo
-            deliveryCost = vendor.delivery_fixed_price || 0;
-            deliveryCost = Math.round(deliveryCost);
-            console.log(`🚚 Delivery cost (fixed, no GPS): ${deliveryCost} $`);
-          }
           }
 
           // ⚠️ CRÍTICO: SIEMPRE usar la dirección del contexto si existe
@@ -760,9 +754,22 @@ async function ejecutarHerramienta(
             console.log(`✅ Using coordinates as address: ${args.direccion}`);
           }
         } else {
-          // Sin ubicación, pedir que la comparta
+          // Sin ubicación GPS - aplicar delivery fijo de todos modos
+          const { data: vendor } = await supabase
+            .from("vendors")
+            .select("delivery_fixed_price")
+            .eq("id", context.selected_vendor_id)
+            .single();
+          
+          if (vendor) {
+            deliveryCost = vendor.delivery_fixed_price || 0;
+            deliveryCost = Math.round(deliveryCost);
+            console.log(`🚚 Delivery cost (fixed, no GPS): ${deliveryCost} $`);
+          }
+          
+          // Aceptar dirección de texto manual
           if (!args.direccion || args.direccion.trim() === "") {
-            return `📍 Para confirmar tu pedido, necesito que compartas tu ubicación.\n\n👉 Tocá el clip 📎 en WhatsApp y elegí "Ubicación"\n\nAsí puedo verificar que ${context.selected_vendor_name} hace delivery a tu zona. 🚗`;
+            return `📍 Para confirmar tu pedido, necesito tu dirección de entrega.\n\n✍️ Escribí tu dirección completa (calle y número).\n\nEl negocio confirmará si hace delivery a tu zona. 🚗`;
           }
         }
 
