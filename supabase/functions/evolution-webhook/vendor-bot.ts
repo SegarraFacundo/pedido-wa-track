@@ -801,40 +801,6 @@ async function ejecutarHerramienta(
                    `Si querés hacer otro pedido, esperá a que este se complete. 😊`;
           }
         }
-          .in("status", ["pending", "confirmed", "preparing", "ready", "delivering"])
-          .order("created_at", { ascending: false });
-
-        if (activeOrders && activeOrders.length > 0) {
-          // Validar que el vendor del pedido activo todavía existe
-          const validActiveOrders = [];
-          
-          for (const order of activeOrders) {
-            const { data: vendor } = await supabase
-              .from("vendors")
-              .select("id, name, is_active")
-              .eq("id", order.vendor_id)
-              .maybeSingle();
-            
-            if (vendor && vendor.is_active) {
-              validActiveOrders.push({ ...order, vendor_name: vendor.name });
-            } else {
-              // El vendor ya no existe, cancelar pedido automáticamente
-              console.log(`⚠️ Vendor ${order.vendor_id} no longer exists, auto-cancelling order ${order.id}`);
-              await supabase
-                .from("orders")
-                .update({ 
-                  status: "cancelled",
-                  notes: "Pedido cancelado automáticamente: negocio ya no disponible"
-                })
-                .eq("id", order.id);
-            }
-          }
-          
-          if (validActiveOrders.length > 0) {
-            const order = validActiveOrders[0];
-            return `⚠️ Ya tenés un pedido en curso (#${order.id.substring(0, 8)}) con ${order.vendor_name} en estado "${order.status}".\n\nPor favor esperá a que se complete o cancele ese pedido antes de hacer uno nuevo.`;
-          }
-        }
 
         // Validar que la dirección y método de pago estén presentes
         if (!args.direccion || args.direccion.trim() === "") {
