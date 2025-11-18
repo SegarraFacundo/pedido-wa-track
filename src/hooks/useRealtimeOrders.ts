@@ -129,7 +129,7 @@ export function useRealtimeOrders(vendorId?: string) {
                   payment_receipt_url: data.payment_receipt_url,
                   address_is_manual: data.address_is_manual || false,
                   payment_status: data.payment_status,
-                  payment_method: data.payment_method,
+                  payment_method: data.payment_method as 'efectivo' | 'transferencia' | 'mercadopago' | undefined,
                   paid_at: data.paid_at ? new Date(data.paid_at) : undefined,
                   customerNameMasked: data.customer_name?.substring(0, 3) + '***',
                   customerPhoneMasked: '****' + data.customer_phone?.slice(-4),

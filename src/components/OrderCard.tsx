@@ -2,12 +2,13 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Order, OrderItem, OrderStatus } from "@/types/order";
-import { Image, FileText, Clock, MapPin, Phone, User, MessageCircle, DollarSign, CheckCircle, XCircle, CreditCard } from "lucide-react";
+import { Image, FileText, Clock, MapPin, Phone, User, MessageCircle, DollarSign, CheckCircle, XCircle, CreditCard, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { OrderCancellationDialog } from "./OrderCancellationDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { canMarkAsPaid, canMarkAsUnpaid } from '@/lib/paymentValidation';
 
 interface OrderCardProps {
   order: Order;
@@ -49,6 +50,14 @@ export function OrderCard({ order, onStatusChange, onOpenChat, isVendorView = fa
   console.log('OrderCard - items length:', order.items?.length);
   
   const handleMarkAsPaid = async () => {
+    // Validar si se puede marcar como pagado
+    const validation = canMarkAsPaid(order.status, order.payment_method || 'efectivo');
+    
+    if (!validation.allowed) {
+      toast.error(validation.reason || 'No se puede marcar como pagado en este momento');
+      return;
+    }
+
     try {
       setIsUpdatingPayment(true);
       const { error } = await supabase
@@ -61,6 +70,16 @@ export function OrderCard({ order, onStatusChange, onOpenChat, isVendorView = fa
         .eq('id', order.id);
 
       if (error) throw error;
+
+      // Add to status history
+      await supabase
+        .from('order_status_history')
+        .insert({
+          order_id: order.id,
+          status: 'payment_confirmed',
+          changed_by: 'vendor',
+          reason: `Pago confirmado por el vendedor (${order.payment_method || 'efectivo'})`
+        });
 
       // Enviar notificación al cliente
       try {
@@ -275,11 +294,11 @@ export function OrderCard({ order, onStatusChange, onOpenChat, isVendorView = fa
               )}
               
               {order.status !== 'cancelled' && (
-                <div className="flex gap-2">
-                  {paymentStatus !== 'paid' && (
+                <div className="flex flex-col gap-2">
+                  {paymentStatus !== 'paid' && canMarkAsPaid(order.status, order.payment_method || 'efectivo').allowed && (
                     <Button
                       size="sm"
-                      className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                      className="bg-green-600 hover:bg-green-700 text-white"
                       onClick={handleMarkAsPaid}
                       disabled={isUpdatingPayment}
                     >
@@ -287,17 +306,31 @@ export function OrderCard({ order, onStatusChange, onOpenChat, isVendorView = fa
                       Marcar como pagado
                     </Button>
                   )}
-                  {paymentStatus === 'paid' && (
+                  
+                  {paymentStatus !== 'paid' && !canMarkAsPaid(order.status, order.payment_method || 'efectivo').allowed && (
+                    <Badge variant="secondary" className="text-xs py-2 px-3">
+                      {canMarkAsPaid(order.status, order.payment_method || 'efectivo').reason}
+                    </Badge>
+                  )}
+                  
+                  {paymentStatus === 'paid' && canMarkAsUnpaid(order.status, order.payment_method || 'efectivo').allowed && (
                     <Button
                       size="sm"
                       variant="outline"
-                      className="flex-1 border-amber-300 text-amber-700 hover:bg-amber-50"
+                      className="border-amber-300 text-amber-700 hover:bg-amber-50"
                       onClick={handleMarkAsUnpaid}
                       disabled={isUpdatingPayment}
                     >
                       <XCircle className="h-4 w-4 mr-1" />
                       Marcar como no pagado
                     </Button>
+                  )}
+                  
+                  {paymentStatus === 'paid' && !canMarkAsUnpaid(order.status, order.payment_method || 'efectivo').allowed && (
+                    <Badge variant="secondary" className="text-xs py-2 px-3 flex items-center gap-1">
+                      <Lock className="h-3 w-3" />
+                      Pago confirmado - No modificable
+                    </Badge>
                   )}
                 </div>
               )}
