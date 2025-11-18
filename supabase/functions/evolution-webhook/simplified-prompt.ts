@@ -65,7 +65,8 @@ Este estado maneja TODO el proceso de compra hasta que el usuario confirme:
 
 ✅ CONFIRMAR PEDIDO:
 - Cuando el usuario diga "confirmar", "listo", "eso es todo" → Pedí dirección
-- Una vez tenga dirección → cambiar a "needs_address" o directamente a "checkout" si ya tiene dirección
+- Una vez tenga dirección → pasar al flujo de pago (preguntar método de pago)
+- ⚠️ NUNCA llames crear_pedido sin estar en estado "checkout" con método de pago validado
 ` : ""}
 
 ${currentState === "needs_address" ? `
@@ -84,7 +85,7 @@ ${currentState === "checkout" ? `
 2️⃣ NUNCA preguntes por métodos sin haber llamado ver_metodos_pago primero
 3️⃣ SOLO mostrá los métodos que ver_metodos_pago devuelva
 4️⃣ SI el usuario elige un método que NO está en la lista → rechazalo y mostrá las opciones reales
-5️⃣ Una vez que el usuario elija un método VÁLIDO → llamá confirmar_pedido
+5️⃣ Una vez que el usuario elija un método VÁLIDO → llamá crear_pedido con dirección y método de pago
 
 DESPUÉS DE CONFIRMAR:
 - El estado cambiará automáticamente según el método de pago:
@@ -106,30 +107,42 @@ DESPUÉS DE CONFIRMAR:
 6. El sistema cambiará automáticamente al estado correspondiente según el pago
 ` : ""}
 
-${currentState === "order_pending_cash" ? `
+  ${currentState === "order_pending_cash" ? `
 💵 ESTADO: ORDER PENDING CASH (Esperando pago en efectivo)
 - El pedido fue creado exitosamente
 - Pago en efectivo al momento de la entrega
 - Dale el número de seguimiento al usuario
 - Informá que debe pagar en efectivo cuando llegue el delivery
+
+📊 CONSULTAR ESTADO:
+- Si el usuario pregunta "cómo va mi pedido", "estado", "dónde está" → llamá ver_estado_pedido (sin order_id, usará automáticamente el contexto)
+
 - Si quiere hacer otro pedido → cambiar a "idle"
 ` : ""}
 
-${currentState === "order_pending_transfer" ? `
+  ${currentState === "order_pending_transfer" ? `
 📱 ESTADO: ORDER PENDING TRANSFER (Esperando comprobante)
 - El pedido fue creado, esperando comprobante de transferencia
 - Dale los datos bancarios al usuario
 - Pedí que envíe el comprobante de transferencia
 - Una vez recibido el comprobante → cambiar a "order_confirmed"
+
+📊 CONSULTAR ESTADO:
+- Si el usuario pregunta "cómo va mi pedido", "estado", "dónde está" → llamá ver_estado_pedido (sin order_id, usará automáticamente el contexto)
+
 - Si quiere cancelar → cambiar a "order_cancelled"
 ` : ""}
 
-${currentState === "order_pending_mp" ? `
+  ${currentState === "order_pending_mp" ? `
 💳 ESTADO: ORDER PENDING MP (Esperando pago MercadoPago)
 - El pedido fue creado con link de pago de MercadoPago
 - Dale el link de pago al usuario
 - Esperá confirmación del pago por webhook
 - Una vez confirmado → cambiar a "order_confirmed"
+
+📊 CONSULTAR ESTADO:
+- Si el usuario pregunta "cómo va mi pedido", "estado", "dónde está" → llamá ver_estado_pedido (sin order_id, usará automáticamente el contexto)
+
 - Si quiere cancelar → cambiar a "order_cancelled"
 ` : ""}
 

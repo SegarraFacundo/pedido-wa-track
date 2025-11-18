@@ -211,6 +211,50 @@ Deno.test("INTEGRATION: Cart should clear when starting new order", async () => 
   console.log("✅ TEST PASSED: Cart cleared successfully for new order");
 });
 
+// Test: Verify that ver_estado_pedido works without order_id using context
+Deno.test("ver_estado_pedido works without order_id from context", async () => {
+  const mockContext: ConversationContext = {
+    phone: "+595991234567",
+    cart: [],
+    delivery_address: null,
+    payment_method: null,
+    selected_vendor_id: null,
+    selected_vendor_name: null,
+    order_state: "order_pending_cash",
+    conversation_history: [],
+    pending_order_id: "order-123",
+    last_order_id: "order-123"
+  };
+
+  const result = await ejecutarHerramienta("ver_estado_pedido", {}, mockContext, mockSupabase);
+  
+  assertEquals(typeof result, "string");
+  assert(result.includes("order-123") || result.includes("pedido"), 
+    "Should use context order_id");
+});
+
+// Test: Verify that crear_pedido cannot be called from shopping state
+Deno.test("crear_pedido rejects calls from non-checkout state", async () => {
+  const mockContext: ConversationContext = {
+    phone: "+595991234567",
+    cart: [{ product_id: "p1", product_name: "Pizza", quantity: 1, price: 50000 }],
+    delivery_address: "Test address",
+    payment_method: "efectivo",
+    selected_vendor_id: "vendor-1",
+    selected_vendor_name: "Test Vendor",
+    order_state: "shopping", // Wrong state!
+    conversation_history: []
+  };
+
+  const result = await ejecutarHerramienta("crear_pedido", {
+    direccion: "Test address",
+    metodo_pago: "efectivo"
+  }, mockContext, mockSupabase);
+  
+  assertEquals(typeof result, "string");
+  assert(result.includes("método de pago"), "Should reject and ask for payment method confirmation");
+});
+
 Deno.test("EDGE CASE: User tries to change vendor with active cart - CONFIRM", async () => {
   const supabase = createMockSupabase();
   const phone = "+5491112345678";

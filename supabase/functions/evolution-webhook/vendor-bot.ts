@@ -677,7 +677,14 @@ async function ejecutarHerramienta(
           address: args.direccion,
           paymentMethod: args.metodo_pago,
           userLocation: context.user_latitude ? `${context.user_latitude},${context.user_longitude}` : "none",
+          currentState: context.order_state,
         });
+        
+        // ⚠️ VALIDACIÓN: No permitir crear pedido si no está en estado checkout
+        if (context.order_state !== "checkout") {
+          console.error(`❌ Attempt to create order from invalid state: ${context.order_state}`);
+          return "⚠️ Primero necesito que confirmes tu método de pago. ¿Querés pagar en efectivo, transferencia o con MercadoPago?";
+        }
 
         if (context.cart.length === 0) {
           return "No podés crear un pedido con el carrito vacío. ¿Querés que te muestre productos disponibles?";
@@ -984,14 +991,31 @@ async function ejecutarHerramienta(
       }
 
       case "ver_estado_pedido": {
+        let orderId = args.order_id;
+        
+        // Si no se proporciona order_id, usar pending_order_id o last_order_id del contexto
+        if (!orderId && context.pending_order_id) {
+          console.log(`📦 Using pending_order_id from context: ${context.pending_order_id}`);
+          orderId = context.pending_order_id;
+        } else if (!orderId && context.last_order_id) {
+          console.log(`📦 Using last_order_id from context: ${context.last_order_id}`);
+          orderId = context.last_order_id;
+        }
+        
+        if (!orderId) {
+          return "No tengo ningún pedido tuyo registrado recientemente. ¿Querés hacer un nuevo pedido?";
+        }
+        
+        console.log("🔍 Checking order status:", orderId);
+        
         const { data: order, error } = await supabase
           .from("orders")
           .select("*, vendors(name)")
-          .eq("id", args.order_id)
+          .eq("id", orderId)
           .single();
 
         if (error || !order) {
-          return "No encontré ese pedido";
+          return "No encontré ese pedido. ¿Querés que te ayude con algo más?";
         }
 
         const statusEmojis: any = {
