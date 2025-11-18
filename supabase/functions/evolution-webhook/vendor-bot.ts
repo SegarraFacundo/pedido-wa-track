@@ -1018,6 +1018,7 @@ async function ejecutarHerramienta(
         // Limpiar carrito después de crear pedido
         context.cart = [];
         context.last_order_id = order.id;
+        context.pending_order_id = order.id;  // ✅ Guardar pending_order_id para seguimiento
         await saveContext(context, supabase);
 
         return confirmacion;
@@ -2162,8 +2163,8 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         return '❌ Hubo un problema al procesar tu comprobante. Por favor, intenta enviarlo de nuevo o contactá con el negocio.';
       }
       
-      // Limpiar pending_order_id del contexto
-      context.pending_order_id = undefined;
+      // ✅ NO limpiar pending_order_id - mantenerlo para consultas de estado
+      // Solo se limpiará cuando el pedido se entregue, cancele o inicie uno nuevo
       context.payment_receipt_url = imageUrl;
       await saveContext(context, supabase);
       
