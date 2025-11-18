@@ -4,11 +4,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Store, DollarSign, BarChart3, LogOut, Headphones, Bot, Star, TrendingUp } from "lucide-react";
+import { Store, DollarSign, BarChart3, LogOut, Headphones, Bot, Star, TrendingUp, Users, Settings } from "lucide-react";
 import VendorManagement from "@/components/admin/VendorManagement";
 import CommissionManagement from "@/components/admin/CommissionManagement";
 import CommissionReports from "@/components/admin/CommissionReports";
 import SupportPanel from "@/components/admin/SupportPanel";
+import SoporteUserManagement from "@/components/admin/SoporteUserManagement";
 import { PlatformReviewsPanel } from "@/components/admin/PlatformReviewsPanel";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { EvolutionConfig } from "@/components/EvolutionConfig";
@@ -131,7 +132,11 @@ export default function Admin() {
             </TabsTrigger>
             <TabsTrigger value="support">
               <Headphones className="mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">Soporte</span>
+              <span className="hidden sm:inline">Tickets Soporte</span>
+            </TabsTrigger>
+            <TabsTrigger value="soporte-users">
+              <Users className="mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">Usuarios Soporte</span>
             </TabsTrigger>
             <TabsTrigger value="evolution">
               <Bot className="mr-2 h-4 w-4" />
@@ -169,6 +174,10 @@ export default function Admin() {
 
           <TabsContent value="support">
             <SupportPanel />
+          </TabsContent>
+
+          <TabsContent value="soporte-users">
+            <SoporteUserManagement />
           </TabsContent>
 
           <TabsContent value="evolution">
