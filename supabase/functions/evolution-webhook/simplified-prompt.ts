@@ -150,8 +150,10 @@ DESPUÉS DE CONFIRMAR:
 
   ${currentState === "order_pending_mp" ? `
 💳 ESTADO: ORDER PENDING MP (Esperando pago MercadoPago)
-- El pedido fue creado con link de pago de MercadoPago
-- Dale el link de pago al usuario
+- El pedido ya está creado
+- Si el usuario pide el link de pago → El sistema lo generará automáticamente
+- NO INVENTES links de pago ni placeholders como "[Pagar Aquí](#)"
+- Solo recordale que complete el pago cuando reciba el link
 - Esperá confirmación del pago por webhook
 - Una vez confirmado → cambiar a "order_confirmed"
 

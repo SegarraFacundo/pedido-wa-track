@@ -2275,6 +2275,68 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       return clarificationResponse;
     }
 
+    // 🔄 MANEJO ESPECIAL: Usuario en order_pending_mp pide el link de pago
+    if (context.order_state === "order_pending_mp") {
+      const userMessage = message.toLowerCase().trim();
+      
+      // Si el usuario pide el link de pago
+      if (userMessage.match(/link|pag(o|ar|ame)|mercadopago|mp/i)) {
+        
+        if (!context.pending_order_id) {
+          return "❌ No encontré un pedido pendiente. Por favor iniciá un nuevo pedido.";
+        }
+        
+        try {
+          console.log("🔗 User requesting payment link for order:", context.pending_order_id);
+          
+          // Generar link de pago
+          const { data: paymentData, error: paymentError } = await supabase.functions.invoke("generate-payment-link", {
+            body: { orderId: context.pending_order_id },
+          });
+          
+          let response = "";
+          
+          if (paymentError) {
+            console.error("❌ Error generating payment link:", paymentError);
+            response = `⚠️ Hubo un problema al generar el link de pago.\n\nPor favor contactá al negocio para coordinar el pago.`;
+          } else if (paymentData?.success && paymentData?.payment_link) {
+            console.log("✅ Payment link generated:", paymentData.payment_link);
+            response = `🔗 *Link de pago de MercadoPago:*\n${paymentData.payment_link}\n\n`;
+            response += `👆 Tocá el link para completar tu pago de forma segura.\n\n`;
+            response += `Una vez que pagues, recibirás la confirmación automáticamente. 😊`;
+          } else if (paymentData?.available_methods) {
+            response = `⚠️ MercadoPago no está disponible en este momento.\n\n`;
+            response += `Métodos de pago alternativos:\n\n`;
+            
+            for (const method of paymentData.available_methods) {
+              if (method.method === 'transferencia') {
+                response += `📱 *Transferencia bancaria:*\n`;
+                response += `• Alias: ${method.details.alias}\n`;
+                response += `• CBU/CVU: ${method.details.cbu}\n`;
+                response += `• Titular: ${method.details.titular}\n`;
+                response += `• Monto: $${method.details.amount}\n\n`;
+              } else if (method.method === 'efectivo') {
+                response += `💵 *Efectivo:* ${method.details.message}\n\n`;
+              }
+            }
+          } else {
+            response = `⚠️ No se pudo generar el link de pago. El negocio te contactará para coordinar.`;
+          }
+          
+          context.conversation_history.push({
+            role: "assistant",
+            content: response,
+          });
+          await saveContext(context, supabase);
+          
+          return response;
+        } catch (error) {
+          console.error("💥 Exception generating payment link:", error);
+          return `⚠️ Error al procesar tu solicitud. Por favor intentá de nuevo o contactá al negocio.`;
+        }
+      }
+    }
+
     // 🔄 MANEJO ESPECIAL: Confirmación de transferencia bancaria
     if (context.order_state === "order_pending_transfer") {
       const userResponse = message.toLowerCase().trim();
