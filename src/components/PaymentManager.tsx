@@ -18,10 +18,12 @@ import {
   AlertCircle,
   RefreshCw,
   Calendar,
-  FileText
+  FileText,
+  Lock
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { getPaymentMethodIcon, isAutomaticPaymentMethod } from '@/lib/paymentValidation';
 
 interface Payment {
   id: string;
@@ -218,9 +220,20 @@ export function PaymentManager({
           <div className="space-y-4">
             {/* Current payment info */}
             <div className="bg-muted/50 rounded-lg p-4 space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <span className="text-sm font-medium">Método de pago:</span>
-                <span className="font-semibold">{currentPayment.payment_method_name}</span>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="flex items-center gap-1">
+                    <span>{getPaymentMethodIcon(currentPayment.payment_method_name)}</span>
+                    {currentPayment.payment_method_name}
+                  </Badge>
+                  {isAutomaticPaymentMethod(currentPayment.payment_method_name.toLowerCase()) && (
+                    <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                      <Lock className="h-3 w-3" />
+                      Automático
+                    </Badge>
+                  )}
+                </div>
               </div>
               
               <div className="flex items-center justify-between">
