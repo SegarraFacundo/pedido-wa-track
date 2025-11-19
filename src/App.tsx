@@ -12,6 +12,7 @@ import Ayuda from "./pages/Ayuda";
 import AdminAuth from "./pages/AdminAuth";
 import Admin from "./pages/Admin";
 import Soporte from "./pages/Soporte";
+import SoporteAuth from "./pages/SoporteAuth";
 import SubdomainRouter from "./components/SubdomainRouter";
 
 const queryClient = new QueryClient();
@@ -31,6 +32,7 @@ const App = () => (
             <Route path="/ayuda" element={<Ayuda />} />
             <Route path="/admin-auth" element={<AdminAuth />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/soporte-auth" element={<SoporteAuth />} />
             <Route path="/soporte" element={<Soporte />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

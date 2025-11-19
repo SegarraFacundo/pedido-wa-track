@@ -25,7 +25,7 @@ export default function Soporte() {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
-        setLoading(false);
+        navigate('/soporte-auth');
         return;
       }
 
@@ -119,12 +119,12 @@ export default function Soporte() {
             </p>
             <div className="space-y-3">
               <Button 
-                onClick={handleSignOut} 
-                variant="outline"
+                onClick={() => navigate('/soporte-auth')} 
+                variant="default"
                 className="w-full"
                 size="lg"
               >
-                Cerrar Sesión
+                Iniciar Sesión
               </Button>
               <Button 
                 onClick={() => navigate('/')} 
