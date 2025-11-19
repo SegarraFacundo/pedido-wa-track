@@ -90,9 +90,9 @@ serve(async (req) => {
           },
         },
         back_urls: {
-          success: `${Deno.env.get('SUPABASE_URL')}/functions/v1/mercadopago-webhook?order_id=${orderId}`,
-          failure: `${Deno.env.get('SUPABASE_URL')}/functions/v1/mercadopago-webhook?order_id=${orderId}`,
-          pending: `${Deno.env.get('SUPABASE_URL')}/functions/v1/mercadopago-webhook?order_id=${orderId}`,
+          success: `${Deno.env.get('APP_URL')}/payment-confirmation?orderId=${orderId}&status=success`,
+          failure: `${Deno.env.get('APP_URL')}/payment-confirmation?orderId=${orderId}&status=failure`,
+          pending: `${Deno.env.get('APP_URL')}/payment-confirmation?orderId=${orderId}&status=pending`,
         },
         notification_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/mercadopago-webhook`,
         external_reference: orderId,
