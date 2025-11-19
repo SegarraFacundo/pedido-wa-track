@@ -56,8 +56,29 @@ export default function Soporte() {
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    navigate('/');
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        toast({
+          title: "Error al cerrar sesión",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({
+        title: "Sesión cerrada",
+        description: "Has cerrado sesión correctamente",
+      });
+      navigate('/');
+    } catch (error) {
+      console.error('Error signing out:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo cerrar la sesión. Por favor, intenta de nuevo.",
+        variant: "destructive",
+      });
+    }
   };
 
   if (loading) {
