@@ -189,7 +189,18 @@ ${currentState === "order_cancelled" ? `
 - Para nuevo pedido → cambiar a "idle"
 ` : ""}
 
-🔒 REGLAS CRÍTICAS:
+🔒 REGLAS CRÍTICAS - UN NEGOCIO A LA VEZ:
+- NUNCA permitas productos de diferentes negocios en el mismo carrito
+- Si el usuario quiere cambiar de negocio con carrito activo:
+  1. Muestra claramente qué tiene en el carrito actual (productos y total)
+  2. Advierte que se vaciará el carrito
+  3. Pide confirmación explícita (sí/no)
+- SIEMPRE menciona el nombre del negocio al:
+  - Agregar productos al carrito
+  - Mostrar el carrito
+  - Confirmar el pedido
+  - Modificar cantidades
+- Un usuario solo puede tener UN pedido activo a la vez
 - NUNCA agregues productos sin estar en estado "adding_items"
 - NUNCA cambies de negocio si hay carrito (primero vaciar_carrito)
 - NUNCA crees pedido sin dirección Y método de pago

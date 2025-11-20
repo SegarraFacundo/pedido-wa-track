@@ -379,12 +379,18 @@ async function ejecutarHerramienta(
           await saveContext(context, supabase);
           
           const currentTotal = context.cart.reduce((s, i) => s + i.price * i.quantity, 0);
-          return `⚠️ *Atención*\n\n` +
-                 `Tenés ${context.cart.length} productos en el carrito de *${context.selected_vendor_name}* (Total: $${currentTotal}).\n\n` +
-                 `Si cambias a *${vendor.name}*, se vaciará tu carrito actual.\n\n` +
-                 `¿Querés cambiar de negocio?\n` +
-                 `✅ Responde "sí" para cambiar\n` +
-                 `❌ Responde "no" para quedarte con tu pedido actual`;
+          
+          // ✅ MENSAJE MEJORADO - Mostrar productos actuales
+          return `⚠️ *¡Atención!*\n\n` +
+                 `Tenés ${context.cart.length} producto(s) en el carrito de *${context.selected_vendor_name}*:\n\n` +
+                 context.cart.map((item, i) => 
+                   `${i + 1}. ${item.product_name} x${item.quantity}`
+                 ).join('\n') +
+                 `\n\n💰 Total actual: $${currentTotal}\n\n` +
+                 `Si querés ver el menú de *${vendor.name}*, voy a tener que *vaciar tu carrito actual*.\n\n` +
+                 `¿Querés cambiar de negocio?\n\n` +
+                 `✅ Escribe *"sí"* para vaciar el carrito y cambiar a ${vendor.name}\n` +
+                 `❌ Escribe *"no"* para seguir con tu pedido de ${context.selected_vendor_name}`;
         }
 
         // Guardar el negocio seleccionado (siempre UUID real)
@@ -492,6 +498,29 @@ async function ejecutarHerramienta(
 
         console.log(`✅ ===== VENDOR VALIDATED: ${vendor.name} (${vendorId}) =====`);
 
+        // ✅ VALIDACIÓN ANTI-MEZCLA: Verificar que productos sean del vendor actual
+        if (!context.selected_vendor_id) {
+          return "⚠️ Primero tenés que elegir un negocio. ¿De dónde querés pedir?";
+        }
+
+        // Verificar que todos los productos pertenezcan al vendor seleccionado
+        for (const item of items) {
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          if (uuidRegex.test(item.product_id)) {
+            const { data: product } = await supabase
+              .from("products")
+              .select("id, vendor_id")
+              .eq("id", item.product_id)
+              .maybeSingle();
+            
+            if (product && product.vendor_id !== context.selected_vendor_id) {
+              console.error(`❌ Product ${item.product_id} belongs to different vendor!`);
+              return `⚠️ Ese producto no pertenece a ${context.selected_vendor_name}.\n\n` +
+                     `Solo podés agregar productos de un negocio a la vez. 🏪`;
+            }
+          }
+        }
+
         // 🚨 VALIDACIÓN DE SEGURIDAD: Esto NO debería pasar nunca
         // (ver_menu_negocio ya maneja el cambio de vendor con confirmación)
         if (context.cart.length > 0 && 
@@ -550,21 +579,23 @@ async function ejecutarHerramienta(
         console.log(`💰 Cart total: $${total}`);
         console.log("================================");
         
-        return `✅ Productos agregados al carrito de ${context.selected_vendor_name}.\n💰 Total actual: $${total}`;
+        return `✅ Productos agregados al carrito de *${context.selected_vendor_name}*.\n\n💰 Total actual: $${total}\n\n¿Querés agregar algo más o confirmás el pedido? 📦`;
       }
 
       case "ver_carrito": {
         if (context.cart.length === 0) {
-          return "El carrito está vacío.";
+          return "El carrito está vacío. ¿Qué te gustaría pedir?";
         }
 
-        let carrito = "🛒 Tu carrito:\n\n";
+        // ✅ MOSTRAR EL NEGOCIO DEL CARRITO
+        let carrito = `🛒 *Tu carrito de ${context.selected_vendor_name}:*\n\n`;
         context.cart.forEach((item, i) => {
           carrito += `${i + 1}. ${item.product_name} x${item.quantity} - $${item.price * item.quantity}\n`;
         });
 
         const total = context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-        carrito += `\n💰 Total: $${total}`;
+        carrito += `\n💰 Total: $${total}\n\n`;
+        carrito += `Para confirmar, decime "confirmar pedido" o "listo" 📦`;
 
         return carrito;
       }
@@ -621,7 +652,8 @@ async function ejecutarHerramienta(
           console.log(`   - ${item.product_name} x${item.quantity}`);
         });
         
-        let response = "✅ Corregí tu pedido:\n\n";
+        // ✅ MENSAJE MEJORADO - Incluir nombre del negocio
+        let response = `✅ Corregí tu pedido de *${context.selected_vendor_name}*:\n\n`;
         context.cart.forEach(item => {
           response += `• ${item.product_name} x${item.quantity} - $${item.price * item.quantity}\n`;
         });
@@ -2236,12 +2268,14 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         context.selected_vendor_id = context.pending_vendor_change.new_vendor_id;
         context.selected_vendor_name = context.pending_vendor_change.new_vendor_name;
         context.pending_vendor_change = undefined;
-        context.order_state = "shopping";
+        context.order_state = "browsing"; // ✅ Volver a browsing, no shopping
         
         await saveContext(context, supabase);
         
-        // Respuesta del bot
-        const response = `✅ Listo, cambiamos a ${context.selected_vendor_name}.\n\n¿Qué querés pedir?`;
+        // ✅ Mensaje mejorado
+        const response = `✅ Perfecto, carrito vaciado.\n\n` +
+                         `Ahora estás viendo el menú de *${context.selected_vendor_name}*.\n\n` +
+                         `¿Qué querés pedir? 🍕`;
         
         context.conversation_history.push({
           role: "assistant",
