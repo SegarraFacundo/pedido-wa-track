@@ -98,31 +98,31 @@ ${currentState === "needs_address" ? `
 ${currentState === "checkout" ? `
 💳 ESTADO: CHECKOUT (Procesando pago)
 
-🚨 REGLAS OBLIGATORIAS:
-1️⃣ PRIMERO: Llamá ver_metodos_pago - SIN EXCEPCIONES
-2️⃣ NUNCA preguntes por métodos sin haber llamado ver_metodos_pago primero
-3️⃣ SOLO mostrá los métodos que ver_metodos_pago devuelva
-4️⃣ SI el usuario elige un método que NO está en la lista → rechazalo y mostrá las opciones reales
-5️⃣ Una vez que el usuario elija un método VÁLIDO → llamá crear_pedido con dirección y método de pago
+🚨 REGLAS OBLIGATORIAS - NO NEGOCIABLES:
+1️⃣ El backend llamará AUTOMÁTICAMENTE a ver_metodos_pago cuando sea necesario
+2️⃣ NUNCA, BAJO NINGUNA CIRCUNSTANCIA, inventes opciones de pago
+3️⃣ SI un usuario menciona un método de pago que NO está en available_payment_methods → RECHAZALO inmediatamente
+4️⃣ SOLO menciona métodos de pago que estén en context.available_payment_methods
+5️⃣ SI el usuario pregunta por métodos de pago → Mostrá solo los de context.available_payment_methods
+
+❌ EJEMPLOS DE LO QUE ESTÁ PROHIBIDO:
+- ❌ "Las opciones son: efectivo, transferencia, mercadopago" (sin verificar)
+- ❌ "Podés pagar en efectivo o con tarjeta" (sin verificar)
+- ❌ Asumir que todos los métodos están disponibles
+
+✅ EJEMPLOS CORRECTOS:
+- ✅ "Los métodos disponibles ya te los mostré antes"
+- ✅ "Elegí uno de: [listar solo context.available_payment_methods]"
+- ✅ Si el usuario elige un método no disponible: "Ese método no está disponible aquí"
+
+⚠️ IMPORTANTE: El backend maneja la lógica de métodos de pago automáticamente.
+Tu trabajo es SOLO validar que el usuario elija uno de los métodos en context.available_payment_methods.
 
 DESPUÉS DE CONFIRMAR:
 - El estado cambiará automáticamente según el método de pago:
   • Efectivo → "order_pending_cash"
   • Transferencia → "order_pending_transfer"
   • MercadoPago → "order_pending_mp"
-
-❌ PROHIBIDO:
-- Inventar métodos de pago
-- Asumir que todos los métodos están disponibles
-- Llamar crear_pedido sin un método válido
-
-✅ FLUJO CORRECTO:
-1. Llamar ver_metodos_pago
-2. Mostrar SOLO los métodos devueltos
-3. Esperar elección del usuario
-4. Validar que la elección está en la lista
-5. Guardar método y llamar crear_pedido
-6. El sistema cambiará automáticamente al estado correspondiente según el pago
 ` : ""}
 
   ${currentState === "order_pending_cash" ? `

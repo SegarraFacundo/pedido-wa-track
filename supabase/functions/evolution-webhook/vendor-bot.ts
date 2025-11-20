@@ -729,7 +729,32 @@ async function ejecutarHerramienta(
           paymentMethod: args.metodo_pago,
           userLocation: context.user_latitude ? `${context.user_latitude},${context.user_longitude}` : "none",
           currentState: context.order_state,
+          paymentMethodsFetched: context.payment_methods_fetched,
+          availablePaymentMethods: context.available_payment_methods,
         });
+        
+        // ⭐ FORZAR ver_metodos_pago si tiene dirección pero no ha visto los métodos
+        if (args.direccion && !context.payment_methods_fetched) {
+          console.log(`⚠️ User has address but hasn't seen payment methods yet. Auto-calling ver_metodos_pago...`);
+          
+          // Guardar la dirección en el contexto
+          context.delivery_address = args.direccion;
+          await saveContext(context, supabase);
+          
+          // Llamar ver_metodos_pago automáticamente
+          const paymentMethodsResult = await ejecutarHerramienta(
+            "ver_metodos_pago",
+            {},
+            context,
+            supabase
+          );
+          
+          // Guardar contexto con payment_methods_fetched = true
+          await saveContext(context, supabase);
+          
+          // Retornar el mensaje con los métodos reales
+          return paymentMethodsResult;
+        }
         
         // ⚠️ VALIDACIÓN: Permitir crear pedido si tiene todos los requisitos
         // Estado debe ser "checkout" O tener método de pago válido desde "shopping"
@@ -744,7 +769,14 @@ async function ejecutarHerramienta(
         
         if (context.order_state !== "checkout" && !hasValidPaymentMethod) {
           console.error(`❌ Attempt to create order without payment method. State: ${context.order_state}`);
-          return "⚠️ Primero necesito que confirmes tu método de pago. ¿Querés pagar en efectivo, transferencia o con MercadoPago?";
+          
+          // Si ya vio los métodos, recordarle que elija
+          if (context.payment_methods_fetched && context.available_payment_methods) {
+            const methodsList = context.available_payment_methods.map(m => `- ${m}`).join('\n');
+            return `⚠️ Por favor elegí uno de los métodos de pago disponibles:\n\n${methodsList}`;
+          }
+          
+          return "⚠️ Primero necesito que confirmes tu método de pago.";
         }
         
         // Si viene desde "shopping" con método de pago, cambiar a "checkout"
@@ -2286,6 +2318,10 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         context.cart = [];
         context.selected_vendor_id = context.pending_vendor_change.new_vendor_id;
         context.selected_vendor_name = context.pending_vendor_change.new_vendor_name;
+        context.payment_method = undefined;
+        context.delivery_address = undefined;
+        context.payment_methods_fetched = false; // ⭐ Resetear métodos de pago
+        context.available_payment_methods = []; // ⭐ Limpiar lista de métodos
         context.pending_vendor_change = undefined;
         context.order_state = "browsing"; // ✅ Volver a browsing, no shopping
         
@@ -2397,6 +2433,71 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         } catch (error) {
           console.error("💥 Exception generating payment link:", error);
           return `⚠️ Error al procesar tu solicitud. Por favor intentá de nuevo o contactá al negocio.`;
+        }
+      }
+    }
+
+    // 🔍 DETECCIÓN AUTOMÁTICA: Usuario eligiendo método de pago
+    // Si el bot ya mostró los métodos de pago, el usuario aún no eligió, y tiene dirección
+    if (context.payment_methods_fetched && !context.payment_method && context.delivery_address) {
+      console.log(`🔍 User seems to be choosing payment method. Message: ${message}`);
+      console.log(`📋 Available methods: ${context.available_payment_methods?.join(', ')}`);
+      
+      const normalizedMsg = message.toLowerCase().trim();
+      let selectedMethod: string | null = null;
+      
+      // Detectar método seleccionado
+      if (normalizedMsg.includes('efectivo') || normalizedMsg.includes('cash')) {
+        selectedMethod = 'efectivo';
+      } else if (normalizedMsg.includes('transferencia') || normalizedMsg.includes('transfer')) {
+        selectedMethod = 'transferencia';
+      } else if (normalizedMsg.includes('mercado') || normalizedMsg.includes('mp') || normalizedMsg.includes('mercadopago')) {
+        selectedMethod = 'mercadopago';
+      }
+      
+      if (selectedMethod) {
+        // Validar que el método seleccionado está en la lista de disponibles
+        if (!context.available_payment_methods || !context.available_payment_methods.includes(selectedMethod)) {
+          console.warn(`❌ User selected unavailable method: ${selectedMethod}`);
+          const availableList = context.available_payment_methods?.map(m => `- ${m}`).join('\n') || '- (ninguno disponible)';
+          const errorResponse = `⚠️ El método "${selectedMethod}" no está disponible en ${context.selected_vendor_name}.\n\n` +
+                                `Por favor elegí uno de estos:\n${availableList}`;
+          
+          context.conversation_history.push({
+            role: "assistant",
+            content: errorResponse,
+          });
+          await saveContext(context, supabase);
+          
+          return errorResponse;
+        }
+        
+        // Método válido - guardar y proceder a crear pedido
+        console.log(`✅ Valid payment method selected: ${selectedMethod}`);
+        context.payment_method = selectedMethod;
+        
+        // Llamar automáticamente a crear_pedido
+        try {
+          const orderResult = await ejecutarHerramienta(
+            "crear_pedido",
+            {
+              direccion: context.delivery_address,
+              metodo_pago: selectedMethod
+            },
+            context,
+            supabase
+          );
+          
+          context.conversation_history.push({
+            role: "assistant",
+            content: orderResult,
+          });
+          await saveContext(context, supabase);
+          
+          return orderResult;
+        } catch (error) {
+          console.error("❌ Error creating order:", error);
+          return "Hubo un error al crear tu pedido. Por favor intentá de nuevo.";
         }
       }
     }
