@@ -97,7 +97,25 @@ su ID exacto, primero llamá a ver_locales_abiertos para obtener la lista con ID
     function: {
       name: "agregar_al_carrito",
       description:
-        "Agrega uno o más productos al carrito del cliente. ⚠️ CRÍTICO: SOLO usar si ya llamaste a ver_menu_negocio antes para mostrar el menú REAL. Si no hay selected_vendor_id en el contexto, PRIMERO debes llamar ver_menu_negocio. Usa el nombre exacto del producto tal como aparece en el menú mostrado.",
+        `Agrega productos al carrito del cliente.
+
+🚨 REGLAS OBLIGATORIAS:
+1. SOLO usar productos que aparecieron en el último ver_menu_negocio
+2. Si el producto NO estaba en el menú mostrado → RECHAZAR y pedir que elija del menú
+3. El product_name debe ser EXACTO al nombre que apareció en el menú
+4. NO inventes productos ni busques en otros negocios
+5. Si hay duda → Volver a llamar ver_menu_negocio
+
+Ejemplo CORRECTO:
+- Bot muestra menú: "1. Pizza Pepperoni - $45.000"
+- Usuario: "dame una pizza pepperoni"
+- Bot: agregar_al_carrito({ product_name: "Pizza Pepperoni" })
+
+Ejemplo INCORRECTO:
+- Bot muestra menú de Pizzería (NO tiene alfajores)
+- Usuario: "agregale un alfajor"
+- Bot: ❌ NO debe llamar agregar_al_carrito
+- Bot: ✅ Debe responder: "Alfajor no está en el menú de esta pizzería"`,
       parameters: {
         type: "object",
         properties: {

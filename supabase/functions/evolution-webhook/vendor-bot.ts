@@ -537,6 +537,8 @@ async function ejecutarHerramienta(
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         const resolvedItems: CartItem[] = [];
         for (const item of items) {
+          console.log(`🔍 Searching for product: "${item.product_name}" in vendor ${context.selected_vendor_name} (${vendorId})`);
+          
           const query = uuidRegex.test(item.product_id)
             ? supabase.from("products").select("id, name, price").eq("id", item.product_id).maybeSingle()
             : supabase
@@ -548,17 +550,34 @@ async function ejecutarHerramienta(
 
           const { data: product } = await query;
           if (product) {
+            console.log(`✅ Product found: ${product.name} - $${product.price}`);
             resolvedItems.push({
               product_id: product.id,
               product_name: product.name,
               quantity: item.quantity,
               price: product.price,
             });
+          } else {
+            console.warn(`⚠️ PRODUCT NOT FOUND: "${item.product_name}" in vendor ${context.selected_vendor_name} (${vendorId})`);
           }
         }
 
         if (!resolvedItems.length) {
-          return "❌ No pude encontrar esos productos en el menú.";
+          // Obtener menú actual del vendor para mostrar opciones reales
+          const { data: availableProducts } = await supabase
+            .from("products")
+            .select("name, price")
+            .eq("vendor_id", vendorId)
+            .eq("is_available", true)
+            .order("name");
+          
+          const productList = availableProducts && availableProducts.length > 0
+            ? availableProducts.map((p, i) => `${i + 1}. ${p.name} - $${p.price}`).join('\n')
+            : "No hay productos disponibles";
+          
+          return `❌ No encontré ese producto en el menú de *${context.selected_vendor_name}*.\n\n` +
+                 `📋 Productos disponibles:\n${productList}\n\n` +
+                 `Por favor, elegí uno de estos productos. 😊`;
         }
 
         // Agregar productos validados
