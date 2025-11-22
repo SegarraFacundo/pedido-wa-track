@@ -14,6 +14,12 @@ ${context.cart.length > 0 ? `  Items: ${context.cart.map(item => `${item.quantit
 ${context.delivery_address ? `- Dirección: ${context.delivery_address}` : "- Sin dirección"}
 ${context.payment_method ? `- Pago: ${context.payment_method}` : "- Sin método de pago"}
 ${context.user_latitude && context.user_longitude ? "- ✅ Con ubicación GPS" : "- ⚠️ Sin ubicación"}
+
+🚨 REGLA CRÍTICA - FUENTE DE VERDAD:
+⚠️ El ÚNICO estado válido es context.cart en la base de datos
+⚠️ NUNCA uses conversation_history para saber qué hay en el carrito
+⚠️ Si context.cart está vacío → El carrito ESTÁ VACÍO, sin excepciones
+⚠️ Los mensajes antiguos NO son válidos, solo context.cart importa
 `;
   
   return `Sos un vendedor de Lapacho, plataforma de delivery por WhatsApp en Argentina.
@@ -81,10 +87,21 @@ Este estado maneja TODO el proceso de compra hasta que el usuario confirme:
 - Si confirma → Limpiar carrito y volver a "browsing"
 
 ✅ CONFIRMAR PEDIDO:
-- Cuando el usuario diga "confirmar", "listo", "eso es todo" → Pedí dirección
-- Una vez tenga dirección → preguntar método de pago
-- Cuando elija método de pago → llamar a crear_pedido con el método elegido
-- El sistema cambiará automáticamente a estado "checkout" si todo está correcto
+
+🚨 VALIDACIÓN OBLIGATORIA ANTES DE CONTINUAR:
+1. Verificar context.cart.length > 0
+2. Si está vacío → Responder: "Tu carrito está vacío. ¿Qué querés agregar?"
+3. Si tiene productos → Llamar ver_carrito para confirmar contenido real
+4. NUNCA asumas que el carrito tiene productos basándote en mensajes viejos
+
+- Cuando el usuario diga "confirmar", "listo", "eso es todo":
+  → PRIMERO verificar que context.cart tenga productos
+  → SI tiene → Mostrar carrito y pedir dirección
+  → SI está vacío → Rechazar y pedir que agregue productos
+  
+- Una vez confirmado el carrito con productos → Pedir dirección
+- Con dirección → El backend mostrará métodos de pago automáticamente
+- Usuario elige método → crear_pedido
 ` : ""}
 
 ${currentState === "needs_address" ? `
