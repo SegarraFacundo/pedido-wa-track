@@ -686,6 +686,8 @@ async function ejecutarHerramienta(
 
       case "vaciar_carrito": {
         context.cart = [];
+        context.conversation_history = []; // 🧹 Limpiar historial al vaciar carrito
+        console.log(`🧹 Cart and conversation history cleared`);
         return "🗑️ Carrito vaciado";
       }
 
@@ -1133,8 +1135,10 @@ async function ejecutarHerramienta(
 
         // Limpiar carrito después de crear pedido
         context.cart = [];
+        context.conversation_history = []; // 🧹 Limpiar historial después de crear pedido
         context.last_order_id = order.id;
         context.pending_order_id = order.id;  // ✅ Guardar pending_order_id para seguimiento
+        console.log(`🧹 Order created, cart and history cleared`);
         await saveContext(context, supabase);
 
         return confirmacion;
@@ -2255,6 +2259,10 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         context.delivery_address = undefined;
         context.pending_order_id = undefined;
         context.order_state = 'idle';
+        context.payment_methods_fetched = false;
+        context.available_payment_methods = [];
+        context.conversation_history = []; // 🧹 Limpiar historial en reset completo
+        console.log(`🧹 Full context reset including conversation history`);
         
         await saveContext(context, supabase);
         console.log('✅ Context cleared - user can start fresh');
@@ -2324,6 +2332,8 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         context.available_payment_methods = []; // ⭐ Limpiar lista de métodos
         context.pending_vendor_change = undefined;
         context.order_state = "browsing"; // ✅ Volver a browsing, no shopping
+        context.conversation_history = []; // 🧹 Limpiar historial al cambiar vendor
+        console.log(`🧹 Cleared conversation history on vendor change`);
         
         await saveContext(context, supabase);
         
@@ -2435,6 +2445,47 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
           return `⚠️ Error al procesar tu solicitud. Por favor intentá de nuevo o contactá al negocio.`;
         }
       }
+    }
+
+    // 🔍 VALIDACIÓN: Detectar intentos de confirmar pedido sin productos en carrito
+    const confirmPhrases = ['confirmar', 'confirmo', 'listo', 'eso es todo', 'si confirmo', 'confirma', 'dale'];
+    const normalizedMsgConfirm = message.toLowerCase().trim();
+    const isConfirming = confirmPhrases.some(phrase => normalizedMsgConfirm.includes(phrase));
+
+    if (isConfirming && context.order_state === 'shopping') {
+      console.log(`🔍 User attempting to confirm order. Cart items: ${context.cart.length}`);
+      console.log(`📋 Cart validation: ${context.cart.length} items in DB`);
+      console.log(`🔍 Cart contents: ${context.cart.map(i => `${i.product_name}x${i.quantity}`).join(', ') || 'EMPTY'}`);
+      
+      if (context.cart.length === 0) {
+        console.warn(`⚠️ CRITICAL: User trying to confirm with EMPTY cart!`);
+        console.warn(`   This should never happen - cart is empty but user thinks they have products`);
+        
+        const emptyCartResponse = "⚠️ Tu carrito está vacío. Primero agregá productos del menú de " +
+               `${context.selected_vendor_name || 'un negocio'}.\n\n¿Querés que te muestre el menú?`;
+        
+        context.conversation_history.push({
+          role: "assistant",
+          content: emptyCartResponse,
+        });
+        await saveContext(context, supabase);
+        
+        return emptyCartResponse;
+      }
+      
+      // Si tiene productos, forzar mostrar carrito antes de pedir dirección
+      console.log(`✅ User confirming with ${context.cart.length} items. Forcing ver_carrito to show real cart...`);
+      const cartSummary = await ejecutarHerramienta("ver_carrito", {}, context, supabase);
+      
+      const confirmResponse = cartSummary + "\n\n¿Confirmás este pedido? Si es así, compartí tu dirección o ubicación GPS 📍";
+      
+      context.conversation_history.push({
+        role: "assistant",
+        content: confirmResponse,
+      });
+      await saveContext(context, supabase);
+      
+      return confirmResponse;
     }
 
     // 🔍 DETECCIÓN AUTOMÁTICA: Usuario eligiendo método de pago
@@ -2562,6 +2613,10 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         context.selected_vendor_name = undefined;
         context.payment_method = undefined;
         context.delivery_address = undefined;
+        context.payment_methods_fetched = false;
+        context.available_payment_methods = [];
+        context.conversation_history = []; // 🧹 Limpiar historial al cancelar pedido
+        console.log(`🧹 Order cancelled, full context reset`);
         await saveContext(context, supabase);
         
         const response = `Pedido cancelado. ¿En qué más puedo ayudarte? 😊`;
