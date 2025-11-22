@@ -773,16 +773,15 @@ async function ejecutarHerramienta(
           console.log(`✅ Payment method validated: "${args.metodo_pago}" -> "${mappedMethod}"`);
         }
         
-        // ⭐ FORZAR ver_metodos_pago si tiene dirección pero no ha visto los métodos
+        // ⭐ AUTO-FETCH payment methods si tiene dirección pero no ha visto los métodos
         if (args.direccion && !context.payment_methods_fetched) {
-          console.log(`⚠️ User has address but hasn't seen payment methods yet. Auto-calling ver_metodos_pago...`);
+          console.log(`⚠️ User has address but hasn't seen payment methods yet. Auto-fetching...`);
           
           // Guardar la dirección en el contexto
           context.delivery_address = args.direccion;
-          await saveContext(context, supabase);
           
-          // Llamar ver_metodos_pago automáticamente
-          const paymentMethodsResult = await ejecutarHerramienta(
+          // Llamar ver_metodos_pago automáticamente para poblar available_payment_methods
+          await ejecutarHerramienta(
             "ver_metodos_pago",
             {},
             context,
@@ -792,8 +791,11 @@ async function ejecutarHerramienta(
           // Guardar contexto con payment_methods_fetched = true
           await saveContext(context, supabase);
           
-          // Retornar el mensaje con los métodos reales
-          return paymentMethodsResult;
+          console.log(`✅ Payment methods auto-fetched. Available: [${context.available_payment_methods?.join(', ')}]`);
+          console.log(`🔄 Continuing order creation flow...`);
+          
+          // ⚠️ NO HACER RETURN - dejar que continúe el flujo
+          // La validación de método de pago (líneas 736-773) se encargará de validar
         }
         
         // ⚠️ VALIDACIÓN: Permitir crear pedido si tiene todos los requisitos
