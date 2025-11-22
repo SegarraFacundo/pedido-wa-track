@@ -735,6 +735,44 @@ async function ejecutarHerramienta(
           availablePaymentMethods: context.available_payment_methods,
         });
         
+        // ⭐ VALIDACIÓN CRÍTICA: Verificar que el método de pago es válido
+        if (args.metodo_pago && context.available_payment_methods?.length > 0) {
+          const normalizedMethod = args.metodo_pago.toLowerCase().trim();
+          const methodMap: Record<string, string> = {
+            'efectivo': 'efectivo',
+            'cash': 'efectivo',
+            'transferencia': 'transferencia',
+            'transferencia bancaria': 'transferencia',
+            'transfer': 'transferencia',
+            'mercadopago': 'mercadopago',
+            'mercado pago': 'mercadopago',
+            'mp': 'mercadopago'
+          };
+          
+          const mappedMethod = methodMap[normalizedMethod];
+          
+          if (!mappedMethod || !context.available_payment_methods.includes(mappedMethod)) {
+            console.error(`❌ Invalid payment method: "${args.metodo_pago}"`);
+            console.error(`   Normalized to: "${mappedMethod}"`);
+            console.error(`   Available: [${context.available_payment_methods.join(', ')}]`);
+            
+            const methodIcons: Record<string, string> = {
+              'efectivo': '💵',
+              'transferencia': '🏦',
+              'mercadopago': '💳'
+            };
+            
+            return `⚠️ El método "${args.metodo_pago}" no está disponible en ${context.selected_vendor_name}.\n\n` +
+                   `Métodos aceptados:\n` +
+                   context.available_payment_methods.map(m => 
+                     `- ${m.charAt(0).toUpperCase() + m.slice(1)} ${methodIcons[m] || '💰'}`
+                   ).join('\n') + 
+                   `\n\n¿Con cuál querés continuar?`;
+          }
+          
+          console.log(`✅ Payment method validated: "${args.metodo_pago}" -> "${mappedMethod}"`);
+        }
+        
         // ⭐ FORZAR ver_metodos_pago si tiene dirección pero no ha visto los métodos
         if (args.direccion && !context.payment_methods_fetched) {
           console.log(`⚠️ User has address but hasn't seen payment methods yet. Auto-calling ver_metodos_pago...`);
@@ -1374,6 +1412,10 @@ async function ejecutarHerramienta(
         if (!context.selected_vendor_id) {
           return "Primero tenés que elegir un negocio. ¿Querés ver los negocios disponibles?";
         }
+
+        // ⭐ LIMPIAR método de pago anterior al obtener nuevos métodos
+        context.payment_method = undefined;
+        console.log(`🧹 Cleared previous payment method before fetching available methods`);
 
         // Obtener payment_settings del vendedor
         const { data: vendor, error: vendorError } = await supabase
@@ -2175,6 +2217,25 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     
     // Cargar contexto
     const context = await getContext(normalizedPhone, supabase);
+    
+    // ⚠️ VALIDACIÓN AUTOMÁTICA: Limpiar payment_method si es inválido
+    if (context.payment_method && 
+        context.available_payment_methods?.length > 0 &&
+        !context.available_payment_methods.includes(context.payment_method)) {
+      
+      console.warn(`⚠️ INCONSISTENCY DETECTED: payment_method="${context.payment_method}" is NOT in available_payment_methods=[${context.available_payment_methods.join(',')}]`);
+      console.warn(`   Auto-cleaning invalid payment method from context`);
+      
+      context.payment_method = undefined;
+      await saveContext(context, supabase);
+      
+      console.log(`✅ Invalid payment method cleared successfully`);
+    }
+    
+    // 💳 Log payment validation state
+    if (context.payment_method || context.available_payment_methods) {
+      console.log(`💳 Payment validation: method=${context.payment_method || 'none'}, available=[${context.available_payment_methods?.join(',') || 'none'}]`);
+    }
     
     // 🧹 LIMPIAR CONTEXTO si hay un pedido ACTIVO del mismo vendor O si el vendor ya no existe
     // SOLO limpiamos si el usuario está en estados seguros (idle/order_placed)
