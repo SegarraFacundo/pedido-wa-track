@@ -419,7 +419,28 @@ async function ejecutarHerramienta(
           return `${vendor.name} no tiene productos disponibles en este momento. 😔\n\nPodés buscar otros negocios con productos disponibles.`;
         }
 
+        // ⭐ Obtener información de pickup del vendor
+        const { data: vendorDetails } = await supabase
+          .from("vendors")
+          .select("allows_pickup, pickup_instructions, address")
+          .eq("id", vendor.id)
+          .single();
+        
+        if (vendorDetails) {
+          context.vendor_allows_pickup = vendorDetails.allows_pickup || false;
+          context.pickup_instructions = vendorDetails.pickup_instructions;
+          console.log(`✅ Pickup info: allows_pickup=${context.vendor_allows_pickup}`);
+        }
+
         let menu = `📋 *Menú de ${vendor.name}*\n\n`;
+        
+        // ⭐ Mostrar opciones de entrega si acepta pickup
+        if (context.vendor_allows_pickup) {
+          menu += `✅ Este negocio acepta *retiro en local*\n`;
+          menu += `📍 Dirección: ${vendorDetails?.address || 'No disponible'}\n\n`;
+        }
+        
+        menu += `📦 Productos disponibles:\n\n`;
         for (const [i, p] of products.entries()) {
           menu += `${i + 1}. *${p.name}* - $${Math.round(p.price).toLocaleString("es-PY")}\n`;
           if (p.category) menu += `   🏷️ ${Array.isArray(p.category) ? p.category.join(", ") : p.category}\n`;
@@ -686,9 +707,50 @@ async function ejecutarHerramienta(
 
       case "vaciar_carrito": {
         context.cart = [];
+        context.delivery_type = undefined;  // ⭐ Limpiar tipo de entrega
         context.conversation_history = []; // 🧹 Limpiar historial al vaciar carrito
-        console.log(`🧹 Cart and conversation history cleared`);
+        console.log(`🧹 Cart, delivery_type and conversation history cleared`);
         return "🗑️ Carrito vaciado";
+      }
+
+      case "seleccionar_tipo_entrega": {
+        if (!context.vendor_allows_pickup && args.tipo === "pickup") {
+          return `⚠️ ${context.selected_vendor_name} no acepta retiro en local. Solo delivery.`;
+        }
+        
+        context.delivery_type = args.tipo;
+        await saveContext(context, supabase);
+        
+        if (args.tipo === "pickup") {
+          console.log(`✅ Customer selected PICKUP`);
+          
+          let respuesta = `✅ Perfecto! Tu pedido será para *retiro en local*.\n\n`;
+          respuesta += `📍 *Retirá en:*\n${context.selected_vendor_name}\n`;
+          
+          // Obtener dirección del vendor
+          const { data: vendor } = await supabase
+            .from("vendors")
+            .select("address, pickup_instructions")
+            .eq("id", context.selected_vendor_id)
+            .single();
+          
+          if (vendor) {
+            respuesta += `${vendor.address}\n\n`;
+            
+            if (vendor.pickup_instructions) {
+              respuesta += `📝 *Instrucciones:*\n${vendor.pickup_instructions}\n\n`;
+            }
+          }
+          
+          respuesta += `💰 Total: $${context.cart.reduce((s, i) => s + i.price * i.quantity, 0).toLocaleString("es-PY")}\n\n`;
+          respuesta += `¿Con qué método querés pagar?`;
+          
+          return respuesta;
+          
+        } else {
+          console.log(`✅ Customer selected DELIVERY`);
+          return `✅ Tu pedido será enviado a domicilio.\n\n¿Cuál es tu dirección de entrega?`;
+        }
       }
 
       case "quitar_producto_carrito": {
@@ -836,9 +898,39 @@ async function ejecutarHerramienta(
           return "Error: No hay negocio seleccionado. Por favor elegí un negocio antes de hacer el pedido.";
         }
 
+        // ⭐ NUEVO: Validación de tipo de entrega
+        if (!context.delivery_type) {
+          // Si el vendor acepta pickup, preguntar
+          if (context.vendor_allows_pickup) {
+            return `¿Querés que te enviemos el pedido a domicilio o lo retirás en el local?\n\n` +
+                   `Respondé "delivery" o "retiro"`;
+          } else {
+            // Si no acepta pickup, asumir delivery
+            context.delivery_type = 'delivery';
+            console.log(`✅ Vendor doesn't accept pickup. Defaulting to delivery.`);
+          }
+        }
+
         // 📍 VALIDACIÓN DE UBICACIÓN Y COBERTURA
         let deliveryCost = 0;
         let deliveryDistance = 0;
+        
+        // ⭐ Si es PICKUP, NO pedir dirección ni calcular delivery
+        if (context.delivery_type === 'pickup') {
+          console.log(`✅ Order is PICKUP - skipping address validation and delivery calculation`);
+          
+          // Obtener dirección del vendor como dirección del pedido
+          const { data: vendor } = await supabase
+            .from("vendors")
+            .select("address")
+            .eq("id", context.selected_vendor_id)
+            .single();
+          
+          context.delivery_address = `RETIRO EN LOCAL: ${vendor?.address || 'Dirección no disponible'}`;
+          deliveryCost = 0;  // Sin costo de delivery
+          
+        } else {
+          // ⭐ Si es DELIVERY, validar dirección y calcular costo
 
         if (context.user_latitude && context.user_longitude) {
           // Usuario tiene ubicación, validar cobertura
@@ -896,7 +988,7 @@ async function ejecutarHerramienta(
           if (!args.direccion || args.direccion.trim() === "") {
             return `📍 Para confirmar tu pedido, necesito tu dirección de entrega.\n\n✍️ Escribí tu dirección completa (calle y número).\n\nEl negocio confirmará si hace delivery a tu zona. 🚗`;
           }
-        }
+        } // ⭐ Fin del else de delivery_type === 'delivery'
 
         // 🚫 Verificar si el usuario ya tiene un pedido activo (SIEMPRE desde BD)
         const { data: activeOrders } = await supabase
@@ -1000,7 +1092,8 @@ async function ejecutarHerramienta(
             status: "pending",
             address: context.delivery_address,
             payment_method: context.payment_method,
-            address_is_manual: !context.user_latitude || context.user_latitude === 0, // Marca si es manual
+            address_is_manual: context.delivery_type === 'pickup' ? false : (!context.user_latitude || context.user_latitude === 0), // Marca si es manual (pickup es siempre false)
+            delivery_type: context.delivery_type || 'delivery',  // ⭐ NUEVO CAMPO
           })
           .select()
           .single();
@@ -1074,17 +1167,31 @@ async function ejecutarHerramienta(
         confirmacion += `📦 Pedido #${order.id.substring(0, 8)}\n`;
         confirmacion += `🏪 Negocio: ${context.selected_vendor_name}\n\n`;
 
-        // SIEMPRE mostrar desglose con delivery
-        confirmacion += `🛒 Subtotal: $ ${Math.round(subtotal).toLocaleString("es-PY")}\n`;
-        confirmacion += `🚚 Delivery: $ ${Math.round(deliveryCost).toLocaleString("es-PY")}\n`;
-        confirmacion += `💰 Total: $ ${Math.round(total).toLocaleString("es-PY")}\n\n`;
+        if (context.delivery_type === 'pickup') {
+          // ⭐ Mensaje para RETIRO
+          confirmacion += `🛒 Total: $ ${Math.round(total).toLocaleString("es-PY")}\n\n`;
+          confirmacion += `📍 *Retirá en:*\n${context.delivery_address}\n\n`;
+          
+          if (context.pickup_instructions) {
+            confirmacion += `📝 ${context.pickup_instructions}\n\n`;
+          }
+          
+          confirmacion += `💳 Pago: ${context.payment_method}\n`;
+          
+        } else {
+          // ⭐ Mensaje para DELIVERY (código existente)
+          // SIEMPRE mostrar desglose con delivery
+          confirmacion += `🛒 Subtotal: $ ${Math.round(subtotal).toLocaleString("es-PY")}\n`;
+          confirmacion += `🚚 Delivery: $ ${Math.round(deliveryCost).toLocaleString("es-PY")}\n`;
+          confirmacion += `💰 Total: $ ${Math.round(total).toLocaleString("es-PY")}\n\n`;
 
-        confirmacion += `📍 Dirección: ${context.delivery_address}\n`;
-        confirmacion += `💳 Pago: ${context.payment_method}\n`;
-        
-        // Aviso sobre confirmación de zona
-        if (deliveryCost > 0) {
-          confirmacion += `\n📌 *Nota:* El negocio confirmará si hace delivery a tu zona.\n`;
+          confirmacion += `📍 Dirección: ${context.delivery_address}\n`;
+          confirmacion += `💳 Pago: ${context.payment_method}\n`;
+          
+          // Aviso sobre confirmación de zona
+          if (deliveryCost > 0) {
+            confirmacion += `\n📌 *Nota:* El negocio confirmará si hace delivery a tu zona.\n`;
+          }
         }
         
         confirmacion += `\n`;
@@ -1171,7 +1278,7 @@ async function ejecutarHerramienta(
           } else {
             confirmacion += paymentErrorMsg;
           }
-        }
+        } // ⭐ Cierre del else if mercadopago
 
         // Limpiar carrito después de crear pedido
         context.cart = [];
@@ -2324,8 +2431,11 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         context.order_state = 'idle';
         context.payment_methods_fetched = false;
         context.available_payment_methods = [];
+        context.delivery_type = undefined;  // ⭐ Limpiar tipo de entrega
+        context.vendor_allows_pickup = undefined;  // ⭐ Limpiar info de pickup
+        context.pickup_instructions = undefined;  // ⭐ Limpiar instrucciones
         context.conversation_history = []; // 🧹 Limpiar historial en reset completo
-        console.log(`🧹 Full context reset including conversation history`);
+        console.log(`🧹 Full context reset including conversation history and pickup info`);
         
         await saveContext(context, supabase);
         console.log('✅ Context cleared - user can start fresh');

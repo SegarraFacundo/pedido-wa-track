@@ -27,6 +27,8 @@ interface VendorData {
   delivery_pricing_type: string;
   delivery_fixed_price: number;
   delivery_additional_per_km: number;
+  allows_pickup?: boolean;  // ⭐ NUEVO
+  pickup_instructions?: string | null;  // ⭐ NUEVO
 }
 
 interface VendorSettingsProps {
@@ -166,7 +168,9 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
           delivery_price_per_km: vendorData.delivery_price_per_km,
           delivery_pricing_type: vendorData.delivery_pricing_type,
           delivery_fixed_price: vendorData.delivery_fixed_price,
-          delivery_additional_per_km: vendorData.delivery_additional_per_km
+          delivery_additional_per_km: vendorData.delivery_additional_per_km,
+          allows_pickup: vendorData.allows_pickup || false,  // ⭐ NUEVO
+          pickup_instructions: vendorData.pickup_instructions || null  // ⭐ NUEVO
         })
         .eq('id', vendorId);
 
@@ -470,6 +474,39 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
           <Label htmlFor="active">
             Negocio activo (visible para clientes)
           </Label>
+        </div>
+
+        {/* ⭐ NUEVA SECCIÓN: Retiro en Local */}
+        <div className="border-t pt-4 mt-4">
+          <h3 className="text-lg font-semibold mb-4">🏪 Retiro en Local (Pickup)</h3>
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="allows_pickup"
+                checked={vendorData.allows_pickup || false}
+                onCheckedChange={(checked) => setVendorData({ ...vendorData, allows_pickup: checked })}
+              />
+              <Label htmlFor="allows_pickup">
+                Permitir que los clientes retiren pedidos en el local
+              </Label>
+            </div>
+            
+            {vendorData.allows_pickup && (
+              <div className="space-y-2 pl-6">
+                <Label htmlFor="pickup_instructions">Instrucciones para retiro (opcional)</Label>
+                <Textarea
+                  id="pickup_instructions"
+                  value={vendorData.pickup_instructions || ''}
+                  onChange={(e) => setVendorData({ ...vendorData, pickup_instructions: e.target.value })}
+                  placeholder="Ej: Retirar por la puerta lateral, horario de 9 a 18hs"
+                  rows={3}
+                />
+                <p className="text-xs text-muted-foreground">
+                  💡 Estas instrucciones se mostrarán a los clientes cuando elijan retiro en local
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
         <Button 

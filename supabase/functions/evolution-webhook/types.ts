@@ -78,5 +78,8 @@ export interface ConversationContext {
   };
   payment_methods_fetched?: boolean;
   available_payment_methods?: string[];
+  delivery_type?: 'delivery' | 'pickup';  // Nuevo: tipo de entrega elegido
+  vendor_allows_pickup?: boolean;          // Nuevo: si el vendor acepta retiro
+  pickup_instructions?: string;            // Nuevo: instrucciones de retiro
   conversation_history: Array<{ role: "user" | "assistant" | "system"; content: string }>;
 }

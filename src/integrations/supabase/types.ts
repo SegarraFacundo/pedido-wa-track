@@ -537,6 +537,7 @@ export type Database = {
           customer_phone: string
           delivery_person_name: string | null
           delivery_person_phone: string | null
+          delivery_type: string | null
           estimated_delivery: string | null
           id: string
           items: Json
@@ -560,6 +561,7 @@ export type Database = {
           customer_phone: string
           delivery_person_name?: string | null
           delivery_person_phone?: string | null
+          delivery_type?: string | null
           estimated_delivery?: string | null
           id?: string
           items: Json
@@ -583,6 +585,7 @@ export type Database = {
           customer_phone?: string
           delivery_person_name?: string | null
           delivery_person_phone?: string | null
+          delivery_type?: string | null
           estimated_delivery?: string | null
           id?: string
           items?: Json
@@ -1600,6 +1603,7 @@ export type Database = {
       vendors: {
         Row: {
           address: string
+          allows_pickup: boolean | null
           available_products: Json | null
           average_rating: number | null
           category: string
@@ -1624,6 +1628,7 @@ export type Database = {
           payment_settings: Json | null
           payment_status: string | null
           phone: string
+          pickup_instructions: string | null
           rating: number | null
           suspended_reason: string | null
           total_orders: number | null
@@ -1634,6 +1639,7 @@ export type Database = {
         }
         Insert: {
           address: string
+          allows_pickup?: boolean | null
           available_products?: Json | null
           average_rating?: number | null
           category: string
@@ -1658,6 +1664,7 @@ export type Database = {
           payment_settings?: Json | null
           payment_status?: string | null
           phone: string
+          pickup_instructions?: string | null
           rating?: number | null
           suspended_reason?: string | null
           total_orders?: number | null
@@ -1668,6 +1675,7 @@ export type Database = {
         }
         Update: {
           address?: string
+          allows_pickup?: boolean | null
           available_products?: Json | null
           average_rating?: number | null
           category?: string
@@ -1692,6 +1700,7 @@ export type Database = {
           payment_settings?: Json | null
           payment_status?: string | null
           phone?: string
+          pickup_instructions?: string | null
           rating?: number | null
           suspended_reason?: string | null
           total_orders?: number | null

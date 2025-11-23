@@ -42,6 +42,7 @@ export interface Order {
   payment_status?: string;  // Estado de pago: 'pending', 'paid', etc.
   payment_method?: PaymentMethod;  // Método de pago: 'efectivo', 'transferencia', 'mercadopago'
   paid_at?: Date;  // Fecha y hora del pago
+  delivery_type?: 'delivery' | 'pickup';  // ⭐ NUEVO: Tipo de entrega
   // Masked fields for vendor view
   customerNameMasked?: string;
   customerPhoneMasked?: string;
