@@ -158,6 +158,16 @@ export function OrderCard({ order, onStatusChange, onOpenChat, isVendorView = fa
             <Badge className={cn("font-medium", statusConfig[order.status].className)}>
               {statusConfig[order.status].label}
             </Badge>
+            {/* ⭐ Badge para tipo de entrega */}
+            {order.delivery_type === 'pickup' ? (
+              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800">
+                🏪 Retiro en Local
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-800">
+                🚚 Delivery
+              </Badge>
+            )}
             {isVendorView && (
               <Badge 
                 variant="outline" 

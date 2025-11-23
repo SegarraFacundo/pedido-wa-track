@@ -45,6 +45,7 @@ export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: "ver_menu_negocio",
       description: `Obtiene el menú completo de un negocio específico con todos sus productos y precios.
+      TAMBIÉN muestra si el negocio acepta RETIRO EN LOCAL (pickup).
       
 ⚠️ IMPORTANTE: USA EL ID EXACTO (UUID) que devuelve ver_locales_abiertos.
 NO inventes IDs en formato snake_case. Si el usuario menciona un negocio pero no tenés 
@@ -165,6 +166,34 @@ Ejemplo INCORRECTO:
     function: {
       name: "vaciar_carrito",
       description: "Elimina todos los productos del carrito",
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "seleccionar_tipo_entrega",
+      description: `Permite al cliente elegir entre DELIVERY o RETIRO EN LOCAL.
+        Solo disponible si el negocio acepta retiro (allows_pickup = true).
+        
+        CUÁNDO USAR:
+        - Cuando el usuario está listo para confirmar el pedido
+        - ANTES de pedir la dirección de entrega
+        - Si el negocio tiene allows_pickup = true
+        
+        IMPORTANTE:
+        - Si elige "delivery": pedir dirección y calcular costo de envío
+        - Si elige "pickup": NO pedir dirección, indicar que retira en el local`,
+      parameters: {
+        type: "object",
+        properties: {
+          tipo: {
+            type: "string",
+            enum: ["delivery", "pickup"],
+            description: "Tipo de entrega: 'delivery' (envío a domicilio) o 'pickup' (retiro en local)"
+          }
+        },
+        required: ["tipo"]
+      }
     },
   },
   {
