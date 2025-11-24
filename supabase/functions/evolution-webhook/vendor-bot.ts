@@ -932,7 +932,7 @@ async function ejecutarHerramienta(
         } else {
           // ⭐ Si es DELIVERY, validar dirección y calcular costo
 
-        if (context.user_latitude && context.user_longitude) {
+          if (context.user_latitude && context.user_longitude) {
           // Usuario tiene ubicación, validar cobertura
           const { data: vendor } = await supabase
             .from("vendors")
@@ -988,7 +988,8 @@ async function ejecutarHerramienta(
           if (!args.direccion || args.direccion.trim() === "") {
             return `📍 Para confirmar tu pedido, necesito tu dirección de entrega.\n\n✍️ Escribí tu dirección completa (calle y número).\n\nEl negocio confirmará si hace delivery a tu zona. 🚗`;
           }
-        } // ⭐ Fin del else de delivery_type === 'delivery'
+        }  // ⭐ Fin del if/else de ubicación GPS
+        }  // ⭐ Fin del else de delivery_type === 'delivery'
 
         // 🚫 Verificar si el usuario ya tiene un pedido activo (SIEMPRE desde BD)
         const { data: activeOrders } = await supabase
@@ -1278,7 +1279,7 @@ async function ejecutarHerramienta(
           } else {
             confirmacion += paymentErrorMsg;
           }
-        } // ⭐ Cierre del else if mercadopago
+        }  // ⭐ Cierre del else if mercadopago
 
         // Limpiar carrito después de crear pedido
         context.cart = [];
