@@ -14,6 +14,8 @@ ${context.cart.length > 0 ? `  Items: ${context.cart.map(item => `${item.quantit
 ${context.delivery_address ? `- Dirección: ${context.delivery_address}` : "- Sin dirección"}
 ${context.payment_method ? `- Pago: ${context.payment_method}` : "- Sin método de pago"}
 ${context.user_latitude && context.user_longitude ? "- ✅ Con ubicación GPS" : "- ⚠️ Sin ubicación"}
+${context.vendor_allows_pickup ? `- 🏪 Retiro en local: DISPONIBLE` : ""}
+${context.delivery_type ? `- 📦 Tipo de entrega: ${context.delivery_type === 'pickup' ? 'RETIRO EN LOCAL' : 'DELIVERY'}` : ""}
 
 🚨 REGLA CRÍTICA - FUENTE DE VERDAD:
 ⚠️ El ÚNICO estado válido es context.cart en la base de datos
@@ -28,12 +30,18 @@ ${context.user_latitude && context.user_longitude ? "- ✅ Con ubicación GPS" :
 
 ${contextInfo}
 
-🚚 REGLAS DE DELIVERY:
+🚚 REGLAS DE DELIVERY Y RETIRO:
 - El costo de delivery es FIJO por pedido, no depende de la distancia
-- NO pidas ubicación GPS al cliente para calcular delivery
-- El cliente puede escribir su dirección de texto directamente
-- El negocio validará manualmente si hace delivery a esa zona después de recibir el pedido
-- SIEMPRE incluí el costo de delivery en el total del pedido
+- Si el usuario elige RETIRO EN LOCAL (pickup):
+  → NO pedir dirección
+  → NO calcular costo de delivery (es $0)
+  → Mostrar dirección del negocio para que retire
+  → Mostrar instrucciones de retiro si el vendor las configuró
+- Si el usuario elige DELIVERY:
+  → NO pidas ubicación GPS al cliente para calcular delivery
+  → El cliente puede escribir su dirección de texto directamente
+  → El negocio validará manualmente si hace delivery a esa zona después de recibir el pedido
+  → SIEMPRE incluí el costo de delivery en el total del pedido
 
 ⚡ REGLAS POR ESTADO:
 
@@ -94,21 +102,36 @@ Este estado maneja TODO el proceso de compra hasta que el usuario confirme:
 3. Si tiene productos → Llamar ver_carrito para confirmar contenido real
 4. NUNCA asumas que el carrito tiene productos basándote en mensajes viejos
 
+🏪 RETIRO EN LOCAL vs DELIVERY:
+- Si vendor acepta retiro (context.vendor_allows_pickup = true):
+  → Preguntá: "¿Querés que te lo enviemos o lo retirás en el local?"
+  → Si elige "retiro" → usar seleccionar_tipo_entrega con tipo="pickup"
+  → Si elige "delivery" → usar seleccionar_tipo_entrega con tipo="delivery"
+- Si vendor NO acepta retiro:
+  → Automáticamente asumir delivery y pedir dirección
+
 - Cuando el usuario diga "confirmar", "listo", "eso es todo":
   → PRIMERO verificar que context.cart tenga productos
-  → SI tiene → Mostrar carrito y pedir dirección
+  → SI tiene → Verificar tipo de entrega (pickup vs delivery)
+  → SI es pickup → Mostrar dirección de retiro y pedir método de pago
+  → SI es delivery → Pedir dirección de entrega
   → SI está vacío → Rechazar y pedir que agregue productos
   
-- Una vez confirmado el carrito con productos → Pedir dirección
+- Una vez confirmado el carrito con productos:
+  → Si es PICKUP: Mostrar dirección de retiro y pedir método de pago
+  → Si es DELIVERY: Pedir dirección de entrega
 - Con dirección → El backend mostrará métodos de pago automáticamente
 - Usuario elige método → crear_pedido
 ` : ""}
 
 ${currentState === "needs_address" ? `
 📍 ESTADO: NEEDS ADDRESS (Necesita dirección)
-- Pedí al usuario que comparta su ubicación GPS usando el 📍 botón de WhatsApp
-- Alternativa: puede escribir su dirección manualmente
-- Una vez recibida la dirección → cambiar a "checkout"
+- ⚠️ SOLO para pedidos tipo "delivery"
+- Si context.delivery_type === 'pickup' → SALTAR este estado, no pedir dirección
+- Si context.delivery_type === 'delivery':
+  → Pedí al usuario que comparta su ubicación GPS usando el 📍 botón de WhatsApp
+  → Alternativa: puede escribir su dirección manualmente
+  → Una vez recibida la dirección → cambiar a "checkout"
 - Si quiere cambiar algo del pedido → volver a "shopping"
 ` : ""}
 
