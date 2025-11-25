@@ -191,11 +191,15 @@ async function ejecutarHerramienta(
 
         let resultado = "¡Aquí tenés los negocios abiertos que hacen delivery a tu zona! 🚗\n\n";
 
+        // Almacenar mapa de vendors disponibles (para búsqueda posterior sin mostrar UUIDs)
+        const vendorMap: Array<{ index: number; name: string; vendor_id: string }> = [];
+        let currentIndex = 1;
+
         // 🟢 ABIERTOS
         if (openVendors.length > 0) {
           resultado += `🟢 *ABIERTOS AHORA* (${openVendors.length}):\n\n`;
           openVendors.forEach((v: any, i: number) => {
-            resultado += `${i + 1}. *${v.vendor_name}*\n`;
+            resultado += `${currentIndex}. *${v.vendor_name}*\n`;
 
             // Dirección y distancia
             const vendorInfo = vendorsInfoMap.get(v.vendor_id);
@@ -203,7 +207,10 @@ async function ejecutarHerramienta(
             resultado += `📍 ${vendorInfo?.address || "Dirección no disponible"} - A ${v.distance_km.toFixed(
               1
             )} km\n`;
-            resultado += `ID: ${v.vendor_id}\n`;
+            
+            // Guardar en el mapa (NO mostrar ID al usuario)
+            vendorMap.push({ index: currentIndex, name: v.vendor_name, vendor_id: v.vendor_id });
+            currentIndex++;
 
             // Mostrar horario real desde vendor_hours
             const todayHours = hoursMap.get(v.vendor_id);
@@ -232,13 +239,16 @@ async function ejecutarHerramienta(
         if (closedVendors.length > 0) {
           resultado += `🔴 *CERRADOS* (${closedVendors.length}):\n\n`;
           closedVendors.forEach((v: any, i: number) => {
-            resultado += `${i + 1}. *${v.vendor_name}* 🔒\n`;
+            resultado += `${currentIndex}. *${v.vendor_name}* 🔒\n`;
 
             const vendorInfo = vendorsInfoMap.get(v.vendor_id);
             resultado += `📍 ${vendorInfo?.address || "Dirección no disponible"} - A ${v.distance_km.toFixed(
               1
             )} km\n`;
-            resultado += `ID: ${v.vendor_id}\n`;
+            
+            // Guardar en el mapa (NO mostrar ID al usuario)
+            vendorMap.push({ index: currentIndex, name: v.vendor_name, vendor_id: v.vendor_id });
+            currentIndex++;
 
             // Mostrar horario real
             const todayHours = hoursMap.get(v.vendor_id);
@@ -263,8 +273,12 @@ async function ejecutarHerramienta(
           });
         }
 
+        // Guardar el mapa en el contexto
+        context.available_vendors_map = vendorMap;
+        await saveContext(context, supabase);
+
         resultado +=
-          "\n💬 Si querés hacer un pedido, decime el nombre o ID del negocio y qué te gustaría pedir. 😊";
+          "\n💬 Decime el *número* o *nombre* del negocio para ver su menú. 😊";
 
         return resultado;
       }
@@ -287,6 +301,46 @@ async function ejecutarHerramienta(
 
         // Búsqueda robusta de vendor con múltiples estrategias
         const searchVendor = async (searchTerm: string) => {
+          // 0. PRIORIDAD: Buscar en el mapa de vendors disponibles (contexto)
+          if (context.available_vendors_map && context.available_vendors_map.length > 0) {
+            console.log("🔍 Buscando en mapa de vendors disponibles:", context.available_vendors_map.length);
+            
+            // 0a. Si es un número (ej: "1", "2"), buscar por índice
+            const indexNum = parseInt(searchTerm);
+            if (!isNaN(indexNum)) {
+              const byIndex = context.available_vendors_map.find(v => v.index === indexNum);
+              if (byIndex) {
+                console.log(`✅ Vendor encontrado por índice ${indexNum}:`, byIndex.name);
+                // Buscar el vendor completo en BD por ID
+                const { data } = await supabase.from("vendors")
+                  .select("id, name, is_active, payment_status")
+                  .eq("id", byIndex.vendor_id)
+                  .maybeSingle();
+                if (data) return data;
+              }
+            }
+            
+            // 0b. Buscar por nombre parcial en el mapa
+            const normalized = searchTerm.toLowerCase()
+              .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+              .replace(/[_-]/g, " ");
+            
+            const byName = context.available_vendors_map.find(v => {
+              const vNorm = v.name.toLowerCase()
+                .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+              return vNorm.includes(normalized) || normalized.includes(vNorm);
+            });
+            
+            if (byName) {
+              console.log(`✅ Vendor encontrado en mapa por nombre:`, byName.name);
+              const { data } = await supabase.from("vendors")
+                .select("id, name, is_active, payment_status")
+                .eq("id", byName.vendor_id)
+                .maybeSingle();
+              if (data) return data;
+            }
+          }
+          
           // 1. Si es un UUID válido, búsqueda directa
           const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
           if (uuidRegex.test(searchTerm)) {

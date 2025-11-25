@@ -81,5 +81,10 @@ export interface ConversationContext {
   delivery_type?: 'delivery' | 'pickup';  // Nuevo: tipo de entrega elegido
   vendor_allows_pickup?: boolean;          // Nuevo: si el vendor acepta retiro
   pickup_instructions?: string;            // Nuevo: instrucciones de retiro
+  available_vendors_map?: Array<{          // Nuevo: mapeo de vendors disponibles (no mostrar IDs al usuario)
+    index: number;                         // Número en la lista (1, 2, 3...)
+    name: string;                          // Nombre del negocio
+    vendor_id: string;                     // UUID interno (nunca mostrado al usuario)
+  }>;
   conversation_history: Array<{ role: "user" | "assistant" | "system"; content: string }>;
 }
