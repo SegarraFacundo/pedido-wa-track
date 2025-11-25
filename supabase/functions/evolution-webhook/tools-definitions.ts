@@ -47,15 +47,19 @@ export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       description: `Obtiene el menú completo de un negocio específico con todos sus productos y precios.
       TAMBIÉN muestra si el negocio acepta RETIRO EN LOCAL (pickup).
       
-⚠️ IMPORTANTE: USA EL ID EXACTO (UUID) que devuelve ver_locales_abiertos.
-NO inventes IDs en formato snake_case. Si el usuario menciona un negocio pero no tenés 
-su ID exacto, primero llamá a ver_locales_abiertos para obtener la lista con IDs reales.`,
+✅ PODÉS USAR:
+- Número de la lista (ej: "1", "2", "3")
+- Nombre del negocio (parcial o completo, ej: "heladería", "pizzeria don luigi")
+- El sistema normaliza acentos automáticamente (heladeria = Heladería)
+
+⚡ NO pidas confirmación si el usuario menciona un negocio claramente.
+Simplemente llamá a esta herramienta con lo que dijo el usuario.`,
       parameters: {
         type: "object",
         properties: {
           vendor_id: {
             type: "string",
-            description: "ID del negocio (UUID) - usar el ID exacto de ver_locales_abiertos",
+            description: "Número de la lista O nombre del negocio (parcial o completo)",
           },
         },
         required: ["vendor_id"],
