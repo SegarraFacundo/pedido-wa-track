@@ -168,6 +168,28 @@ Ejemplo INCORRECTO:
   {
     type: "function",
     function: {
+      name: "mostrar_resumen_pedido",
+      description: `⚠️ OBLIGATORIO ANTES DE crear_pedido. Muestra resumen completo del pedido para confirmación final.
+      
+USAR CUANDO:
+- Usuario dice "listo", "confirmar", "eso es todo", "hacer el pedido"
+- Después de que el usuario eligió método de pago
+- SIEMPRE antes de llamar a crear_pedido
+
+MUESTRA:
+- Todos los productos del carrito con cantidades y precios
+- Tipo de entrega (delivery/pickup)
+- Dirección de entrega (solo si es delivery)
+- Método de pago seleccionado
+- Total con/sin costo de envío
+- Pregunta final: "¿Confirmás el pedido?"
+
+🚨 REGLA CRÍTICA: NUNCA llamar crear_pedido sin antes mostrar este resumen.`,
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "vaciar_carrito",
       description: "Elimina todos los productos del carrito",
     },
