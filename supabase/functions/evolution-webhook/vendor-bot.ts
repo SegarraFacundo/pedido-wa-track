@@ -110,6 +110,13 @@ async function ejecutarHerramienta(
       }
 
       case "ver_locales_abiertos": {
+        // 🚫 Validar que no haya pedido activo
+        const pendingStates = ['order_pending_cash', 'order_pending_transfer', 'order_pending_mp', 'order_confirmed'];
+        if (pendingStates.includes(context.order_state || '')) {
+          const orderId = context.pending_order_id ? context.pending_order_id.substring(0, 8) : 'activo';
+          return `⏳ Ya tenés un pedido activo (#${orderId}). Esperá a que se complete o cancelalo antes de hacer otro. 😊`;
+        }
+        
         // 🕒 Hora local en Argentina
         const now = new Date();
         const argentinaTime = new Date(
@@ -287,6 +294,13 @@ async function ejecutarHerramienta(
       case "ver_menu_negocio": {
         console.log(`🔍 ========== VER MENU NEGOCIO ==========`);
         console.log(`📝 Args vendor_id: "${args.vendor_id}"`);
+
+        // 🚫 Validar que no haya pedido activo
+        const pendingStates = ['order_pending_cash', 'order_pending_transfer', 'order_pending_mp', 'order_confirmed'];
+        if (pendingStates.includes(context.order_state || '')) {
+          const orderId = context.pending_order_id ? context.pending_order_id.substring(0, 8) : 'activo';
+          return `⏳ Ya tenés un pedido activo (#${orderId}). Esperá a que se complete o cancelalo antes de hacer otro. 😊`;
+        }
 
         // 🔄 STATE VALIDATION: Debe estar en browsing o viewing_menu
         const currentState = context.order_state || "idle";
@@ -520,6 +534,13 @@ async function ejecutarHerramienta(
       }
 
       case "agregar_al_carrito": {
+        // 🚫 Validar que no haya pedido activo
+        const pendingStates = ['order_pending_cash', 'order_pending_transfer', 'order_pending_mp', 'order_confirmed'];
+        if (pendingStates.includes(context.order_state || '')) {
+          const orderId = context.pending_order_id ? context.pending_order_id.substring(0, 8) : 'activo';
+          return `⏳ Ya tenés un pedido activo (#${orderId}). Esperá a que se complete o cancelalo antes de hacer otro. 😊`;
+        }
+        
         const items = args.items as CartItem[];
         console.log("🛒 ========== AGREGAR AL CARRITO ==========");
         console.log("📦 Items to add:", JSON.stringify(items, null, 2));
@@ -2644,6 +2665,23 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       historyLength: context.conversation_history.length,
       hasLocation: !!(context.user_latitude && context.user_longitude),
     });
+
+    // 🚫 VALIDACIÓN TEMPRANA: Bloquear pedidos duplicados cuando hay uno activo
+    const pendingStates = ['order_pending_cash', 'order_pending_transfer', 'order_pending_mp', 'order_confirmed'];
+    const newOrderKeywords = ['quiero pedir', 'quiero hacer un pedido', 'nuevo pedido', 'hacer pedido', 'quiero comprar', 'ver locales', 'ver negocios', 'ver menu', 'ver menú'];
+    
+    if (pendingStates.includes(context.order_state || '')) {
+      const messageLower = message.toLowerCase();
+      const wantsNewOrder = newOrderKeywords.some(kw => messageLower.includes(kw));
+      
+      if (wantsNewOrder) {
+        console.log(`🚫 BLOCKED: User tried to start new order with active order in state: ${context.order_state}`);
+        const orderId = context.pending_order_id ? context.pending_order_id.substring(0, 8) : 'activo';
+        const stateDisplay = context.order_state?.replace('order_pending_', '').replace('_', ' ').toUpperCase() || 'ACTIVO';
+        
+        return `⏳ Ya tenés un pedido activo (#${orderId}) en estado *${stateDisplay}*.\n\n📊 Podés:\n- Decir "estado de mi pedido" para ver cómo va\n- Decir "cancelar pedido" si querés cancelarlo\n\nUna vez completado o cancelado, podés hacer un nuevo pedido. 😊`;
+      }
+    }
 
     // Agregar mensaje del usuario al historial
     context.conversation_history.push({
