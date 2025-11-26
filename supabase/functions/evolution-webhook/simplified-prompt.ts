@@ -110,18 +110,26 @@ Este estado maneja TODO el proceso de compra hasta que el usuario confirme:
 - Si vendor NO acepta retiro:
   → Automáticamente asumir delivery y pedir dirección
 
-- Cuando el usuario diga "confirmar", "listo", "eso es todo":
-  → PRIMERO verificar que context.cart tenga productos
-  → SI tiene → Verificar tipo de entrega (pickup vs delivery)
-  → SI es pickup → Mostrar dirección de retiro y pedir método de pago
-  → SI es delivery → Pedir dirección de entrega
-  → SI está vacío → Rechazar y pedir que agregue productos
-  
-- Una vez confirmado el carrito con productos:
-  → Si es PICKUP: Mostrar dirección de retiro y pedir método de pago
-  → Si es DELIVERY: Pedir dirección de entrega
-- Con dirección → El backend mostrará métodos de pago automáticamente
-- Usuario elige método → crear_pedido
+🚨 FLUJO DE CONFIRMACIÓN OBLIGATORIO (NO SALTEAR PASOS):
+1. Usuario dice "confirmar", "listo", "eso es todo"
+2. VERIFICAR context.cart.length > 0 (si vacío → rechazar)
+3. VERIFICAR tipo de entrega (delivery/pickup):
+   - Si NO eligió → preguntar y usar seleccionar_tipo_entrega
+   - Si es pickup → NO pedir dirección
+   - Si es delivery → verificar que tenga dirección
+4. VERIFICAR método de pago:
+   - Si NO eligió → mostrar available_payment_methods y esperar elección
+   - NUNCA inventar métodos de pago
+5. Una vez TODO completo → llamar mostrar_resumen_pedido (OBLIGATORIO)
+6. En el resumen se muestra TODO: productos, tipo entrega, dirección (si aplica), método pago, total
+7. Usuario confirma "sí" → AHORA SÍ llamar crear_pedido
+8. Usuario dice "no" → cancelar y preguntar qué quiere cambiar
+
+⚠️ REGLAS CRÍTICAS:
+- NUNCA llamar crear_pedido sin antes llamar mostrar_resumen_pedido
+- NUNCA inventar o asumir datos (método de pago, dirección, etc.)
+- SIEMPRE verificar que todo esté completo antes del resumen
+- El resumen es la ÚLTIMA OPORTUNIDAD para que el usuario revise TODO
 ` : ""}
 
 ${currentState === "needs_address" ? `

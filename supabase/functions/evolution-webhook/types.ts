@@ -86,5 +86,6 @@ export interface ConversationContext {
     name: string;                          // Nombre del negocio
     vendor_id: string;                     // UUID interno (nunca mostrado al usuario)
   }>;
+  resumen_mostrado?: boolean;              // Nuevo: indica si ya se mostró el resumen final del pedido
   conversation_history: Array<{ role: "user" | "assistant" | "system"; content: string }>;
 }

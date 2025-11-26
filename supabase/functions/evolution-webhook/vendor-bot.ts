@@ -481,9 +481,12 @@ async function ejecutarHerramienta(
           .single();
         
         if (vendorDetails) {
-          context.vendor_allows_pickup = vendorDetails.allows_pickup || false;
+          // ⭐ FIX: Asegurar que solo sea true si está explícitamente habilitado
+          context.vendor_allows_pickup = vendorDetails.allows_pickup === true;
           context.pickup_instructions = vendorDetails.pickup_instructions;
           console.log(`✅ Pickup info: allows_pickup=${context.vendor_allows_pickup}`);
+        } else {
+          context.vendor_allows_pickup = false;
         }
 
         let menu = `📋 *Menú de ${vendor.name}*\n\n`;
@@ -694,6 +697,108 @@ async function ejecutarHerramienta(
         return carrito;
       }
 
+      case "mostrar_resumen_pedido": {
+        console.log("📋 ========== MOSTRAR RESUMEN PEDIDO ==========");
+        
+        if (context.cart.length === 0) {
+          return "⚠️ Tu carrito está vacío. No hay nada que confirmar todavía.";
+        }
+
+        if (!context.selected_vendor_id || !context.selected_vendor_name) {
+          return "⚠️ Error: No hay negocio seleccionado.";
+        }
+
+        let resumen = `📋 *RESUMEN DE TU PEDIDO*\n\n`;
+        resumen += `🏪 *Negocio:* ${context.selected_vendor_name}\n\n`;
+        
+        // 1. Productos del carrito
+        resumen += `📦 *Productos:*\n`;
+        context.cart.forEach((item, i) => {
+          resumen += `${i + 1}. ${item.product_name} x${item.quantity} - $${item.price * item.quantity}\n`;
+        });
+        
+        const subtotal = context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        resumen += `\n💰 *Subtotal:* $${subtotal}\n`;
+        
+        // 2. Tipo de entrega
+        if (context.delivery_type === 'pickup') {
+          resumen += `\n📍 *Entrega:* Retiro en local\n`;
+          if (context.pickup_instructions) {
+            resumen += `   ℹ️ ${context.pickup_instructions}\n`;
+          }
+        } else if (context.delivery_type === 'delivery') {
+          resumen += `\n🚚 *Entrega:* A domicilio\n`;
+          if (context.delivery_address) {
+            resumen += `📍 *Dirección:* ${context.delivery_address}\n`;
+          } else {
+            resumen += `⚠️ *Falta confirmar dirección de entrega*\n`;
+          }
+          resumen += `🚴 *Costo de envío:* (se calculará según distancia)\n`;
+        } else {
+          resumen += `\n⚠️ *Tipo de entrega no seleccionado*\n`;
+        }
+        
+        // 3. Método de pago
+        resumen += `\n💳 *Método de pago:* `;
+        if (context.payment_method) {
+          const paymentIcons: Record<string, string> = {
+            'efectivo': '💵',
+            'transferencia': '🏦',
+            'mercadopago': '💳'
+          };
+          const icon = paymentIcons[context.payment_method.toLowerCase()] || '💰';
+          resumen += `${icon} ${context.payment_method.charAt(0).toUpperCase() + context.payment_method.slice(1)}\n`;
+        } else {
+          resumen += `⚠️ *No seleccionado*\n`;
+          
+          // Si tiene métodos disponibles, mostrarlos
+          if (context.available_payment_methods && context.available_payment_methods.length > 0) {
+            resumen += `\nPor favor elegí uno de estos métodos:\n`;
+            context.available_payment_methods.forEach(method => {
+              const methodIcons: Record<string, string> = {
+                'efectivo': '💵',
+                'transferencia': '🏦',
+                'mercadopago': '💳'
+              };
+              resumen += `- ${method.charAt(0).toUpperCase() + method.slice(1)} ${methodIcons[method] || '💰'}\n`;
+            });
+            
+            // No marcar como resumen_mostrado si falta método de pago
+            return resumen;
+          }
+        }
+        
+        // 4. Total estimado
+        resumen += `\n💰💰 *TOTAL ESTIMADO:* $${subtotal}`;
+        if (context.delivery_type === 'delivery') {
+          resumen += ` + envío`;
+        }
+        resumen += `\n\n`;
+        
+        // 5. Verificar que todo esté completo antes de pedir confirmación
+        const missingInfo = [];
+        if (!context.delivery_type) missingInfo.push("tipo de entrega");
+        if (context.delivery_type === 'delivery' && !context.delivery_address) missingInfo.push("dirección");
+        if (!context.payment_method) missingInfo.push("método de pago");
+        
+        if (missingInfo.length > 0) {
+          resumen += `⚠️ *Falta completar:* ${missingInfo.join(', ')}\n`;
+          return resumen;
+        }
+        
+        // Todo completo, pedir confirmación final
+        resumen += `✅ *¿Confirmás el pedido?*\n`;
+        resumen += `Respondé "sí" para confirmar o "no" para cancelar.`;
+        
+        // Marcar que se mostró el resumen
+        context.resumen_mostrado = true;
+        await saveContext(context, supabase);
+        
+        console.log("✅ Resumen mostrado y marcado en contexto");
+        
+        return resumen;
+      }
+
       case "modificar_carrito_completo": {
         // Esta herramienta permite reemplazar el carrito completo
         // Útil para correcciones: "quiero 2 cocas y 1 alfajor"
@@ -838,6 +943,12 @@ async function ejecutarHerramienta(
       }
 
       case "crear_pedido": {
+        // 🚨 VALIDACIÓN CRÍTICA: Verificar que se mostró el resumen primero
+        if (!context.resumen_mostrado) {
+          console.error("❌ Attempt to create order without showing summary first");
+          return "⚠️ Primero necesito mostrarte el resumen completo del pedido. Decime 'listo' o 'confirmar' para verlo.";
+        }
+        
         console.log("🛒 crear_pedido called with context:", {
           cartLength: context.cart.length,
           cartPreview: context.cart.map((i) => `${i.product_name} x${i.quantity}`).join(", "),
@@ -849,6 +960,7 @@ async function ejecutarHerramienta(
           currentState: context.order_state,
           paymentMethodsFetched: context.payment_methods_fetched,
           availablePaymentMethods: context.available_payment_methods,
+          resumenMostrado: context.resumen_mostrado,
         });
         
         // ⭐ VALIDACIÓN CRÍTICA: Verificar que el método de pago es válido
@@ -1340,6 +1452,7 @@ async function ejecutarHerramienta(
         context.conversation_history = []; // 🧹 Limpiar historial después de crear pedido
         context.last_order_id = order.id;
         context.pending_order_id = order.id;  // ✅ Guardar pending_order_id para seguimiento
+        context.resumen_mostrado = false; // Reset para próximo pedido
         console.log(`🧹 Order created, cart and history cleared`);
         await saveContext(context, supabase);
 
