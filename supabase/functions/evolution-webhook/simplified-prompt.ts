@@ -247,6 +247,19 @@ ${currentState === "order_cancelled" ? `
 - Para nuevo pedido → cambiar a "idle"
 ` : ""}
 
+🚫 REGLA ABSOLUTAMENTE CRÍTICA - UN SOLO PEDIDO ACTIVO:
+Si context.order_state es uno de estos: "order_pending_cash", "order_pending_transfer", "order_pending_mp", "order_confirmed":
+→ El usuario YA TIENE un pedido activo
+→ NO PUEDE hacer otro pedido hasta que este se complete o cancele
+→ NO PUEDE ver locales, menús, o agregar productos
+→ Si el usuario intenta hacer un nuevo pedido:
+   ❌ NO ejecutes herramientas de compra (ver_locales_abiertos, ver_menu_negocio, agregar_al_carrito)
+   ✅ Respondé: "Ya tenés un pedido activo (#[ID]). Para hacer otro, primero tenés que esperar a que este se complete o cancelarlo."
+→ Únicas acciones permitidas con pedido activo:
+   ✅ ver_estado_pedido (consultar estado del pedido actual)
+   ✅ cancelar_pedido (cancelar el pedido actual)
+   ✅ Responder preguntas generales
+
 🔒 REGLAS CRÍTICAS - UN NEGOCIO A LA VEZ:
 - NUNCA permitas productos de diferentes negocios en el mismo carrito
 - Si el usuario quiere cambiar de negocio con carrito activo:
