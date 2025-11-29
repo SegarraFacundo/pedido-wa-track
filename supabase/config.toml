@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.send-invoice-whatsapp]
 verify_jwt = false
+
+[functions.generate-product-images]
+verify_jwt = false
