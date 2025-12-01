@@ -15,6 +15,9 @@ import Soporte from "./pages/Soporte";
 import SoporteAuth from "./pages/SoporteAuth";
 import PaymentConfirmation from "./pages/PaymentConfirmation";
 import SubdomainRouter from "./components/SubdomainRouter";
+import Terminos from "./pages/Terminos";
+import Privacidad from "./pages/Privacidad";
+import Contacto from "./pages/Contacto";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +39,9 @@ const App = () => (
             <Route path="/soporte-auth" element={<SoporteAuth />} />
             <Route path="/soporte" element={<Soporte />} />
             <Route path="/payment-confirmation" element={<PaymentConfirmation />} />
+            <Route path="/terminos" element={<Terminos />} />
+            <Route path="/privacidad" element={<Privacidad />} />
+            <Route path="/contacto" element={<Contacto />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
