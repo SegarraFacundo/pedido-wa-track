@@ -9,11 +9,17 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Lapacho">
     
-    <title>Lapacho - Plataforma de Delivery Local</title>
-    <meta name="description" content="Plataforma de delivery local que integra WhatsApp Business. Conectamos tu negocio con tus clientes de forma simple y eficiente." />
+    <!-- Google Fonts - Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <title>Lapacho - Simple por naturaleza | Pedidos por WhatsApp</title>
+    <meta name="description" content="Lapacho es un asistente automatizado que toma pedidos por WhatsApp, los organiza y te los envía listos para preparar. Simple por naturaleza." />
     <meta name="author" content="Lapacho" />
+    <meta name="keywords" content="pedidos, WhatsApp, delivery, asistente automatizado, negocios, restaurantes" />
 
-    <!-- PWA Manifests (se cargará dinámicamente según el tipo de usuario) -->
+    <!-- PWA Manifests -->
     <link rel="manifest" href="/manifest-vendor.json" id="manifest-placeholder">
     
     <!-- Apple Touch Icons -->
@@ -22,18 +28,28 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/lapacho-icon.png">
     <link rel="apple-touch-icon" sizes="167x167" href="/lapacho-icon.png">
 
-    <!-- Theme Colors -->
-    <meta name="theme-color" content="#E94E87">
-    <meta name="msapplication-TileColor" content="#E94E87">
+    <!-- Theme Colors - Rosa Lapacho -->
+    <meta name="theme-color" content="#E878A8">
+    <meta name="msapplication-TileColor" content="#E878A8">
     
-    <meta property="og:title" content="Lapacho - Plataforma de Delivery Local" />
-    <meta property="og:description" content="Plataforma de delivery local que integra WhatsApp Business. Conectamos tu negocio con tus clientes de forma simple y eficiente." />
+    <!-- Open Graph -->
+    <meta property="og:title" content="Lapacho - Simple por naturaleza" />
+    <meta property="og:description" content="Asistente automatizado que toma pedidos por WhatsApp. Pedidos claros, rápidos y sin errores." />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <meta property="og:url" content="https://lapacho.ar" />
 
+    <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@lovable_dev" />
+    <meta name="twitter:title" content="Lapacho - Simple por naturaleza" />
+    <meta name="twitter:description" content="Asistente automatizado que toma pedidos por WhatsApp." />
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+
+    <style>
+      body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+    </style>
   </head>
 
   <body>
@@ -62,7 +78,7 @@
         
         if (path.includes('/vendor') || path.includes('/dashboard')) {
           manifestLink.href = '/manifest-vendor.json';
-          themeColor.content = '#E94E87';
+          themeColor.content = '#E878A8';
         } else if (path.includes('/soporte')) {
           manifestLink.href = '/manifest-soporte.json';
           themeColor.content = '#9b87f5';
