@@ -31,21 +31,19 @@ export default function Landing() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <img src={lapachoLogo} alt="Lapacho" className="h-8" />
-              <span className="text-muted-foreground text-sm hidden sm:block">Simple por naturaleza.</span>
-            </div>
-            <nav className="flex items-center gap-2 sm:gap-4">
-              <Link to="/contacto" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                Contacto
-              </Link>
-              <Button variant="outline" size="sm" onClick={handleProbarClick}>
-                Probar Lapacho
-              </Button>
-            </nav>
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img src={lapachoLogo} alt="Lapacho" className="h-8" />
+            <span className="text-muted-foreground text-sm hidden sm:block">Simple por naturaleza.</span>
           </div>
+          <nav className="flex items-center gap-2 sm:gap-4">
+            <Link to="/contacto" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Contacto
+            </Link>
+            <Button variant="outline" size="sm" onClick={handleProbarClick}>
+              Probar Lapacho
+            </Button>
+          </nav>
         </div>
       </header>
 
