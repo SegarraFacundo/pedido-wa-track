@@ -18,7 +18,7 @@ import SubdomainRouter from "./components/SubdomainRouter";
 import Terminos from "./pages/Terminos";
 import Privacidad from "./pages/Privacidad";
 import Contacto from "./pages/Contacto";
-
+import BrandAssets from "./pages/BrandAssets";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -42,6 +42,7 @@ const App = () => (
             <Route path="/terminos" element={<Terminos />} />
             <Route path="/privacidad" element={<Privacidad />} />
             <Route path="/contacto" element={<Contacto />} />
+            <Route path="/brand-assets" element={<BrandAssets />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
