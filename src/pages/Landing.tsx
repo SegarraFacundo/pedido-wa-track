@@ -12,7 +12,6 @@ import {
   ArrowRight,
   Leaf
 } from "lucide-react";
-import lapachoLogo from '@/assets/lapacho-logo.png';
 
 export default function Landing() {
   const handleProbarClick = () => {
@@ -32,9 +31,12 @@ export default function Landing() {
       {/* Header */}
       <header className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-end gap-3">
-            <img src={lapachoLogo} alt="Lapacho" className="h-8" />
-            <span className="text-muted-foreground text-sm hidden sm:block">Simple por naturaleza.</span>
+          <div className="flex items-end gap-6">
+            <div className="flex items-center gap-2">
+              <Leaf className="h-6 w-6 text-primary" />
+              <span className="text-xl font-semibold text-primary">Lapacho</span>
+            </div>
+            <span className="text-muted-foreground text-sm hidden sm:block pb-0.5">Simple por naturaleza.</span>
           </div>
           <nav className="flex items-center gap-2 sm:gap-4">
             <Link to="/contacto" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
@@ -297,9 +299,9 @@ export default function Landing() {
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center gap-8">
             <div className="text-center md:text-left">
-              <div className="flex items-center justify-center md:justify-start gap-3 mb-2">
-                <Leaf className="h-6 w-6" />
-                <span className="text-xl font-semibold">Lapacho</span>
+              <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
+                <Leaf className="h-6 w-6 text-primary" />
+                <span className="text-xl font-semibold text-primary">Lapacho</span>
               </div>
               <p className="text-sm opacity-70">Simple por naturaleza.</p>
             </div>
