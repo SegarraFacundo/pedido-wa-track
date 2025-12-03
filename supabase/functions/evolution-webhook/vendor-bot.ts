@@ -487,28 +487,34 @@ async function ejecutarHerramienta(
           return `${vendor.name} no tiene productos disponibles en este momento. 😔\n\nPodés buscar otros negocios con productos disponibles.`;
         }
 
-        // ⭐ Obtener información de pickup del vendor
+        // ⭐ Obtener información de delivery y pickup del vendor
         const { data: vendorDetails } = await supabase
           .from("vendors")
-          .select("allows_pickup, pickup_instructions, address")
+          .select("allows_pickup, allows_delivery, pickup_instructions, address")
           .eq("id", vendor.id)
           .single();
         
         if (vendorDetails) {
-          // ⭐ FIX: Asegurar que solo sea true si está explícitamente habilitado
           context.vendor_allows_pickup = vendorDetails.allows_pickup === true;
+          context.vendor_allows_delivery = vendorDetails.allows_delivery ?? true; // Default true si no está definido
           context.pickup_instructions = vendorDetails.pickup_instructions;
-          console.log(`✅ Pickup info: allows_pickup=${context.vendor_allows_pickup}`);
+          console.log(`✅ Delivery options: allows_delivery=${context.vendor_allows_delivery}, allows_pickup=${context.vendor_allows_pickup}`);
         } else {
           context.vendor_allows_pickup = false;
+          context.vendor_allows_delivery = true; // Default true
         }
 
         let menu = `📋 *Menú de ${vendor.name}*\n\n`;
         
-        // ⭐ Mostrar opciones de entrega si acepta pickup
-        if (context.vendor_allows_pickup) {
-          menu += `✅ Este negocio acepta *retiro en local*\n`;
+        // ⭐ Mostrar opciones de entrega disponibles
+        if (context.vendor_allows_delivery && context.vendor_allows_pickup) {
+          menu += `✅ Opciones: *Delivery* y *Retiro en local*\n`;
           menu += `📍 Dirección: ${vendorDetails?.address || 'No disponible'}\n\n`;
+        } else if (context.vendor_allows_pickup && !context.vendor_allows_delivery) {
+          menu += `🏪 Este negocio solo acepta *retiro en local*\n`;
+          menu += `📍 Dirección: ${vendorDetails?.address || 'No disponible'}\n\n`;
+        } else if (context.vendor_allows_delivery && !context.vendor_allows_pickup) {
+          menu += `🚚 Este negocio solo hace *delivery*\n\n`;
         }
         
         menu += `📦 Productos disponibles:\n\n`;
@@ -894,8 +900,14 @@ async function ejecutarHerramienta(
       }
 
       case "seleccionar_tipo_entrega": {
+        // Validar pickup
         if (!context.vendor_allows_pickup && args.tipo === "pickup") {
           return `⚠️ ${context.selected_vendor_name} no acepta retiro en local. Solo delivery.`;
+        }
+        
+        // ⭐ NUEVO: Validar delivery
+        if (context.vendor_allows_delivery === false && args.tipo === "delivery") {
+          return `⚠️ ${context.selected_vendor_name} no hace delivery. Solo retiro en local.`;
         }
         
         context.delivery_type = args.tipo;
