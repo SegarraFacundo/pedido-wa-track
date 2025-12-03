@@ -3018,21 +3018,33 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     }
 
     // 🔍 DETECCIÓN AUTOMÁTICA: Usuario eligiendo método de pago
-    // Si el bot ya mostró los métodos de pago, el usuario aún no eligió, y tiene dirección
-    if (context.payment_methods_fetched && !context.payment_method && context.delivery_address) {
+    // Si el bot ya mostró los métodos de pago, el usuario aún no eligió, y tiene dirección O es pickup
+    if (context.payment_methods_fetched && !context.payment_method && 
+        (context.delivery_address || context.delivery_type === 'pickup')) {
       console.log(`🔍 User seems to be choosing payment method. Message: ${message}`);
       console.log(`📋 Available methods: ${context.available_payment_methods?.join(', ')}`);
+      console.log(`🚚 Delivery type: ${context.delivery_type}`);
       
       const normalizedMsg = message.toLowerCase().trim();
       let selectedMethod: string | null = null;
       
-      // Detectar método seleccionado
+      // Detectar método seleccionado explícitamente
       if (normalizedMsg.includes('efectivo') || normalizedMsg.includes('cash')) {
         selectedMethod = 'efectivo';
       } else if (normalizedMsg.includes('transferencia') || normalizedMsg.includes('transfer')) {
         selectedMethod = 'transferencia';
       } else if (normalizedMsg.includes('mercado') || normalizedMsg.includes('mp') || normalizedMsg.includes('mercadopago')) {
         selectedMethod = 'mercadopago';
+      }
+      
+      // 🆕 Si el usuario confirma con "Si/Ok/Dale" y hay UN solo método disponible, auto-seleccionarlo
+      if (!selectedMethod) {
+        const confirmKeywords = /^(s[ií]|si|yes|dale|ok|confirmo|listo|confirmar)$/i;
+        if (confirmKeywords.test(normalizedMsg) && 
+            context.available_payment_methods?.length === 1) {
+          selectedMethod = context.available_payment_methods[0];
+          console.log(`✅ Auto-selected single available method: ${selectedMethod}`);
+        }
       }
       
       if (selectedMethod) {
@@ -3056,12 +3068,17 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         console.log(`✅ Valid payment method selected: ${selectedMethod}`);
         context.payment_method = selectedMethod;
         
+        // Determinar la dirección correcta según el tipo de entrega
+        const orderAddress = context.delivery_type === 'pickup' 
+          ? `Retiro en local: ${context.selected_vendor_name}` 
+          : context.delivery_address;
+        
         // Llamar automáticamente a crear_pedido
         try {
           const orderResult = await ejecutarHerramienta(
             "crear_pedido",
             {
-              direccion: context.delivery_address,
+              direccion: orderAddress,
               metodo_pago: selectedMethod
             },
             context,
