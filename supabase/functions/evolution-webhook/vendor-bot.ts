@@ -6,6 +6,31 @@ import { getContext, saveContext } from "./context.ts";
 import { tools } from "./tools-definitions.ts";
 import { buildSystemPrompt } from "./simplified-prompt.ts";
 
+// ==================== HELPER: REAL-TIME VENDOR CONFIG ====================
+
+// ✅ SIEMPRE consulta la DB para obtener la configuración actual del vendor
+// NUNCA usa valores cacheados del contexto para allows_pickup/allows_delivery
+async function getVendorConfig(vendorId: string, supabase: any) {
+  const { data, error } = await supabase
+    .from("vendors")
+    .select("allows_pickup, allows_delivery, pickup_instructions, address, is_active, name")
+    .eq("id", vendorId)
+    .single();
+  
+  if (error) {
+    console.error(`❌ Error fetching vendor config for ${vendorId}:`, error);
+  }
+  
+  return {
+    allows_pickup: data?.allows_pickup === true,
+    allows_delivery: data?.allows_delivery ?? true, // Default true si no existe
+    pickup_instructions: data?.pickup_instructions,
+    address: data?.address,
+    is_active: data?.is_active ?? true,
+    name: data?.name
+  };
+}
+
 // ==================== EJECUTORES DE HERRAMIENTAS ====================
 
 async function ejecutarHerramienta(
@@ -900,13 +925,17 @@ async function ejecutarHerramienta(
       }
 
       case "seleccionar_tipo_entrega": {
-        // Validar pickup
-        if (!context.vendor_allows_pickup && args.tipo === "pickup") {
+        // ✅ SIEMPRE consultar en tiempo real - NUNCA usar caché
+        const vendorConfig = await getVendorConfig(context.selected_vendor_id!, supabase);
+        console.log(`🔄 Real-time vendor config for ${context.selected_vendor_id}:`, vendorConfig);
+        
+        // Validar pickup EN TIEMPO REAL
+        if (!vendorConfig.allows_pickup && args.tipo === "pickup") {
           return `⚠️ ${context.selected_vendor_name} no acepta retiro en local. Solo delivery.`;
         }
         
-        // ⭐ NUEVO: Validar delivery
-        if (context.vendor_allows_delivery === false && args.tipo === "delivery") {
+        // Validar delivery EN TIEMPO REAL
+        if (!vendorConfig.allows_delivery && args.tipo === "delivery") {
           return `⚠️ ${context.selected_vendor_name} no hace delivery. Solo retiro en local.`;
         }
         
@@ -919,18 +948,12 @@ async function ejecutarHerramienta(
           let respuesta = `✅ Perfecto! Tu pedido será para *retiro en local*.\n\n`;
           respuesta += `📍 *Retirá en:*\n${context.selected_vendor_name}\n`;
           
-          // Obtener dirección del vendor
-          const { data: vendor } = await supabase
-            .from("vendors")
-            .select("address, pickup_instructions")
-            .eq("id", context.selected_vendor_id)
-            .single();
-          
-          if (vendor) {
-            respuesta += `${vendor.address}\n\n`;
+          // Usar datos ya obtenidos de vendorConfig
+          if (vendorConfig.address) {
+            respuesta += `${vendorConfig.address}\n\n`;
             
-            if (vendor.pickup_instructions) {
-              respuesta += `📝 *Instrucciones:*\n${vendor.pickup_instructions}\n\n`;
+            if (vendorConfig.pickup_instructions) {
+              respuesta += `📝 *Instrucciones:*\n${vendorConfig.pickup_instructions}\n\n`;
             }
           }
           
@@ -1097,16 +1120,23 @@ async function ejecutarHerramienta(
           return "Error: No hay negocio seleccionado. Por favor elegí un negocio antes de hacer el pedido.";
         }
 
-        // ⭐ NUEVO: Validación de tipo de entrega
+        // ✅ SIEMPRE consultar en tiempo real para tipo de entrega
         if (!context.delivery_type) {
-          // Si el vendor acepta pickup, preguntar
-          if (context.vendor_allows_pickup) {
+          const vendorConfig = await getVendorConfig(context.selected_vendor_id!, supabase);
+          console.log(`🔄 Real-time vendor config for delivery type:`, vendorConfig);
+          
+          // Si el vendor acepta ambos, preguntar
+          if (vendorConfig.allows_pickup && vendorConfig.allows_delivery) {
             return `¿Querés que te enviemos el pedido a domicilio o lo retirás en el local?\n\n` +
                    `Respondé "delivery" o "retiro"`;
+          } else if (vendorConfig.allows_pickup && !vendorConfig.allows_delivery) {
+            // Solo pickup disponible
+            context.delivery_type = 'pickup';
+            console.log(`✅ Vendor only allows pickup. Auto-setting to pickup.`);
           } else {
-            // Si no acepta pickup, asumir delivery
+            // Solo delivery o default
             context.delivery_type = 'delivery';
-            console.log(`✅ Vendor doesn't accept pickup. Defaulting to delivery.`);
+            console.log(`✅ Vendor only allows delivery. Auto-setting to delivery.`);
           }
         }
 
