@@ -10,7 +10,8 @@ import {
   Bell,
   CheckCircle2,
   ArrowRight,
-  Leaf
+  Leaf,
+  Instagram
 } from "lucide-react";
 
 export default function Landing() {
@@ -322,6 +323,15 @@ export default function Landing() {
               </Link>
               <a href="mailto:contacto@lapacho.ar" className="opacity-70 hover:opacity-100 transition-opacity">
                 contacto@lapacho.ar
+              </a>
+              <a 
+                href="https://www.instagram.com/lapacho.ar/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="opacity-70 hover:opacity-100 transition-opacity flex items-center gap-1"
+              >
+                <Instagram className="h-4 w-4" />
+                @lapacho.ar
               </a>
             </div>
           </div>
