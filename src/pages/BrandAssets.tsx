@@ -101,7 +101,7 @@ const BrandAssets = () => {
     document.body.removeChild(link);
   };
 
-  const downloadPng = async (svgUrl: string, filename: string, width: number, height: number, targetSize: number) => {
+  const downloadPng = async (svgUrl: string, filename: string, width: number, height: number, targetSize: number, isDark: boolean) => {
     setDownloading(`${filename}-${targetSize}`);
     
     try {
@@ -109,19 +109,32 @@ const BrandAssets = () => {
       const svgText = await response.text();
       
       const canvas = document.createElement("canvas");
-      const scale = targetSize / Math.max(width, height);
-      canvas.width = width * scale;
-      canvas.height = height * scale;
+      // Make it square with padding
+      canvas.width = targetSize;
+      canvas.height = targetSize;
       
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
+      
+      // Fill background based on theme
+      ctx.fillStyle = isDark ? "#1A1A1A" : "#FFFFFF";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
       
       const img = new Image();
       const svgBlob = new Blob([svgText], { type: "image/svg+xml;charset=utf-8" });
       const svgBlobUrl = URL.createObjectURL(svgBlob);
       
       img.onload = () => {
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        // Calculate size with padding (80% of canvas, centered)
+        const padding = targetSize * 0.1;
+        const availableSize = targetSize - (padding * 2);
+        const scale = Math.min(availableSize / width, availableSize / height);
+        const scaledWidth = width * scale;
+        const scaledHeight = height * scale;
+        const x = (targetSize - scaledWidth) / 2;
+        const y = (targetSize - scaledHeight) / 2;
+        
+        ctx.drawImage(img, x, y, scaledWidth, scaledHeight);
         URL.revokeObjectURL(svgBlobUrl);
         
         canvas.toBlob((blob) => {
@@ -279,12 +292,13 @@ const BrandAssets = () => {
                               variant="outline"
                               size="sm"
                               disabled={downloading === `${variant.name}-light-${size}`}
-                              onClick={() => downloadPng(
+                            onClick={() => downloadPng(
                                 variant.lightSvg,
                                 `lapacho-${variant.name.toLowerCase().replace(/\s+/g, '-')}-light`,
                                 variant.width,
                                 variant.height,
-                                size
+                                size,
+                                false
                               )}
                             >
                               <Download className="h-4 w-4 mr-2" />
@@ -322,12 +336,13 @@ const BrandAssets = () => {
                               variant="outline"
                               size="sm"
                               disabled={downloading === `${variant.name}-dark-${size}`}
-                              onClick={() => downloadPng(
+                            onClick={() => downloadPng(
                                 variant.darkSvg,
                                 `lapacho-${variant.name.toLowerCase().replace(/\s+/g, '-')}-dark`,
                                 variant.width,
                                 variant.height,
-                                size
+                                size,
+                                true
                               )}
                             >
                               <Download className="h-4 w-4 mr-2" />
