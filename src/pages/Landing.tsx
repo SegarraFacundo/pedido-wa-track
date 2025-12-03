@@ -48,14 +48,30 @@ export default function Landing() {
       </header>
 
       {/* Hero Section */}
-      <section className="bg-gradient-hero py-20 md:py-32">
-        <div className="container mx-auto px-4">
+      <section className="relative overflow-hidden py-20 md:py-32 min-h-[80vh] flex items-center">
+        {/* Video de fondo */}
+        <div className="absolute inset-0 z-0">
+          <video 
+            autoPlay 
+            loop 
+            muted 
+            playsInline
+            className="w-full h-full object-cover"
+            poster="/videos/hero-poster.jpg"
+          >
+            <source src="/videos/hero-lapacho.mp4" type="video/mp4" />
+          </video>
+          {/* Overlay para legibilidad */}
+          <div className="absolute inset-0 bg-gradient-to-b from-background/70 via-background/60 to-background/80" />
+        </div>
+        
+        <div className="relative z-10 container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 bg-accent text-accent-foreground px-4 py-2 rounded-full text-sm mb-8">
+            <div className="inline-flex items-center gap-2 bg-primary/20 text-primary-foreground backdrop-blur-sm px-4 py-2 rounded-full text-sm mb-8 border border-primary/30">
               <Leaf className="h-4 w-4" />
               Simple por naturaleza.
             </div>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-6 leading-tight">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-6 leading-tight drop-shadow-sm">
               Lapacho – Simple por naturaleza.
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto">
@@ -66,7 +82,7 @@ export default function Landing() {
                 Probar Lapacho
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
-              <Button size="lg" variant="outline" className="text-base px-8" onClick={handleDemoClick}>
+              <Button size="lg" variant="outline" className="text-base px-8 bg-background/50 backdrop-blur-sm" onClick={handleDemoClick}>
                 Ver demo
               </Button>
             </div>
