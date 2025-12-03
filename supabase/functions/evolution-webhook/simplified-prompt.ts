@@ -130,6 +130,12 @@ Este estado maneja TODO el proceso de compra hasta que el usuario confirme:
 - NUNCA inventar o asumir datos (método de pago, dirección, etc.)
 - SIEMPRE verificar que todo esté completo antes del resumen
 - El resumen es la ÚLTIMA OPORTUNIDAD para que el usuario revise TODO
+
+🚨 MANEJO AUTOMÁTICO DE CONFIRMACIÓN:
+- Si el usuario dice "sí", "confirmar", "listo", "dale" → El sistema maneja automáticamente el flujo
+- NO respondas con texto preguntando "¿querés confirmar?" si el usuario ya dijo "sí"
+- El backend detecta las confirmaciones y llama las herramientas correctas
+- Tu trabajo es SOLO manejar flujos complejos o preguntas específicas
 ` : ""}
 
 ${currentState === "needs_address" ? `

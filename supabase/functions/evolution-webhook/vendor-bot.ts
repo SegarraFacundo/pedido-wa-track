@@ -744,7 +744,19 @@ async function ejecutarHerramienta(
 
         const total = context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
         carrito += `\n💰 Total: $${total}\n\n`;
-        carrito += `Para confirmar, decime "confirmar pedido" o "listo" 📦`;
+        
+        // ⭐ NUEVO: Si el pedido está completo, permitir confirmación directa
+        if (context.delivery_type && context.payment_method) {
+          context.resumen_mostrado = true;
+          carrito += `✅ *Todo listo para confirmar*\n`;
+          carrito += `📦 Entrega: ${context.delivery_type === 'pickup' ? 'Retiro en local' : 'Delivery'}\n`;
+          carrito += `💳 Pago: ${context.payment_method}\n\n`;
+          carrito += `Respondé *"sí"* para confirmar el pedido.`;
+          await saveContext(context, supabase);
+          console.log("✅ ver_carrito: Cart complete, set resumen_mostrado=true");
+        } else {
+          carrito += `Para confirmar, decime "confirmar pedido" o "listo" 📦`;
+        }
 
         return carrito;
       }
@@ -999,10 +1011,11 @@ async function ejecutarHerramienta(
       }
 
       case "crear_pedido": {
-        // 🚨 VALIDACIÓN CRÍTICA: Verificar que se mostró el resumen primero
+        // 🔄 MEJORADO: Si no se mostró el resumen, mostrarlo automáticamente en vez de rechazar
         if (!context.resumen_mostrado) {
-          console.error("❌ Attempt to create order without showing summary first");
-          return "⚠️ Primero necesito mostrarte el resumen completo del pedido. Decime 'listo' o 'confirmar' para verlo.";
+          console.log("⚠️ resumen_mostrado=false, auto-calling mostrar_resumen_pedido first");
+          const resumenResult = await ejecutarHerramienta("mostrar_resumen_pedido", {}, context, supabase);
+          return resumenResult;
         }
         
         console.log("🛒 crear_pedido called with context:", {
@@ -2922,6 +2935,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       console.log(`🔍 User attempting to confirm order. Cart items: ${context.cart.length}`);
       console.log(`📋 Cart validation: ${context.cart.length} items in DB`);
       console.log(`🔍 Cart contents: ${context.cart.map(i => `${i.product_name}x${i.quantity}`).join(', ') || 'EMPTY'}`);
+      console.log(`📋 resumen_mostrado: ${context.resumen_mostrado}, delivery_type: ${context.delivery_type}, payment_method: ${context.payment_method}`);
       
       if (context.cart.length === 0) {
         console.warn(`⚠️ CRITICAL: User trying to confirm with EMPTY cart!`);
@@ -2939,11 +2953,60 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         return emptyCartResponse;
       }
       
-      // Si tiene productos, forzar mostrar carrito antes de pedir dirección
+      // 🔄 NUEVO: Si el pedido está completo y ya se mostró el resumen, crear pedido directamente
+      if (context.resumen_mostrado && context.delivery_type && context.payment_method) {
+        console.log(`✅ Order is complete, creating order automatically...`);
+        
+        const orderResult = await ejecutarHerramienta(
+          "crear_pedido",
+          {
+            direccion: context.delivery_address || '',
+            metodo_pago: context.payment_method
+          },
+          context,
+          supabase
+        );
+        
+        context.conversation_history.push({
+          role: "assistant",
+          content: orderResult,
+        });
+        await saveContext(context, supabase);
+        
+        return orderResult;
+      }
+      
+      // 🔄 NUEVO: Si tiene delivery_type y payment_method pero no se mostró resumen, mostrarlo
+      if (context.delivery_type && context.payment_method && !context.resumen_mostrado) {
+        console.log(`📋 Showing summary before creating order...`);
+        
+        const resumenResult = await ejecutarHerramienta("mostrar_resumen_pedido", {}, context, supabase);
+        
+        context.conversation_history.push({
+          role: "assistant",
+          content: resumenResult,
+        });
+        await saveContext(context, supabase);
+        
+        return resumenResult;
+      }
+      
+      // Si tiene productos pero no está completo, mostrar carrito y pedir lo que falta
       console.log(`✅ User confirming with ${context.cart.length} items. Forcing ver_carrito to show real cart...`);
       const cartSummary = await ejecutarHerramienta("ver_carrito", {}, context, supabase);
       
-      const confirmResponse = cartSummary + "\n\n¿Confirmás este pedido? Si es así, compartí tu dirección o ubicación GPS 📍";
+      let confirmResponse = cartSummary;
+      
+      // Agregar lo que falta
+      if (!context.delivery_type) {
+        confirmResponse += "\n\n¿Lo retirás en el local o te lo enviamos? 🏪🚚";
+      } else if (context.delivery_type === 'delivery' && !context.delivery_address) {
+        confirmResponse += "\n\nCompartí tu dirección o ubicación GPS 📍";
+      } else if (!context.payment_method) {
+        // Mostrar métodos de pago disponibles
+        const paymentResult = await ejecutarHerramienta("ver_metodos_pago", {}, context, supabase);
+        confirmResponse += "\n\n" + paymentResult;
+      }
       
       context.conversation_history.push({
         role: "assistant",
