@@ -299,8 +299,8 @@ export default function Landing() {
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center gap-8">
             <div className="text-center md:text-left">
-              <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
-                <Leaf className="h-6 w-6 text-primary" />
+              <div className="flex items-center justify-center md:justify-start gap-2 mb-2 group cursor-pointer">
+                <Leaf className="h-6 w-6 text-primary transition-transform origin-bottom group-hover:animate-leaf-sway" />
                 <span className="text-xl font-semibold text-primary">Lapacho</span>
               </div>
               <p className="text-sm opacity-70">Simple por naturaleza.</p>
