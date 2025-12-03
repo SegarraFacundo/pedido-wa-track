@@ -22,6 +22,10 @@ export async function getContext(phone: string, supabase: any): Promise<Conversa
       console.log("🏪 Vendor Name:", saved.selected_vendor_name);
       console.log("📍 User location:", userLatitude && userLongitude ? `${userLatitude}, ${userLongitude}` : "Not set");
       
+      console.log("📋 Resumen mostrado:", saved.resumen_mostrado);
+      console.log("🚚 Delivery type:", saved.delivery_type);
+      console.log("💳 Payment methods:", saved.available_payment_methods?.length || 0);
+      
       return {
         phone,
         cart: saved.cart || [],
@@ -32,10 +36,22 @@ export async function getContext(phone: string, supabase: any): Promise<Conversa
         payment_method: saved.payment_method,
         payment_receipt_url: saved.payment_receipt_url,
         pending_order_id: saved.pending_order_id,
+        last_order_id: saved.last_order_id,
         user_latitude: userLatitude,
         user_longitude: userLongitude,
         pending_location_decision: saved.pending_location_decision || false,
+        pending_vendor_change: saved.pending_vendor_change,
         conversation_history: saved.conversation_history || [],
+        
+        // ⭐ CAMPOS CRÍTICOS QUE FALTABAN:
+        resumen_mostrado: saved.resumen_mostrado || false,
+        delivery_type: saved.delivery_type,
+        vendor_allows_pickup: saved.vendor_allows_pickup,
+        vendor_allows_delivery: saved.vendor_allows_delivery,
+        pickup_instructions: saved.pickup_instructions,
+        payment_methods_fetched: saved.payment_methods_fetched || false,
+        available_payment_methods: saved.available_payment_methods || [],
+        available_vendors_map: saved.available_vendors_map || [],
       };
     } catch (e) {
       console.error("❌ Error parsing context:", e);
