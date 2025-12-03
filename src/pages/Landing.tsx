@@ -32,8 +32,8 @@ export default function Landing() {
       <header className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-end gap-6">
-            <div className="flex items-center gap-2">
-              <Leaf className="h-6 w-6 text-primary" />
+            <div className="flex items-center gap-2 group cursor-pointer">
+              <Leaf className="h-6 w-6 text-primary transition-transform origin-bottom group-hover:animate-leaf-sway" />
               <span className="text-xl font-semibold text-primary">Lapacho</span>
             </div>
             <span className="text-muted-foreground text-sm hidden sm:block pb-0.5">Simple por naturaleza.</span>
