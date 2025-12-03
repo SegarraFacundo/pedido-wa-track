@@ -3068,6 +3068,11 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         console.log(`✅ Valid payment method selected: ${selectedMethod}`);
         context.payment_method = selectedMethod;
         
+        // 🆕 CRÍTICO: Guardar el contexto ANTES de llamar a crear_pedido
+        // para que payment_method esté disponible cuando se muestre el resumen
+        await saveContext(context, supabase);
+        console.log(`✅ Context saved with payment_method: ${selectedMethod}`);
+        
         // Determinar la dirección correcta según el tipo de entrega
         const orderAddress = context.delivery_type === 'pickup' 
           ? `Retiro en local: ${context.selected_vendor_name}` 
