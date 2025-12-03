@@ -21,8 +21,8 @@ const SubdomainRouter = ({ children }: { children: React.ReactNode }) => {
     // Redirigir según el subdominio
     switch (subdomain) {
       case 'admin':
-        // Si no está en /admin-auth o /admin, redirigir
-        if (location.pathname !== '/admin-auth' && location.pathname !== '/admin') {
+        // Si no está en /admin-auth, /admin o /brand-assets, redirigir
+        if (location.pathname !== '/admin-auth' && location.pathname !== '/admin' && location.pathname !== '/brand-assets') {
           navigate('/admin-auth');
         }
         break;
@@ -40,6 +40,10 @@ const SubdomainRouter = ({ children }: { children: React.ReactNode }) => {
         break;
       // lapacho.ar (sin subdominio) - sin restricciones
       default:
+        // Si intenta acceder a /brand-assets desde otro subdominio, redirigir
+        if (location.pathname === '/brand-assets') {
+          navigate('/');
+        }
         break;
     }
   }, [navigate, location]);
