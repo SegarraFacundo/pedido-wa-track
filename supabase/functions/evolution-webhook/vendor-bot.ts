@@ -1011,7 +1011,26 @@ async function ejecutarHerramienta(
       }
 
       case "crear_pedido": {
-        // 🔄 MEJORADO: Si no se mostró el resumen, mostrarlo automáticamente en vez de rechazar
+        // 🆕 CRÍTICO: Guardar el método de pago de los args ANTES de cualquier verificación
+        // Esto asegura que mostrar_resumen_pedido tenga el payment_method disponible
+        if (args.metodo_pago && !context.payment_method) {
+          const methodMap: Record<string, string> = {
+            'efectivo': 'efectivo', 'cash': 'efectivo',
+            'transferencia': 'transferencia', 'transfer': 'transferencia', 'transferencia bancaria': 'transferencia',
+            'mercadopago': 'mercadopago', 'mercado pago': 'mercadopago', 'mp': 'mercadopago'
+          };
+          const normalizedInput = args.metodo_pago.toLowerCase().trim();
+          const mappedMethod = methodMap[normalizedInput];
+          
+          if (mappedMethod && (!context.available_payment_methods?.length || 
+              context.available_payment_methods.includes(mappedMethod))) {
+            context.payment_method = mappedMethod;
+            console.log(`✅ Pre-set payment_method from args: ${mappedMethod}`);
+            await saveContext(context, supabase);
+          }
+        }
+        
+        // 🔄 Si no se mostró el resumen, mostrarlo automáticamente
         if (!context.resumen_mostrado) {
           console.log("⚠️ resumen_mostrado=false, auto-calling mostrar_resumen_pedido first");
           const resumenResult = await ejecutarHerramienta("mostrar_resumen_pedido", {}, context, supabase);
