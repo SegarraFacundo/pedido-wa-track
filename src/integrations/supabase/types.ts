@@ -1603,6 +1603,7 @@ export type Database = {
       vendors: {
         Row: {
           address: string
+          allows_delivery: boolean | null
           allows_pickup: boolean | null
           available_products: Json | null
           average_rating: number | null
@@ -1639,6 +1640,7 @@ export type Database = {
         }
         Insert: {
           address: string
+          allows_delivery?: boolean | null
           allows_pickup?: boolean | null
           available_products?: Json | null
           average_rating?: number | null
@@ -1675,6 +1677,7 @@ export type Database = {
         }
         Update: {
           address?: string
+          allows_delivery?: boolean | null
           allows_pickup?: boolean | null
           available_products?: Json | null
           average_rating?: number | null

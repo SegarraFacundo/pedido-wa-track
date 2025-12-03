@@ -27,8 +27,9 @@ interface VendorData {
   delivery_pricing_type: string;
   delivery_fixed_price: number;
   delivery_additional_per_km: number;
-  allows_pickup?: boolean;  // ⭐ NUEVO
-  pickup_instructions?: string | null;  // ⭐ NUEVO
+  allows_pickup?: boolean;
+  pickup_instructions?: string | null;
+  allows_delivery?: boolean;  // ⭐ NUEVO: permite delivery
 }
 
 interface VendorSettingsProps {
@@ -169,8 +170,9 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
           delivery_pricing_type: vendorData.delivery_pricing_type,
           delivery_fixed_price: vendorData.delivery_fixed_price,
           delivery_additional_per_km: vendorData.delivery_additional_per_km,
-          allows_pickup: vendorData.allows_pickup || false,  // ⭐ NUEVO
-          pickup_instructions: vendorData.pickup_instructions || null  // ⭐ NUEVO
+          allows_pickup: vendorData.allows_pickup || false,
+          pickup_instructions: vendorData.pickup_instructions || null,
+          allows_delivery: vendorData.allows_delivery ?? true  // ⭐ NUEVO
         })
         .eq('id', vendorId);
 
@@ -476,36 +478,81 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
           </Label>
         </div>
 
-        {/* ⭐ NUEVA SECCIÓN: Retiro en Local */}
+        {/* ⭐ SECCIÓN: Opciones de Entrega */}
         <div className="border-t pt-4 mt-4">
-          <h3 className="text-lg font-semibold mb-4">🏪 Retiro en Local (Pickup)</h3>
+          <h3 className="text-lg font-semibold mb-4">🚚 Opciones de Entrega</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Configurá cómo los clientes pueden recibir sus pedidos. Debe estar habilitada al menos una opción.
+          </p>
+          
+          {/* Validación: al menos uno debe estar activo */}
+          {!vendorData.allows_delivery && !vendorData.allows_pickup && (
+            <div className="bg-destructive/10 text-destructive p-3 rounded-lg mb-4 text-sm">
+              ⚠️ Debes habilitar al menos una opción de entrega (Delivery o Retiro en local)
+            </div>
+          )}
+          
           <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="allows_pickup"
-                checked={vendorData.allows_pickup || false}
-                onCheckedChange={(checked) => setVendorData({ ...vendorData, allows_pickup: checked })}
-              />
-              <Label htmlFor="allows_pickup">
-                Permitir que los clientes retiren pedidos en el local
-              </Label>
+            {/* Delivery */}
+            <div className="p-4 border rounded-lg space-y-3">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="allows_delivery"
+                  checked={vendorData.allows_delivery ?? true}
+                  onCheckedChange={(checked) => {
+                    // No permitir desactivar si pickup tampoco está activo
+                    if (!checked && !vendorData.allows_pickup) {
+                      return;
+                    }
+                    setVendorData({ ...vendorData, allows_delivery: checked });
+                  }}
+                />
+                <Label htmlFor="allows_delivery" className="font-medium">
+                  🚚 Permite Delivery (envío a domicilio)
+                </Label>
+              </div>
+              {(vendorData.allows_delivery ?? true) && (
+                <p className="text-xs text-muted-foreground pl-6">
+                  Los clientes pueden recibir sus pedidos en su dirección
+                </p>
+              )}
             </div>
             
-            {vendorData.allows_pickup && (
-              <div className="space-y-2 pl-6">
-                <Label htmlFor="pickup_instructions">Instrucciones para retiro (opcional)</Label>
-                <Textarea
-                  id="pickup_instructions"
-                  value={vendorData.pickup_instructions || ''}
-                  onChange={(e) => setVendorData({ ...vendorData, pickup_instructions: e.target.value })}
-                  placeholder="Ej: Retirar por la puerta lateral, horario de 9 a 18hs"
-                  rows={3}
+            {/* Pickup */}
+            <div className="p-4 border rounded-lg space-y-3">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="allows_pickup"
+                  checked={vendorData.allows_pickup || false}
+                  onCheckedChange={(checked) => {
+                    // No permitir desactivar si delivery tampoco está activo
+                    if (!checked && !(vendorData.allows_delivery ?? true)) {
+                      return;
+                    }
+                    setVendorData({ ...vendorData, allows_pickup: checked });
+                  }}
                 />
-                <p className="text-xs text-muted-foreground">
-                  💡 Estas instrucciones se mostrarán a los clientes cuando elijan retiro en local
-                </p>
+                <Label htmlFor="allows_pickup" className="font-medium">
+                  🏪 Permite Retiro en Local
+                </Label>
               </div>
-            )}
+              
+              {vendorData.allows_pickup && (
+                <div className="space-y-2 pl-6">
+                  <Label htmlFor="pickup_instructions">Instrucciones para retiro (opcional)</Label>
+                  <Textarea
+                    id="pickup_instructions"
+                    value={vendorData.pickup_instructions || ''}
+                    onChange={(e) => setVendorData({ ...vendorData, pickup_instructions: e.target.value })}
+                    placeholder="Ej: Retirar por la puerta lateral, horario de 9 a 18hs"
+                    rows={3}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    💡 Estas instrucciones se mostrarán a los clientes cuando elijan retiro en local
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

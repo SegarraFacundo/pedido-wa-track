@@ -78,9 +78,10 @@ export interface ConversationContext {
   };
   payment_methods_fetched?: boolean;
   available_payment_methods?: string[];
-  delivery_type?: 'delivery' | 'pickup';  // Nuevo: tipo de entrega elegido
-  vendor_allows_pickup?: boolean;          // Nuevo: si el vendor acepta retiro
-  pickup_instructions?: string;            // Nuevo: instrucciones de retiro
+  delivery_type?: 'delivery' | 'pickup';  // Tipo de entrega elegido
+  vendor_allows_pickup?: boolean;          // Si el vendor acepta retiro
+  vendor_allows_delivery?: boolean;        // ⭐ NUEVO: Si el vendor hace delivery
+  pickup_instructions?: string;            // Instrucciones de retiro
   available_vendors_map?: Array<{          // Nuevo: mapeo de vendors disponibles (no mostrar IDs al usuario)
     index: number;                         // Número en la lista (1, 2, 3...)
     name: string;                          // Nombre del negocio

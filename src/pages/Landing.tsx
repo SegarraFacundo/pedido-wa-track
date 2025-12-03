@@ -26,6 +26,13 @@ export default function Landing() {
     window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');
   };
 
+  // ⭐ NUEVO: Botón para clientes que quieren hacer pedidos
+  const handlePedirClick = () => {
+    const whatsappNumber = '5493464515971'; // Número del bot Lapacho
+    const message = encodeURIComponent('Hola! Quiero hacer un pedido');
+    window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -80,12 +87,12 @@ export default function Landing() {
               Pedidos claros, rápidos y sin errores. Todo por WhatsApp.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" className="text-base px-8" onClick={handleProbarClick}>
-                Probar Lapacho
+              <Button size="lg" className="text-base px-8" onClick={handlePedirClick}>
+                Hacer un pedido
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
-              <Button size="lg" variant="outline" className="text-base px-8 bg-background/50 backdrop-blur-sm" onClick={handleDemoClick}>
-                Ver demo
+              <Button size="lg" variant="outline" className="text-base px-8 bg-background/50 backdrop-blur-sm" onClick={handleProbarClick}>
+                Soy un negocio
               </Button>
             </div>
           </div>

@@ -105,7 +105,11 @@ const BrandAssets = () => {
     setDownloading(`${filename}-${targetSize}`);
     
     try {
-      const response = await fetch(svgUrl);
+      // Construir URL completa para evitar 404 en producción
+      const fullUrl = svgUrl.startsWith('/') 
+        ? `${window.location.origin}${svgUrl}` 
+        : svgUrl;
+      const response = await fetch(fullUrl);
       const svgText = await response.text();
       
       const canvas = document.createElement("canvas");
