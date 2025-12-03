@@ -1702,7 +1702,23 @@ async function ejecutarHerramienta(
           console.error("Error notifying vendor about cancellation:", notifyError);
         }
 
-        return `✅ Pedido #${orderId.substring(0, 8)} cancelado.\n📝 Motivo: ${args.motivo}\n\nEl vendedor ha sido notificado.`;
+        // 🧹 LIMPIAR CONTEXTO después de cancelación exitosa
+        context.order_state = "idle";
+        context.pending_order_id = undefined;
+        context.cart = [];
+        context.selected_vendor_id = undefined;
+        context.selected_vendor_name = undefined;
+        context.payment_method = undefined;
+        context.delivery_address = undefined;
+        context.delivery_type = undefined;
+        context.resumen_mostrado = false;
+        context.payment_methods_fetched = false;
+        context.available_payment_methods = [];
+        context.conversation_history = [];
+        await saveContext(context, supabase);
+        console.log(`🧹 Context cleaned after order cancellation for order ${orderId}`);
+
+        return `✅ Pedido #${orderId.substring(0, 8)} cancelado.\n📝 Motivo: ${args.motivo}\n\nEl vendedor ha sido notificado.\n\n¿Querés hacer un nuevo pedido? 😊`;
       }
 
       case "ver_metodos_pago": {
@@ -2515,6 +2531,35 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     
     // Cargar contexto
     const context = await getContext(normalizedPhone, supabase);
+    
+    // 🔄 VALIDACIÓN DE SINCRONIZACIÓN: Verificar si pending_order_id ya fue cancelado/entregado
+    if (context.pending_order_id) {
+      console.log(`🔄 Checking sync status for pending_order_id: ${context.pending_order_id}`);
+      const { data: orderCheck } = await supabase
+        .from("orders")
+        .select("status")
+        .eq("id", context.pending_order_id)
+        .single();
+      
+      // Si el pedido no existe o ya fue cancelado/entregado, limpiar contexto
+      if (!orderCheck || ['cancelled', 'delivered'].includes(orderCheck.status)) {
+        console.log(`🔄 Detected stale order state - order is ${orderCheck?.status || 'not found'}, cleaning context`);
+        context.order_state = "idle";
+        context.pending_order_id = undefined;
+        context.cart = [];
+        context.selected_vendor_id = undefined;
+        context.selected_vendor_name = undefined;
+        context.payment_method = undefined;
+        context.delivery_address = undefined;
+        context.delivery_type = undefined;
+        context.resumen_mostrado = false;
+        context.payment_methods_fetched = false;
+        context.available_payment_methods = [];
+        context.conversation_history = [];
+        await saveContext(context, supabase);
+        console.log(`🧹 Stale context cleaned successfully`);
+      }
+    }
     
     // ⚠️ VALIDACIÓN AUTOMÁTICA: Limpiar payment_method si es inválido
     if (context.payment_method && 
