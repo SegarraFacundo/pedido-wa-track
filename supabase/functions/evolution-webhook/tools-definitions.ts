@@ -514,4 +514,29 @@ MUESTRA:
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "confirmar_direccion_entrega",
+      description: `IMPORTANTE: Usa esta herramienta cuando el cliente proporciona una dirección de entrega para el pedido.
+      
+Ejemplos de uso:
+- "Lavalle 1985"
+- "Calle Falsa 123"
+- "Av. San Martín 456"
+- "Mi dirección es Sarmiento 789"
+
+Esta herramienta guarda la dirección en el contexto del pedido actual.`,
+      parameters: {
+        type: "object",
+        properties: {
+          direccion: {
+            type: "string",
+            description: "La dirección de entrega proporcionada por el cliente",
+          },
+        },
+        required: ["direccion"],
+      },
+    },
+  },
 ];

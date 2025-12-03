@@ -110,6 +110,13 @@ Este estado maneja TODO el proceso de compra hasta que el usuario confirme:
 - Si vendor NO acepta retiro:
   → Automáticamente asumir delivery y pedir dirección
 
+🆕 CAPTURA DE DIRECCIONES:
+- Si el usuario proporciona una dirección de texto durante el flujo (ej: "Lavalle 1985", "Calle San Martín 456"):
+  → LLAMÁ confirmar_direccion_entrega con la dirección
+  → Esta herramienta GUARDA la dirección en el contexto del pedido
+  → NO preguntes "¿es correcta?" sin antes llamar la herramienta
+  → La herramienta ya confirma la dirección automáticamente
+
 🚨 FLUJO DE CONFIRMACIÓN OBLIGATORIO (NO SALTEAR PASOS):
 1. Usuario dice "confirmar", "listo", "eso es todo"
 2. VERIFICAR context.cart.length > 0 (si vacío → rechazar)
@@ -145,6 +152,9 @@ ${currentState === "needs_address" ? `
 - Si context.delivery_type === 'delivery':
   → Pedí al usuario que comparta su ubicación GPS usando el 📍 botón de WhatsApp
   → Alternativa: puede escribir su dirección manualmente
+  → 🆕 Cuando el usuario proporcione una dirección de texto (ej: "Lavalle 1985"):
+     ✅ LLAMÁ confirmar_direccion_entrega con la dirección exacta
+     ✅ Esta herramienta guarda la dirección en el contexto
   → Una vez recibida la dirección → cambiar a "checkout"
 - Si quiere cambiar algo del pedido → volver a "shopping"
 ` : ""}
