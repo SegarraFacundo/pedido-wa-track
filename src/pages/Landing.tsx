@@ -32,7 +32,7 @@ export default function Landing() {
       {/* Header */}
       <header className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-end gap-3">
             <img src={lapachoLogo} alt="Lapacho" className="h-8" />
             <span className="text-muted-foreground text-sm hidden sm:block">Simple por naturaleza.</span>
           </div>
