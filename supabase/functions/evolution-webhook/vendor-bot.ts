@@ -2516,6 +2516,56 @@ Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
         return response;
       }
 
+      case "confirmar_direccion_entrega": {
+        console.log("📍 ========== CONFIRMAR DIRECCION ENTREGA ==========");
+        console.log("   Dirección recibida:", args.direccion);
+        console.log("   Vendor actual:", context.selected_vendor_name);
+        console.log("   Delivery type:", context.delivery_type);
+        
+        const direccion = args.direccion?.trim();
+        
+        if (!direccion || direccion.length < 3) {
+          return "⚠️ Por favor proporcioná una dirección más completa (calle y número).";
+        }
+        
+        // Guardar la dirección en el contexto
+        context.delivery_address = direccion;
+        
+        // Si no hay tipo de entrega seleccionado, asumir delivery
+        if (!context.delivery_type) {
+          context.delivery_type = 'delivery';
+          console.log("   Auto-set delivery_type to 'delivery'");
+        }
+        
+        // Guardar el contexto inmediatamente
+        await saveContext(context, supabase);
+        
+        console.log("✅ Dirección guardada en contexto:", context.delivery_address);
+        
+        // Construir respuesta
+        let response = `📍 Perfecto, tu pedido será enviado a: **${direccion}**\n\n`;
+        
+        // Si tiene carrito y vendor, mostrar próximo paso
+        if (context.cart.length > 0 && context.selected_vendor_id) {
+          // Verificar método de pago
+          if (!context.payment_method) {
+            if (context.available_payment_methods && context.available_payment_methods.length > 0) {
+              response += `¿Con qué método de pago querés confirmar?\n`;
+              context.available_payment_methods.forEach(method => {
+                const icons: Record<string, string> = { 'efectivo': '💵', 'transferencia': '🏦', 'mercadopago': '💳' };
+                response += `- ${method.charAt(0).toUpperCase() + method.slice(1)} ${icons[method] || '💰'}\n`;
+              });
+            } else {
+              response += `¿Querés confirmar el pedido? 📦`;
+            }
+          } else {
+            response += `¿Confirmás el pedido con pago en ${context.payment_method}? 📦`;
+          }
+        }
+        
+        return response;
+      }
+
       default:
         return `Herramienta ${toolName} no implementada`;
     }
