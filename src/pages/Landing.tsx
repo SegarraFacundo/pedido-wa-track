@@ -57,7 +57,7 @@ export default function Landing() {
             muted 
             playsInline
             className="w-full h-full object-cover"
-            poster="/videos/hero-poster.jpg"
+            poster="/images/hero-poster.jpg"
           >
             <source src="/videos/hero-lapacho.mp4" type="video/mp4" />
           </video>
