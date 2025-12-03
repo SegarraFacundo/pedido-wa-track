@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, Sun, Moon, ArrowLeft } from "lucide-react";
+import { Download, Sun, Moon, ArrowLeft, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 interface LogoVariant {
   name: string;
@@ -29,7 +31,7 @@ const logoVariants: LogoVariant[] = [
     lightSvg: "/brand/logo-text-light.svg",
     darkSvg: "/brand/logo-text-dark.svg",
     width: 400,
-    height: 120,
+    height: 100,
   },
   {
     name: "Logo Completo",
@@ -37,7 +39,7 @@ const logoVariants: LogoVariant[] = [
     lightSvg: "/brand/logo-full-light.svg",
     darkSvg: "/brand/logo-full-dark.svg",
     width: 400,
-    height: 140,
+    height: 120,
   },
   {
     name: "Wordmark",
@@ -52,7 +54,43 @@ const logoVariants: LogoVariant[] = [
 const pngSizes = [64, 128, 256, 512, 1024];
 
 const BrandAssets = () => {
+  const navigate = useNavigate();
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    checkAdminAccess();
+  }, []);
+
+  const checkAdminAccess = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        navigate('/admin-auth');
+        return;
+      }
+
+      const { data: roles } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', session.user.id)
+        .eq('role', 'admin')
+        .single();
+
+      if (!roles) {
+        navigate('/admin');
+        return;
+      }
+      
+      setIsAdmin(true);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error checking admin access:', error);
+      navigate('/admin-auth');
+    }
+  };
 
   const downloadSvg = (url: string, filename: string) => {
     const link = document.createElement("a");
@@ -108,8 +146,6 @@ const BrandAssets = () => {
   };
 
   const downloadAllAsZip = async () => {
-    // For simplicity, we'll download all SVGs individually
-    // A proper implementation would use JSZip library
     for (const variant of logoVariants) {
       const lightName = variant.lightSvg.split("/").pop()?.replace(".svg", "") || "";
       const darkName = variant.darkSvg.split("/").pop()?.replace(".svg", "") || "";
@@ -120,15 +156,27 @@ const BrandAssets = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+            <Link to="/admin" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
               <ArrowLeft className="h-5 w-5" />
-              <span>Volver</span>
+              <span>Volver al Admin</span>
             </Link>
             <h1 className="text-xl font-semibold text-foreground">Brand Assets</h1>
             <Button onClick={downloadAllAsZip} variant="outline" size="sm">
