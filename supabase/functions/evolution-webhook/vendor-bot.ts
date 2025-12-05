@@ -1855,11 +1855,14 @@ async function ejecutarHerramienta(
         context.available_payment_methods = availableKeys;
         console.log(`✅ Payment methods saved to context: ${availableKeys.join(", ")}`);
 
+        // ⭐ Mostrar con números para que el usuario pueda elegir con "1", "2", etc.
         const textoMetodos = metodosDisponibles.length === 1 
           ? "Tenés disponible el siguiente método de pago:"
-          : "Tenés disponibles los siguientes métodos de pago:";
+          : "Estos son los métodos de pago disponibles:";
 
-        return `${textoMetodos}\n\n${metodosDisponibles.join("\n")}${datosTransferencia}\n\n¿Te gustaría confirmar el pedido con ${metodosDisponibles.length === 1 ? 'este método' : 'alguno de estos métodos'}? 😊`;
+        const metodosNumerados = metodosDisponibles.map((m, i) => `${i + 1}. *${m.replace('- ', '')}*`).join('\n');
+
+        return `${textoMetodos}\n\n${metodosNumerados}${datosTransferencia}\n\nElegí uno (podés escribir el número o el nombre). 😊`;
       }
 
       case "hablar_con_vendedor": {
