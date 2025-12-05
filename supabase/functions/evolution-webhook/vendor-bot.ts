@@ -173,15 +173,8 @@ async function ejecutarHerramienta(
           return "😔 No hay negocios disponibles en este momento.";
         }
         
-        // Mapear los campos para compatibilidad con el resto del código
-        const mappedVendors = vendorsInRange.map((v: any) => ({
-          vendor_id: v.id,
-          vendor_name: v.name,
-          is_open: true, // MVP: asumir abiertos, después se valida con horarios
-        }));
-
         // 📋 Obtenemos todos los vendor_id para consultar horarios
-        const vendorIds = mappedVendors.map((v: any) => v.vendor_id);
+        const vendorIds = vendorsInRange.map((v: any) => v.id);
         const { data: vendorHours, error: hoursError } = await supabase
           .from("vendor_hours")
           .select(
@@ -199,28 +192,27 @@ async function ejecutarHerramienta(
           hoursMap.get(h.vendor_id).push(h);
         });
 
-        // 📋 Obtener información detallada de todos los vendors
-        console.log("📋 Vendor IDs to fetch:", vendorIds);
-        const { data: vendorsInfo, error: vendorsInfoError } = await supabase
-          .from("vendors")
-          .select("id, address, average_rating, total_reviews")
-          .in("id", vendorIds);
-
-        if (vendorsInfoError) console.error("Error obteniendo info vendors:", vendorsInfoError);
-        console.log("📋 Vendors info fetched:", JSON.stringify(vendorsInfo, null, 2));
-
-        // 🗺️ Crear mapa vendor_id → información
-        const vendorsInfoMap = new Map();
-        vendorsInfo?.forEach((vi) => {
-          vendorsInfoMap.set(vi.id, vi);
-          console.log(`  Mapped vendor ${vi.id}: ${vi.address}`);
-        });
+        // 🕐 Obtener hora actual en Argentina para verificar si está abierto
+        const currentTimeStr = argentinaTime.toTimeString().slice(0, 5); // "HH:MM"
+        
+        // 🔍 Función para determinar si un vendor está abierto
+        const isVendorOpen = (vendorId: string): boolean => {
+          const todayHours = hoursMap.get(vendorId);
+          if (!todayHours || todayHours.length === 0) return true; // Sin horarios = asumir abierto
+          
+          return todayHours.some((h: any) => {
+            if (h.is_closed) return false;
+            if (h.is_open_24_hours) return true;
+            // Verificar si hora actual está en rango
+            return currentTimeStr >= h.opening_time.slice(0, 5) && currentTimeStr <= h.closing_time.slice(0, 5);
+          });
+        };
 
         // 🟢 y 🔴 Separar abiertos y cerrados
-        const openVendors = vendorsInRange.filter((v: any) => v.is_open);
-        const closedVendors = vendorsInRange.filter((v: any) => !v.is_open);
+        const openVendors = vendorsInRange.filter((v: any) => isVendorOpen(v.id));
+        const closedVendors = vendorsInRange.filter((v: any) => !isVendorOpen(v.id));
 
-        let resultado = "¡Aquí tenés los negocios abiertos que hacen delivery a tu zona! 🚗\n\n";
+        let resultado = "¡Aquí tenés los negocios disponibles! 🚗\n\n";
 
         // Almacenar mapa de vendors disponibles (para búsqueda posterior sin mostrar UUIDs)
         const vendorMap: Array<{ index: number; name: string; vendor_id: string }> = [];
@@ -229,22 +221,16 @@ async function ejecutarHerramienta(
         // 🟢 ABIERTOS
         if (openVendors.length > 0) {
           resultado += `🟢 *ABIERTOS AHORA* (${openVendors.length}):\n\n`;
-          openVendors.forEach((v: any, i: number) => {
-            resultado += `${currentIndex}. *${v.vendor_name}*\n`;
-
-            // Dirección y distancia
-            const vendorInfo = vendorsInfoMap.get(v.vendor_id);
-            console.log(`🔍 Looking for vendor ${v.vendor_id}, found:`, vendorInfo);
-            resultado += `📍 ${vendorInfo?.address || "Dirección no disponible"} - A ${v.distance_km.toFixed(
-              1
-            )} km\n`;
+          openVendors.forEach((v: any) => {
+            resultado += `${currentIndex}. *${v.name}*\n`;
+            resultado += `📍 ${v.address || "Dirección no disponible"}\n`;
             
             // Guardar en el mapa (NO mostrar ID al usuario)
-            vendorMap.push({ index: currentIndex, name: v.vendor_name, vendor_id: v.vendor_id });
+            vendorMap.push({ index: currentIndex, name: v.name, vendor_id: v.id });
             currentIndex++;
 
             // Mostrar horario real desde vendor_hours
-            const todayHours = hoursMap.get(v.vendor_id);
+            const todayHours = hoursMap.get(v.id);
             if (todayHours && todayHours.length > 0) {
               const slots = todayHours
                 .filter((h: any) => !h.is_closed)
@@ -253,14 +239,12 @@ async function ejecutarHerramienta(
                     ? "24 hs"
                     : `${h.opening_time.slice(0, 5)} - ${h.closing_time.slice(0, 5)}`
                 );
-              resultado += `⏰ Horario: ${slots.join(", ")}\n`;
-            } else {
-              resultado += `⏰ Horario: No disponible\n`;
+              if (slots.length > 0) resultado += `⏰ Horario: ${slots.join(", ")}\n`;
             }
 
             // Rating si existe
-            if (vendorInfo?.average_rating && vendorInfo?.total_reviews)
-              resultado += `⭐ Rating: ${vendorInfo.average_rating.toFixed(1)} (${vendorInfo.total_reviews} reseñas)\n`;
+            if (v.average_rating && v.total_reviews)
+              resultado += `⭐ Rating: ${v.average_rating.toFixed(1)} (${v.total_reviews} reseñas)\n`;
 
             resultado += `\n`;
           });
@@ -269,20 +253,16 @@ async function ejecutarHerramienta(
         // 🔴 CERRADOS
         if (closedVendors.length > 0) {
           resultado += `🔴 *CERRADOS* (${closedVendors.length}):\n\n`;
-          closedVendors.forEach((v: any, i: number) => {
-            resultado += `${currentIndex}. *${v.vendor_name}* 🔒\n`;
-
-            const vendorInfo = vendorsInfoMap.get(v.vendor_id);
-            resultado += `📍 ${vendorInfo?.address || "Dirección no disponible"} - A ${v.distance_km.toFixed(
-              1
-            )} km\n`;
+          closedVendors.forEach((v: any) => {
+            resultado += `${currentIndex}. *${v.name}* 🔒\n`;
+            resultado += `📍 ${v.address || "Dirección no disponible"}\n`;
             
             // Guardar en el mapa (NO mostrar ID al usuario)
-            vendorMap.push({ index: currentIndex, name: v.vendor_name, vendor_id: v.vendor_id });
+            vendorMap.push({ index: currentIndex, name: v.name, vendor_id: v.id });
             currentIndex++;
 
             // Mostrar horario real
-            const todayHours = hoursMap.get(v.vendor_id);
+            const todayHours = hoursMap.get(v.id);
             if (todayHours && todayHours.length > 0) {
               const slots = todayHours
                 .filter((h: any) => !h.is_closed)
@@ -291,14 +271,12 @@ async function ejecutarHerramienta(
                     ? "24 hs"
                     : `${h.opening_time.slice(0, 5)} - ${h.closing_time.slice(0, 5)}`
                 );
-              resultado += `⏰ Horario: ${slots.join(", ")}\n`;
-            } else {
-              resultado += `⏰ Horario: No disponible\n`;
+              if (slots.length > 0) resultado += `⏰ Horario: ${slots.join(", ")}\n`;
             }
 
             // Rating si existe
-            if (vendorInfo?.average_rating && vendorInfo?.total_reviews)
-              resultado += `⭐ Rating: ${vendorInfo.average_rating.toFixed(1)} (${vendorInfo.total_reviews} reseñas)\n`;
+            if (v.average_rating && v.total_reviews)
+              resultado += `⭐ Rating: ${v.average_rating.toFixed(1)} (${v.total_reviews} reseñas)\n`;
 
             resultado += `\n`;
           });
