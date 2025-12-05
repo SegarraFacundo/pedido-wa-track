@@ -168,20 +168,26 @@ ${currentState === "checkout" ? `
 3️⃣ SI el usuario menciona un método que NO está en available_payment_methods → RECHAZALO
 4️⃣ ENTENDÉ RESPUESTAS NUMÉRICAS: Si mostraste una lista numerada y el usuario responde "1", "2", etc. → Es la opción correspondiente
 
-📝 INTERPRETAR RESPUESTAS DEL USUARIO:
-- "1" o "uno" → Primera opción de la lista mostrada
-- "2" o "dos" → Segunda opción de la lista mostrada  
-- "efectivo", "cash" → efectivo
-- "transferencia", "transfer" → transferencia
-- "mercadopago", "mp" → mercadopago
+📝 CUANDO EL USUARIO ELIJA UN MÉTODO DE PAGO → LLAMÁ seleccionar_metodo_pago:
+- "1" o "uno" → seleccionar_metodo_pago({ metodo: "[primera opción de available_payment_methods]" })
+- "2" o "dos" → seleccionar_metodo_pago({ metodo: "[segunda opción de available_payment_methods]" })
+- "efectivo", "cash" → seleccionar_metodo_pago({ metodo: "efectivo" })
+- "transferencia", "transfer" → seleccionar_metodo_pago({ metodo: "transferencia" })
+- "mercadopago", "mp" → seleccionar_metodo_pago({ metodo: "mercadopago" })
+
+🔄 FLUJO CORRECTO:
+1. Usuario elige método → Llamar seleccionar_metodo_pago
+2. Después de guardar → Llamar mostrar_resumen_pedido
+3. Usuario confirma "sí" → Llamar crear_pedido
 
 ⚠️ SI available_payment_methods = ["efectivo", "transferencia"]:
-- Usuario dice "1" → efectivo
+- Usuario dice "1" → seleccionar_metodo_pago({ metodo: "efectivo" })
 - Usuario dice "mercadopago" → RECHAZAR (no está disponible)
 
 ❌ PROHIBIDO:
 - ❌ Inventar métodos: "efectivo, transferencia, mercadopago" (sin verificar)
 - ❌ Mostrar MercadoPago si no está en available_payment_methods
+- ❌ Continuar sin llamar seleccionar_metodo_pago cuando el usuario elige un método
 
 DESPUÉS DE CONFIRMAR:
 - El estado cambiará automáticamente según el método de pago
