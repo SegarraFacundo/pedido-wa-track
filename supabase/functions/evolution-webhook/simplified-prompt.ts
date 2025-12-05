@@ -127,6 +127,7 @@ Este estado maneja TODO el proceso de compra hasta que el usuario confirme:
 4. VERIFICAR método de pago:
    - Si NO eligió → mostrar available_payment_methods y esperar elección
    - NUNCA inventar métodos de pago
+   - ENTENDÉ "1", "2" como la opción correspondiente de la lista mostrada
 5. Una vez TODO completo → llamar mostrar_resumen_pedido (OBLIGATORIO)
 6. En el resumen se muestra TODO: productos, tipo entrega, dirección (si aplica), método pago, total
 7. Usuario confirma "sí" → AHORA SÍ llamar crear_pedido
@@ -162,30 +163,28 @@ ${currentState === "checkout" ? `
 💳 ESTADO: CHECKOUT (Procesando pago)
 
 🚨 REGLAS OBLIGATORIAS - NO NEGOCIABLES:
-1️⃣ El backend llamará AUTOMÁTICAMENTE a ver_metodos_pago cuando sea necesario
-2️⃣ NUNCA, BAJO NINGUNA CIRCUNSTANCIA, inventes opciones de pago
-3️⃣ SI un usuario menciona un método de pago que NO está en available_payment_methods → RECHAZALO inmediatamente
-4️⃣ SOLO menciona métodos de pago que estén en context.available_payment_methods
-5️⃣ SI el usuario pregunta por métodos de pago → Mostrá solo los de context.available_payment_methods
+1️⃣ NUNCA INVENTES MÉTODOS DE PAGO - Solo usá los de context.available_payment_methods
+2️⃣ SI available_payment_methods está vacío o no existe → NO ofrezcas ningún método
+3️⃣ SI el usuario menciona un método que NO está en available_payment_methods → RECHAZALO
+4️⃣ ENTENDÉ RESPUESTAS NUMÉRICAS: Si mostraste una lista numerada y el usuario responde "1", "2", etc. → Es la opción correspondiente
 
-❌ EJEMPLOS DE LO QUE ESTÁ PROHIBIDO:
-- ❌ "Las opciones son: efectivo, transferencia, mercadopago" (sin verificar)
-- ❌ "Podés pagar en efectivo o con tarjeta" (sin verificar)
-- ❌ Asumir que todos los métodos están disponibles
+📝 INTERPRETAR RESPUESTAS DEL USUARIO:
+- "1" o "uno" → Primera opción de la lista mostrada
+- "2" o "dos" → Segunda opción de la lista mostrada  
+- "efectivo", "cash" → efectivo
+- "transferencia", "transfer" → transferencia
+- "mercadopago", "mp" → mercadopago
 
-✅ EJEMPLOS CORRECTOS:
-- ✅ "Los métodos disponibles ya te los mostré antes"
-- ✅ "Elegí uno de: [listar solo context.available_payment_methods]"
-- ✅ Si el usuario elige un método no disponible: "Ese método no está disponible aquí"
+⚠️ SI available_payment_methods = ["efectivo", "transferencia"]:
+- Usuario dice "1" → efectivo
+- Usuario dice "mercadopago" → RECHAZAR (no está disponible)
 
-⚠️ IMPORTANTE: El backend maneja la lógica de métodos de pago automáticamente.
-Tu trabajo es SOLO validar que el usuario elija uno de los métodos en context.available_payment_methods.
+❌ PROHIBIDO:
+- ❌ Inventar métodos: "efectivo, transferencia, mercadopago" (sin verificar)
+- ❌ Mostrar MercadoPago si no está en available_payment_methods
 
 DESPUÉS DE CONFIRMAR:
-- El estado cambiará automáticamente según el método de pago:
-  • Efectivo → "order_pending_cash"
-  • Transferencia → "order_pending_transfer"
-  • MercadoPago → "order_pending_mp"
+- El estado cambiará automáticamente según el método de pago
 ` : ""}
 
   ${currentState === "order_pending_cash" ? `
