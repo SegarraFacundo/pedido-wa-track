@@ -113,11 +113,11 @@ async function ejecutarHerramienta(
           console.log("Search products result:", JSON.stringify(data, null, 2));
 
           if (error || !data?.found) {
-            return `No encontré negocios abiertos con "${args.consulta}".\n\n💡 Tip: Si compartís tu ubicación 📍, te puedo mostrar solo los negocios que hacen delivery a tu zona.`;
+            return `No encontré negocios abiertos con "${args.consulta}".`;
           }
 
           // Formatear resultados
-          let resultado = `Encontré ${data.totalVendors} negocios con ${data.totalProducts} productos:\n\n⚠️ *Nota:* Sin tu ubicación, te muestro todos los negocios. Para ver solo los que te entregan, compartí tu ubicación 📍.\n\n`;
+          let resultado = `Encontré ${data.totalVendors} negocios con ${data.totalProducts} productos:\n\n`;
           data.results.forEach((r: any, i: number) => {
             resultado += `${i + 1}. ${r.vendor.name}\n`;
             resultado += `   ID: ${r.vendor.id}\n`;
@@ -158,31 +158,30 @@ async function ejecutarHerramienta(
         ][argentinaTime.getDay()];
         console.log(`🕐 Día actual: ${currentDay}`);
 
-        // 📍 Comprobamos si el usuario tiene ubicación
-        if (!context.user_latitude || !context.user_longitude) {
-          return "📍 Para ver negocios cercanos, primero compartí tu ubicación.";
-        }
-
-        // 🔎 Pedimos la lista de negocios dentro del radio de entrega
-        const { data: vendorsInRange, error } = await supabase.rpc(
-          "get_vendors_in_range",
-          {
-            user_lat: context.user_latitude,
-            user_lon: context.user_longitude,
-          }
-        );
+        // 📍 MVP: Mostrar todos los negocios activos sin filtrar por GPS
+        const { data: vendorsInRange, error } = await supabase
+          .from("vendors")
+          .select("id, name, address, average_rating, total_reviews, is_active, allows_delivery, allows_pickup")
+          .eq("is_active", true);
 
         if (error) {
-          console.error("Error get_vendors_in_range:", error);
-          return "⚠️ Ocurrió un error al buscar negocios cercanos. Intentalo nuevamente.";
+          console.error("Error fetching vendors:", error);
+          return "⚠️ Ocurrió un error al buscar negocios. Intentalo nuevamente.";
         }
 
         if (!vendorsInRange || vendorsInRange.length === 0) {
-          return "😔 No hay negocios que hagan delivery a tu ubicación en este momento.";
+          return "😔 No hay negocios disponibles en este momento.";
         }
+        
+        // Mapear los campos para compatibilidad con el resto del código
+        const mappedVendors = vendorsInRange.map((v: any) => ({
+          vendor_id: v.id,
+          vendor_name: v.name,
+          is_open: true, // MVP: asumir abiertos, después se valida con horarios
+        }));
 
         // 📋 Obtenemos todos los vendor_id para consultar horarios
-        const vendorIds = vendorsInRange.map((v: any) => v.vendor_id);
+        const vendorIds = mappedVendors.map((v: any) => v.vendor_id);
         const { data: vendorHours, error: hoursError } = await supabase
           .from("vendor_hours")
           .select(
@@ -3070,7 +3069,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       if (!context.delivery_type) {
         confirmResponse += "\n\n¿Lo retirás en el local o te lo enviamos? 🏪🚚";
       } else if (context.delivery_type === 'delivery' && !context.delivery_address) {
-        confirmResponse += "\n\nCompartí tu dirección o ubicación GPS 📍";
+        confirmResponse += "\n\n✍️ Escribí tu dirección de entrega (calle y número)";
       } else if (!context.payment_method) {
         // Mostrar métodos de pago disponibles
         const paymentResult = await ejecutarHerramienta("ver_metodos_pago", {}, context, supabase);
