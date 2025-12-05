@@ -13,7 +13,7 @@ ${context.cart.length > 0 ? `- Carrito: ${context.cart.length} productos ($${tot
 ${context.cart.length > 0 ? `  Items: ${context.cart.map(item => `${item.quantity}x ${item.product_name}`).join(', ')}` : ""}
 ${context.delivery_address ? `- Dirección: ${context.delivery_address}` : "- Sin dirección"}
 ${context.payment_method ? `- Pago: ${context.payment_method}` : "- Sin método de pago"}
-${context.user_latitude && context.user_longitude ? "- ✅ Con ubicación GPS" : "- ⚠️ Sin ubicación"}
+- 📍 Dirección: se pide manualmente al confirmar delivery
 ${context.vendor_allows_pickup ? `- 🏪 Retiro en local: DISPONIBLE` : ""}
 ${context.delivery_type ? `- 📦 Tipo de entrega: ${context.delivery_type === 'pickup' ? 'RETIRO EN LOCAL' : 'DELIVERY'}` : ""}
 
@@ -150,9 +150,8 @@ ${currentState === "needs_address" ? `
 - ⚠️ SOLO para pedidos tipo "delivery"
 - Si context.delivery_type === 'pickup' → SALTAR este estado, no pedir dirección
 - Si context.delivery_type === 'delivery':
-  → Pedí al usuario que comparta su ubicación GPS usando el 📍 botón de WhatsApp
-  → Alternativa: puede escribir su dirección manualmente
-  → 🆕 Cuando el usuario proporcione una dirección de texto (ej: "Lavalle 1985"):
+  → Pedí al usuario que escriba su dirección de entrega (calle y número)
+  → Cuando el usuario proporcione una dirección de texto (ej: "Lavalle 1985"):
      ✅ LLAMÁ confirmar_direccion_entrega con la dirección exacta
      ✅ Esta herramienta guarda la dirección en el contexto
   → Una vez recibida la dirección → cambiar a "checkout"
