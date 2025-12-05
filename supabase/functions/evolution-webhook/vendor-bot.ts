@@ -1843,6 +1843,59 @@ async function ejecutarHerramienta(
         return `${textoMetodos}\n\n${metodosNumerados}${datosTransferencia}\n\nElegí uno (podés escribir el número o el nombre). 😊`;
       }
 
+      case "seleccionar_metodo_pago": {
+        console.log(`💳 ========== SELECCIONAR MÉTODO PAGO ==========`);
+        console.log(`📝 Args: ${JSON.stringify(args)}`);
+        
+        const metodo = args.metodo?.toLowerCase().trim();
+        
+        // Mapear variaciones comunes
+        const methodMap: Record<string, string> = {
+          'efectivo': 'efectivo',
+          'cash': 'efectivo',
+          'plata': 'efectivo',
+          'transferencia': 'transferencia',
+          'transfer': 'transferencia',
+          'banco': 'transferencia',
+          'mercadopago': 'mercadopago',
+          'mercado pago': 'mercadopago',
+          'mp': 'mercadopago'
+        };
+        
+        const normalizedMethod = methodMap[metodo] || metodo;
+        console.log(`🔄 Normalized method: "${metodo}" → "${normalizedMethod}"`);
+        
+        // Validar que esté en available_payment_methods
+        if (!context.available_payment_methods || context.available_payment_methods.length === 0) {
+          return `⚠️ Primero necesito ver qué métodos de pago acepta el negocio. Dame un momento...`;
+        }
+        
+        if (!context.available_payment_methods.includes(normalizedMethod)) {
+          const available = context.available_payment_methods.join(', ');
+          return `❌ "${metodo}" no está disponible para este negocio.\n\nMétodos disponibles: ${available}`;
+        }
+        
+        // ✅ GUARDAR EN CONTEXTO
+        context.payment_method = normalizedMethod;
+        await saveContext(context, supabase);
+        
+        console.log(`✅ Payment method saved: ${normalizedMethod}`);
+        
+        const icons: Record<string, string> = {
+          'efectivo': '💵',
+          'transferencia': '🏦',
+          'mercadopago': '💳'
+        };
+        
+        const labels: Record<string, string> = {
+          'efectivo': 'Efectivo',
+          'transferencia': 'Transferencia',
+          'mercadopago': 'MercadoPago'
+        };
+        
+        return `✅ Método de pago: ${icons[normalizedMethod] || '💰'} ${labels[normalizedMethod] || normalizedMethod}`;
+      }
+
       case "hablar_con_vendedor": {
         console.log("🔄 Switching to vendor chat mode");
 

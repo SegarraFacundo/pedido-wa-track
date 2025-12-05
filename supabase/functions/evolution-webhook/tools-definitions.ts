@@ -539,4 +539,32 @@ Esta herramienta guarda la dirección en el contexto del pedido actual.`,
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "seleccionar_metodo_pago",
+      description: `Guarda el método de pago elegido por el cliente.
+    
+USAR CUANDO:
+- El cliente dice "efectivo", "transferencia", "mercadopago", "mp"
+- El cliente responde con número ("1", "2", "3") después de ver las opciones de pago
+- El cliente confirma un método de pago específico
+
+IMPORTANTE: 
+- Solo acepta métodos que estén en available_payment_methods del contexto
+- Normaliza automáticamente variaciones como "mp" → "mercadopago"
+- Después de guardar, el bot debe continuar con mostrar_resumen_pedido`,
+      parameters: {
+        type: "object",
+        properties: {
+          metodo: {
+            type: "string",
+            enum: ["efectivo", "transferencia", "mercadopago"],
+            description: "Método de pago elegido (efectivo, transferencia, mercadopago)"
+          }
+        },
+        required: ["metodo"]
+      }
+    }
+  },
 ];
