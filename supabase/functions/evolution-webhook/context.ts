@@ -2,6 +2,50 @@ import type { ConversationContext } from "./types.ts";
 
 // ==================== GESTIÓN DE CONTEXTO ====================
 
+// ✅ Verifica si el pedido pendiente sigue activo en la DB
+// Si el pedido ya fue entregado/cancelado, limpia el contexto
+async function syncOrderStateWithDB(context: ConversationContext, supabase: any): Promise<void> {
+  if (!context.pending_order_id) return;
+  
+  const pendingStates = ['order_pending_cash', 'order_pending_transfer', 'order_pending_mp', 'order_confirmed'];
+  if (!pendingStates.includes(context.order_state || '')) return;
+  
+  console.log(`🔄 Syncing order state with DB for order: ${context.pending_order_id}`);
+  
+  const { data: order, error } = await supabase
+    .from("orders")
+    .select("status")
+    .eq("id", context.pending_order_id)
+    .maybeSingle();
+  
+  if (error) {
+    console.error("❌ Error checking order status:", error);
+    return;
+  }
+  
+  // Si el pedido no existe o ya terminó, limpiar el contexto
+  if (!order || order.status === 'delivered' || order.status === 'cancelled') {
+    console.log(`✅ Order ${context.pending_order_id} is ${order?.status || 'not found'}, resetting context`);
+    
+    // Guardar el ID como último pedido antes de limpiar
+    context.last_order_id = context.pending_order_id;
+    
+    // Limpiar estado de pedido activo
+    context.pending_order_id = undefined;
+    context.order_state = "idle";
+    context.cart = [];
+    context.delivery_address = undefined;
+    context.payment_method = undefined;
+    context.delivery_type = undefined;
+    context.resumen_mostrado = false;
+    context.payment_methods_fetched = false;
+    
+    console.log(`🧹 Context cleaned - user can now make new orders`);
+  } else {
+    console.log(`📦 Order ${context.pending_order_id} is still active with status: ${order.status}`);
+  }
+}
+
 export async function getContext(phone: string, supabase: any): Promise<ConversationContext> {
   console.log("📂 ========== LOADING CONTEXT ==========");
   console.log("📞 Phone:", phone);
@@ -26,7 +70,7 @@ export async function getContext(phone: string, supabase: any): Promise<Conversa
       console.log("🚚 Delivery type:", saved.delivery_type);
       console.log("💳 Payment methods:", saved.available_payment_methods?.length || 0);
       
-      return {
+      const context: ConversationContext = {
         phone,
         cart: saved.cart || [],
         order_state: saved.order_state || "idle",
@@ -53,6 +97,17 @@ export async function getContext(phone: string, supabase: any): Promise<Conversa
         available_payment_methods: saved.available_payment_methods || [],
         available_vendors_map: saved.available_vendors_map || [],
       };
+      
+      // ✅ SINCRONIZAR CON LA DB - verificar si el pedido sigue activo
+      await syncOrderStateWithDB(context, supabase);
+      
+      // Si se limpió el contexto, guardarlo
+      if (saved.pending_order_id && !context.pending_order_id) {
+        await saveContext(context, supabase);
+        console.log("💾 Context saved after sync cleanup");
+      }
+      
+      return context;
     } catch (e) {
       console.error("❌ Error parsing context:", e);
     }
