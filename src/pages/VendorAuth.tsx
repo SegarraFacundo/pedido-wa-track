@@ -165,9 +165,18 @@ export default function VendorAuth() {
         description: 'Iniciando sesión...',
       });
     } catch (error: any) {
+      let errorMessage = error.message;
+      
+      // Handle network errors
+      if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
+        errorMessage = 'Error de conexión. Verifica tu internet y vuelve a intentarlo.';
+      } else if (error.message?.includes('Invalid login credentials')) {
+        errorMessage = 'Email o contraseña incorrectos.';
+      }
+      
       toast({
         title: 'Error',
-        description: error.message,
+        description: errorMessage,
         variant: 'destructive'
       });
     } finally {
