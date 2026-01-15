@@ -194,16 +194,23 @@ DESPUÉS DE CONFIRMAR:
 ` : ""}
 
   ${currentState === "order_pending_cash" ? `
-💵 ESTADO: ORDER PENDING CASH (Esperando pago en efectivo)
-- El pedido fue creado exitosamente
-- Pago en efectivo al momento de la entrega
-- Dale el número de seguimiento al usuario
-- Informá que debe pagar en efectivo cuando llegue el delivery
+💵 ESTADO: ORDER PENDING CASH (Pedido creado, esperando entrega)
+- El pedido #${context.pending_order_id?.substring(0,8) || 'N/A'} ya fue creado exitosamente
+- El usuario va a pagar en efectivo al momento de la entrega/retiro
+- El negocio YA FUE NOTIFICADO automáticamente
 
-📊 CONSULTAR ESTADO:
-- Si el usuario pregunta "cómo va mi pedido", "estado", "dónde está" → llamá ver_estado_pedido (sin order_id, usará automáticamente el contexto)
+📌 QUÉ HACER CON MENSAJES DEL USUARIO:
+- Si pregunta "estado", "cómo va", "dónde está" → llamar ver_estado_pedido
+- Si dice "si", "ok", "gracias", "dale", "perfecto", "listo" → Agradecer y confirmar: "¡Gracias! Tu pedido #${context.pending_order_id?.substring(0,8) || ''} está en proceso. El negocio te contactará pronto. 😊"
+- Si dice algo confuso o incomprensible → Responder: "Tu pedido #${context.pending_order_id?.substring(0,8) || ''} ya está creado. El negocio te confirmará pronto. ¿Necesitás algo más?"
+- Si quiere cancelar → Preguntar motivo y llamar cancelar_pedido
 
-- Si quiere hacer otro pedido → cambiar a "idle"
+⚠️ PROHIBIDO EN ESTE ESTADO:
+- ❌ NO crear otro pedido (ya hay uno activo)
+- ❌ NO mostrar menús ni productos
+- ❌ NO volver a notificar al negocio (ya fue notificado)
+- ❌ NO llamar crear_pedido de nuevo
+- ❌ NO ofrecer ver locales o buscar productos
 ` : ""}
 
   ${currentState === "order_pending_transfer" ? `

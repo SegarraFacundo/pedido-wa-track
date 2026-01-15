@@ -138,19 +138,8 @@ export function useRealtimeOrders(vendorId?: string) {
 
                 setOrders(prev => [newOrder, ...prev]);
                 
-                // Enviar notificación al vendedor por WhatsApp si está configurado
-                supabase.functions.invoke('notify-vendor', {
-                  body: {
-                    orderId: newOrder.id,
-                    eventType: 'new_order'
-                  }
-                }).then(({ data, error }) => {
-                  if (error) {
-                    console.error('Error sending vendor notification:', error);
-                  } else {
-                    console.log('Vendor notification sent:', data);
-                  }
-                });
+                // ✅ La notificación al vendedor se maneja SOLO en el backend (vendor-bot.ts)
+                // NO duplicar aquí para evitar notificaciones dobles
                 
                 toast({
                   title: '🆕 NUEVO PEDIDO INGRESADO',
