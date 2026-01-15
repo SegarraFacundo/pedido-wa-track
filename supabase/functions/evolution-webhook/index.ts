@@ -701,10 +701,59 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
       .eq('phone', normalizedPhone)
       .maybeSingle();
 
-    if (vendorSession?.in_vendor_chat) {
+    // 🤖 Comandos del cliente para reactivar el bot
+    const clientBotCommands = ['menu', 'bot', 'ayuda', 'salir', 'inicio', 'volver'];
+    const isReactivateCommand = clientBotCommands.includes(messageText.toLowerCase().trim());
+    
+    if (vendorSession?.in_vendor_chat && isReactivateCommand) {
+      console.log('🔄 Client requested to reactivate bot with command:', messageText);
+      
+      // Desactivar chat directo
+      await supabase.from('user_sessions').update({
+        in_vendor_chat: false,
+        assigned_vendor_phone: null,
+        updated_at: new Date().toISOString()
+      }).eq('phone', normalizedPhone);
+      
+      // Continuar con el procesamiento normal del bot (no return aquí)
+      console.log('✅ Bot reactivated for customer:', normalizedPhone);
+    } else if (vendorSession?.in_vendor_chat) {
       console.log('💬 User is in vendor chat mode');
 
-      // Buscar el chat activo con el vendedor
+      // Buscar pedido activo del cliente para guardar mensaje en messages (tabla de pedidos)
+      const { data: activeOrder } = await supabase
+        .from('orders')
+        .select('id, vendor_id')
+        .eq('customer_phone', normalizedPhone)
+        .in('status', ['pending', 'confirmed', 'preparing', 'ready', 'on_the_way'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (activeOrder) {
+        console.log('📝 Saving customer message to order messages:', activeOrder.id);
+        
+        // Guardar el mensaje del cliente en la tabla messages del pedido
+        await supabase
+          .from('messages')
+          .insert({
+            order_id: activeOrder.id,
+            sender: 'customer',
+            content: messageText,
+            is_read: false
+          });
+
+        console.log('✅ Message saved to order chat, bot will not respond');
+        console.log('💡 Tip: Customer can write "menu" or "bot" to reactivate the bot');
+
+        // NO procesamos con el bot si está en chat directo
+        return new Response(JSON.stringify({ status: 'vendor_chat_mode', order_id: activeOrder.id }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200
+        });
+      }
+
+      // Fallback: buscar vendor_chats activo (sistema anterior)
       const { data: activeChat } = await supabase
         .from('vendor_chats')
         .select('id, vendor_id')
@@ -713,7 +762,7 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
         .maybeSingle();
 
       if (activeChat) {
-        console.log('📝 Saving message to vendor chat:', activeChat.id);
+        console.log('📝 Saving message to vendor chat (legacy):', activeChat.id);
         
         // Guardar el mensaje del cliente en chat_messages
         await supabase
@@ -726,13 +775,12 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
 
         console.log('✅ Message saved to vendor chat, bot will not respond');
 
-        // NO procesamos con el bot si está en chat directo
         return new Response(JSON.stringify({ status: 'vendor_chat_mode', chat_id: activeChat.id }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200
         });
       } else {
-        console.log('⚠️ User marked as in_vendor_chat but no active chat found, resetting...');
+        console.log('⚠️ User marked as in_vendor_chat but no active order/chat found, resetting...');
         // Si no hay chat activo, desactivar el modo
         await supabase
           .from('user_sessions')

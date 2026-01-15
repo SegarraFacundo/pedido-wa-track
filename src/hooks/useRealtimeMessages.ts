@@ -1,12 +1,67 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Message } from '@/types/order';
 import { useToast } from '@/hooks/use-toast';
 
-export function useRealtimeMessages(orderId: string) {
+export function useRealtimeMessages(orderId: string, customerPhone?: string) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isBotPaused, setIsBotPaused] = useState(false);
   const { toast } = useToast();
+
+  // Check bot status
+  const checkBotStatus = useCallback(async () => {
+    if (!customerPhone) return;
+    
+    const { data } = await supabase
+      .from('user_sessions')
+      .select('in_vendor_chat')
+      .eq('phone', customerPhone)
+      .maybeSingle();
+    
+    setIsBotPaused(data?.in_vendor_chat || false);
+  }, [customerPhone]);
+
+  // Pause bot when vendor sends message
+  const pauseBot = useCallback(async () => {
+    if (!customerPhone) return;
+    
+    await supabase
+      .from('user_sessions')
+      .upsert({
+        phone: customerPhone,
+        in_vendor_chat: true,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'phone' });
+    
+    setIsBotPaused(true);
+  }, [customerPhone]);
+
+  // Activate bot
+  const activateBot = useCallback(async () => {
+    if (!customerPhone) return;
+    
+    await supabase
+      .from('user_sessions')
+      .update({
+        in_vendor_chat: false,
+        assigned_vendor_phone: null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('phone', customerPhone);
+    
+    setIsBotPaused(false);
+    
+    // Notify customer
+    await supabase.functions.invoke('send-whatsapp-notification', {
+      body: {
+        phoneNumber: customerPhone,
+        message: '✅ El asistente virtual está activo nuevamente. Escribe "menu" para ver opciones.'
+      }
+    });
+    
+    toast({ title: 'Bot reactivado', description: 'El cliente fue notificado' });
+  }, [customerPhone, toast]);
 
   useEffect(() => {
     let channel: any;
@@ -37,6 +92,9 @@ export function useRealtimeMessages(orderId: string) {
         setLoading(false);
       }
     };
+
+    // Check initial bot status
+    checkBotStatus();
 
     const setupRealtime = () => {
       channel = supabase
@@ -83,7 +141,7 @@ export function useRealtimeMessages(orderId: string) {
         supabase.removeChannel(channel);
       }
     };
-  }, [orderId, toast]);
+  }, [orderId, toast, checkBotStatus]);
 
   const sendMessage = async (content: string, sender: 'customer' | 'vendor') => {
     try {
@@ -100,7 +158,7 @@ export function useRealtimeMessages(orderId: string) {
 
       if (error) throw error;
 
-      // If vendor is sending, notify customer via WhatsApp
+      // If vendor is sending, pause bot and notify customer via WhatsApp
       if (sender === 'vendor') {
         console.log('Vendor sending message, fetching order and vendor data...');
         const { data: orderData, error: orderError } = await supabase
@@ -116,6 +174,20 @@ export function useRealtimeMessages(orderId: string) {
 
         if (orderData && orderData.customer_phone) {
           const vendorName = orderData.vendor?.name || 'el vendedor';
+          
+          // Pause the bot when vendor sends a message
+          await supabase
+            .from('user_sessions')
+            .upsert({
+              phone: orderData.customer_phone,
+              in_vendor_chat: true,
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'phone' });
+          
+          setIsBotPaused(true);
+          console.log('Bot paused for customer:', orderData.customer_phone);
+          
+          // Send WhatsApp notification
           console.log('Sending WhatsApp notification to:', orderData.customer_phone);
           
           const { data: whatsappResponse, error: whatsappError } = await supabase.functions.invoke('send-whatsapp-notification', {
@@ -144,7 +216,7 @@ export function useRealtimeMessages(orderId: string) {
             console.log('WhatsApp notification sent successfully:', whatsappResponse);
             toast({
               title: 'Mensaje enviado',
-              description: 'El cliente recibirá el mensaje por WhatsApp',
+              description: 'Bot pausado. El cliente recibirá el mensaje por WhatsApp.',
             });
           }
         } else {
@@ -167,6 +239,9 @@ export function useRealtimeMessages(orderId: string) {
   return {
     messages,
     loading,
-    sendMessage
+    sendMessage,
+    isBotPaused,
+    activateBot,
+    pauseBot
   };
 }
