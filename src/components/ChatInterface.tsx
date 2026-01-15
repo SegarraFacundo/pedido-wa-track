@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Message } from "@/types/order";
-import { Send, Phone, MoreVertical, ArrowLeft } from "lucide-react";
+import { Send, Phone, MoreVertical, ArrowLeft, Bot, BotOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ChatInterfaceProps {
@@ -16,6 +17,8 @@ interface ChatInterfaceProps {
   vendorName: string;
   customerName: string;
   isVendorView?: boolean;
+  isBotPaused?: boolean;
+  onActivateBot?: () => void;
 }
 
 export function ChatInterface({
@@ -25,7 +28,9 @@ export function ChatInterface({
   onClose,
   vendorName,
   customerName,
-  isVendorView = false
+  isVendorView = false,
+  isBotPaused = false,
+  onActivateBot
 }: ChatInterfaceProps) {
   const [newMessage, setNewMessage] = useState("");
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -79,7 +84,35 @@ export function ChatInterface({
               <p className="text-sm opacity-90">Pedido #{orderId.slice(0, 8)}</p>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            {isVendorView && (
+              <>
+                <Badge 
+                  variant={isBotPaused ? "destructive" : "secondary"}
+                  className={cn(
+                    "text-xs",
+                    isBotPaused ? "bg-red-500/80" : "bg-green-500/80 text-white"
+                  )}
+                >
+                  {isBotPaused ? (
+                    <><BotOff className="h-3 w-3 mr-1" /> Bot pausado</>
+                  ) : (
+                    <><Bot className="h-3 w-3 mr-1" /> Bot activo</>
+                  )}
+                </Badge>
+                {isBotPaused && onActivateBot && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={onActivateBot}
+                    className="text-white hover:bg-white/20 text-xs h-7"
+                  >
+                    <Bot className="h-3 w-3 mr-1" />
+                    Activar Bot
+                  </Button>
+                )}
+              </>
+            )}
             <Button
               variant="ghost"
               size="icon"

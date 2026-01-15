@@ -325,6 +325,7 @@ export function VendorDashboardWithRealtime({ vendor }: VendorDashboardWithRealt
         <ChatModal
           orderId={selectedOrderForChat}
           vendorName={vendor.name}
+          customerPhone={orders.find(o => o.id === selectedOrderForChat)?.customerPhone}
           onClose={() => setSelectedOrderForChat(null)}
         />
       )}
@@ -335,11 +336,12 @@ export function VendorDashboardWithRealtime({ vendor }: VendorDashboardWithRealt
 interface ChatModalProps {
   orderId: string;
   vendorName: string;
+  customerPhone?: string;
   onClose: () => void;
 }
 
-function ChatModal({ orderId, vendorName, onClose }: ChatModalProps) {
-  const { messages, sendMessage } = useRealtimeMessages(orderId);
+function ChatModal({ orderId, vendorName, customerPhone, onClose }: ChatModalProps) {
+  const { messages, sendMessage, isBotPaused, activateBot } = useRealtimeMessages(orderId, customerPhone);
 
   return (
     <div className="fixed bottom-4 right-4 w-96 h-[600px] z-50 animate-slide-in">
@@ -359,6 +361,8 @@ function ChatModal({ orderId, vendorName, onClose }: ChatModalProps) {
           vendorName={vendorName}
           customerName="Cliente"
           isVendorView={true}
+          isBotPaused={isBotPaused}
+          onActivateBot={activateBot}
         />
       </div>
     </div>
