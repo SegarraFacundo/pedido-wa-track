@@ -1367,22 +1367,31 @@ async function ejecutarHerramienta(
         }
 
         // 📧 Notificar al vendedor sobre el nuevo pedido
-        try {
-          console.log("📨 Sending new order notification to vendor:", context.selected_vendor_id);
-          const { data: notifyData, error: notifyError } = await supabase.functions.invoke("notify-vendor", {
-            body: {
-              orderId: order.id,
-              eventType: "new_order",
-            },
-          });
+        // ✅ PROTECCIÓN: Solo notificar si el pedido es reciente (evitar duplicados por retry)
+        const orderCreatedAt = new Date(order.created_at);
+        const now = new Date();
+        const secondsSinceCreation = (now.getTime() - orderCreatedAt.getTime()) / 1000;
+        
+        if (secondsSinceCreation < 30) { // Solo notificar si el pedido tiene menos de 30 segundos
+          try {
+            console.log("📨 Sending new order notification to vendor:", context.selected_vendor_id);
+            const { data: notifyData, error: notifyError } = await supabase.functions.invoke("notify-vendor", {
+              body: {
+                orderId: order.id,
+                eventType: "new_order",
+              },
+            });
 
-          if (notifyError) {
-            console.error("❌ Error notifying vendor:", notifyError);
-          } else {
-            console.log("✅ Vendor notification sent:", notifyData);
+            if (notifyError) {
+              console.error("❌ Error notifying vendor:", notifyError);
+            } else {
+              console.log("✅ Vendor notification sent:", notifyData);
+            }
+          } catch (notifyErr) {
+            console.error("💥 Exception notifying vendor:", notifyErr);
           }
-        } catch (notifyErr) {
-          console.error("💥 Exception notifying vendor:", notifyErr);
+        } else {
+          console.log(`⏭️ Skipping notification - order is ${secondsSinceCreation}s old (likely retry/duplicate)`);
         }
 
         // 🗑️ Eliminar direcciones temporales después de crear el pedido
