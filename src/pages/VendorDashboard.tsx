@@ -12,6 +12,7 @@ import { VendorDirectChat } from '@/components/VendorDirectChat';
 import { VendorSupportTickets } from '@/components/VendorSupportTickets';
 import { VendorPaymentSettings } from '@/components/VendorPaymentSettings';
 import { VendorPaymentMetrics } from '@/components/VendorPaymentMetrics';
+import { VendorAnalyticsDashboard } from '@/components/VendorAnalyticsDashboard';
 import { PlatformReviewForm } from '@/components/PlatformReviewForm';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -212,7 +213,10 @@ export default function VendorDashboard() {
           </TabsContent>
 
           <TabsContent value="metrics">
-            <VendorPaymentMetrics vendorId={vendor.id} />
+            <div className="space-y-8">
+              <VendorAnalyticsDashboard vendorId={vendor.id} />
+              <VendorPaymentMetrics vendorId={vendor.id} />
+            </div>
           </TabsContent>
 
           <TabsContent value="payments">
