@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_emergency_contacts: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          notify_email: boolean | null
+          notify_whatsapp: boolean | null
+          phone: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          notify_email?: boolean | null
+          notify_whatsapp?: boolean | null
+          phone?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          notify_email?: boolean | null
+          notify_whatsapp?: boolean | null
+          phone?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       bot_error_logs: {
         Row: {
           created_at: string

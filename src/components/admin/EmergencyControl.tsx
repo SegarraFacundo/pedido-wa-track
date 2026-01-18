@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -25,7 +26,13 @@ import {
   Loader2,
   WifiOff,
   Store,
-  HeadphonesIcon
+  HeadphonesIcon,
+  Bell,
+  Mail,
+  Phone,
+  Send,
+  Plus,
+  Trash2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -55,16 +62,29 @@ interface ErrorLog {
   created_at: string;
 }
 
+interface EmergencyContact {
+  id: string;
+  user_id: string;
+  email: string;
+  phone: string | null;
+  notify_email: boolean;
+  notify_whatsapp: boolean;
+}
+
 export default function EmergencyControl() {
   const [settings, setSettings] = useState<PlatformSettings | null>(null);
   const [errorLogs, setErrorLogs] = useState<ErrorLog[]>([]);
+  const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [emergencyMessage, setEmergencyMessage] = useState('');
+  const [newContactPhone, setNewContactPhone] = useState('');
+  const [sendingTest, setSendingTest] = useState(false);
 
   useEffect(() => {
     fetchSettings();
     fetchErrorLogs();
+    fetchEmergencyContacts();
 
     // Subscribe to real-time changes
     const settingsChannel = supabase
@@ -89,9 +109,21 @@ export default function EmergencyControl() {
       })
       .subscribe();
 
+    const contactsChannel = supabase
+      .channel('emergency_contacts_changes')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'admin_emergency_contacts' 
+      }, () => {
+        fetchEmergencyContacts();
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(settingsChannel);
       supabase.removeChannel(errorLogsChannel);
+      supabase.removeChannel(contactsChannel);
     };
   }, []);
 
@@ -127,6 +159,75 @@ export default function EmergencyControl() {
       setErrorLogs((data || []) as ErrorLog[]);
     } catch (error) {
       console.error('Error fetching error logs:', error);
+    }
+  };
+
+  const fetchEmergencyContacts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('admin_emergency_contacts')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      setEmergencyContacts((data || []) as EmergencyContact[]);
+    } catch (error) {
+      console.error('Error fetching emergency contacts:', error);
+    }
+  };
+
+  const updateEmergencyContact = async (contactId: string, updates: Partial<EmergencyContact>) => {
+    try {
+      const { error } = await supabase
+        .from('admin_emergency_contacts')
+        .update(updates)
+        .eq('id', contactId);
+
+      if (error) throw error;
+      toast.success('Contacto actualizado');
+      await fetchEmergencyContacts();
+    } catch (error) {
+      console.error('Error updating contact:', error);
+      toast.error('Error al actualizar contacto');
+    }
+  };
+
+  const addPhoneToContact = async (contactId: string) => {
+    if (!newContactPhone.trim()) {
+      toast.error('Ingresa un número de teléfono');
+      return;
+    }
+
+    // Format phone number
+    let phone = newContactPhone.trim();
+    if (!phone.startsWith('+')) {
+      phone = '+54' + phone.replace(/^0/, '');
+    }
+
+    await updateEmergencyContact(contactId, { phone });
+    setNewContactPhone('');
+  };
+
+  const sendTestNotification = async () => {
+    setSendingTest(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('notify-admin-emergency', {
+        body: {
+          error_type: 'TEST_NOTIFICATION',
+          error_message: 'Esta es una notificación de prueba del sistema de alertas de emergencia.',
+          error_count: 0,
+          threshold: 3,
+        },
+      });
+
+      if (error) throw error;
+
+      toast.success(`Notificación de prueba enviada: ${data.emails_sent} emails, ${data.whatsapps_sent} WhatsApps`);
+    } catch (error: any) {
+      console.error('Error sending test notification:', error);
+      toast.error('Error al enviar notificación de prueba');
+    } finally {
+      setSendingTest(false);
     }
   };
 
@@ -394,6 +495,144 @@ export default function EmergencyControl() {
               Guardar Mensaje
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Emergency Contacts */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Bell className="h-5 w-5" />
+              <CardTitle>Contactos de Emergencia</CardTitle>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={sendTestNotification}
+              disabled={sendingTest || emergencyContacts.length === 0}
+            >
+              {sendingTest ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4 mr-2" />
+              )}
+              Enviar Prueba
+            </Button>
+          </div>
+          <CardDescription>
+            Estos contactos recibirán notificaciones cuando el modo emergencia se active automáticamente
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {emergencyContacts.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Bell className="h-12 w-12 mx-auto mb-2 opacity-50" />
+              <p>No hay contactos de emergencia configurados</p>
+              <p className="text-sm mt-1">Los administradores aparecerán aquí automáticamente</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {emergencyContacts.map((contact) => (
+                <div 
+                  key={contact.id}
+                  className="p-4 rounded-lg border bg-card"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 space-y-3">
+                      {/* Email */}
+                      <div className="flex items-center gap-3">
+                        <Mail className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">{contact.email}</span>
+                        <div className="flex items-center gap-2 ml-auto">
+                          <Switch
+                            id={`email-${contact.id}`}
+                            checked={contact.notify_email}
+                            onCheckedChange={(checked) => 
+                              updateEmergencyContact(contact.id, { notify_email: checked })
+                            }
+                          />
+                          <Label htmlFor={`email-${contact.id}`} className="text-xs">
+                            Email
+                          </Label>
+                        </div>
+                      </div>
+
+                      {/* Phone */}
+                      <div className="flex items-center gap-3">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        {contact.phone ? (
+                          <>
+                            <span className="text-sm">{contact.phone}</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => updateEmergencyContact(contact.id, { phone: null })}
+                              className="h-6 px-2"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              placeholder="+5493435123456"
+                              value={newContactPhone}
+                              onChange={(e) => setNewContactPhone(e.target.value)}
+                              className="h-8 w-40 text-sm"
+                            />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => addPhoneToContact(contact.id)}
+                              className="h-8"
+                            >
+                              <Plus className="h-3 w-3 mr-1" />
+                              Agregar
+                            </Button>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2 ml-auto">
+                          <Switch
+                            id={`wa-${contact.id}`}
+                            checked={contact.notify_whatsapp}
+                            disabled={!contact.phone}
+                            onCheckedChange={(checked) => 
+                              updateEmergencyContact(contact.id, { notify_whatsapp: checked })
+                            }
+                          />
+                          <Label htmlFor={`wa-${contact.id}`} className="text-xs">
+                            WhatsApp
+                          </Label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Status badges */}
+                  <div className="flex gap-2 mt-3">
+                    {contact.notify_email && (
+                      <Badge variant="outline" className="text-xs">
+                        <Mail className="h-3 w-3 mr-1" />
+                        Email activo
+                      </Badge>
+                    )}
+                    {contact.notify_whatsapp && contact.phone && (
+                      <Badge variant="outline" className="text-xs">
+                        <Phone className="h-3 w-3 mr-1" />
+                        WhatsApp activo
+                      </Badge>
+                    )}
+                    {!contact.notify_email && !contact.notify_whatsapp && (
+                      <Badge variant="secondary" className="text-xs">
+                        Sin notificaciones
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

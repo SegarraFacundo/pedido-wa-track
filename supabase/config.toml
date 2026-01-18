@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.generate-product-images]
 verify_jwt = false
+
+[functions.notify-admin-emergency]
+verify_jwt = false
