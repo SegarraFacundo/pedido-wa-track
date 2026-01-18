@@ -2832,11 +2832,117 @@ async function handleEmergencyFallback(
       return await createSupportTicketFallback(customerPhone, messageText, supabase, settings);
     }
     
+    case 'menu_basico': {
+      // Get list of open vendors with their contact info
+      return await sendBasicMenuFallback(customerPhone, supabase, settings);
+    }
+    
     case 'offline':
     default: {
       return settings.emergency_message || 
         '⚠️ El sistema está temporalmente fuera de servicio. Por favor intentá más tarde.';
     }
+  }
+}
+
+async function sendBasicMenuFallback(
+  customerPhone: string,
+  supabase: any,
+  settings: PlatformSettings
+): Promise<string> {
+  try {
+    console.log('📋 Sending basic menu fallback...');
+    
+    // Get current day and time in Argentina
+    const now = new Date();
+    const argentinaTime = new Date(
+      now.toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" })
+    );
+    const currentDay = [
+      "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"
+    ][argentinaTime.getDay()];
+    const currentTimeStr = argentinaTime.toTimeString().slice(0, 5);
+    
+    // Get all active vendors with their hours
+    const { data: vendors, error: vendorsError } = await supabase
+      .from('vendors')
+      .select('id, name, phone, whatsapp_number, address, category')
+      .eq('is_active', true);
+    
+    if (vendorsError || !vendors || vendors.length === 0) {
+      console.error('Error fetching vendors:', vendorsError);
+      return settings.emergency_message || 
+        '⚠️ El sistema está temporalmente fuera de servicio. Por favor intentá más tarde.';
+    }
+    
+    // Get hours for all vendors
+    const vendorIds = vendors.map((v: any) => v.id);
+    const { data: vendorHours } = await supabase
+      .from('vendor_hours')
+      .select('vendor_id, day_of_week, opening_time, closing_time, is_closed, is_open_24_hours')
+      .in('vendor_id', vendorIds)
+      .eq('day_of_week', currentDay);
+    
+    // Create hours map
+    const hoursMap = new Map();
+    vendorHours?.forEach((h: any) => {
+      if (!hoursMap.has(h.vendor_id)) hoursMap.set(h.vendor_id, []);
+      hoursMap.get(h.vendor_id).push(h);
+    });
+    
+    // Check which vendors are open
+    const isVendorOpen = (vendorId: string): boolean => {
+      const todayHours = hoursMap.get(vendorId);
+      if (!todayHours || todayHours.length === 0) return true; // No hours = assume open
+      
+      return todayHours.some((h: any) => {
+        if (h.is_closed) return false;
+        if (h.is_open_24_hours) return true;
+        return currentTimeStr >= h.opening_time.slice(0, 5) && currentTimeStr <= h.closing_time.slice(0, 5);
+      });
+    };
+    
+    // Filter open vendors
+    const openVendors = vendors.filter((v: any) => isVendorOpen(v.id));
+    const closedVendors = vendors.filter((v: any) => !isVendorOpen(v.id));
+    
+    // Build message
+    let message = '🔧 *Nuestro asistente está temporalmente fuera de servicio.*\n\n';
+    
+    if (openVendors.length > 0) {
+      message += '📍 *Negocios disponibles ahora:*\n\n';
+      
+      openVendors.forEach((v: any, i: number) => {
+        const contactNumber = v.whatsapp_number || v.phone;
+        message += `${i + 1}. *${v.name}*\n`;
+        if (v.category) message += `   📂 ${v.category}\n`;
+        if (v.address) message += `   📍 ${v.address.split(',')[0]}\n`;
+        message += `   📱 ${contactNumber}\n\n`;
+      });
+      
+      message += '👆 Contactá directamente al negocio de tu preferencia.\n';
+    } else if (closedVendors.length > 0) {
+      message += '😔 No hay negocios abiertos en este momento.\n\n';
+      message += '🕐 *Negocios que abrirán pronto:*\n\n';
+      
+      closedVendors.slice(0, 3).forEach((v: any, i: number) => {
+        message += `${i + 1}. ${v.name}\n`;
+      });
+      
+      message += '\n⏰ Intentá más tarde cuando estén abiertos.';
+    } else {
+      message += '😔 No hay negocios disponibles en este momento.';
+    }
+    
+    message += '\n\n_Disculpá las molestias. 🙏_';
+    
+    console.log(`✅ Basic menu sent with ${openVendors.length} open vendors`);
+    return message;
+    
+  } catch (error) {
+    console.error('Error in sendBasicMenuFallback:', error);
+    return settings.emergency_message || 
+      '⚠️ El sistema está temporalmente fuera de servicio. Por favor intentá más tarde.';
   }
 }
 

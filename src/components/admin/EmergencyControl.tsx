@@ -42,7 +42,7 @@ interface PlatformSettings {
   bot_enabled: boolean;
   emergency_mode: boolean;
   emergency_message: string;
-  fallback_mode: 'vendor_direct' | 'support_queue' | 'offline';
+  fallback_mode: 'vendor_direct' | 'support_queue' | 'menu_basico' | 'offline';
   last_error: string | null;
   error_count: number;
   last_error_at: string | null;
@@ -265,7 +265,7 @@ export default function EmergencyControl() {
     });
   };
 
-  const updateFallbackMode = (mode: 'vendor_direct' | 'support_queue' | 'offline') => {
+  const updateFallbackMode = (mode: 'vendor_direct' | 'support_queue' | 'menu_basico' | 'offline') => {
     updateSettings({ fallback_mode: mode });
   };
 
@@ -422,9 +422,23 @@ export default function EmergencyControl() {
         <CardContent>
           <RadioGroup
             value={settings?.fallback_mode}
-            onValueChange={(value) => updateFallbackMode(value as 'vendor_direct' | 'support_queue' | 'offline')}
+            onValueChange={(value) => updateFallbackMode(value as 'vendor_direct' | 'support_queue' | 'menu_basico' | 'offline')}
             className="space-y-4"
           >
+            <div className="flex items-start space-x-3 p-4 rounded-lg border hover:bg-accent/50 transition-colors">
+              <RadioGroupItem value="menu_basico" id="menu_basico" />
+              <div className="flex-1">
+                <Label htmlFor="menu_basico" className="flex items-center gap-2 font-medium cursor-pointer">
+                  <Store className="h-4 w-4 text-primary" />
+                  Menú Básico
+                  <Badge variant="secondary" className="ml-2 text-xs">Recomendado</Badge>
+                </Label>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Envía una lista de negocios abiertos con sus números de WhatsApp para que el cliente contacte directamente.
+                </p>
+              </div>
+            </div>
+
             <div className="flex items-start space-x-3 p-4 rounded-lg border hover:bg-accent/50 transition-colors">
               <RadioGroupItem value="vendor_direct" id="vendor_direct" />
               <div className="flex-1">
