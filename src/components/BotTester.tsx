@@ -60,6 +60,7 @@ export function BotTester() {
       // Call the bot through the evolution webhook
       const { data, error } = await supabase.functions.invoke('evolution-webhook', {
         body: {
+          event: 'messages.upsert',
           data: {
             key: {
               remoteJid: testPhone
