@@ -2736,6 +2736,28 @@ async function incrementErrorCount(supabase: any, errorMessage: string): Promise
     if (shouldActivateEmergency) {
       updateData.emergency_mode = true;
       console.warn(`🚨 AUTO-EMERGENCY: Threshold reached (${newCount}/${threshold}), activating emergency mode`);
+      
+      // 🔔 Notify all admin contacts about emergency activation
+      try {
+        console.log('📧 Triggering admin emergency notifications...');
+        const { error: notifyError } = await supabase.functions.invoke('notify-admin-emergency', {
+          body: {
+            error_type: 'AUTO_EMERGENCY_ACTIVATED',
+            error_message: errorMessage,
+            error_count: newCount,
+            threshold: threshold,
+          },
+        });
+        
+        if (notifyError) {
+          console.error('⚠️ Failed to notify admins (non-blocking):', notifyError);
+        } else {
+          console.log('✅ Admin emergency notifications triggered successfully');
+        }
+      } catch (notifyErr) {
+        // Don't fail the main process if notifications fail
+        console.error('⚠️ Error invoking notify-admin-emergency (non-blocking):', notifyErr);
+      }
     }
     
     await supabase
