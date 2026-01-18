@@ -14,6 +14,68 @@ export type Database = {
   }
   public: {
     Tables: {
+      bot_error_logs: {
+        Row: {
+          created_at: string
+          customer_phone: string | null
+          error_details: Json | null
+          error_message: string
+          error_type: string
+          id: string
+          resolved: boolean | null
+          vendor_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          customer_phone?: string | null
+          error_details?: Json | null
+          error_message: string
+          error_type: string
+          id?: string
+          resolved?: boolean | null
+          vendor_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          customer_phone?: string | null
+          error_details?: Json | null
+          error_message?: string
+          error_type?: string
+          id?: string
+          resolved?: boolean | null
+          vendor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bot_error_logs_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "public_vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bot_error_logs_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_change_summary"
+            referencedColumns: ["vendor_id"]
+          },
+          {
+            foreignKeyName: "bot_error_logs_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bot_error_logs_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_messages: {
         Row: {
           chat_id: string
@@ -685,6 +747,51 @@ export type Database = {
           reviewer_phone?: string
           updated_at?: string | null
           user_type?: string
+        }
+        Relationships: []
+      }
+      platform_settings: {
+        Row: {
+          auto_emergency_threshold: number
+          bot_enabled: boolean
+          created_at: string
+          emergency_message: string | null
+          emergency_mode: boolean
+          error_count: number
+          fallback_mode: string
+          id: string
+          last_error: string | null
+          last_error_at: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          auto_emergency_threshold?: number
+          bot_enabled?: boolean
+          created_at?: string
+          emergency_message?: string | null
+          emergency_mode?: boolean
+          error_count?: number
+          fallback_mode?: string
+          id?: string
+          last_error?: string | null
+          last_error_at?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          auto_emergency_threshold?: number
+          bot_enabled?: boolean
+          created_at?: string
+          emergency_message?: string | null
+          emergency_mode?: boolean
+          error_count?: number
+          fallback_mode?: string
+          id?: string
+          last_error?: string | null
+          last_error_at?: string | null
+          updated_at?: string
+          updated_by?: string | null
         }
         Relationships: []
       }
