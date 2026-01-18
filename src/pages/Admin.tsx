@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Store, DollarSign, BarChart3, LogOut, Headphones, Bot, Star, TrendingUp, Users, Settings, Wrench } from "lucide-react";
+import { Store, DollarSign, BarChart3, LogOut, Headphones, Bot, Star, TrendingUp, Users, Settings, Wrench, AlertTriangle } from "lucide-react";
 import VendorManagement from "@/components/admin/VendorManagement";
 import CommissionManagement from "@/components/admin/CommissionManagement";
 import CommissionReports from "@/components/admin/CommissionReports";
@@ -17,6 +17,7 @@ import AdminPaymentMetrics from "@/components/admin/AdminPaymentMetrics";
 import CommissionInvoiceGenerator from "@/components/admin/CommissionInvoiceGenerator";
 import { VendorChangeAnalytics } from "@/components/admin/VendorChangeAnalytics";
 import PharmacyProductLoader from "@/components/admin/PharmacyProductLoader";
+import EmergencyControl from "@/components/admin/EmergencyControl";
 import lapachoLogo from "@/assets/lapacho-logo.png";
 import lapachoIcon from "@/assets/lapacho-icon.png";
 
@@ -102,7 +103,7 @@ export default function Admin() {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue="vendors" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-10 mb-8">
+          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-12 mb-8">
             <TabsTrigger value="vendors">
               <Store className="mr-2 h-4 w-4" />
               <span className="hidden sm:inline">Negocios</span>
@@ -142,6 +143,10 @@ export default function Admin() {
             <TabsTrigger value="evolution">
               <Bot className="mr-2 h-4 w-4" />
               <span className="hidden sm:inline">Agente IA</span>
+            </TabsTrigger>
+            <TabsTrigger value="emergency" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
+              <AlertTriangle className="mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">Emergencia</span>
             </TabsTrigger>
             <TabsTrigger value="tools">
               <Wrench className="mr-2 h-4 w-4" />
@@ -187,6 +192,10 @@ export default function Admin() {
 
           <TabsContent value="evolution">
             <EvolutionConfig />
+          </TabsContent>
+
+          <TabsContent value="emergency">
+            <EmergencyControl />
           </TabsContent>
 
           <TabsContent value="tools">

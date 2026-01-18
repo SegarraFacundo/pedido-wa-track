@@ -2659,6 +2659,223 @@ async function trackVendorChange(
   }
 }
 
+// ==================== EMERGENCY FALLBACK HANDLER ====================
+
+interface PlatformSettings {
+  bot_enabled: boolean;
+  emergency_mode: boolean;
+  emergency_message: string;
+  fallback_mode: 'vendor_direct' | 'support_queue' | 'offline';
+  error_count: number;
+  auto_emergency_threshold: number;
+}
+
+async function checkPlatformSettings(supabase: any): Promise<PlatformSettings | null> {
+  try {
+    const { data, error } = await supabase
+      .from('platform_settings')
+      .select('*')
+      .eq('id', 'global')
+      .single();
+    
+    if (error) {
+      console.error('❌ Error fetching platform_settings:', error);
+      return null;
+    }
+    
+    return data as PlatformSettings;
+  } catch (err) {
+    console.error('❌ Exception fetching platform_settings:', err);
+    return null;
+  }
+}
+
+async function logBotError(
+  supabase: any, 
+  errorType: string, 
+  errorMessage: string, 
+  customerPhone?: string,
+  vendorId?: string,
+  errorDetails?: Record<string, unknown>
+): Promise<void> {
+  try {
+    await supabase.from('bot_error_logs').insert({
+      error_type: errorType,
+      error_message: errorMessage,
+      error_details: errorDetails || {},
+      customer_phone: customerPhone,
+      vendor_id: vendorId,
+    });
+    console.log(`📝 Error logged: ${errorType}`);
+  } catch (err) {
+    console.error('❌ Failed to log error:', err);
+  }
+}
+
+async function incrementErrorCount(supabase: any, errorMessage: string): Promise<boolean> {
+  try {
+    // Get current settings
+    const { data: settings } = await supabase
+      .from('platform_settings')
+      .select('error_count, auto_emergency_threshold')
+      .eq('id', 'global')
+      .single();
+    
+    const newCount = (settings?.error_count || 0) + 1;
+    const threshold = settings?.auto_emergency_threshold || 3;
+    
+    const shouldActivateEmergency = newCount >= threshold;
+    
+    // Update error count and potentially activate emergency mode
+    const updateData: Record<string, any> = {
+      error_count: newCount,
+      last_error: errorMessage,
+      last_error_at: new Date().toISOString(),
+    };
+    
+    if (shouldActivateEmergency) {
+      updateData.emergency_mode = true;
+      console.warn(`🚨 AUTO-EMERGENCY: Threshold reached (${newCount}/${threshold}), activating emergency mode`);
+    }
+    
+    await supabase
+      .from('platform_settings')
+      .update(updateData)
+      .eq('id', 'global');
+    
+    return shouldActivateEmergency;
+  } catch (err) {
+    console.error('❌ Failed to increment error count:', err);
+    return false;
+  }
+}
+
+async function handleEmergencyFallback(
+  settings: PlatformSettings,
+  customerPhone: string,
+  messageText: string,
+  supabase: any
+): Promise<string> {
+  const mode = settings.fallback_mode || 'vendor_direct';
+  console.log(`🚨 Emergency fallback mode: ${mode}`);
+  
+  switch (mode) {
+    case 'vendor_direct': {
+      // Check if customer has an active order
+      const { data: activeOrder } = await supabase
+        .from('orders')
+        .select('id, vendor_id, status, vendors!inner(phone, whatsapp_number, name)')
+        .eq('customer_phone', customerPhone)
+        .not('status', 'in', '("delivered","cancelled")')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (activeOrder) {
+        console.log(`📦 Active order found: ${activeOrder.id}, routing to vendor`);
+        
+        // Update user session to route to vendor
+        const vendorPhone = activeOrder.vendors?.whatsapp_number || activeOrder.vendors?.phone;
+        await supabase.from('user_sessions').upsert({
+          phone: customerPhone,
+          in_vendor_chat: true,
+          assigned_vendor_phone: vendorPhone,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'phone' });
+        
+        // Save message to order messages
+        await supabase.from('messages').insert({
+          order_id: activeOrder.id,
+          sender: 'customer',
+          content: messageText,
+          is_read: false,
+        });
+        
+        // Save to customer_messages for vendor dashboard
+        await supabase.from('customer_messages').insert({
+          customer_phone: customerPhone,
+          message: messageText,
+          read: false,
+        });
+        
+        return settings.emergency_message || 
+          `⚠️ Estamos experimentando dificultades técnicas.\n\nTu mensaje fue enviado directamente a *${activeOrder.vendors?.name}* y te responderán pronto.\n\nDisculpá las molestias. 🙏`;
+      } else {
+        // No active order - create support ticket
+        return await createSupportTicketFallback(customerPhone, messageText, supabase, settings);
+      }
+    }
+    
+    case 'support_queue': {
+      return await createSupportTicketFallback(customerPhone, messageText, supabase, settings);
+    }
+    
+    case 'offline':
+    default: {
+      return settings.emergency_message || 
+        '⚠️ El sistema está temporalmente fuera de servicio. Por favor intentá más tarde.';
+    }
+  }
+}
+
+async function createSupportTicketFallback(
+  customerPhone: string,
+  messageText: string,
+  supabase: any,
+  settings: PlatformSettings
+): Promise<string> {
+  try {
+    // Check if there's already an open emergency ticket for this customer
+    const { data: existingTicket } = await supabase
+      .from('support_tickets')
+      .select('id')
+      .eq('customer_phone', customerPhone)
+      .eq('status', 'open')
+      .ilike('subject', '%[EMERGENCIA]%')
+      .maybeSingle();
+    
+    if (existingTicket) {
+      // Add message to existing ticket
+      await supabase.from('support_messages').insert({
+        ticket_id: existingTicket.id,
+        sender_type: 'customer',
+        message: messageText,
+      });
+      
+      console.log(`📩 Message added to existing emergency ticket: ${existingTicket.id}`);
+    } else {
+      // Create new emergency support ticket
+      const { data: newTicket, error } = await supabase
+        .from('support_tickets')
+        .insert({
+          customer_phone: customerPhone,
+          customer_name: 'Cliente (Emergencia Bot)',
+          subject: '[EMERGENCIA] Bot no disponible - Mensaje de cliente',
+          priority: 'high',
+          status: 'open',
+        })
+        .select('id')
+        .single();
+      
+      if (!error && newTicket) {
+        await supabase.from('support_messages').insert({
+          ticket_id: newTicket.id,
+          sender_type: 'customer',
+          message: messageText,
+        });
+        
+        console.log(`🎫 New emergency support ticket created: ${newTicket.id}`);
+      }
+    }
+    
+    return settings.emergency_message || 
+      '⚠️ Estamos experimentando dificultades técnicas.\n\nTu mensaje fue enviado a nuestro equipo de soporte y te contactaremos pronto.\n\nDisculpá las molestias. 🙏';
+  } catch (err) {
+    console.error('❌ Error creating support ticket fallback:', err);
+    return '⚠️ El sistema está temporalmente fuera de servicio. Por favor intentá más tarde.';
+  }
+}
+
 // ==================== AGENTE PRINCIPAL ====================
 
 export async function handleVendorBot(message: string, phone: string, supabase: any, imageUrl?: string): Promise<string> {
@@ -2666,6 +2883,26 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
   console.log("🤖 AI Bot START - Phone:", normalizedPhone, "Message:", message, "ImageUrl:", imageUrl);
 
   try {
+    // 🚨 EMERGENCY CHECK: Verify platform settings before processing
+    const platformSettings = await checkPlatformSettings(supabase);
+    
+    if (platformSettings) {
+      // Check if bot is disabled or in emergency mode
+      if (!platformSettings.bot_enabled || platformSettings.emergency_mode) {
+        console.log(`🚨 Bot disabled or emergency mode active - bot_enabled: ${platformSettings.bot_enabled}, emergency_mode: ${platformSettings.emergency_mode}`);
+        
+        // Log this occurrence
+        await logBotError(
+          supabase,
+          platformSettings.emergency_mode ? 'EMERGENCY_MODE' : 'BOT_DISABLED',
+          `Bot is ${platformSettings.emergency_mode ? 'in emergency mode' : 'disabled'}. Customer message: "${message.substring(0, 100)}"`,
+          normalizedPhone
+        );
+        
+        // Handle with fallback
+        return await handleEmergencyFallback(platformSettings, normalizedPhone, message, supabase);
+      }
+    }
     // 🔄 COMANDO DE REINICIO: Detectar palabras clave para limpiar memoria
     const resetCommands = ['reiniciar', 'empezar de nuevo', 'borrar todo', 'limpiar memoria', 'reset', 'comenzar de nuevo', 'nuevo pedido', 'empezar'];
     const normalizedMessage = message.toLowerCase().trim();
@@ -3430,6 +3667,48 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       message: error.message,
       stack: error.stack,
     });
+    
+    // 🚨 Log error and potentially trigger emergency mode
+    const errorMessage = error.message || 'Unknown error';
+    const isOpenAIError = errorMessage.includes('OpenAI') || 
+                          errorMessage.includes('rate limit') || 
+                          errorMessage.includes('API') ||
+                          errorMessage.includes('timeout') ||
+                          errorMessage.includes('insufficient_quota') ||
+                          error.name === 'APIError';
+    
+    if (isOpenAIError) {
+      console.warn('🚨 OpenAI-related error detected, incrementing error count');
+      await logBotError(
+        supabase,
+        'OPENAI_ERROR',
+        errorMessage,
+        normalizedPhone,
+        undefined,
+        { name: error.name, stack: error.stack?.substring(0, 500) }
+      );
+      
+      const emergencyActivated = await incrementErrorCount(supabase, errorMessage);
+      
+      if (emergencyActivated) {
+        // Fetch updated settings and handle with fallback
+        const updatedSettings = await checkPlatformSettings(supabase);
+        if (updatedSettings) {
+          return await handleEmergencyFallback(updatedSettings, normalizedPhone, message, supabase);
+        }
+      }
+    } else {
+      // Log non-OpenAI errors too
+      await logBotError(
+        supabase,
+        'BOT_ERROR',
+        errorMessage,
+        normalizedPhone,
+        undefined,
+        { name: error.name }
+      );
+    }
+    
     return "Disculpá, tuve un problema técnico. Por favor intentá de nuevo en un momento.";
   }
 }
