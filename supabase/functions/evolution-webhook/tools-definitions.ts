@@ -44,16 +44,20 @@ export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "ver_menu_negocio",
-      description: `Obtiene el menú completo de un negocio específico con todos sus productos y precios.
+      description: `Obtiene el menú de UN SOLO negocio específico con todos sus productos y precios.
       TAMBIÉN muestra si el negocio acepta RETIRO EN LOCAL (pickup).
+
+🚨 REGLAS CRÍTICAS:
+- SOLO llamar UNA VEZ por turno - NUNCA llamar múltiples veces en paralelo
+- Si el usuario dice "ver menús" o "mostrame los negocios" → Usá ver_locales_abiertos, NO esta herramienta
+- Solo usar cuando el usuario YA ELIGIÓ un negocio específico
       
 ✅ PODÉS USAR:
 - Número de la lista (ej: "1", "2", "3")
 - Nombre del negocio (parcial o completo, ej: "heladería", "pizzeria don luigi")
 - El sistema normaliza acentos automáticamente (heladeria = Heladería)
 
-⚡ NO pidas confirmación si el usuario menciona un negocio claramente.
-Simplemente llamá a esta herramienta con lo que dijo el usuario.`,
+❌ PROHIBIDO: Llamar esta herramienta 2+ veces para mostrar varios menús juntos`,
       parameters: {
         type: "object",
         properties: {
