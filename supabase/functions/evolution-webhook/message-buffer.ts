@@ -11,6 +11,7 @@ const MAX_BUFFER_CHARS = 1000;       // Máximo caracteres combinados
 const LOCK_TIMEOUT_MS = 30000;       // 30 segundos timeout del lock
 const SPAM_THRESHOLD = 10;           // Mensajes en 10 segundos = spam
 const SPAM_WINDOW_SECONDS = 10;
+const MAX_SINGLE_MESSAGE_CHARS = 500; // Máximo caracteres por mensaje individual
 
 interface BufferedMessage {
   id: string;
@@ -23,12 +24,13 @@ interface BufferedMessage {
 }
 
 interface BufferResult {
-  action: 'process' | 'buffered' | 'delegated' | 'spam';
+  action: 'process' | 'buffered' | 'delegated' | 'spam' | 'too_long';
   combinedText?: string;
   lastImageUrl?: string | null;
   lastDocumentUrl?: string | null;
   messageCount?: number;
   spamMessage?: string;
+  warningMessage?: string;
 }
 
 /**
@@ -222,6 +224,15 @@ export async function processWithDebounce(
   documentUrl: string | null,
   rawJid: string | null
 ): Promise<BufferResult> {
+  
+  // 0. Verificar longitud de mensaje individual ANTES de agregar al buffer
+  if (messageText && messageText.length > MAX_SINGLE_MESSAGE_CHARS) {
+    console.log(`📏 Message too long (${messageText.length} chars) for ${phone}`);
+    return {
+      action: 'too_long',
+      warningMessage: `⚠️ Tu mensaje es muy largo (${messageText.length} caracteres). Por favor enviá mensajes más cortos. Recordá que estoy para ayudarte con pedidos de comida y productos 🍕📦`
+    };
+  }
   
   // 1. Agregar mensaje al buffer
   await addToBuffer(supabase, phone, messageText, imageUrl, documentUrl, rawJid);
