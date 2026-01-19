@@ -256,12 +256,35 @@ export default function EmergencyControl() {
     updateSettings({ bot_enabled: !settings.bot_enabled });
   };
 
-  const toggleEmergencyMode = () => {
+  const toggleEmergencyMode = async () => {
     if (!settings) return;
-    updateSettings({ 
-      emergency_mode: !settings.emergency_mode,
+    
+    const newEmergencyMode = !settings.emergency_mode;
+    
+    // Si estamos DESACTIVANDO el modo emergencia, cerrar tickets de emergencia automáticamente
+    if (!newEmergencyMode) {
+      try {
+        const { error, count } = await supabase
+          .from('support_tickets')
+          .update({
+            status: 'resolved',
+            resolved_at: new Date().toISOString()
+          })
+          .in('status', ['open', 'in_progress'])
+          .ilike('subject', '%[EMERGENCIA]%');
+        
+        if (!error && count && count > 0) {
+          toast.info(`Se cerraron ${count} ticket(s) de emergencia automáticamente`);
+        }
+      } catch (err) {
+        console.error('Error closing emergency tickets:', err);
+      }
+    }
+    
+    await updateSettings({ 
+      emergency_mode: newEmergencyMode,
       // Reset error count when manually toggling
-      error_count: !settings.emergency_mode ? settings.error_count : 0
+      error_count: newEmergencyMode ? settings.error_count : 0
     });
   };
 

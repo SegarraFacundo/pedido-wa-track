@@ -663,7 +663,7 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
     console.log('Processing message from:', normalizedPhone, 'Message:', messageText);
 
     // 🎫 Verificar si hay un ticket de soporte abierto RECIENTE (últimas 48 horas)
-    const { data: openTicket } = await supabase
+    let openTicket = await supabase
       .from('support_tickets')
       .select('id, subject, status, created_at')
       .eq('customer_phone', normalizedPhone)
@@ -671,7 +671,56 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
       .gte('created_at', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()) // Últimas 48 horas
       .order('created_at', { ascending: false })
       .limit(1)
-      .maybeSingle();
+      .maybeSingle()
+      .then(r => r.data);
+
+    // 🚨 Si el ticket es de EMERGENCIA y el modo emergencia ya está desactivado, cerrarlo automáticamente
+    if (openTicket && openTicket.subject?.includes('[EMERGENCIA]')) {
+      const { data: platformSettings } = await supabase
+        .from('platform_settings')
+        .select('emergency_mode, bot_enabled')
+        .eq('id', 'global')
+        .single();
+      
+      if (platformSettings && !platformSettings.emergency_mode && platformSettings.bot_enabled) {
+        console.log('🔄 Closing emergency ticket because bot is back online:', openTicket.id);
+        
+        // Cerrar el ticket de emergencia automáticamente
+        await supabase
+          .from('support_tickets')
+          .update({
+            status: 'resolved',
+            resolved_at: new Date().toISOString()
+          })
+          .eq('id', openTicket.id);
+        
+        // Notificar al usuario que el servicio fue restaurado
+        const chatId = data.key?.remoteJid?.includes('@lid')
+          ? data.key.remoteJid
+          : `${normalizedPhone}@s.whatsapp.net`;
+        
+        const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL');
+        const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
+        const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
+        
+        await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': evolutionApiKey!,
+            "ngrok-skip-browser-warning": "true",
+            "User-Agent": "SupabaseFunction/1.0"
+          },
+          body: JSON.stringify({
+            number: chatId,
+            text: '✅ ¡El servicio ha sido restaurado! Ya puedo ayudarte nuevamente. ¿En qué te puedo asistir?',
+          }),
+        });
+        
+        // Limpiar el ticket para continuar con el procesamiento normal
+        openTicket = null;
+      }
+    }
 
     if (openTicket) {
       console.log('🎫 User has open support ticket:', openTicket.id);
