@@ -474,6 +474,36 @@ export type Database = {
           },
         ]
       }
+      message_buffer: {
+        Row: {
+          created_at: string | null
+          document_url: string | null
+          id: string
+          image_url: string | null
+          message_text: string | null
+          phone: string
+          raw_jid: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          document_url?: string | null
+          id?: string
+          image_url?: string | null
+          message_text?: string | null
+          phone: string
+          raw_jid?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          document_url?: string | null
+          id?: string
+          image_url?: string | null
+          message_text?: string | null
+          phone?: string
+          raw_jid?: string | null
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           content: string
@@ -1099,9 +1129,12 @@ export type Database = {
           created_at: string | null
           in_vendor_chat: boolean | null
           last_bot_message: string | null
+          last_message_at: string | null
           location_updated_at: string | null
+          lock_acquired_at: string | null
           phone: string
           previous_state: string | null
+          processing_lock: boolean | null
           updated_at: string | null
           user_latitude: number | null
           user_longitude: number | null
@@ -1111,9 +1144,12 @@ export type Database = {
           created_at?: string | null
           in_vendor_chat?: boolean | null
           last_bot_message?: string | null
+          last_message_at?: string | null
           location_updated_at?: string | null
+          lock_acquired_at?: string | null
           phone: string
           previous_state?: string | null
+          processing_lock?: boolean | null
           updated_at?: string | null
           user_latitude?: number | null
           user_longitude?: number | null
@@ -1123,9 +1159,12 @@ export type Database = {
           created_at?: string | null
           in_vendor_chat?: boolean | null
           last_bot_message?: string | null
+          last_message_at?: string | null
           location_updated_at?: string | null
+          lock_acquired_at?: string | null
           phone?: string
           previous_state?: string | null
+          processing_lock?: boolean | null
           updated_at?: string | null
           user_latitude?: number | null
           user_longitude?: number | null
@@ -2166,7 +2205,9 @@ export type Database = {
         }
         Returns: boolean
       }
+      cleanup_message_buffer: { Args: never; Returns: number }
       cleanup_old_sessions: { Args: never; Returns: number }
+      cleanup_stale_locks: { Args: never; Returns: number }
       generate_invoice_number: { Args: never; Returns: string }
       get_masked_phone: { Args: { phone: string }; Returns: string }
       get_order_customer_details: {

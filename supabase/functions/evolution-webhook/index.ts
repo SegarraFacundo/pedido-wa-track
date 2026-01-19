@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
 import { handleVendorBot } from './vendor-bot.ts';
+import { processWithDebounce, releaseLock } from './message-buffer.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -652,8 +653,8 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
       });
     }
 
-    if (!messageText) {
-      console.log('Missing message text');
+    if (!messageText && !imageUrl && !documentUrl) {
+      console.log('Missing message content');
       return new Response(JSON.stringify({ status: 'invalid_data' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200
@@ -661,6 +662,63 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
     }
 
     console.log('Processing message from:', normalizedPhone, 'Message:', messageText);
+
+    // =============================================
+    // SISTEMA DE DEBOUNCE - Agrupar mensajes rápidos
+    // =============================================
+    const debounceResult = await processWithDebounce(
+      supabase,
+      normalizedPhone,
+      messageText,
+      imageUrl,
+      documentUrl,
+      rawJid
+    );
+    
+    // Para LID, usar el remoteJid original; sino usar el número normalizado
+    const chatIdForDebounce = data.key?.remoteJid?.includes('@lid')
+      ? data.key.remoteJid
+      : `${normalizedPhone}@s.whatsapp.net`;
+    
+    const evolutionApiUrlDebounce = Deno.env.get('EVOLUTION_API_URL');
+    const evolutionApiKeyDebounce = Deno.env.get('EVOLUTION_API_KEY');
+    const instanceNameDebounce = Deno.env.get('EVOLUTION_INSTANCE_NAME');
+    
+    if (debounceResult.action === 'spam') {
+      // Responder con mensaje anti-spam
+      await fetch(`${evolutionApiUrlDebounce}/message/sendText/${instanceNameDebounce}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': evolutionApiKeyDebounce!,
+          "ngrok-skip-browser-warning": "true",
+          "User-Agent": "SupabaseFunction/1.0"
+        },
+        body: JSON.stringify({
+          number: chatIdForDebounce,
+          text: debounceResult.spamMessage
+        }),
+      });
+      
+      return new Response(JSON.stringify({ status: 'spam_detected' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
+      });
+    }
+    
+    if (debounceResult.action === 'buffered' || debounceResult.action === 'delegated') {
+      // Mensaje guardado en buffer, otro proceso se encargará
+      console.log(`📦 Message ${debounceResult.action} for ${normalizedPhone}`);
+      return new Response(JSON.stringify({ status: debounceResult.action }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
+      });
+    }
+    
+    // debounceResult.action === 'process' → Continuar con el procesamiento
+    const finalMessageText = debounceResult.combinedText || messageText || '';
+    const finalImageUrl = debounceResult.lastImageUrl || imageUrl;
+    console.log(`🔄 Processing ${debounceResult.messageCount} combined message(s) for ${normalizedPhone}`);
 
     // 🎫 Verificar si hay un ticket de soporte abierto RECIENTE (últimas 48 horas)
     let openTicket = await supabase
@@ -731,10 +789,13 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
         .insert({
           ticket_id: openTicket.id,
           sender_type: 'customer',
-          message: messageText
+          message: finalMessageText
         });
       
       console.log('📝 Message saved to support ticket, bot will not respond');
+      
+      // Liberar lock antes de salir
+      await releaseLock(supabase, normalizedPhone);
       
       // NO procesamos con el bot si hay un ticket abierto
       return new Response(JSON.stringify({ status: 'support_mode', ticket_id: openTicket.id }), {
@@ -752,10 +813,10 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
 
     // 🤖 Comandos del cliente para reactivar el bot
     const clientBotCommands = ['menu', 'bot', 'ayuda', 'salir', 'inicio', 'volver'];
-    const isReactivateCommand = clientBotCommands.includes(messageText.toLowerCase().trim());
+    const isReactivateCommand = clientBotCommands.includes(finalMessageText.toLowerCase().trim());
     
     if (vendorSession?.in_vendor_chat && isReactivateCommand) {
-      console.log('🔄 Client requested to reactivate bot with command:', messageText);
+      console.log('🔄 Client requested to reactivate bot with command:', finalMessageText);
       
       // Desactivar chat directo
       await supabase.from('user_sessions').update({
@@ -788,12 +849,15 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
           .insert({
             order_id: activeOrder.id,
             sender: 'customer',
-            content: messageText,
+            content: finalMessageText,
             is_read: false
           });
 
         console.log('✅ Message saved to order chat, bot will not respond');
         console.log('💡 Tip: Customer can write "menu" or "bot" to reactivate the bot');
+
+        // Liberar lock antes de salir
+        await releaseLock(supabase, normalizedPhone);
 
         // NO procesamos con el bot si está en chat directo
         return new Response(JSON.stringify({ status: 'vendor_chat_mode', order_id: activeOrder.id }), {
@@ -819,10 +883,13 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
           .insert({
             chat_id: activeChat.id,
             sender_type: 'customer',
-            message: messageText
+            message: finalMessageText
           });
 
         console.log('✅ Message saved to vendor chat, bot will not respond');
+
+        // Liberar lock antes de salir
+        await releaseLock(supabase, normalizedPhone);
 
         return new Response(JSON.stringify({ status: 'vendor_chat_mode', chat_id: activeChat.id }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -841,8 +908,8 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
       }
     }
 
-    // Procesar mensaje con el bot de IA
-    let responseMessage = await processWithVendorBot(normalizedPhone, messageText);
+    // Procesar mensaje con el bot de IA (usando texto combinado del buffer)
+    let responseMessage = await processWithVendorBot(normalizedPhone, finalMessageText, finalImageUrl || undefined);
 
     // --- ENVÍO FINAL ---
     if (responseMessage) {
@@ -877,7 +944,10 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
       }
     }
 
-    return new Response(JSON.stringify({ status: 'success' }), {
+    // 🔓 Liberar lock después de procesar
+    await releaseLock(supabase, normalizedPhone);
+
+    return new Response(JSON.stringify({ status: 'success', messagesProcessed: debounceResult.messageCount }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200
     });
