@@ -524,6 +524,7 @@ async function ejecutarHerramienta(
           menu += `${i + 1}. *${p.name}* - $${Math.round(p.price).toLocaleString("es-PY")}\n`;
           if (p.category) menu += `   🏷️ ${Array.isArray(p.category) ? p.category.join(", ") : p.category}\n`;
           if (p.description) menu += `   📝 ${p.description}\n`;
+          if (p.image) menu += `   📷 Foto: https://pedido-wa-track.lovable.app/p/${p.id}\n`;
           menu += `\n`;
         }
 
