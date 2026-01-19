@@ -741,6 +741,28 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
     const finalMessageText = debounceResult.combinedText || messageText || '';
     const finalImageUrl = debounceResult.lastImageUrl || imageUrl;
     console.log(`🔄 Processing ${debounceResult.messageCount} combined message(s) for ${normalizedPhone}`);
+    
+    // 📤 Enviar mensaje instantáneo "Procesando..." ANTES de la IA
+    if (debounceResult.shouldSendProcessingMessage) {
+      try {
+        await fetch(`${evolutionApiUrlDebounce}/message/sendText/${instanceNameDebounce}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': evolutionApiKeyDebounce!,
+            "ngrok-skip-browser-warning": "true",
+            "User-Agent": "SupabaseFunction/1.0"
+          },
+          body: JSON.stringify({
+            number: chatIdForDebounce,
+            text: "⏳ Un momento, estoy procesando tu mensaje..."
+          }),
+        });
+        console.log('✅ Processing message sent to user');
+      } catch (processingMsgError) {
+        console.error('⚠️ Could not send processing message:', processingMsgError);
+      }
+    }
 
     // 🎫 Verificar si hay un ticket de soporte abierto RECIENTE (últimas 48 horas)
     let openTicket = await supabase
