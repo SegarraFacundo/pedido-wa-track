@@ -506,26 +506,22 @@ async function ejecutarHerramienta(
           context.vendor_allows_delivery = true; // Default true
         }
 
-        let menu = `📋 *Menú de ${vendor.name}*\n\n`;
+        let menu = `*${vendor.name}*\n`;
         
-        // ⭐ Mostrar opciones de entrega disponibles
+        // ⭐ Mostrar opciones de entrega de forma compacta
         if (context.vendor_allows_delivery && context.vendor_allows_pickup) {
-          menu += `✅ Opciones: *Delivery* y *Retiro en local*\n`;
-          menu += `📍 Dirección: ${vendorDetails?.address || 'No disponible'}\n\n`;
+          menu += `📍 ${vendorDetails?.address || ''} | 🚚 Delivery y 🏪 Retiro\n\n`;
         } else if (context.vendor_allows_pickup && !context.vendor_allows_delivery) {
-          menu += `🏪 Este negocio solo acepta *retiro en local*\n`;
-          menu += `📍 Dirección: ${vendorDetails?.address || 'No disponible'}\n\n`;
-        } else if (context.vendor_allows_delivery && !context.vendor_allows_pickup) {
-          menu += `🚚 Este negocio solo hace *delivery*\n\n`;
+          menu += `📍 ${vendorDetails?.address || ''} | Solo 🏪 Retiro\n\n`;
+        } else {
+          menu += `Solo 🚚 Delivery\n\n`;
         }
         
-        menu += `📦 Productos disponibles:\n\n`;
         for (const [i, p] of products.entries()) {
-          menu += `${i + 1}. *${p.name}* - $${Math.round(p.price).toLocaleString("es-PY")}\n`;
-          if (p.category) menu += `   🏷️ ${Array.isArray(p.category) ? p.category.join(", ") : p.category}\n`;
-          if (p.description) menu += `   📝 ${p.description}\n`;
-          if (p.image) menu += `   📷 Foto: https://pedido-wa-track.lovable.app/p/${p.id}\n`;
+          menu += `${i + 1}. *${p.name}* $${Math.round(p.price).toLocaleString("es-PY")}`;
+          if (p.image) menu += ` 📷 lapacho.ar/p/${p.id}`;
           menu += `\n`;
+          if (p.description) menu += `   _${p.description}_\n`;
         }
 
         console.log(`✅ Menu generated successfully with ${products.length} products`);
