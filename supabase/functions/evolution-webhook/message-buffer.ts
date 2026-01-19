@@ -31,6 +31,7 @@ interface BufferResult {
   messageCount?: number;
   spamMessage?: string;
   warningMessage?: string;
+  shouldSendProcessingMessage?: boolean;
 }
 
 /**
@@ -283,6 +284,7 @@ export async function processWithDebounce(
     combinedText: combinedText || 'mensaje vacío',
     lastImageUrl,
     lastDocumentUrl,
-    messageCount
+    messageCount,
+    shouldSendProcessingMessage: true
   };
 }
