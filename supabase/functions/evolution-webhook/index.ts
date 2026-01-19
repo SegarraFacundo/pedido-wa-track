@@ -706,6 +706,28 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
       });
     }
     
+    if (debounceResult.action === 'too_long') {
+      // Responder con mensaje de advertencia de longitud
+      await fetch(`${evolutionApiUrlDebounce}/message/sendText/${instanceNameDebounce}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': evolutionApiKeyDebounce!,
+          "ngrok-skip-browser-warning": "true",
+          "User-Agent": "SupabaseFunction/1.0"
+        },
+        body: JSON.stringify({
+          number: chatIdForDebounce,
+          text: debounceResult.warningMessage
+        }),
+      });
+      
+      return new Response(JSON.stringify({ status: 'message_too_long' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
+      });
+    }
+    
     if (debounceResult.action === 'buffered' || debounceResult.action === 'delegated') {
       // Mensaje guardado en buffer, otro proceso se encargará
       console.log(`📦 Message ${debounceResult.action} for ${normalizedPhone}`);
