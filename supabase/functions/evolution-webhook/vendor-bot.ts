@@ -3727,7 +3727,22 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
           
           // 🛡️ Rate limiting: Prevenir que la misma herramienta se llame múltiples veces
           const callCount = toolCallTracker.get(toolName) || 0;
-          if (callCount >= 2) {
+          
+          // 🚨 REGLA ESPECIAL: ver_menu_negocio SOLO se puede llamar UNA VEZ por turno
+          // Esto evita que se mezclen menús de múltiples negocios
+          const maxCalls = toolName === 'ver_menu_negocio' ? 1 : 2;
+          
+          if (callCount >= maxCalls) {
+            if (toolName === 'ver_menu_negocio') {
+              console.warn(`⚠️ BLOQUEADO: ver_menu_negocio ya se llamó ${callCount} vez. No se permiten menús múltiples.`);
+              // En lugar de romper el loop, retornar mensaje útil
+              messages.push({
+                role: "tool",
+                tool_call_id: toolCall.id,
+                content: "⚠️ Solo puedo mostrarte un menú a la vez. Elegí un negocio de la lista y te muestro su menú.",
+              });
+              continue; // Continuar con otros tool calls si hay
+            }
             console.warn(`⚠️ Tool ${toolName} called ${callCount} times, forcing text response`);
             continueLoop = false;
             finalResponse = "Disculpá, tuve un problema. ¿Podés reformular tu pedido?";
