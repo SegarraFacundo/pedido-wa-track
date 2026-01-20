@@ -4,7 +4,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Store, DollarSign, BarChart3, LogOut, Headphones, Bot, Star, TrendingUp, Users, Settings, Wrench, AlertTriangle } from "lucide-react";
+import { 
+  Store, DollarSign, BarChart3, LogOut, Headphones, Bot, Star, 
+  TrendingUp, Users, Wrench, AlertTriangle, Menu, FileText 
+} from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import VendorManagement from "@/components/admin/VendorManagement";
 import CommissionManagement from "@/components/admin/CommissionManagement";
 import CommissionReports from "@/components/admin/CommissionReports";
@@ -20,10 +30,28 @@ import PharmacyProductLoader from "@/components/admin/PharmacyProductLoader";
 import EmergencyControl from "@/components/admin/EmergencyControl";
 import lapachoLogo from "@/assets/lapacho-logo.png";
 import lapachoIcon from "@/assets/lapacho-icon.png";
+import { cn } from "@/lib/utils";
+
+const menuItems = [
+  { value: "vendors", label: "Negocios", icon: Store },
+  { value: "commissions", label: "Comisiones", icon: DollarSign },
+  { value: "metrics", label: "Métricas", icon: BarChart3 },
+  { value: "analytics", label: "Analytics", icon: TrendingUp },
+  { value: "invoices", label: "Facturación", icon: FileText },
+  { value: "reports", label: "Reportes", icon: BarChart3 },
+  { value: "reviews", label: "Reseñas", icon: Star },
+  { value: "support", label: "Tickets Soporte", icon: Headphones },
+  { value: "soporte-users", label: "Usuarios Soporte", icon: Users },
+  { value: "evolution", label: "Agente IA", icon: Bot },
+  { value: "emergency", label: "Emergencia", icon: AlertTriangle, danger: true },
+  { value: "tools", label: "Herramientas", icon: Wrench },
+];
 
 export default function Admin() {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [activeTab, setActiveTab] = useState("vendors");
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -71,6 +99,11 @@ export default function Admin() {
     navigate('/admin-auth');
   };
 
+  const handleMenuItemClick = (value: string) => {
+    setActiveTab(value);
+    setDrawerOpen(false);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -84,75 +117,88 @@ export default function Admin() {
 
   if (!isAdmin) return null;
 
+  const currentMenuItem = menuItems.find(item => item.value === activeTab);
+
   return (
     <div className="min-h-screen bg-background">
       <PWAInstallPrompt userType="admin" />
       <header className="border-b bg-card sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3 justify-center md:justify-start flex-1 md:flex-initial">
-            <img src={lapachoIcon} alt="Lapacho" className="h-8 md:hidden" />
-            <img src={lapachoLogo} alt="Lapacho Logo" className="h-10 hidden md:block" />
-            <h1 className="text-xl font-bold md:hidden">Lapacho</h1>
+          <div className="flex items-center gap-3">
+            {/* Botón hamburguesa - solo móvil */}
+            <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
+              <SheetTrigger asChild className="lg:hidden">
+                <Button variant="ghost" size="icon">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-72">
+                <SheetHeader>
+                  <SheetTitle className="flex items-center gap-2">
+                    <img src={lapachoIcon} alt="Lapacho" className="h-6" />
+                    Panel Admin
+                  </SheetTitle>
+                </SheetHeader>
+                <nav className="mt-6 flex flex-col gap-1">
+                  {menuItems.map((item) => (
+                    <Button
+                      key={item.value}
+                      variant={activeTab === item.value ? "secondary" : "ghost"}
+                      className={cn(
+                        "justify-start w-full",
+                        item.danger && activeTab === item.value && "bg-orange-500 text-white hover:bg-orange-600",
+                        item.danger && activeTab !== item.value && "text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                      )}
+                      onClick={() => handleMenuItemClick(item.value)}
+                    >
+                      <item.icon className="mr-3 h-4 w-4" />
+                      {item.label}
+                    </Button>
+                  ))}
+                </nav>
+              </SheetContent>
+            </Sheet>
+
+            {/* Logo */}
+            <img src={lapachoIcon} alt="Lapacho" className="h-8 lg:hidden" />
+            <img src={lapachoLogo} alt="Lapacho Logo" className="h-10 hidden lg:block" />
           </div>
-          <Button onClick={handleSignOut} variant="outline">
+
+          <Button onClick={handleSignOut} variant="outline" size="sm">
             <LogOut className="mr-2 h-4 w-4" />
-            Cerrar Sesión
+            <span className="hidden sm:inline">Cerrar Sesión</span>
           </Button>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <Tabs defaultValue="vendors" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-12 mb-8">
-            <TabsTrigger value="vendors">
-              <Store className="mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">Negocios</span>
-            </TabsTrigger>
-            <TabsTrigger value="commissions">
-              <DollarSign className="mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">Comisiones</span>
-            </TabsTrigger>
-            <TabsTrigger value="metrics">
-              <BarChart3 className="mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">Métricas</span>
-            </TabsTrigger>
-            <TabsTrigger value="analytics">
-              <TrendingUp className="mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">Analytics</span>
-            </TabsTrigger>
-            <TabsTrigger value="invoices">
-              <BarChart3 className="mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">Facturación</span>
-            </TabsTrigger>
-            <TabsTrigger value="reports">
-              <BarChart3 className="mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">Reportes</span>
-            </TabsTrigger>
-            <TabsTrigger value="reviews">
-              <Star className="mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">Reseñas</span>
-            </TabsTrigger>
-            <TabsTrigger value="support">
-              <Headphones className="mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">Tickets Soporte</span>
-            </TabsTrigger>
-            <TabsTrigger value="soporte-users">
-              <Users className="mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">Usuarios Soporte</span>
-            </TabsTrigger>
-            <TabsTrigger value="evolution">
-              <Bot className="mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">Agente IA</span>
-            </TabsTrigger>
-            <TabsTrigger value="emergency" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
-              <AlertTriangle className="mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">Emergencia</span>
-            </TabsTrigger>
-            <TabsTrigger value="tools">
-              <Wrench className="mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">Herramientas</span>
-            </TabsTrigger>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          {/* TabsList solo visible en desktop */}
+          <TabsList className="hidden lg:grid w-full grid-cols-12 mb-8">
+            {menuItems.map((item) => (
+              <TabsTrigger
+                key={item.value}
+                value={item.value}
+                className={cn(
+                  item.danger && "data-[state=active]:bg-orange-500 data-[state=active]:text-white"
+                )}
+              >
+                <item.icon className="mr-2 h-4 w-4" />
+                <span className="hidden xl:inline">{item.label}</span>
+              </TabsTrigger>
+            ))}
           </TabsList>
+
+          {/* Indicador de sección actual en móvil */}
+          {currentMenuItem && (
+            <div className="lg:hidden mb-4 flex items-center gap-2 px-1">
+              <currentMenuItem.icon className={cn(
+                "h-5 w-5",
+                currentMenuItem.danger ? "text-orange-500" : "text-primary"
+              )} />
+              <h2 className="text-lg font-semibold">{currentMenuItem.label}</h2>
+            </div>
+          )}
 
           <TabsContent value="vendors">
             <VendorManagement />
