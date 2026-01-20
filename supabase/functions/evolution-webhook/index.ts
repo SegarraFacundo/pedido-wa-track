@@ -742,10 +742,10 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
     const finalImageUrl = debounceResult.lastImageUrl || imageUrl;
     console.log(`🔄 Processing ${debounceResult.messageCount} combined message(s) for ${normalizedPhone}`);
     
-    // 📤 Enviar mensaje instantáneo "Procesando..." ANTES de la IA
+    // 📤 Enviar indicador nativo "escribiendo..." ANTES de la IA (no deja mensaje visible)
     if (debounceResult.shouldSendProcessingMessage) {
       try {
-        await fetch(`${evolutionApiUrlDebounce}/message/sendText/${instanceNameDebounce}`, {
+        await fetch(`${evolutionApiUrlDebounce}/chat/sendPresence/${instanceNameDebounce}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -755,12 +755,15 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
           },
           body: JSON.stringify({
             number: chatIdForDebounce,
-            text: "⏳ Un momento, estoy procesando tu mensaje..."
+            options: {
+              presence: "composing",
+              delay: 8000 // Mantener el indicador "escribiendo..." 8 segundos
+            }
           }),
         });
-        console.log('✅ Processing message sent to user');
+        console.log('✅ Composing presence sent to user (native typing indicator)');
       } catch (processingMsgError) {
-        console.error('⚠️ Could not send processing message:', processingMsgError);
+        console.error('⚠️ Could not send composing presence:', processingMsgError);
       }
     }
 
