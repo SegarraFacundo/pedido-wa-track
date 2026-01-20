@@ -138,9 +138,16 @@ export function useRealtimeOrders(vendorId?: string) {
 
                 setOrders(prev => [newOrder, ...prev]);
                 
-                // ✅ La notificación al vendedor se maneja SOLO en el backend (vendor-bot.ts)
-                // NO duplicar aquí para evitar notificaciones dobles
-                
+                // Insertar notificación en la tabla de historial
+                // Esto disparará el realtime para el NotificationCenter
+                await supabase.from('vendor_notification_history').insert({
+                  vendor_id: newOrder.vendorId,
+                  type: 'new_order',
+                  title: 'Nuevo Pedido',
+                  message: `Pedido #${newOrder.id.slice(0, 8)} - $${newOrder.total.toLocaleString()}`,
+                  data: { order_id: newOrder.id, total: newOrder.total }
+                });
+
                 toast({
                   title: '🆕 NUEVO PEDIDO INGRESADO',
                   description: `Pedido #${newOrder.id.slice(0, 8)} - $${newOrder.total.toFixed(2)}`,
@@ -148,11 +155,14 @@ export function useRealtimeOrders(vendorId?: string) {
                 });
               }
             } else if (payload.eventType === 'UPDATE') {
+              const oldOrder = orders.find(o => o.id === payload.new.id);
+              const newStatus = payload.new.status as OrderStatus;
+              
               setOrders(prev => prev.map(order => 
                 order.id === payload.new.id
                   ? {
                       ...order,
-                      status: payload.new.status as OrderStatus,
+                      status: newStatus,
                       updatedAt: new Date(payload.new.updated_at),
                       deliveryPersonName: payload.new.delivery_person_name,
                       deliveryPersonPhone: payload.new.delivery_person_phone,
@@ -164,9 +174,41 @@ export function useRealtimeOrders(vendorId?: string) {
                   : order
               ));
 
+              // Crear notificaciones según el tipo de cambio
+              if (oldOrder && oldOrder.status !== newStatus) {
+                let notificationType: 'order_cancelled' | 'order_updated' | 'payment_received' = 'order_updated';
+                let title = 'Pedido Actualizado';
+                let message = `Estado cambiado a ${newStatus}`;
+
+                if (newStatus === 'cancelled') {
+                  notificationType = 'order_cancelled';
+                  title = 'Pedido Cancelado';
+                  message = `El pedido #${payload.new.id.slice(0, 8)} fue cancelado`;
+                }
+
+                await supabase.from('vendor_notification_history').insert({
+                  vendor_id: payload.new.vendor_id,
+                  type: notificationType,
+                  title,
+                  message,
+                  data: { order_id: payload.new.id, status: newStatus }
+                });
+              }
+
+              // Notificación de pago recibido
+              if (oldOrder && oldOrder.payment_status !== 'paid' && payload.new.payment_status === 'paid') {
+                await supabase.from('vendor_notification_history').insert({
+                  vendor_id: payload.new.vendor_id,
+                  type: 'payment_received',
+                  title: 'Pago Recibido',
+                  message: `Se recibió el pago del pedido #${payload.new.id.slice(0, 8)}`,
+                  data: { order_id: payload.new.id }
+                });
+              }
+
               toast({
                 title: '✅ Pedido actualizado',
-                description: `Estado cambiado a ${payload.new.status}`,
+                description: `Estado cambiado a ${newStatus}`,
               });
             } else if (payload.eventType === 'DELETE') {
               setOrders(prev => prev.filter(order => order.id !== payload.old.id));

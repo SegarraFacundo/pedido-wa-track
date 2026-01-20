@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OrderCard } from "@/components/OrderCard";
 import { ChatInterface } from "@/components/ChatInterface";
+import { NotificationCenter } from "@/components/NotificationCenter";
 import { useRealtimeOrders } from "@/hooks/useRealtimeOrders";
 import { useRealtimeMessages } from "@/hooks/useRealtimeMessages";
 import { OrderStatus, Vendor } from "@/types/order";
@@ -20,8 +21,6 @@ import {
   Star,
   MessageCircle,
   X,
-  Bell,
-  BellOff,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -36,7 +35,6 @@ interface VendorDashboardWithRealtimeProps {
 export function VendorDashboardWithRealtime({ vendor }: VendorDashboardWithRealtimeProps) {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
   const [selectedOrderForChat, setSelectedOrderForChat] = useState<string | null>(null);
-  const [soundEnabled, setSoundEnabled] = useState(true);
   const { orders, loading, updateOrderStatus } = useRealtimeOrders(vendor.id);
   const { toast } = useToast();
 
@@ -54,17 +52,6 @@ export function VendorDashboardWithRealtime({ vendor }: VendorDashboardWithRealt
       .order('slot_number', { ascending: true })
       .then(({ data }) => setTodayHours(data || []));
   }, [vendor.id]);
-
-  // Play notification sound for new orders
-  useEffect(() => {
-    if (soundEnabled && orders.length > 0) {
-      const pendingOrders = orders.filter(o => o.status === 'pending');
-      if (pendingOrders.length > 0) {
-        const audio = new Audio('/notification.mp3');
-        audio.play().catch(e => console.log('Could not play sound:', e));
-      }
-    }
-  }, [orders, soundEnabled]);
 
   const filteredOrders = statusFilter === 'all' 
     ? orders 
@@ -194,14 +181,7 @@ export function VendorDashboardWithRealtime({ vendor }: VendorDashboardWithRealt
               </div>
             </div>
             
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSoundEnabled(!soundEnabled)}
-              className="ml-4"
-            >
-              {soundEnabled ? <Bell className="h-5 w-5" /> : <BellOff className="h-5 w-5" />}
-            </Button>
+            <NotificationCenter vendorId={vendor.id} />
           </div>
         </CardContent>
       </Card>
