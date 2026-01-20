@@ -17,15 +17,42 @@ import { PlatformReviewForm } from '@/components/PlatformReviewForm';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Package, Clock, Settings, LayoutDashboard, Tag, Star, MessageCircle, LifeBuoy, CreditCard, Heart, BarChart3 } from 'lucide-react';
+import { 
+  Loader2, Package, Clock, Settings, LayoutDashboard, Tag, Star, 
+  MessageCircle, LifeBuoy, CreditCard, Heart, BarChart3, Menu, LogOut 
+} from 'lucide-react';
 import { PWAInstallPrompt } from '@/components/PWAInstallPrompt';
 import lapachoIcon from "@/assets/lapacho-icon.png";
+import { cn } from "@/lib/utils";
+
+const menuItems = [
+  { value: "dashboard", label: "Pedidos", icon: LayoutDashboard },
+  { value: "products", label: "Productos", icon: Package },
+  { value: "offers", label: "Ofertas", icon: Tag },
+  { value: "chats", label: "Chats", icon: MessageCircle },
+  { value: "reviews", label: "Reseñas", icon: Star },
+  { value: "hours", label: "Horarios", icon: Clock },
+  { value: "metrics", label: "Métricas", icon: BarChart3 },
+  { value: "payments", label: "Pagos", icon: CreditCard },
+  { value: "settings", label: "Ajustes", icon: Settings },
+  { value: "support", label: "Soporte", icon: LifeBuoy },
+  { value: "review", label: "Calificar", icon: Heart },
+];
 
 export default function VendorDashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [vendor, setVendor] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -86,6 +113,11 @@ export default function VendorDashboard() {
     navigate('/vendor-auth');
   };
 
+  const handleMenuItemClick = (value: string) => {
+    setActiveTab(value);
+    setDrawerOpen(false);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -114,17 +146,59 @@ export default function VendorDashboard() {
     );
   }
 
+  const currentMenuItem = menuItems.find(item => item.value === activeTab);
+
   return (
     <div className="min-h-screen bg-background">
       <PWAInstallPrompt userType="vendor" />
       {/* Mobile-responsive header */}
       <div className="bg-card border-b sticky top-0 z-10">
         <div className="px-4 py-3 flex justify-between items-center">
-          <div className="flex items-center gap-3 justify-center md:justify-start flex-1 md:flex-initial">
-            <img src={lapachoIcon} alt="Lapacho" className="h-8 md:hidden" />
-            <h1 className="text-lg sm:text-xl font-bold truncate md:inline">
-              <span className="md:hidden">Lapacho</span>
-              <span className="hidden md:inline">{vendor.name}</span>
+          <div className="flex items-center gap-3">
+            {/* Botón hamburguesa - solo móvil */}
+            <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
+              <SheetTrigger asChild className="lg:hidden">
+                <Button variant="ghost" size="icon">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-72">
+                <SheetHeader>
+                  <SheetTitle className="flex items-center gap-2">
+                    <img src={lapachoIcon} alt="Lapacho" className="h-6" />
+                    {vendor.name}
+                  </SheetTitle>
+                </SheetHeader>
+                <nav className="mt-6 flex flex-col gap-1">
+                  {menuItems.map((item) => (
+                    <Button
+                      key={item.value}
+                      variant={activeTab === item.value ? "secondary" : "ghost"}
+                      className="justify-start w-full"
+                      onClick={() => handleMenuItemClick(item.value)}
+                    >
+                      <item.icon className="mr-3 h-4 w-4" />
+                      {item.label}
+                    </Button>
+                  ))}
+                </nav>
+                <div className="absolute bottom-6 left-4 right-4">
+                  <Button 
+                    onClick={handleSignOut} 
+                    variant="outline" 
+                    className="w-full"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Cerrar Sesión
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
+
+            {/* Logo */}
+            <img src={lapachoIcon} alt="Lapacho" className="h-8 lg:hidden" />
+            <h1 className="text-lg sm:text-xl font-bold truncate hidden lg:inline">
+              {vendor.name}
             </h1>
           </div>
           <Button 
@@ -133,6 +207,7 @@ export default function VendorDashboard() {
             size="sm"
             className="ml-2"
           >
+            <LogOut className="mr-2 h-4 w-4 hidden sm:inline" />
             Salir
           </Button>
         </div>
@@ -140,53 +215,28 @@ export default function VendorDashboard() {
       
       {/* Dashboard tabs */}
       <div className="container mx-auto p-4">
-        <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="flex flex-wrap gap-2 h-auto p-1 mb-6">
-            <TabsTrigger value="dashboard" className="flex items-center gap-1">
-              <LayoutDashboard className="h-4 w-4" />
-              <span className="hidden sm:inline">Pedidos</span>
-            </TabsTrigger>
-            <TabsTrigger value="products" className="flex items-center gap-1">
-              <Package className="h-4 w-4" />
-              <span className="hidden sm:inline">Productos</span>
-            </TabsTrigger>
-            <TabsTrigger value="offers" className="flex items-center gap-1">
-              <Tag className="h-4 w-4" />
-              <span className="hidden sm:inline">Ofertas</span>
-            </TabsTrigger>
-            <TabsTrigger value="chats" className="flex items-center gap-1">
-              <MessageCircle className="h-4 w-4" />
-              <span className="hidden sm:inline">Chats</span>
-            </TabsTrigger>
-            <TabsTrigger value="reviews" className="flex items-center gap-1">
-              <Star className="h-4 w-4" />
-              <span className="hidden sm:inline">Reseñas</span>
-            </TabsTrigger>
-            <TabsTrigger value="hours" className="flex items-center gap-1">
-              <Clock className="h-4 w-4" />
-              <span className="hidden sm:inline">Horarios</span>
-            </TabsTrigger>
-            <TabsTrigger value="metrics" className="flex items-center gap-1">
-              <BarChart3 className="h-4 w-4" />
-              <span className="hidden sm:inline">Métricas</span>
-            </TabsTrigger>
-            <TabsTrigger value="payments" className="flex items-center gap-1">
-              <CreditCard className="h-4 w-4" />
-              <span className="hidden sm:inline">Pagos</span>
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-1">
-              <Settings className="h-4 w-4" />
-              <span className="hidden sm:inline">Ajustes</span>
-            </TabsTrigger>
-            <TabsTrigger value="support" className="flex items-center gap-1">
-              <LifeBuoy className="h-4 w-4" />
-              <span className="hidden sm:inline">Soporte</span>
-            </TabsTrigger>
-            <TabsTrigger value="review" className="flex items-center gap-1">
-              <Heart className="h-4 w-4" />
-              <span className="hidden sm:inline">Calificar</span>
-            </TabsTrigger>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          {/* TabsList solo visible en desktop */}
+          <TabsList className="hidden lg:flex flex-wrap gap-2 h-auto p-1 mb-6">
+            {menuItems.map((item) => (
+              <TabsTrigger 
+                key={item.value} 
+                value={item.value} 
+                className="flex items-center gap-1"
+              >
+                <item.icon className="h-4 w-4" />
+                <span>{item.label}</span>
+              </TabsTrigger>
+            ))}
           </TabsList>
+
+          {/* Indicador de sección actual en móvil */}
+          {currentMenuItem && (
+            <div className="lg:hidden mb-4 flex items-center gap-2 px-1">
+              <currentMenuItem.icon className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-semibold">{currentMenuItem.label}</h2>
+            </div>
+          )}
 
           <TabsContent value="dashboard">
             <VendorDashboardWithRealtime vendor={vendor} />
