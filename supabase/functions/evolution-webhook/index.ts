@@ -743,7 +743,8 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
     console.log(`🔄 Processing ${debounceResult.messageCount} combined message(s) for ${normalizedPhone}`);
     
     // 📤 Enviar indicador nativo "escribiendo..." ANTES de la IA (no deja mensaje visible)
-    if (debounceResult.shouldSendProcessingMessage) {
+    // Función helper para enviar el typing indicator
+    const sendTypingIndicator = async () => {
       try {
         await fetch(`${evolutionApiUrlDebounce}/chat/sendPresence/${instanceNameDebounce}`, {
           method: 'POST',
@@ -757,14 +758,26 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
             number: chatIdForDebounce,
             options: {
               presence: "composing",
-              delay: 8000 // Mantener el indicador "escribiendo..." 8 segundos
+              delay: 10000 // Mantener el indicador "escribiendo..." 10 segundos
             }
           }),
         });
-        console.log('✅ Composing presence sent to user (native typing indicator)');
-      } catch (processingMsgError) {
-        console.error('⚠️ Could not send composing presence:', processingMsgError);
+      } catch (e) {
+        console.error('⚠️ Could not send composing presence:', e);
       }
+    };
+    
+    // Enviar indicador inicial y configurar intervalo para mantenerlo activo
+    let typingInterval: number | undefined;
+    if (debounceResult.shouldSendProcessingMessage) {
+      await sendTypingIndicator();
+      console.log('✅ Composing presence sent to user (typing indicator)');
+      
+      // Renovar el typing indicator cada 8 segundos mientras se procesa
+      typingInterval = setInterval(async () => {
+        await sendTypingIndicator();
+        console.log('🔄 Typing indicator renewed');
+      }, 8000);
     }
 
     // 🎫 Verificar si hay un ticket de soporte abierto RECIENTE (últimas 48 horas)
@@ -957,6 +970,12 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
 
     // Procesar mensaje con el bot de IA (usando texto combinado del buffer)
     let responseMessage = await processWithVendorBot(normalizedPhone, finalMessageText, finalImageUrl || undefined);
+    
+    // 🛑 Detener el typing indicator después del procesamiento
+    if (typingInterval) {
+      clearInterval(typingInterval);
+      console.log('🛑 Typing indicator stopped');
+    }
 
     // --- ENVÍO FINAL ---
     if (responseMessage) {
