@@ -1250,8 +1250,9 @@ async function ejecutarHerramienta(
           }
         }
 
-        // Validar que la dirección y método de pago estén presentes
-        if (!args.direccion || args.direccion.trim() === "") {
+        // ⭐ BUG FIX #2: Solo validar dirección si es DELIVERY (no pickup)
+        // Para pickup, la dirección ya se estableció automáticamente en línea ~1164
+        if (context.delivery_type !== 'pickup' && (!args.direccion || args.direccion.trim() === "")) {
           return "Por favor indicá tu dirección de entrega.";
         }
 
@@ -1854,21 +1855,37 @@ async function ejecutarHerramienta(
         console.log(`📝 Args: ${JSON.stringify(args)}`);
         
         const metodo = args.metodo?.toLowerCase().trim();
+        let normalizedMethod: string | null = null;
         
-        // Mapear variaciones comunes
-        const methodMap: Record<string, string> = {
-          'efectivo': 'efectivo',
-          'cash': 'efectivo',
-          'plata': 'efectivo',
-          'transferencia': 'transferencia',
-          'transfer': 'transferencia',
-          'banco': 'transferencia',
-          'mercadopago': 'mercadopago',
-          'mercado pago': 'mercadopago',
-          'mp': 'mercadopago'
-        };
+        // ⭐ BUG FIX #1: Mapear números "1", "2", "3" a índices del array available_payment_methods
+        if (/^[123]$/.test(metodo) && context.available_payment_methods && context.available_payment_methods.length > 0) {
+          const index = parseInt(metodo) - 1;
+          if (index >= 0 && index < context.available_payment_methods.length) {
+            normalizedMethod = context.available_payment_methods[index];
+            console.log(`✅ Numeric selection: "${metodo}" → index ${index} → "${normalizedMethod}"`);
+          }
+        }
         
-        const normalizedMethod = methodMap[metodo] || metodo;
+        // Si no es número, mapear variaciones comunes de texto
+        if (!normalizedMethod) {
+          const methodMap: Record<string, string> = {
+            'efectivo': 'efectivo',
+            'cash': 'efectivo',
+            'plata': 'efectivo',
+            'uno': 'efectivo', // Texto "uno" como fallback para primer método
+            'transferencia': 'transferencia',
+            'transfer': 'transferencia',
+            'banco': 'transferencia',
+            'dos': 'transferencia', // Texto "dos" como fallback
+            'mercadopago': 'mercadopago',
+            'mercado pago': 'mercadopago',
+            'mp': 'mercadopago',
+            'tres': 'mercadopago' // Texto "tres" como fallback
+          };
+          
+          normalizedMethod = methodMap[metodo] || metodo;
+        }
+        
         console.log(`🔄 Normalized method: "${metodo}" → "${normalizedMethod}"`);
         
         // Validar que esté en available_payment_methods
@@ -1877,8 +1894,8 @@ async function ejecutarHerramienta(
         }
         
         if (!context.available_payment_methods.includes(normalizedMethod)) {
-          const available = context.available_payment_methods.join(', ');
-          return `❌ "${metodo}" no está disponible para este negocio.\n\nMétodos disponibles: ${available}`;
+          const available = context.available_payment_methods.map((m, i) => `${i + 1}. ${m}`).join('\n');
+          return `❌ "${metodo}" no está disponible para este negocio.\n\nMétodos disponibles:\n${available}`;
         }
         
         // ✅ GUARDAR EN CONTEXTO
@@ -3490,6 +3507,27 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       return confirmResponse;
     }
 
+    // ⭐ BUG FIX #3: Detectar si usuario envía dirección pero ya tiene pickup configurado
+    if (context.delivery_type === 'pickup' && 
+        context.order_state === 'checkout' &&
+        !context.payment_method &&
+        message.match(/\d{2,}/) &&  // Contiene números (probable dirección)
+        !message.match(/^[123]$/)) {  // No es selección de método de pago
+      console.log(`⚠️ User sent address-like message but delivery_type is pickup: "${message}"`);
+      
+      const pickupReminder = `📍 Tu pedido es para *retiro en local*, no necesito dirección de entrega.\n\n` +
+                            `Lo vas a retirar en: ${context.selected_vendor_name}\n\n` +
+                            `¿Con qué método querés pagar? Respondé con el número o nombre del método.`;
+      
+      context.conversation_history.push({
+        role: "assistant",
+        content: pickupReminder,
+      });
+      await saveContext(context, supabase);
+      
+      return pickupReminder;
+    }
+
     // 🔍 DETECCIÓN AUTOMÁTICA: Usuario eligiendo método de pago
     // Si el bot ya mostró los métodos de pago, el usuario aún no eligió, y tiene dirección O es pickup
     if (context.payment_methods_fetched && !context.payment_method && 
@@ -3501,13 +3539,24 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       const normalizedMsg = message.toLowerCase().trim();
       let selectedMethod: string | null = null;
       
-      // Detectar método seleccionado explícitamente
-      if (normalizedMsg.includes('efectivo') || normalizedMsg.includes('cash')) {
-        selectedMethod = 'efectivo';
-      } else if (normalizedMsg.includes('transferencia') || normalizedMsg.includes('transfer')) {
-        selectedMethod = 'transferencia';
-      } else if (normalizedMsg.includes('mercado') || normalizedMsg.includes('mp') || normalizedMsg.includes('mercadopago')) {
-        selectedMethod = 'mercadopago';
+      // ⭐ BUG FIX #1 (parte 2): Detectar números "1", "2", "3" PRIMERO
+      if (/^[123]$/.test(normalizedMsg) && context.available_payment_methods && context.available_payment_methods.length > 0) {
+        const index = parseInt(normalizedMsg) - 1;
+        if (index >= 0 && index < context.available_payment_methods.length) {
+          selectedMethod = context.available_payment_methods[index];
+          console.log(`✅ Numeric selection: "${normalizedMsg}" → index ${index} → "${selectedMethod}"`);
+        }
+      }
+      
+      // Detectar método seleccionado explícitamente por texto
+      if (!selectedMethod) {
+        if (normalizedMsg.includes('efectivo') || normalizedMsg.includes('cash')) {
+          selectedMethod = 'efectivo';
+        } else if (normalizedMsg.includes('transferencia') || normalizedMsg.includes('transfer')) {
+          selectedMethod = 'transferencia';
+        } else if (normalizedMsg.includes('mercado') || normalizedMsg.includes('mp') || normalizedMsg.includes('mercadopago')) {
+          selectedMethod = 'mercadopago';
+        }
       }
       
       // 🆕 Si el usuario confirma con "Si/Ok/Dale" y hay UN solo método disponible, auto-seleccionarlo
