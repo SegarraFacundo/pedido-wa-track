@@ -518,10 +518,20 @@ async function ejecutarHerramienta(
         }
         
         for (const [i, p] of products.entries()) {
-          menu += `${i + 1}. *${p.name}* $${Math.round(p.price).toLocaleString("es-PY")}`;
-          if (p.image) menu += ` 📷 lapacho.ar/p/${p.id}`;
-          menu += `\n`;
-          if (p.description) menu += `   _${p.description}_\n`;
+          // 🛡️ STOCK VALIDATION: Check if product is out of stock
+          const isOutOfStock = p.stock_enabled && (p.stock_quantity === null || p.stock_quantity <= 0);
+          const lowStock = p.stock_enabled && p.stock_quantity !== null && p.stock_quantity > 0 && p.stock_quantity <= 3;
+          
+          if (isOutOfStock) {
+            menu += `${i + 1}. ~${p.name}~ ❌ AGOTADO\n`;
+            if (p.description) menu += `   _${p.description}_\n`;
+          } else {
+            menu += `${i + 1}. *${p.name}* $${Math.round(p.price).toLocaleString("es-PY")}`;
+            if (lowStock) menu += ` ⚠️ (${p.stock_quantity} disponibles)`;
+            if (p.image) menu += ` 📷 lapacho.ar/p/${p.id}`;
+            menu += `\n`;
+            if (p.description) menu += `   _${p.description}_\n`;
+          }
         }
 
         console.log(`✅ Menu generated successfully with ${products.length} products`);
@@ -644,10 +654,10 @@ async function ejecutarHerramienta(
           console.log(`🔍 Searching for product: "${item.product_name}" in vendor ${context.selected_vendor_name} (${vendorId})`);
           
           const query = uuidRegex.test(item.product_id)
-            ? supabase.from("products").select("id, name, price").eq("id", item.product_id).maybeSingle()
+            ? supabase.from("products").select("id, name, price, stock_enabled, stock_quantity").eq("id", item.product_id).maybeSingle()
             : supabase
               .from("products")
-              .select("id, name, price")
+              .select("id, name, price, stock_enabled, stock_quantity")
               .ilike("name", `%${item.product_name}%`)
               .eq("vendor_id", vendorId)
               .maybeSingle();
@@ -655,6 +665,35 @@ async function ejecutarHerramienta(
           const { data: product } = await query;
           if (product) {
             console.log(`✅ Product found: ${product.name} - $${product.price}`);
+            
+            // 🛡️ STOCK VALIDATION: Check availability before adding to cart
+            if (product.stock_enabled) {
+              const currentStock = product.stock_quantity || 0;
+              
+              // Check how many units are already in cart for this product
+              const existingInCart = context.cart.find(c => c.product_id === product.id);
+              const alreadyInCart = existingInCart?.quantity || 0;
+              const totalRequested = alreadyInCart + item.quantity;
+              
+              if (currentStock <= 0) {
+                console.warn(`❌ STOCK: ${product.name} is OUT OF STOCK`);
+                return `❌ *${product.name}* está AGOTADO.\n\nElegí otro producto del menú. 😊`;
+              }
+              
+              if (totalRequested > currentStock) {
+                const canAdd = currentStock - alreadyInCart;
+                console.warn(`⚠️ STOCK: ${product.name} - Requested: ${totalRequested}, Available: ${currentStock}`);
+                
+                if (canAdd <= 0) {
+                  return `⚠️ Ya tenés ${alreadyInCart} de *${product.name}* en el carrito (máximo disponible: ${currentStock}).\n\nNo podés agregar más unidades.`;
+                }
+                return `⚠️ Solo hay ${currentStock} unidades de *${product.name}* disponibles.\n\n` +
+                       `Ya tenés ${alreadyInCart} en el carrito. ¿Querés agregar ${canAdd} más?`;
+              }
+              
+              console.log(`✅ STOCK validated: ${product.name} - Requested: ${item.quantity}, Available: ${currentStock}`);
+            }
+            
             resolvedItems.push({
               product_id: product.id,
               product_name: product.name,
@@ -1119,6 +1158,35 @@ async function ejecutarHerramienta(
 
         if (context.cart.length === 0) {
           return "No podés crear un pedido con el carrito vacío. ¿Querés que te muestre productos disponibles?";
+        }
+
+        // 🛡️ VALIDACIÓN FINAL DE STOCK ANTES DE CREAR PEDIDO
+        const stockIssues: string[] = [];
+        for (const cartItem of context.cart) {
+          const { data: stockProduct } = await supabase
+            .from("products")
+            .select("name, stock_enabled, stock_quantity")
+            .eq("id", cartItem.product_id)
+            .single();
+          
+          if (stockProduct && stockProduct.stock_enabled) {
+            const available = stockProduct.stock_quantity || 0;
+            if (cartItem.quantity > available) {
+              if (available <= 0) {
+                stockIssues.push(`❌ *${stockProduct.name}* - AGOTADO`);
+              } else {
+                stockIssues.push(`⚠️ *${stockProduct.name}* - Pediste ${cartItem.quantity}, solo hay ${available}`);
+              }
+            }
+          }
+        }
+
+        if (stockIssues.length > 0) {
+          console.warn(`🚫 STOCK ISSUES detected before order creation:`, stockIssues);
+          return `🚫 *No se puede crear el pedido*\n\n` +
+                 `Algunos productos ya no tienen stock suficiente:\n\n` +
+                 stockIssues.join('\n') +
+                 `\n\nPor favor ajustá tu carrito con "modificar carrito" o eliminá los productos sin stock.`;
         }
 
         if (!context.selected_vendor_id) {
