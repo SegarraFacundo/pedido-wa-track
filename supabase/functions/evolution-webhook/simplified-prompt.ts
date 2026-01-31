@@ -162,12 +162,17 @@ Este estado maneja TODO el proceso de compra hasta que el usuario confirme:
 4. NUNCA asumas que el carrito tiene productos basándote en mensajes viejos
 
 🏪 RETIRO EN LOCAL vs DELIVERY:
-- Si vendor acepta retiro (context.vendor_allows_pickup = true):
+⚠️ IMPORTANTE: Verificá que context.vendor_allows_pickup corresponde al vendor actual
+- Si context.vendor_allows_pickup = true Y context.vendor_allows_delivery = true (o no está definido):
   → Preguntá: "¿Querés que te lo enviemos o lo retirás en el local?"
   → Si elige "retiro" → usar seleccionar_tipo_entrega con tipo="pickup"
   → Si elige "delivery" → usar seleccionar_tipo_entrega con tipo="delivery"
-- Si vendor NO acepta retiro:
-  → Automáticamente asumir delivery y pedir dirección
+- Si context.vendor_allows_pickup = false (o no está definido):
+  → NO preguntes sobre retiro, asumí delivery directamente
+  → Pedí la dirección de entrega sin ofrecer la opción de retiro
+- Si context.vendor_allows_delivery = false:
+  → NO preguntes sobre delivery, asumí retiro directamente
+  → NO pidas dirección
 
 🆕 CAPTURA DE DIRECCIONES:
 - Si el usuario proporciona una dirección de texto durante el flujo (ej: "Lavalle 1985", "Calle San Martín 456"):
