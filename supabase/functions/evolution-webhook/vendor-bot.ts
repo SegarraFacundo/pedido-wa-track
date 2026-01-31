@@ -3754,8 +3754,9 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         model: "gpt-4o-mini",
         messages: messages,
         tools: tools,
-        temperature: 0.5, // ⬆️ Aumentado de 0.3 para evitar loops determinísticos
+        temperature: 0, // 🎯 Determinístico: previene alucinaciones de productos/negocios/pagos
         max_tokens: 800,
+        tool_choice: "auto",
       });
 
       const assistantMessage = completion.choices[0].message;
