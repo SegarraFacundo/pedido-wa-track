@@ -1,76 +1,102 @@
 
-# Plan: Reducir Temperature a 0 para Evitar Alucinaciones de la IA
+# Plan: Forzar Consulta de Menú Actualizado cuando el Usuario lo Pide
 
-## Resumen
+## Resumen del Problema
 
-Configurar `temperature: 0` hará que las respuestas de la IA sean 100% deterministas, lo cual es ideal para un bot transaccional de pedidos. Esto evitará que invente productos, negocios o métodos de pago que no existen.
+El bot está mostrando menús desactualizados porque cuando el usuario pide "ver el menú de nuevo", la IA usa el menú del historial de conversación en lugar de llamar a `ver_menu_negocio` para obtener los productos actualizados de la base de datos.
+
+**Evidencia del log:**
+```
+✅ No tool calls - AI responding with text
+```
+Cuando el usuario pidió "Quiero ver el menu de nuevo", la IA respondió con texto del historial SIN llamar a la herramienta.
+
+---
+
+## Causa Raíz
+
+En `simplified-prompt.ts` líneas 374-377:
+```
+- Si el usuario tiene un negocio seleccionado y pide agregar productos, NO vuelvas a pedir el menú
+- Solo llamá ver_menu_negocio si el usuario explícitamente pide ver OTRO negocio diferente
+```
+
+Esta instrucción fue diseñada para evitar repetir el menú innecesariamente, pero tiene un efecto secundario: bloquea la actualización del menú cuando el usuario lo pide explícitamente.
+
+---
+
+## Solución Propuesta
+
+Modificar el prompt para diferenciar entre:
+1. **Pedir agregar productos** = No mostrar menú de nuevo (comportamiento actual)
+2. **Pedir VER el menú de nuevo** = SIEMPRE llamar a `ver_menu_negocio` para obtener datos frescos
 
 ---
 
 ## Cambio Principal
 
-### Archivo: `supabase/functions/evolution-webhook/vendor-bot.ts`
+### Archivo: `supabase/functions/evolution-webhook/simplified-prompt.ts`
 
-**Linea 3753-3759**
+**Reemplazar sección de "Continuidad de Pedidos" (líneas 373-378):**
 
-```typescript
-// ANTES:
-const completion = await openai.chat.completions.create({
-  model: "gpt-4o-mini",
-  messages: messages,
-  tools: tools,
-  temperature: 0.5, // ⬆️ Aumentado de 0.3 para evitar loops determinísticos
-  max_tokens: 800,
-});
+Antes:
+```
+💡 IMPORTANTE - Continuidad de Pedidos:
+- Si el usuario tiene un negocio seleccionado y pide agregar productos, NO vuelvas a pedir el menú
+- USA el vendor_id que ya está en el contexto
+- Solo llamá ver_menu_negocio si el usuario explícitamente pide ver OTRO negocio diferente
+- Si hay carrito con productos, el usuario puede seguir agregando del mismo negocio sin volver a elegir
+5. Si el usuario no entendió, reformulá la respuesta, NO vuelvas a ejecutar la herramienta
+```
 
-// DESPUÉS:
-const completion = await openai.chat.completions.create({
-  model: "gpt-4o-mini",
-  messages: messages,
-  tools: tools,
-  temperature: 0, // 🎯 Determinístico: previene alucinaciones de productos/negocios/pagos
-  max_tokens: 800,
-  tool_choice: "auto",
-});
+Después:
+```
+💡 IMPORTANTE - Continuidad de Pedidos:
+- Si el usuario tiene un negocio seleccionado y pide agregar productos, NO vuelvas a pedir el menú
+- USA el vendor_id que ya está en el contexto
+- Si hay carrito con productos, el usuario puede seguir agregando del mismo negocio sin volver a elegir
+
+🔄 EXCEPCIÓN CRÍTICA - Actualización de Menú:
+- Si el usuario pide EXPLÍCITAMENTE ver el menú de nuevo ("ver menú", "mostrar menú", "menú de nuevo", "actualizar menú", "ver productos"):
+  → SIEMPRE llamá ver_menu_negocio con el vendor_id actual
+  → NUNCA uses el menú del historial de conversación
+  → El menú puede haber cambiado (productos nuevos, precios, stock)
+  → El usuario espera ver datos FRESCOS de la base de datos
+
+5. Si el usuario no entendió, reformulá la respuesta, NO vuelvas a ejecutar la herramienta
 ```
 
 ---
 
-## Por Qué `temperature: 0` Funciona
+## Por Qué Esto Funciona
 
-| Aspecto | Temperature 0.5 | Temperature 0 |
-|---------|----------------|---------------|
-| Creatividad | Media-alta | Nula |
-| Consistencia | Variable | 100% consistente |
-| Alucinaciones | Posibles | Minimizadas |
-| Uso recomendado | Chat creativo | Transacciones/datos |
-
----
-
-## Qué Problema Resuelve
-
-Con `temperature: 0`, la IA:
-
-1. **NO inventará productos** - Solo mencionará los que aparecen en el menú real
-2. **NO inventará negocios** - Solo los que devuelve `ver_locales_abiertos`
-3. **NO inventará métodos de pago** - Solo los de `available_payment_methods`
-4. **NO inventará stock** - Respetará las validaciones que ya agregamos
-5. **Será más predecible** - Las mismas preguntas darán respuestas similares
-
----
-
-## Nota sobre Loops
-
-El comentario anterior decía "Aumentado de 0.3 para evitar loops determinísticos". Sin embargo:
-
-- Los loops determinísticos se previenen mejor con el rate limiting de herramientas que ya tenés implementado (lineas 3731-3800)
-- `temperature: 0` con las reglas de rate limiting actuales no debería causar loops
+| Situación | Comportamiento Anterior | Comportamiento Nuevo |
+|-----------|------------------------|---------------------|
+| Usuario: "agregame 2 pizzas" | No muestra menú (OK) | No muestra menú (OK) |
+| Usuario: "ver menú" (mismo negocio) | Usa menú del historial (MAL) | Llama ver_menu_negocio (CORRECTO) |
+| Usuario: "ver menú de Pizza House" (otro negocio) | Llama ver_menu_negocio (OK) | Llama ver_menu_negocio (OK) |
 
 ---
 
 ## Impacto
 
-- **Archivos modificados**: 1
-- **Lineas cambiadas**: 1
-- **Riesgo**: Bajo (mejora la precisión sin afectar funcionalidad)
-- **Requiere deploy**: Si (edge function)
+- **Archivos modificados**: 1 (`simplified-prompt.ts`)
+- **Líneas cambiadas**: ~10
+- **Riesgo**: Bajo (solo agrega una excepción clara)
+- **Requiere deploy**: Sí (edge function)
+- **Resultado esperado**: Cuando el usuario pida "ver el menú", siempre verá los productos actualizados de la BD
+
+---
+
+## Sección Técnica
+
+### Orden de Implementación
+1. Modificar `simplified-prompt.ts` con la nueva instrucción
+2. Deploy de la edge function `evolution-webhook`
+3. Probar agregando un producto y pidiendo el menú de nuevo
+
+### Verificación Post-Implementación
+- Agregar un producto nuevo desde el dashboard del vendor
+- Pedir "ver el menú" por WhatsApp
+- Verificar que el producto nuevo aparece
+- Verificar en logs que `ver_menu_negocio` fue llamado (no "No tool calls")
