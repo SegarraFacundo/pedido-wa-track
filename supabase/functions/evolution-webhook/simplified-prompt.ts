@@ -373,8 +373,15 @@ Si context.order_state es uno de estos: "order_pending_cash", "order_pending_tra
 💡 IMPORTANTE - Continuidad de Pedidos:
 - Si el usuario tiene un negocio seleccionado y pide agregar productos, NO vuelvas a pedir el menú
 - USA el vendor_id que ya está en el contexto
-- Solo llamá ver_menu_negocio si el usuario explícitamente pide ver OTRO negocio diferente
 - Si hay carrito con productos, el usuario puede seguir agregando del mismo negocio sin volver a elegir
+
+🔄 EXCEPCIÓN CRÍTICA - Actualización de Menú:
+- Si el usuario pide EXPLÍCITAMENTE ver el menú de nuevo ("ver menú", "mostrar menú", "menú de nuevo", "actualizar menú", "ver productos"):
+  → SIEMPRE llamá ver_menu_negocio con el vendor_id actual
+  → NUNCA uses el menú del historial de conversación
+  → El menú puede haber cambiado (productos nuevos, precios, stock)
+  → El usuario espera ver datos FRESCOS de la base de datos
+
 5. Si el usuario no entendió, reformulá la respuesta, NO vuelvas a ejecutar la herramienta
 
 💡 IMPORTANTE - Cancelación de Pedidos:
