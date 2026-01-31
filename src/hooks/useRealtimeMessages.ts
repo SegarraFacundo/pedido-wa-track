@@ -56,7 +56,7 @@ export function useRealtimeMessages(orderId: string, customerPhone?: string) {
     await supabase.functions.invoke('send-whatsapp-notification', {
       body: {
         phoneNumber: customerPhone,
-        message: '✅ El asistente virtual está activo nuevamente. Escribe "menu" para ver opciones.'
+        message: '✅ El asistente virtual está activo nuevamente.'
       }
     });
     
@@ -174,6 +174,7 @@ export function useRealtimeMessages(orderId: string, customerPhone?: string) {
 
         if (orderData && orderData.customer_phone) {
           const vendorName = orderData.vendor?.name || 'el vendedor';
+          const wasBotPaused = isBotPaused;
           
           // Pause the bot when vendor sends a message
           await supabase
@@ -187,7 +188,18 @@ export function useRealtimeMessages(orderId: string, customerPhone?: string) {
           setIsBotPaused(true);
           console.log('Bot paused for customer:', orderData.customer_phone);
           
-          // Send WhatsApp notification
+          // Si el bot NO estaba pausado, primero notificar que el vendedor va a responder
+          if (!wasBotPaused) {
+            console.log('Sending bot paused notification to:', orderData.customer_phone);
+            await supabase.functions.invoke('send-whatsapp-notification', {
+              body: {
+                phoneNumber: orderData.customer_phone,
+                message: `⚠️ *${vendorName}* va a responderte personalmente.\n\n🤖 El bot está pausado hasta que el vendedor lo reactive.`
+              }
+            });
+          }
+          
+          // Send WhatsApp notification with vendor message
           console.log('Sending WhatsApp notification to:', orderData.customer_phone);
           
           const { data: whatsappResponse, error: whatsappError } = await supabase.functions.invoke('send-whatsapp-notification', {

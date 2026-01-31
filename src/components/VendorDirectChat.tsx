@@ -301,7 +301,7 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
           const { error: notifyError } = await supabase.functions.invoke('send-whatsapp-notification', {
             body: {
               phoneNumber: phone,
-              message: `✅ El vendedor cerró el chat directo.\n\n🤖 El bot está activo nuevamente.\n\nEscribe "menu" para ver las opciones.`
+              message: `✅ El bot está activo nuevamente.`
             }
           });
 
