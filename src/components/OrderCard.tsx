@@ -27,7 +27,25 @@ const statusConfig: Record<OrderStatus, { label: string; className: string }> = 
   cancelled: { label: "Cancelado", className: "bg-status-cancelled text-white" },
 };
 
-const getNextStatus = (currentStatus: OrderStatus): OrderStatus | null => {
+const getNextStatus = (
+  currentStatus: OrderStatus,
+  deliveryType?: 'delivery' | 'pickup'
+): OrderStatus | null => {
+  // Para retiro en local: saltar "delivering"
+  if (deliveryType === 'pickup') {
+    const pickupFlow: Record<OrderStatus, OrderStatus | null> = {
+      pending: 'confirmed',
+      confirmed: 'preparing',
+      preparing: 'ready',
+      ready: 'delivered',  // ⭐ Salta directamente a entregado
+      delivering: 'delivered',
+      delivered: null,
+      cancelled: null,
+    };
+    return pickupFlow[currentStatus];
+  }
+  
+  // Flujo normal para delivery
   const flow: Record<OrderStatus, OrderStatus | null> = {
     pending: 'confirmed',
     confirmed: 'preparing',
@@ -43,7 +61,7 @@ const getNextStatus = (currentStatus: OrderStatus): OrderStatus | null => {
 export function OrderCard({ order, onStatusChange, onOpenChat, isVendorView = false }: OrderCardProps) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [isUpdatingPayment, setIsUpdatingPayment] = useState(false);
-  const nextStatus = getNextStatus(order.status);
+  const nextStatus = getNextStatus(order.status, order.delivery_type);
   
   // Debug logging
   console.log('OrderCard - order.items:', order.items);
