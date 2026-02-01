@@ -867,15 +867,49 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
     // 💬 Verificar si el usuario está en modo chat directo con vendedor
     const { data: vendorSession } = await supabase
       .from('user_sessions')
-      .select('in_vendor_chat, assigned_vendor_phone')
+      .select('in_vendor_chat, assigned_vendor_phone, updated_at')
       .eq('phone', normalizedPhone)
       .maybeSingle();
 
+    // ⏰ Verificar timeout de inactividad (30 minutos)
+    const THIRTY_MINUTES = 30 * 60 * 1000;
+    let vendorChatExpired = false;
+    
+    if (vendorSession?.in_vendor_chat && vendorSession.updated_at) {
+      const lastActivity = new Date(vendorSession.updated_at).getTime();
+      const now = Date.now();
+      
+      if (now - lastActivity > THIRTY_MINUTES) {
+        console.log('⏰ Vendor chat expired due to inactivity');
+        vendorChatExpired = true;
+        
+        // Auto-reactivar el bot
+        await supabase.from('user_sessions').update({
+          in_vendor_chat: false,
+          assigned_vendor_phone: null,
+          updated_at: new Date().toISOString()
+        }).eq('phone', normalizedPhone);
+        
+        // Notificar al cliente
+        const chatId = remoteJid.includes('@lid') ? remoteJid : `${normalizedPhone}@s.whatsapp.net`;
+        await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey! },
+          body: JSON.stringify({
+            number: chatId,
+            text: '⏰ El chat con el vendedor expiró por inactividad.\n\n✅ El bot está activo. ¿En qué te puedo ayudar?'
+          }),
+        });
+        
+        // Continuar con procesamiento normal del bot
+      }
+    }
+
     // 🤖 Comandos del cliente para reactivar el bot
-    const clientBotCommands = ['menu', 'bot', 'ayuda', 'salir', 'inicio', 'volver'];
+    const clientBotCommands = ['menu', 'bot', 'ayuda', 'salir', 'inicio', 'volver', 'estado', 'mi pedido', 'cancelar', 'nuevo pedido'];
     const isReactivateCommand = clientBotCommands.includes(finalMessageText.toLowerCase().trim());
     
-    if (vendorSession?.in_vendor_chat && isReactivateCommand) {
+    if (vendorSession?.in_vendor_chat && !vendorChatExpired && isReactivateCommand) {
       console.log('🔄 Client requested to reactivate bot with command:', finalMessageText);
       
       // Desactivar chat directo
@@ -885,9 +919,43 @@ _Tip: Podés guardar varias direcciones con nombres como "Casa", "Trabajo", "Ofi
         updated_at: new Date().toISOString()
       }).eq('phone', normalizedPhone);
       
-      // Continuar con el procesamiento normal del bot (no return aquí)
+      // Verificar si tiene pedido activo para mostrar menú contextual
+      const { data: activeOrder } = await supabase
+        .from('orders')
+        .select('id, status, vendor_id, vendors(name)')
+        .eq('customer_phone', normalizedPhone)
+        .in('status', ['pending', 'confirmed', 'preparing', 'ready', 'on_the_way'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (activeOrder) {
+        console.log('📦 Customer has active order, showing contextual menu');
+        const vendorName = (activeOrder as any).vendors?.name || 'el vendedor';
+        const orderId = activeOrder.id.substring(0, 8);
+        
+        // Enviar mensaje con opciones para pedido activo
+        const chatId = remoteJid.includes('@lid') ? remoteJid : `${normalizedPhone}@s.whatsapp.net`;
+        await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey! },
+          body: JSON.stringify({
+            number: chatId,
+            text: `✅ El bot está activo nuevamente.\n\n📦 Tenés un pedido activo (#${orderId}).\n\n¿Qué querés hacer?\n• Escribí *"estado"* para ver el estado del pedido\n• Escribí *"cancelar"* si querés cancelar el pedido\n• Escribí *"hablar vendedor"* para volver a hablar con ${vendorName}`
+          }),
+        });
+        
+        // Liberar lock y salir
+        await releaseLock(supabase, normalizedPhone);
+        return new Response(JSON.stringify({ status: 'bot_reactivated_with_active_order' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200
+        });
+      }
+      
+      // Sin pedido activo, continuar con el procesamiento normal del bot
       console.log('✅ Bot reactivated for customer:', normalizedPhone);
-    } else if (vendorSession?.in_vendor_chat) {
+    } else if (vendorSession?.in_vendor_chat && !vendorChatExpired) {
       console.log('💬 User is in vendor chat mode');
 
       // Buscar pedido activo del cliente para guardar mensaje en messages (tabla de pedidos)

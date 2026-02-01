@@ -194,7 +194,7 @@ export function useRealtimeMessages(orderId: string, customerPhone?: string) {
             await supabase.functions.invoke('send-whatsapp-notification', {
               body: {
                 phoneNumber: orderData.customer_phone,
-                message: `⚠️ *${vendorName}* va a responderte personalmente.\n\n🤖 El bot está pausado hasta que el vendedor lo reactive.`
+                message: `⚠️ *${vendorName}* va a responderte personalmente.\n\n🤖 El bot está pausado.\n\n_Escribí *"menu"* para volver al bot._`
               }
             });
           }
