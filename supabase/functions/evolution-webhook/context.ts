@@ -4,11 +4,9 @@ import type { ConversationContext } from "./types.ts";
 
 // ✅ Verifica si el pedido pendiente sigue activo en la DB
 // Si el pedido ya fue entregado/cancelado, limpia el contexto
+// IMPORTANTE: Se ejecuta SIEMPRE que haya un pending_order_id, sin importar order_state
 async function syncOrderStateWithDB(context: ConversationContext, supabase: any): Promise<void> {
   if (!context.pending_order_id) return;
-  
-  const pendingStates = ['order_pending_cash', 'order_pending_transfer', 'order_pending_mp', 'order_confirmed'];
-  if (!pendingStates.includes(context.order_state || '')) return;
   
   console.log(`🔄 Syncing order state with DB for order: ${context.pending_order_id}`);
   
