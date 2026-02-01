@@ -57,6 +57,7 @@ export function useRealtimeOrders(vendorId?: string) {
           payment_status: order.payment_status,
           payment_method: order.payment_method,
           paid_at: order.paid_at ? new Date(order.paid_at) : undefined,
+          delivery_type: (order.delivery_type as 'delivery' | 'pickup') || 'delivery',
           // Masked fields for vendor view
           customerNameMasked: order.customer_name?.substring(0, 3) + '***',
           customerPhoneMasked: '****' + order.customer_phone?.slice(-4),
@@ -131,6 +132,7 @@ export function useRealtimeOrders(vendorId?: string) {
                   payment_status: data.payment_status,
                   payment_method: data.payment_method as 'efectivo' | 'transferencia' | 'mercadopago' | undefined,
                   paid_at: data.paid_at ? new Date(data.paid_at) : undefined,
+                  delivery_type: (data.delivery_type as 'delivery' | 'pickup') || 'delivery',
                   customerNameMasked: data.customer_name?.substring(0, 3) + '***',
                   customerPhoneMasked: '****' + data.customer_phone?.slice(-4),
                   addressSimplified: data.address?.split(',')[0]
@@ -285,12 +287,17 @@ export function useRealtimeOrders(vendorId?: string) {
         cancelled: 'ha sido cancelado'
       };
 
+      const isPickup = currentOrder.delivery_type === 'pickup';
       const statusDescriptions = {
         confirmed: 'El vendedor está preparando tu pedido.',
         preparing: 'Tu pedido está siendo preparado.',
-        ready: 'Tu pedido está listo para entrega.',
+        ready: isPickup 
+          ? 'Tu pedido está listo para retirar en el local.' 
+          : 'Tu pedido está listo para entrega.',
         delivering: 'Tu pedido está en camino.',
-        delivered: '¡Gracias por tu compra!',
+        delivered: isPickup
+          ? '¡Gracias por retirarlo!'
+          : '¡Gracias por tu compra!',
         cancelled: 'Si tienes alguna duda, contacta al vendedor.'
       };
 
