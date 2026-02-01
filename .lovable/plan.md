@@ -1,128 +1,152 @@
 
 
-# Plan: Corregir Chat en Tiempo Real y Mensajes de Bot
+# Plan: Mejorar Flujo de Escape del Chat con Vendedor
 
-## Problemas Identificados
+## Resumen del Problema
 
-### Problema 1: Mensajes del cliente no aparecen en tiempo real
-El cliente escribió "hola" pero no se ve en el panel del vendedor.
+Cuando el cliente tiene un **pedido activo** y está en chat directo con el vendedor:
+- Si el vendedor no reactiva el bot, el cliente queda "atrapado"
+- Si el cliente escribe "menu", el bot se reactiva pero no le dice qué puede hacer
+- El cliente piensa que está "bloqueado" porque no puede ver locales ni menús
 
-**Causa**: El webhook inserta mensajes del cliente en la tabla `messages`, y hay suscripción realtime configurada, pero podría haber un problema con el filtro o el orden de llegada.
-
-### Problema 2: Falta notificación de "bot desactivado"
-Cuando el vendedor envía un mensaje, el cliente solo recibe el mensaje pero no sabe que el bot fue pausado.
-
-**Solución**: Agregar un mensaje inicial cuando el vendedor envía por primera vez: "⚠️ El vendedor va a responderte personalmente. El bot está pausado."
-
-### Problema 3: Mensaje de reactivación con texto innecesario
-Actualmente: `'✅ El asistente virtual está activo nuevamente. Escribe "menu" para ver opciones.'`
-
-El usuario no quiere la parte de "Escribe 'menu'..."
+**Solución**: Cuando el cliente sale del chat con vendedor Y tiene pedido activo, mostrar un menú contextual con las opciones disponibles.
 
 ---
 
-## Cambios Necesarios
+## Cambios Propuestos
 
-### 1. Mejorar flujo de mensajes cuando el bot se pausa
+### 1. Mensaje de Escape Mejorado (cuando el bot se reactiva)
 
-**Archivo:** `src/hooks/useRealtimeMessages.ts`
-**Líneas 175-197**
+**Archivo:** `supabase/functions/evolution-webhook/index.ts`
+**Líneas:** ~878-889
 
-Cuando el vendedor envía el primer mensaje (y el bot no está pausado aún):
-1. Enviar primero: "⚠️ *{vendorName}* va a responderte personalmente. El bot está pausado."
-2. Luego enviar el mensaje del vendedor
+Cuando el cliente escribe "menu" o "bot" para reactivar el bot, verificar si tiene pedido activo y mostrar opciones relevantes:
 
 ```typescript
-// Antes del mensaje del vendedor, si el bot NO estaba pausado, notificar
-if (!isBotPaused) {
-  await supabase.functions.invoke('send-whatsapp-notification', {
-    body: {
-      phoneNumber: orderData.customer_phone,
-      message: `⚠️ *${vendorName}* va a responderte personalmente.\n\n🤖 El bot está pausado hasta que el vendedor lo reactive.`
-    }
-  });
+if (vendorSession?.in_vendor_chat && isReactivateCommand) {
+  // Desactivar chat directo
+  await supabase.from('user_sessions').update({ ... });
+  
+  // NUEVO: Verificar si tiene pedido activo
+  const { data: activeOrder } = await supabase
+    .from('orders')
+    .select('id, status, vendor_id, vendors(name)')
+    .eq('customer_phone', normalizedPhone)
+    .in('status', ['pending', 'confirmed', 'preparing', 'ready', 'on_the_way'])
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  
+  if (activeOrder) {
+    // Enviar mensaje con opciones para pedido activo
+    await sendWhatsAppMessage(chatId, 
+      `✅ El bot está activo nuevamente.\n\n` +
+      `📦 Tenés un pedido activo (#${activeOrder.id.substring(0,8)}).\n\n` +
+      `¿Qué querés hacer?\n` +
+      `• Escribí *"estado"* para ver el estado del pedido\n` +
+      `• Escribí *"cancelar"* si querés cancelar el pedido\n` +
+      `• Escribí *"hablar vendedor"* para volver a hablar con ${activeOrder.vendors?.name}`
+    );
+    
+    // NO continuar con procesamiento del bot, ya enviamos respuesta
+    return Response...
+  }
 }
-
-// Luego el mensaje normal del vendedor
-await supabase.functions.invoke('send-whatsapp-notification', {
-  body: {
-    orderId,
-    phoneNumber: orderData.customer_phone,
-    message: `📩 *${vendorName}*: ${content}`
-  }
-});
 ```
 
-### 2. Simplificar mensaje de reactivación del bot
+### 2. Timeout Automático (30 minutos)
+
+**Archivo:** `supabase/functions/evolution-webhook/index.ts`
+**Líneas:** ~867-873
+
+Antes de procesar el modo chat con vendedor, verificar timeout:
+
+```typescript
+const { data: vendorSession } = await supabase
+  .from('user_sessions')
+  .select('in_vendor_chat, assigned_vendor_phone, updated_at')
+  .eq('phone', normalizedPhone)
+  .maybeSingle();
+
+// NUEVO: Verificar timeout de 30 minutos
+if (vendorSession?.in_vendor_chat && vendorSession.updated_at) {
+  const lastActivity = new Date(vendorSession.updated_at).getTime();
+  const now = Date.now();
+  const THIRTY_MINUTES = 30 * 60 * 1000;
+  
+  if (now - lastActivity > THIRTY_MINUTES) {
+    // Auto-reactivar el bot
+    await supabase.from('user_sessions').update({
+      in_vendor_chat: false,
+      assigned_vendor_phone: null
+    }).eq('phone', normalizedPhone);
+    
+    await sendWhatsAppMessage(chatId,
+      `⏰ El chat con el vendedor expiró por inactividad.\n\n` +
+      `✅ El bot está activo. ¿En qué te puedo ayudar?`
+    );
+    
+    // Continuar procesamiento normal
+  }
+}
+```
+
+### 3. Mensaje de Pausa con Instrucciones
 
 **Archivo:** `src/hooks/useRealtimeMessages.ts`
-**Línea 59**
+**Línea:** ~160
 
-Cambiar:
-```typescript
-message: '✅ El asistente virtual está activo nuevamente. Escribe "menu" para ver opciones.'
-```
-
-Por:
-```typescript
-message: '✅ El asistente virtual está activo nuevamente.'
-```
-
-**Archivo:** `src/components/VendorDirectChat.tsx`
-**Línea 304**
-
-Cambiar:
-```typescript
-message: `✅ El vendedor cerró el chat directo.\n\n🤖 El bot está activo nuevamente.\n\nEscribe "menu" para ver las opciones.`
-```
-
-Por:
-```typescript
-message: `✅ El bot está activo nuevamente.`
-```
-
-### 3. Verificar realtime de mensajes del cliente
-
-**Archivo:** `src/hooks/useRealtimeMessages.ts`
-**Líneas 99-133**
-
-El código actual tiene la suscripción correcta, pero necesito verificar que esté funcionando:
+Cuando el vendedor pausa el bot, informar cómo escapar:
 
 ```typescript
-.on(
-  'postgres_changes',
-  {
-    event: 'INSERT',
-    schema: 'public',
-    table: 'messages',
-    filter: `order_id=eq.${orderId}`
-  },
-  (payload) => {
-    // Este callback debería dispararse cuando llega un mensaje
-  }
-)
+message: `⚠️ *${vendorName}* va a responderte personalmente.\n\n🤖 El bot está pausado.\n\n_Escribí *"menu"* para volver al bot._`
 ```
 
-**Posible problema**: El filtro RLS podría estar bloqueando la lectura en tiempo real. Verificar políticas RLS de la tabla `messages`.
+### 4. Agregar Comandos de Escape
+
+**Archivo:** `supabase/functions/evolution-webhook/index.ts`
+**Línea:** ~875
+
+Ampliar la lista de comandos que reactivan el bot:
+
+```typescript
+const clientBotCommands = [
+  'menu', 'bot', 'ayuda', 'salir', 'inicio', 'volver',
+  'estado', 'mi pedido', 'cancelar', 'nuevo pedido'
+];
+```
 
 ---
 
-## Flujo Corregido
+## Flujo Actualizado
 
 ```text
-1. Cliente tiene pedido activo
-2. Vendedor abre el chat y escribe un mensaje
-
-   → [NUEVO] Cliente recibe: "⚠️ El vendedor va a responderte. Bot pausado."
-   → Cliente recibe: "📩 Vendedor: [mensaje]"
-   
-3. Cliente responde "hola"
-   → Webhook guarda en tabla messages
-   → Realtime notifica al panel del vendedor
-   → [A VERIFICAR] Mensaje aparece en el chat
-
-4. Vendedor reactiva el bot
-   → [SIMPLIFICADO] Cliente recibe: "✅ El asistente virtual está activo."
+┌─────────────────────────────────────────────────────────────┐
+│         CLIENTE CON PEDIDO ACTIVO EN CHAT VENDEDOR          │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Vendedor envía mensaje →                                   │
+│  "⚠️ Vendedor va a responderte. Bot pausado.               │
+│   Escribí 'menu' para volver al bot."                       │
+│                                                             │
+│  ┌──────────────────┐         ┌────────────────────┐       │
+│  │ OPCIÓN 1         │         │ OPCIÓN 2           │       │
+│  │ Cliente escribe  │         │ 30 min sin         │       │
+│  │ "menu"/"estado"  │         │ actividad          │       │
+│  └────────┬─────────┘         └──────────┬─────────┘       │
+│           │                              │                  │
+│           └──────────┬───────────────────┘                  │
+│                      ▼                                      │
+│  ┌──────────────────────────────────────────────────┐      │
+│  │ ✅ Bot activo. Tenés pedido #abc123.             │      │
+│  │                                                  │      │
+│  │ ¿Qué querés hacer?                               │      │
+│  │ • "estado" → ver estado                          │      │
+│  │ • "cancelar" → cancelar pedido                   │      │
+│  │ • "hablar vendedor" → volver al chat             │      │
+│  └──────────────────────────────────────────────────┘      │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -131,23 +155,19 @@ El código actual tiene la suscripción correcta, pero necesito verificar que es
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/hooks/useRealtimeMessages.ts` | Agregar notificación de bot pausado + simplificar reactivación |
-| `src/components/VendorDirectChat.tsx` | Simplificar mensaje de reactivación |
+| `supabase/functions/evolution-webhook/index.ts` | Mensaje contextual al reactivar + timeout automático + más comandos |
+| `src/hooks/useRealtimeMessages.ts` | Instrucción de escape en mensaje de pausa |
 
 ---
 
-## Sección Técnica
+## Resumen
 
-### Verificación de Realtime
-Para depurar si los mensajes llegan, agregaré logs adicionales en el callback de realtime para confirmar que la suscripción está activa.
+| Mejora | Descripción |
+|--------|-------------|
+| Mensaje de escape | El cliente sabe cómo volver al bot |
+| Menú contextual | Al volver, ve sus opciones (estado/cancelar/hablar) |
+| Timeout automático | Si nadie habla en 30 min, bot se reactiva solo |
+| Más comandos | "estado", "cancelar", "mi pedido" también reactivan el bot |
 
-### Secuencia de Mensajes WhatsApp
-Cuando el vendedor envía su primer mensaje:
-1. **Primer mensaje**: Notificación de bot pausado (solo si `!isBotPaused`)
-2. **Segundo mensaje**: El contenido del mensaje del vendedor
-
-Esto asegura que el cliente sepa que está hablando con una persona real.
-
-### Edge Case: Mensajes Consecutivos
-Si el vendedor envía múltiples mensajes, solo el primero debería notificar "bot pausado". Los siguientes solo envían el contenido porque `isBotPaused` ya será `true`.
+Esto asegura que el cliente **nunca quede atrapado** y siempre sepa qué puede hacer.
 
