@@ -88,6 +88,11 @@ export interface ConversationContext {
     vendor_id: string;                     // UUID interno (nunca mostrado al usuario)
   }>;
   resumen_mostrado?: boolean;              // Nuevo: indica si ya se mostró el resumen final del pedido
+  pending_cancellation?: {
+    step: "awaiting_reason" | "awaiting_confirmation";
+    reason?: string;
+    order_id?: string;
+  };
   last_menu_fetch?: string;                // ISO timestamp del último menú obtenido
   last_vendors_fetch?: string;             // ISO timestamp de la última lista de locales
   conversation_history: Array<{ role: "user" | "assistant" | "system"; content: string }>;

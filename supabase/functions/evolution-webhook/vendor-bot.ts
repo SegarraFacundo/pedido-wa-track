@@ -1639,8 +1639,14 @@ async function ejecutarHerramienta(
       }
 
       case "cancelar_pedido": {
-        if (!args.motivo || args.motivo.trim().length < 10) {
-          return "Por favor proporciona un motivo detallado para la cancelación (mínimo 10 caracteres).";
+        if (!args.motivo || args.motivo.trim().length < 5) {
+          // En vez de pedir motivo al LLM, activar flujo programático
+          context.pending_cancellation = {
+            step: "awaiting_reason",
+            order_id: args.order_id || context.pending_order_id || context.last_order_id,
+          };
+          await saveContext(context, supabase);
+          return "¿Por qué querés cancelar el pedido? Escribí el motivo:";
         }
 
         let orderId = args.order_id;
@@ -2974,7 +2980,67 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       return clarificationResponse;
     }
 
-    // 🔄 MANEJO PROGRAMATICO: Confirmacion de pedido post-resumen
+    // 🔄 MANEJO PROGRAMATICO: Flujo de cancelación con captura de motivo
+    if (context.pending_cancellation) {
+      const userResponse = message.trim();
+      const userResponseLower = userResponse.toLowerCase();
+      
+      if (context.pending_cancellation.step === "awaiting_reason") {
+        // Capturar lo que sea que el usuario escriba como motivo
+        console.log(`📝 CANCELLATION: Captured reason: "${userResponse}"`);
+        
+        const orderId = context.pending_cancellation.order_id || context.pending_order_id || context.last_order_id;
+        const orderShort = orderId ? orderId.substring(0, 8) : '???';
+        
+        context.pending_cancellation = {
+          step: "awaiting_confirmation",
+          reason: userResponse,
+          order_id: orderId,
+        };
+        await saveContext(context, supabase);
+        
+        const response = `Vas a cancelar el pedido #${orderShort}.\n📝 Motivo: "${userResponse}"\n\n¿Confirmás la cancelación? (sí/no)`;
+        context.conversation_history.push({ role: "assistant", content: response });
+        await saveContext(context, supabase);
+        return response;
+      }
+      
+      if (context.pending_cancellation.step === "awaiting_confirmation") {
+        const isConfirm = /^(s[ií]|si|yes|dale|ok|confirmo|confirmar|vamos)$/i.test(userResponseLower);
+        const isDeny = /^(no|nop|nel|cancelar cancelacion|mejor no|dejá|deja)$/i.test(userResponseLower);
+        
+        if (isConfirm) {
+          console.log(`✅ CANCELLATION: User confirmed, executing cancelar_pedido`);
+          const result = await ejecutarHerramienta("cancelar_pedido", {
+            motivo: context.pending_cancellation.reason,
+            order_id: context.pending_cancellation.order_id,
+          }, context, supabase);
+          
+          context.pending_cancellation = undefined;
+          await saveContext(context, supabase);
+          return result;
+        }
+        
+        if (isDeny) {
+          console.log(`❌ CANCELLATION: User cancelled the cancellation`);
+          context.pending_cancellation = undefined;
+          await saveContext(context, supabase);
+          
+          const response = "Ok, no se cancela el pedido. ¿Necesitás algo más? 😊";
+          context.conversation_history.push({ role: "assistant", content: response });
+          await saveContext(context, supabase);
+          return response;
+        }
+        
+        // Respuesta no clara, volver a preguntar
+        const clarification = `Respondé *"sí"* para confirmar la cancelación o *"no"* para mantener el pedido.`;
+        context.conversation_history.push({ role: "assistant", content: clarification });
+        await saveContext(context, supabase);
+        return clarification;
+      }
+    }
+
+
     // Cuando resumen_mostrado = true y el usuario confirma, llamar crear_pedido
     // directamente sin pasar por el LLM (que alucina "pedido activo" inexistente)
     if (context.resumen_mostrado && !context.pending_order_id) {
