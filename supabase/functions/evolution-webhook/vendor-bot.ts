@@ -3354,7 +3354,9 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     // 🎯 CRÍTICO: Construir mensajes UNA SOLA VEZ antes del loop
     // 🧹 En estado idle/browsing, limitar historial agresivamente para evitar alucinaciones
     // El historial viejo contiene menús, precios y vendors de sesiones anteriores
-    const historyLimit = (context.order_state === "idle" || context.order_state === "browsing") ? 4 : 15;
+    const historyLimit = context.order_state === "idle" ? 1 
+      : context.order_state === "browsing" ? 2 
+      : 15;
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       { role: "system", content: buildSystemPrompt(context) },
       ...context.conversation_history.slice(-historyLimit),
@@ -3372,13 +3374,18 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       // 🔄 Actualizar SOLO el system prompt (primer mensaje) con el estado actualizado
       messages[0] = { role: "system", content: buildSystemPrompt(context) };
 
+      // 🎯 Forzar tool_choice en primera iteración para idle/browsing
+      // Esto OBLIGA al modelo a llamar una herramienta en vez de alucinar con datos del historial
+      const forceTools = (context.order_state === "idle" || context.order_state === "browsing") 
+        && iterationCount === 1;
+
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: messages,
         tools: tools,
         temperature: 0, // 🎯 Determinístico: previene alucinaciones de productos/negocios/pagos
         max_tokens: 800,
-        tool_choice: "auto",
+        tool_choice: forceTools ? "required" : "auto",
       });
 
       const assistantMessage = completion.choices[0].message;
