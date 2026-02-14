@@ -768,13 +768,19 @@ serve(async (req) => {
           updated_at: new Date().toISOString()
         }).eq('phone', normalizedPhone);
         
+        // Cerrar vendor_chats activos
+        await supabase.from('vendor_chats').update({
+          is_active: false,
+          ended_at: new Date().toISOString()
+        }).eq('customer_phone', normalizedPhone).eq('is_active', true);
+        
         // Notificar al cliente
-        const chatId = remoteJid.includes('@lid') ? remoteJid : `${normalizedPhone}@s.whatsapp.net`;
-        await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
+        const chatIdTimeout = rawJid.includes('@lid') ? rawJid : `${normalizedPhone}@s.whatsapp.net`;
+        await fetch(`${evolutionApiUrlDebounce}/message/sendText/${instanceNameDebounce}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey! },
+          headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKeyDebounce! },
           body: JSON.stringify({
-            number: chatId,
+            number: chatIdTimeout,
             text: '⏰ El chat con el vendedor expiró por inactividad.\n\n✅ El bot está activo. ¿En qué te puedo ayudar?'
           }),
         });
@@ -785,7 +791,9 @@ serve(async (req) => {
 
     // 🤖 Comandos del cliente para reactivar el bot
     const clientBotCommands = ['menu', 'bot', 'ayuda', 'salir', 'inicio', 'volver', 'estado', 'mi pedido', 'cancelar', 'nuevo pedido'];
-    const isReactivateCommand = clientBotCommands.includes(finalMessageText.toLowerCase().trim());
+    // Check if ANY line in the combined text is a reactivation command
+    const messageLines = finalMessageText.toLowerCase().trim().split('\n').map(l => l.trim());
+    const isReactivateCommand = messageLines.some(line => clientBotCommands.includes(line));
     
     if (vendorSession?.in_vendor_chat && !vendorChatExpired && isReactivateCommand) {
       console.log('🔄 Client requested to reactivate bot with command:', finalMessageText);
@@ -796,6 +804,12 @@ serve(async (req) => {
         assigned_vendor_phone: null,
         updated_at: new Date().toISOString()
       }).eq('phone', normalizedPhone);
+      
+      // Cerrar vendor_chats activos
+      await supabase.from('vendor_chats').update({
+        is_active: false,
+        ended_at: new Date().toISOString()
+      }).eq('customer_phone', normalizedPhone).eq('is_active', true);
       
       // Verificar si tiene pedido activo para mostrar menú contextual
       const { data: activeOrder } = await supabase
@@ -813,12 +827,12 @@ serve(async (req) => {
         const orderId = activeOrder.id.substring(0, 8);
         
         // Enviar mensaje con opciones para pedido activo
-        const chatId = remoteJid.includes('@lid') ? remoteJid : `${normalizedPhone}@s.whatsapp.net`;
-        await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
+        const chatIdCmd = rawJid.includes('@lid') ? rawJid : `${normalizedPhone}@s.whatsapp.net`;
+        await fetch(`${evolutionApiUrlDebounce}/message/sendText/${instanceNameDebounce}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey! },
+          headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKeyDebounce! },
           body: JSON.stringify({
-            number: chatId,
+            number: chatIdCmd,
             text: `✅ El bot está activo nuevamente.\n\n📦 Tenés un pedido activo (#${orderId}).\n\n¿Qué querés hacer?\n• Escribí *"estado"* para ver el estado del pedido\n• Escribí *"cancelar"* si querés cancelar el pedido\n• Escribí *"hablar vendedor"* para volver a hablar con ${vendorName}`
           }),
         });
