@@ -3352,10 +3352,12 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     const toolCallTracker = new Map<string, number>();
 
     // 🎯 CRÍTICO: Construir mensajes UNA SOLA VEZ antes del loop
-    // Esto asegura que los tool calls previos y sus resultados se preserven
+    // 🧹 En estado idle/browsing, limitar historial agresivamente para evitar alucinaciones
+    // El historial viejo contiene menús, precios y vendors de sesiones anteriores
+    const historyLimit = (context.order_state === "idle" || context.order_state === "browsing") ? 4 : 15;
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       { role: "system", content: buildSystemPrompt(context) },
-      ...context.conversation_history.slice(-15), // Últimos 15 mensajes para no saturar
+      ...context.conversation_history.slice(-historyLimit),
     ];
 
     // Loop de conversación con tool calling

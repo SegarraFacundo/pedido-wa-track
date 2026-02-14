@@ -37,6 +37,12 @@ async function syncOrderStateWithDB(context: ConversationContext, supabase: any)
     context.delivery_type = undefined;
     context.resumen_mostrado = false;
     context.payment_methods_fetched = false;
+    // 🧹 CRÍTICO: Limpiar historial de conversación al resetear
+    // El historial viejo contiene datos de menús/vendors que causan alucinaciones
+    context.conversation_history = [];
+    context.available_vendors_map = [];
+    context.selected_vendor_id = undefined;
+    context.selected_vendor_name = undefined;
     
     console.log(`🧹 Context cleaned - user can now make new orders`);
   } else {
