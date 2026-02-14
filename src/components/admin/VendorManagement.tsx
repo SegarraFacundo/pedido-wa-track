@@ -22,6 +22,11 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
+interface VendorProfile {
+  email: string | null;
+  full_name: string | null;
+}
+
 interface Vendor {
   id: string;
   name: string;
@@ -32,6 +37,7 @@ interface Vendor {
   suspended_reason: string | null;
   total_orders: number;
   user_id: string | null;
+  profiles?: VendorProfile | null;
 }
 
 export default function VendorManagement() {
@@ -116,7 +122,23 @@ export default function VendorManagement() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setVendors(data || []);
+      
+      // Fetch linked user profiles
+      const vendorsWithProfiles = await Promise.all(
+        (data || []).map(async (vendor: any) => {
+          if (vendor.user_id) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('email, full_name')
+              .eq('id', vendor.user_id)
+              .single();
+            return { ...vendor, profiles: profile };
+          }
+          return { ...vendor, profiles: null };
+        })
+      );
+      
+      setVendors(vendorsWithProfiles);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -444,7 +466,12 @@ export default function VendorManagement() {
               <p className="text-sm font-semibold">
                 Total pedidos: {vendor.total_orders}
               </p>
-              {!vendor.user_id && (
+              {vendor.user_id && vendor.profiles ? (
+                <div className="text-xs text-muted-foreground bg-muted rounded px-2 py-1">
+                  👤 {vendor.profiles.email || 'Sin email'}
+                  {vendor.profiles.full_name ? ` (${vendor.profiles.full_name})` : ''}
+                </div>
+              ) : (
                 <Badge variant="outline" className="text-yellow-600">
                   Sin usuario
                 </Badge>
