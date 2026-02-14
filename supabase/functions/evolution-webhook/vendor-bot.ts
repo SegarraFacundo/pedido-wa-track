@@ -2890,7 +2890,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       const messageLower = message.toLowerCase();
       const wantsNewOrder = newOrderKeywords.some(kw => messageLower.includes(kw));
       
-      if (wantsNewOrder) {
+      if (wantsNewOrder && !context.pending_cancellation) {
         console.log(`🚫 BLOCKED: User tried to start new order with active order in state: ${context.order_state}`);
         const orderId = context.pending_order_id ? context.pending_order_id.substring(0, 8) : 'activo';
         const stateDisplay = context.order_state?.replace('order_pending_', '').replace('_', ' ').toUpperCase() || 'ACTIVO';
