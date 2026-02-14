@@ -1,93 +1,105 @@
 
 
-# Plan: Corregir Comportamiento Errático del Bot al Buscar Productos
+# Plan: Forzar al Bot a Usar Herramientas Obligatoriamente
 
-## Problema
+## Problema Real
 
-Cuando el usuario busca un producto (ej: "coca cola"), el bot encuentra resultados en varios negocios. Al elegir uno (ej: "de la pizzeria"), el bot:
+Los cambios anteriores (limitar historial a 4 mensajes, reglas en el prompt) NO funcionaron porque:
 
-1. Intenta agregar al carrito sin haber seleccionado el negocio correctamente
-2. Usa un mapa de vendors (`available_vendors_map`) desactualizado de una operacion anterior
-3. Termina mostrando el menu de un negocio completamente diferente (Supermercado El Ahorro)
-4. Inventa que "no encontro Coca Cola en Pizzeria Don Luigi" cuando si la tenia
+1. La `conversation_history` guarda las respuestas del asistente que **contienen menus completos** como texto plano
+2. Ejemplo: el historial tiene un mensaje como "Te muestro el menu del Supermercado El Ahorro: 1. Leche $8500, 2. Pan $5000..."  
+3. Cuando el usuario dice "coca cola", gpt-4o-mini **ve ese menu en el historial** y responde con esos datos en lugar de llamar a `buscar_productos`
+4. El modelo ignora las reglas del prompt porque ya tiene "datos suficientes" en el historial
 
-## Causa Raiz
+## Solucion (3 cambios)
 
-La herramienta `buscar_productos` NO actualiza `available_vendors_map` en el contexto. Cuando el usuario responde eligiendo un negocio de los resultados de busqueda, el bot usa un mapa viejo de `ver_locales_abiertos`, mapeando "1" al negocio equivocado.
+### 1. Forzar `tool_choice: "required"` en estados idle/browsing
 
-## Cambios
-
-### 1. `supabase/functions/evolution-webhook/vendor-bot.ts` - Herramienta `buscar_productos`
-
-**Guardar el mapa de vendors de los resultados de busqueda en el contexto**, igual que lo hace `ver_locales_abiertos`.
+En `vendor-bot.ts`, cuando el estado es `idle` o `browsing`, usar `tool_choice: "required"` en vez de `"auto"` para la **primera iteracion** del loop. Esto obliga al modelo a llamar una herramienta sin excepcion.
 
 ```
-Actual (lineas 65-79):
-- Formatea resultados con UUIDs visibles para la IA
-- NO actualiza available_vendors_map
-- La IA no puede mapear "de la pizzeria" → vendor correcto
-
-Nuevo:
-- Actualizar available_vendors_map con los vendors encontrados
-- Quitar los UUIDs del texto visible (la IA no los necesita)
-- El formato sera: "1. Pizzeria Don Luigi\n   - Coca Cola 1L - $8000\n"
-- Guardar contexto con saveContext despues de actualizar el mapa
+Iteracion 1 (idle/browsing): tool_choice = "required"
+Iteracion 2+: tool_choice = "auto" (para que pueda responder con texto)
 ```
 
-Cambio concreto en lineas 65-79:
+### 2. Limpiar historial al entrar a idle/browsing  
 
-```typescript
-// Formatear resultados SIN exponer UUIDs
-const vendorMap = [];
-let resultado = `Encontre estos negocios con "${args.consulta}":\n\n`;
-data.results.forEach((r, i) => {
-  const idx = i + 1;
-  resultado += `${idx}. *${r.vendor.name}*\n`;
-  r.products.forEach((p, j) => {
-    resultado += `   - ${p.name} - $${p.price}\n`;
-  });
-  resultado += `\n`;
-  vendorMap.push({ index: idx, name: r.vendor.name, vendor_id: r.vendor.id });
-});
+En `vendor-bot.ts`, antes de construir los mensajes, si el estado es `idle` o `browsing`, **filtrar del historial cualquier mensaje que contenga menus o resultados de busqueda**. Concretamente:
 
-// Guardar mapa para que ver_menu_negocio pueda resolver "1", "pizzeria", etc.
-context.available_vendors_map = vendorMap;
-context.last_vendors_fetch = new Date().toISOString();
-await saveContext(context, supabase);
+- Si el estado es `idle`: enviar solo el ultimo mensaje del usuario (0 historial previo)
+- Si el estado es `browsing`: enviar maximo los ultimos 2 mensajes
 
-resultado += `Decime el numero o nombre del negocio para ver su menu completo.`;
-return resultado;
-```
+Esto elimina la fuente de datos viejos que el modelo usa para alucinar.
 
-### 2. `supabase/functions/evolution-webhook/simplified-prompt.ts` - Regla para buscar_productos
+### 3. Desplegar
 
-Agregar instruccion explicita en el estado `browsing` para que despues de `buscar_productos`, la IA SIEMPRE llame a `ver_menu_negocio` antes de intentar agregar al carrito.
-
-En la seccion de estado "browsing" (linea ~121-129), agregar:
-
-```
-DESPUES DE buscar_productos:
-- Si el usuario elige un negocio de los resultados → Llama ver_menu_negocio (NUNCA agregar_al_carrito directo)
-- El usuario DEBE ver el menu completo antes de poder agregar productos
-- NUNCA intentes agregar productos basandote solo en los resultados de busqueda
-```
-
-### 3. Desplegar edge function
-
-Redesplegar `evolution-webhook` con los cambios.
+Redesplegar `evolution-webhook`.
 
 ---
 
-## Resultado Esperado
+## Detalle Tecnico
 
-| Paso | Antes (roto) | Despues (correcto) |
-|------|-------------|-------------------|
-| 1. "coca cola" | Busca, muestra 2 negocios | Busca, muestra 2 negocios + actualiza mapa |
-| 2. "de la pizzeria" | Intenta agregar al carrito directo, falla, muestra menu equivocado | Llama ver_menu_negocio("pizzeria"), muestra menu correcto |
-| 3. "agregala" | N/A (ya delirio) | Agrega Coca Cola del menu de la pizzeria |
+### Archivo: `supabase/functions/evolution-webhook/vendor-bot.ts`
 
-## Impacto
+**Cambio A - Linea ~3357**: Reducir historial a 0 en idle
 
-- **Archivos modificados:** 2 (vendor-bot.ts, simplified-prompt.ts)
-- **Riesgo:** Bajo (cambio en formato de resultados y regla de prompt)
-- **Beneficio critico:** Elimina el problema principal que impide lanzar el bot a produccion
+```typescript
+// Antes:
+const historyLimit = (context.order_state === "idle" || context.order_state === "browsing") ? 4 : 15;
+
+// Despues:
+const historyLimit = context.order_state === "idle" ? 1 
+  : context.order_state === "browsing" ? 2 
+  : 15;
+```
+
+Solo 1 mensaje (el mensaje actual del usuario) en idle, 2 en browsing, 15 en otros estados.
+
+**Cambio B - Linea ~3375-3381**: Forzar tool_choice en primera iteracion
+
+```typescript
+// Antes:
+const completion = await openai.chat.completions.create({
+  model: "gpt-4o-mini",
+  messages: messages,
+  tools: tools,
+  temperature: 0,
+  max_tokens: 800,
+  tool_choice: "auto",
+});
+
+// Despues:
+const forceTools = (context.order_state === "idle" || context.order_state === "browsing") 
+  && iterationCount === 1;
+
+const completion = await openai.chat.completions.create({
+  model: "gpt-4o-mini",
+  messages: messages,
+  tools: tools,
+  temperature: 0,
+  max_tokens: 800,
+  tool_choice: forceTools ? "required" : "auto",
+});
+```
+
+Esto garantiza que en la primera iteracion, el modelo SIEMPRE llame una herramienta cuando esta en idle/browsing.
+
+---
+
+## Por que esto funciona
+
+| Situacion | Antes | Despues |
+|-----------|-------|---------|
+| Usuario dice "coca cola" en idle | AI ve menu viejo en historial, responde sin herramienta | AI NO tiene historial viejo + OBLIGADA a llamar herramienta |
+| Usuario dice "de la pizzeria" en browsing | AI usa datos viejos del historial | AI tiene solo 2 mensajes recientes + obligada a llamar herramienta |
+| Usuario en shopping/checkout | Sin cambios, historial necesario para contexto | Sin cambios |
+
+## Archivos modificados
+
+- `supabase/functions/evolution-webhook/vendor-bot.ts` (2 cambios puntuales)
+
+## Riesgo
+
+Bajo. El unico cambio es forzar herramientas en idle/browsing (donde SIEMPRE deberian usarse) y reducir historial en esos estados. Los estados de compra/checkout no se tocan.
+
+Hay un caso edge: si el usuario manda un mensaje off-topic como "hola" en idle, el modelo sera forzado a llamar una herramienta. Pero como el prompt ya tiene reglas para off-topic, la herramienta mas probable sera `ver_locales_abiertos` y luego respondera normalmente.
