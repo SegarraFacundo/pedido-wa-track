@@ -62,20 +62,25 @@ async function ejecutarHerramienta(
           return `No encontré negocios abiertos con "${args.consulta}".`;
         }
 
-        // Formatear resultados
-        let resultado = `Encontré ${data.totalVendors} negocios con ${data.totalProducts} productos:\n\n`;
+        // Formatear resultados SIN exponer UUIDs
+        const vendorMap: Array<{ index: number; name: string; vendor_id: string }> = [];
+        let resultado = `Encontré estos negocios con "${args.consulta}":\n\n`;
         data.results.forEach((r: any, i: number) => {
-          resultado += `${i + 1}. ${r.vendor.name}\n`;
-          resultado += `   ID: ${r.vendor.id}\n`;
-          resultado += `   Rating: ${r.vendor.average_rating || "N/A"}⭐\n`;
-          resultado += `   Productos disponibles:\n`;
-          r.products.forEach((p: any, j: number) => {
-            resultado += `     ${j + 1}. ${p.name} - $${p.price}\n`;
-            resultado += `        ID: ${p.id}\n`;
+          const idx = i + 1;
+          resultado += `${idx}. *${r.vendor.name}*\n`;
+          r.products.forEach((p: any) => {
+            resultado += `   - ${p.name} - $${p.price}\n`;
           });
           resultado += `\n`;
+          vendorMap.push({ index: idx, name: r.vendor.name, vendor_id: r.vendor.id });
         });
 
+        // Guardar mapa para que ver_menu_negocio pueda resolver "1", "pizzeria", etc.
+        context.available_vendors_map = vendorMap;
+        context.last_vendors_fetch = new Date().toISOString();
+        await saveContext(context, supabase);
+
+        resultado += `Decime el número o nombre del negocio para ver su menú completo.`;
         return resultado;
       }
 
