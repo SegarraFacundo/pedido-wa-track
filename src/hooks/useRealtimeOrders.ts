@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Order, OrderStatus } from '@/types/order';
 import { useToast } from '@/hooks/use-toast';
@@ -7,9 +7,45 @@ export function useRealtimeOrders(vendorId?: string) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const toastRef = useRef(toast);
+  toastRef.current = toast;
 
   useEffect(() => {
     let channel: any;
+
+    const formatOrder = (data: any): Order => ({
+      id: data.id,
+      customerName: data.customer_name,
+      customerPhone: data.customer_phone,
+      vendorId: data.vendor_id,
+      vendorName: data.vendor?.name || '',
+      items: (Array.isArray(data.items) ? data.items : []).map((item: any) => ({
+        id: item.product_id || item.id,
+        name: item.product_name || item.name,
+        quantity: item.quantity,
+        price: Number(item.price),
+        notes: item.notes
+      })),
+      total: Number(data.total),
+      status: data.status as OrderStatus,
+      address: data.address,
+      coordinates: data.coordinates ? (data.coordinates as any) : undefined,
+      estimatedDelivery: data.estimated_delivery ? new Date(data.estimated_delivery) : undefined,
+      createdAt: new Date(data.created_at),
+      updatedAt: new Date(data.updated_at),
+      notes: data.notes,
+      deliveryPersonName: data.delivery_person_name,
+      deliveryPersonPhone: data.delivery_person_phone,
+      payment_receipt_url: data.payment_receipt_url,
+      address_is_manual: data.address_is_manual || false,
+      payment_status: data.payment_status,
+      payment_method: data.payment_method as 'efectivo' | 'transferencia' | 'mercadopago' | undefined,
+      paid_at: data.paid_at ? new Date(data.paid_at) : undefined,
+      delivery_type: (data.delivery_type as 'delivery' | 'pickup') || 'delivery',
+      customerNameMasked: data.customer_name?.substring(0, 3) + '***',
+      customerPhoneMasked: '****' + data.customer_phone?.slice(-4),
+      addressSimplified: data.address?.split(',')[0]
+    });
 
     const fetchOrders = async () => {
       try {
@@ -29,45 +65,10 @@ export function useRealtimeOrders(vendorId?: string) {
 
         if (error) throw error;
 
-        const formattedOrders: Order[] = data?.map((order: any) => ({
-          id: order.id,
-          customerName: order.customer_name,
-          customerPhone: order.customer_phone,
-          vendorId: order.vendor_id,
-          vendorName: order.vendor?.name || '',
-          items: (order.items || []).map((item: any) => ({
-            id: item.product_id || item.id,
-            name: item.product_name || item.name,
-            quantity: item.quantity,
-            price: Number(item.price),
-            notes: item.notes
-          })),
-          total: Number(order.total),
-          status: order.status as OrderStatus,
-          address: order.address,
-          coordinates: order.coordinates,
-          estimatedDelivery: order.estimated_delivery ? new Date(order.estimated_delivery) : undefined,
-          createdAt: new Date(order.created_at),
-          updatedAt: new Date(order.updated_at),
-          notes: order.notes,
-          deliveryPersonName: order.delivery_person_name,
-          deliveryPersonPhone: order.delivery_person_phone,
-          payment_receipt_url: order.payment_receipt_url,
-          address_is_manual: order.address_is_manual || false,
-          payment_status: order.payment_status,
-          payment_method: order.payment_method,
-          paid_at: order.paid_at ? new Date(order.paid_at) : undefined,
-          delivery_type: (order.delivery_type as 'delivery' | 'pickup') || 'delivery',
-          // Masked fields for vendor view
-          customerNameMasked: order.customer_name?.substring(0, 3) + '***',
-          customerPhoneMasked: '****' + order.customer_phone?.slice(-4),
-          addressSimplified: order.address?.split(',')[0]
-        })) || [];
-
-        setOrders(formattedOrders);
+        setOrders(data?.map(formatOrder) || []);
       } catch (error) {
         console.error('Error fetching orders:', error);
-        toast({
+        toastRef.current({
           title: 'Error',
           description: 'No se pudieron cargar los pedidos',
           variant: 'destructive'
@@ -79,7 +80,7 @@ export function useRealtimeOrders(vendorId?: string) {
 
     const setupRealtime = () => {
       channel = supabase
-        .channel('orders-channel')
+        .channel(`orders-rt-${vendorId || 'all'}`)
         .on(
           'postgres_changes',
           {
@@ -92,56 +93,21 @@ export function useRealtimeOrders(vendorId?: string) {
             console.log('Order change received:', payload);
             
             if (payload.eventType === 'INSERT') {
-              // Fetch the complete order with vendor info
               const { data } = await supabase
                 .from('orders')
-                .select(`
-                  *,
-                  vendor:vendors(*)
-                `)
+                .select(`*, vendor:vendors(*)`)
                 .eq('id', payload.new.id)
                 .single();
 
               if (data) {
-                const items = Array.isArray(data.items) ? data.items : [];
-                const newOrder: Order = {
-                  id: data.id,
-                  customerName: data.customer_name,
-                  customerPhone: data.customer_phone,
-                  vendorId: data.vendor_id,
-                  vendorName: data.vendor?.name || '',
-                  items: items.map((item: any) => ({
-                    id: item.product_id || item.id,
-                    name: item.product_name || item.name,
-                    quantity: item.quantity,
-                    price: Number(item.price),
-                    notes: item.notes
-                  })),
-                  total: Number(data.total),
-                  status: data.status as OrderStatus,
-                  address: data.address,
-                  coordinates: data.coordinates ? (data.coordinates as any) : undefined,
-                  estimatedDelivery: data.estimated_delivery ? new Date(data.estimated_delivery) : undefined,
-                  createdAt: new Date(data.created_at),
-                  updatedAt: new Date(data.updated_at),
-                  notes: data.notes,
-                  deliveryPersonName: data.delivery_person_name,
-                  deliveryPersonPhone: data.delivery_person_phone,
-                  payment_receipt_url: data.payment_receipt_url,
-                  address_is_manual: data.address_is_manual || false,
-                  payment_status: data.payment_status,
-                  payment_method: data.payment_method as 'efectivo' | 'transferencia' | 'mercadopago' | undefined,
-                  paid_at: data.paid_at ? new Date(data.paid_at) : undefined,
-                  delivery_type: (data.delivery_type as 'delivery' | 'pickup') || 'delivery',
-                  customerNameMasked: data.customer_name?.substring(0, 3) + '***',
-                  customerPhoneMasked: '****' + data.customer_phone?.slice(-4),
-                  addressSimplified: data.address?.split(',')[0]
-                };
+                const newOrder = formatOrder(data);
 
-                setOrders(prev => [newOrder, ...prev]);
+                setOrders(prev => {
+                  // Avoid duplicates
+                  if (prev.some(o => o.id === newOrder.id)) return prev;
+                  return [newOrder, ...prev];
+                });
                 
-                // Insertar notificación en la tabla de historial
-                // Esto disparará el realtime para el NotificationCenter
                 await supabase.from('vendor_notification_history').insert({
                   vendor_id: newOrder.vendorId,
                   type: 'new_order',
@@ -150,65 +116,67 @@ export function useRealtimeOrders(vendorId?: string) {
                   data: { order_id: newOrder.id, total: newOrder.total }
                 });
 
-                toast({
+                toastRef.current({
                   title: '🆕 NUEVO PEDIDO INGRESADO',
                   description: `Pedido #${newOrder.id.slice(0, 8)} - $${newOrder.total.toFixed(2)}`,
                   duration: 10000,
                 });
               }
             } else if (payload.eventType === 'UPDATE') {
-              const oldOrder = orders.find(o => o.id === payload.new.id);
               const newStatus = payload.new.status as OrderStatus;
               
-              setOrders(prev => prev.map(order => 
-                order.id === payload.new.id
-                  ? {
-                      ...order,
-                      status: newStatus,
-                      updatedAt: new Date(payload.new.updated_at),
-                      deliveryPersonName: payload.new.delivery_person_name,
-                      deliveryPersonPhone: payload.new.delivery_person_phone,
-                      notes: payload.new.notes,
-                      payment_status: payload.new.payment_status,
-                      payment_method: payload.new.payment_method,
-                      paid_at: payload.new.paid_at ? new Date(payload.new.paid_at) : undefined
-                    }
-                  : order
-              ));
+              setOrders(prev => {
+                const oldOrder = prev.find(o => o.id === payload.new.id);
+                
+                // Fire notifications asynchronously based on old state
+                if (oldOrder && oldOrder.status !== newStatus) {
+                  let notificationType: 'order_cancelled' | 'order_updated' | 'payment_received' = 'order_updated';
+                  let title = 'Pedido Actualizado';
+                  let message = `Estado cambiado a ${newStatus}`;
 
-              // Crear notificaciones según el tipo de cambio
-              if (oldOrder && oldOrder.status !== newStatus) {
-                let notificationType: 'order_cancelled' | 'order_updated' | 'payment_received' = 'order_updated';
-                let title = 'Pedido Actualizado';
-                let message = `Estado cambiado a ${newStatus}`;
+                  if (newStatus === 'cancelled') {
+                    notificationType = 'order_cancelled';
+                    title = 'Pedido Cancelado';
+                    message = `El pedido #${payload.new.id.slice(0, 8)} fue cancelado`;
+                  }
 
-                if (newStatus === 'cancelled') {
-                  notificationType = 'order_cancelled';
-                  title = 'Pedido Cancelado';
-                  message = `El pedido #${payload.new.id.slice(0, 8)} fue cancelado`;
+                  supabase.from('vendor_notification_history').insert({
+                    vendor_id: payload.new.vendor_id,
+                    type: notificationType,
+                    title,
+                    message,
+                    data: { order_id: payload.new.id, status: newStatus }
+                  });
                 }
 
-                await supabase.from('vendor_notification_history').insert({
-                  vendor_id: payload.new.vendor_id,
-                  type: notificationType,
-                  title,
-                  message,
-                  data: { order_id: payload.new.id, status: newStatus }
-                });
-              }
+                if (oldOrder && oldOrder.payment_status !== 'paid' && payload.new.payment_status === 'paid') {
+                  supabase.from('vendor_notification_history').insert({
+                    vendor_id: payload.new.vendor_id,
+                    type: 'payment_received',
+                    title: 'Pago Recibido',
+                    message: `Se recibió el pago del pedido #${payload.new.id.slice(0, 8)}`,
+                    data: { order_id: payload.new.id }
+                  });
+                }
 
-              // Notificación de pago recibido
-              if (oldOrder && oldOrder.payment_status !== 'paid' && payload.new.payment_status === 'paid') {
-                await supabase.from('vendor_notification_history').insert({
-                  vendor_id: payload.new.vendor_id,
-                  type: 'payment_received',
-                  title: 'Pago Recibido',
-                  message: `Se recibió el pago del pedido #${payload.new.id.slice(0, 8)}`,
-                  data: { order_id: payload.new.id }
-                });
-              }
+                return prev.map(order => 
+                  order.id === payload.new.id
+                    ? {
+                        ...order,
+                        status: newStatus,
+                        updatedAt: new Date(payload.new.updated_at),
+                        deliveryPersonName: payload.new.delivery_person_name,
+                        deliveryPersonPhone: payload.new.delivery_person_phone,
+                        notes: payload.new.notes,
+                        payment_status: payload.new.payment_status,
+                        payment_method: payload.new.payment_method,
+                        paid_at: payload.new.paid_at ? new Date(payload.new.paid_at) : undefined
+                      }
+                    : order
+                );
+              });
 
-              toast({
+              toastRef.current({
                 title: '✅ Pedido actualizado',
                 description: `Estado cambiado a ${newStatus}`,
               });
@@ -217,7 +185,9 @@ export function useRealtimeOrders(vendorId?: string) {
             }
           }
         )
-        .subscribe();
+        .subscribe((status) => {
+          console.log(`Realtime subscription status for orders: ${status}`);
+        });
     };
 
     fetchOrders();
@@ -228,7 +198,7 @@ export function useRealtimeOrders(vendorId?: string) {
         supabase.removeChannel(channel);
       }
     };
-  }, [vendorId, toast]);
+  }, [vendorId]);
 
   const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
     try {
