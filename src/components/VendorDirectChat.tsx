@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -47,7 +47,7 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
     fetchVendorInfo();
     fetchActiveChats();
     setupRealtimeSubscription();
-  }, [vendorId]);
+  }, [vendorId, fetchVendorInfo, fetchActiveChats, setupRealtimeSubscription]);
 
   useEffect(() => {
     if (selectedChat) {
@@ -78,7 +78,7 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
     }
   }, [messages]);
 
-  const setupRealtimeSubscription = () => {
+  const setupRealtimeSubscription = useCallback(() => {
     const channel = supabase
       .channel(`vendor-chats-${vendorId}`)
       .on(
@@ -112,23 +112,19 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
           table: 'chat_messages'
         },
         (payload) => {
-          console.log('🔔 New message received via realtime:', payload.new);
           const newMessage = {
             ...payload.new,
             created_at: new Date(payload.new.created_at)
           } as ChatMessage;
           
           if (selectedChat && newMessage.chat_id === selectedChat.id) {
-            console.log('✅ Message is for selected chat, checking for duplicates');
             
             // Evitar duplicados verificando si el mensaje ya existe
             setMessages(prev => {
               const exists = prev.some(msg => msg.id === newMessage.id);
               if (exists) {
-                console.log('⚠️ Message already exists, skipping');
                 return prev;
               }
-              console.log('✅ Adding new message to state');
               return [...prev, newMessage];
             });
             
@@ -159,7 +155,7 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
     return () => {
       supabase.removeChannel(channel);
     };
-  };
+  }, [vendorId, selectedChat, toast]);
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -167,7 +163,7 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
     }, 100);
   };
 
-  const fetchVendorInfo = async () => {
+  const fetchVendorInfo = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('vendors')
@@ -180,14 +176,13 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
       setVendorName(data?.name || 'el vendedor');
       // Usar whatsapp_number si existe, sino phone
       setVendorPhone(data?.whatsapp_number || data?.phone || '');
-      console.log('Vendor info loaded:', { name: data?.name, phone: data?.whatsapp_number || data?.phone });
     } catch (error) {
       console.error('Error fetching vendor info:', error);
       setVendorName('el vendedor');
     }
-  };
+  }, [vendorId]);
 
-  const fetchActiveChats = async () => {
+  const fetchActiveChats = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('vendor_chats')
@@ -213,7 +208,7 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [vendorId, toast]);
 
   const fetchMessages = async (chatId: string) => {
     try {
@@ -253,13 +248,10 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
       }
 
       try {
-        console.log('🔄 Activating bot, closing all chats for vendor:', vendorId);
-        console.log('📋 Active chats to close:', activeChats.length);
         
         // Obtener todos los clientes afectados ANTES de cerrar los chats
         const customerPhones = activeChats.map(chat => chat.customer_phone);
         
-        console.log('📱 Customer phones to notify:', customerPhones);
 
         // Cerrar todos los chats activos de este vendedor
         const { error: updateError } = await supabase
@@ -276,11 +268,9 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
           throw updateError;
         }
 
-        console.log('✅ Chats closed successfully');
 
         // Desactivar modo chat para todos los clientes y notificar
         for (const phone of customerPhones) {
-          console.log('🔄 Updating user_sessions for:', phone);
           
           const { error: sessionError } = await supabase
             .from('user_sessions')
@@ -296,7 +286,6 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
           }
 
           // Notificar al cliente que el bot está activo
-          console.log('📨 Sending notification to customer:', phone);
           
           const { error: notifyError } = await supabase.functions.invoke('send-whatsapp-notification', {
             body: {
@@ -321,7 +310,6 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
           description: `Bot activo nuevamente para ${customerPhones.length} cliente(s)`,
         });
         
-        console.log('✅ Bot activation completed successfully');
       } catch (error) {
         console.error('❌ Error activating bot:', error);
         toast({

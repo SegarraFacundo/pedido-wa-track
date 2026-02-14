@@ -21,7 +21,6 @@ export function OrderTracking({ order }: OrderTrackingProps) {
   const [mapUrl, setMapUrl] = useState("");
   
   useEffect(() => {
-    // Simulate a map with delivery tracking
     if (order.coordinates) {
       setMapUrl(`https://maps.googleapis.com/maps/api/staticmap?center=${order.coordinates.lat},${order.coordinates.lng}&zoom=15&size=600x300&markers=${order.coordinates.lat},${order.coordinates.lng}&key=YOUR_API_KEY`);
     }

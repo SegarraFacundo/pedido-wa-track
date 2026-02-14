@@ -96,7 +96,7 @@ export function BotTester() {
           if (context.conversation_history && context.conversation_history.length > 0) {
             const lastAssistant = [...context.conversation_history]
               .reverse()
-              .find((msg: any) => msg.role === "assistant");
+              .find((msg: { role: string; content: string }) => msg.role === "assistant");
             
             if (lastAssistant) {
               const assistantMessage: Message = {
@@ -107,16 +107,17 @@ export function BotTester() {
               setMessages(prev => [...prev, assistantMessage]);
             }
           }
+          // Context is optional or could have parsing issues, ignoring silently
         } catch (e) {
-          console.error('Error parsing context:', e);
+          // Silent catch for parsing errors
         }
       }
 
-    } catch (error: any) {
-      console.error('Error sending message:', error);
+    } catch (error: unknown) {
+      const err = error as { message?: string };
       toast({
         title: "Error",
-        description: error.message || "Error al enviar mensaje",
+        description: err.message || "Error al enviar mensaje",
         variant: "destructive"
       });
     } finally {
@@ -145,10 +146,11 @@ export function BotTester() {
         title: "Sesión limpiada",
         description: "Puedes empezar una nueva conversación"
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { message?: string };
       toast({
         title: "Error",
-        description: error.message,
+        description: err.message,
         variant: "destructive"
       });
     }
