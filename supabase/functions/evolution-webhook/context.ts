@@ -37,6 +37,7 @@ async function syncOrderStateWithDB(context: ConversationContext, supabase: any)
     context.delivery_type = undefined;
     context.resumen_mostrado = false;
     context.payment_methods_fetched = false;
+    context.pending_cancellation = undefined;
     // 🧹 CRÍTICO: Limpiar historial de conversación al resetear
     // El historial viejo contiene datos de menús/vendors que causan alucinaciones
     context.conversation_history = [];
@@ -102,6 +103,7 @@ export async function getContext(phone: string, supabase: any): Promise<Conversa
         available_vendors_map: saved.available_vendors_map || [],
         last_menu_fetch: saved.last_menu_fetch,
         last_vendors_fetch: saved.last_vendors_fetch,
+        pending_cancellation: saved.pending_cancellation,
       };
       
       // ✅ SINCRONIZAR CON LA DB - verificar si el pedido sigue activo
