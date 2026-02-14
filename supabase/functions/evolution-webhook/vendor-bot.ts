@@ -3390,11 +3390,12 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       // 🔄 Actualizar SOLO el system prompt (primer mensaje) con el estado actualizado
       messages[0] = { role: "system", content: buildSystemPrompt(context) };
 
-      // 🎯 Forzar tool_choice en primera iteración para TODOS los estados pre-checkout
-      // Esto OBLIGA al modelo a llamar una herramienta en vez de alucinar con datos del historial
+      // 🎯 Forzar tool_choice en primera iteración para estados pre-checkout
+      // PERO NO cuando ya se mostró el resumen (para que pueda llamar crear_pedido libremente)
       const nonCheckoutStates = ["idle", "browsing", "shopping", "needs_address"];
       const forceTools = nonCheckoutStates.includes(context.order_state || "idle") 
-        && iterationCount === 1;
+        && iterationCount === 1
+        && !context.resumen_mostrado;
 
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
