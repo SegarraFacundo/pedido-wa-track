@@ -3507,10 +3507,18 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         && iterationCount === 1
         && !context.resumen_mostrado;
 
+      // 🎯 Filtrar herramientas por estado para evitar confusiones
+      const currentState = context.order_state || "idle";
+      let filteredTools = tools;
+      if (currentState === "shopping" && context.selected_vendor_id) {
+        // En shopping, no necesita ver_locales_abiertos (evita cambios accidentales de negocio)
+        filteredTools = tools.filter(t => t.function.name !== "ver_locales_abiertos");
+      }
+
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: messages,
-        tools: tools,
+        tools: filteredTools,
         temperature: 0, // 🎯 Determinístico: previene alucinaciones de productos/negocios/pagos
         max_tokens: 800,
         tool_choice: forceTools ? "required" : "auto",
