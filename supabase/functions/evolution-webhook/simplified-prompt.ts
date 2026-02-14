@@ -116,6 +116,13 @@ ${currentState === "idle" ? `
 - El usuario debe elegir qué busca o ver locales disponibles
 - Responde de forma amigable y sugerí opciones populares
 - Después de mostrar locales/productos → cambiar a "browsing"
+
+🚨🚨 REGLA ANTI-ALUCINACIONES (IDLE/BROWSING) 🚨🚨
+- SIEMPRE llamá a buscar_productos o ver_locales_abiertos cuando el usuario mencione un producto o negocio
+- NUNCA respondas sobre productos, menús, precios o disponibilidad sin llamar una herramienta PRIMERO
+- El historial de conversación puede tener datos VIEJOS de sesiones anteriores - IGNORALOS
+- Si el usuario dice "coca cola", "pizza", "milanesas" etc → LLAMÁ buscar_productos OBLIGATORIAMENTE
+- Si no llamás una herramienta, tu respuesta NO PUEDE mencionar nombres de negocios ni productos específicos
 ` : ""}
 
 ${currentState === "browsing" ? `
@@ -126,6 +133,12 @@ ${currentState === "browsing" ? `
 - SOLO DESPUÉS llamá ver_menu_negocio con el ID del negocio elegido
 - NO llames ver_menu_negocio hasta que el usuario elija
 - Una vez elegido → cambiar a "shopping"
+
+🚨🚨 REGLA ANTI-ALUCINACIONES (BROWSING) 🚨🚨
+- Si el usuario menciona un producto → LLAMÁ buscar_productos OBLIGATORIAMENTE
+- NUNCA inventes resultados de búsqueda basándote en mensajes anteriores
+- NUNCA digas "no encontré X en el menú de Y" sin haber llamado una herramienta en ESTE TURNO
+- Si no hay tool_calls en tu respuesta, NO PODÉS mencionar nombres de negocios ni productos
 
 🚨 DESPUÉS DE buscar_productos:
 - Si el usuario elige un negocio de los resultados → Llamá ver_menu_negocio (NUNCA agregar_al_carrito directo)
