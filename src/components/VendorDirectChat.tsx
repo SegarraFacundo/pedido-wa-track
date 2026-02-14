@@ -43,7 +43,6 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  
 
   useEffect(() => {
     if (selectedChat) {
@@ -206,6 +205,13 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
     }
   }, [vendorId, toast]);
 
+  useEffect(() => {
+    fetchVendorInfo();
+    fetchActiveChats();
+    const cleanup = setupRealtimeSubscription();
+    return cleanup;
+  }, [fetchVendorInfo, fetchActiveChats, setupRealtimeSubscription]);
+
   const fetchMessages = async (chatId: string) => {
     try {
       const { data, error } = await supabase
@@ -248,11 +254,6 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
         // Obtener todos los clientes afectados ANTES de cerrar los chats
         const customerPhones = activeChats.map(chat => chat.customer_phone);
 
-  useEffect(() => {
-    fetchVendorInfo();
-    fetchActiveChats();
-    setupRealtimeSubscription();
-  }, [vendorId, fetchVendorInfo, fetchActiveChats, setupRealtimeSubscription]);
 
 
         // Cerrar todos los chats activos de este vendedor
