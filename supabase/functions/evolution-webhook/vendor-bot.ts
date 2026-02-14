@@ -51,87 +51,32 @@ async function ejecutarHerramienta(
         console.log(`🔄 STATE: ${oldState} → browsing (buscar_productos)`);
         await saveContext(context, supabase);
 
-        // Si el usuario tiene ubicación, usar función de filtrado por radio
-        if (context.user_latitude && context.user_longitude) {
-          console.log(`📍 User has location, filtering by delivery radius`);
+        // Búsqueda normal sin ubicación
+        const { data, error } = await supabase.functions.invoke("search-products", {
+          body: { searchQuery: args.consulta },
+        });
 
-          // Primero obtener vendors en rango
-          const { data: vendorsInRange, error: rangeError } = await supabase.rpc("get_vendors_in_range", {
-            user_lat: context.user_latitude,
-            user_lon: context.user_longitude,
-          });
+        console.log("Search products result:", JSON.stringify(data, null, 2));
 
-          if (rangeError) {
-            console.error("Error getting vendors in range:", rangeError);
-          }
-
-          if (!vendorsInRange || vendorsInRange.length === 0) {
-            return `😔 No encontré negocios que hagan delivery a tu ubicación con "${args.consulta}".\n\n💡 Tip: Si te moviste de zona, podés compartir tu nueva ubicación usando el botón 📍 de WhatsApp.`;
-          }
-
-          // Filtrar solo los vendor IDs que están en rango
-          const vendorIdsInRange = vendorsInRange.map((v: any) => v.vendor_id);
-
-          // Buscar productos solo en esos vendors
-          const { data: searchResults, error: searchError } = await supabase.functions.invoke("search-products", {
-            body: {
-              searchQuery: args.consulta,
-              vendorIds: vendorIdsInRange, // Filtrar por vendors en rango
-            },
-          });
-
-          if (searchError || !searchResults?.found) {
-            return `No encontré productos de "${args.consulta}" en negocios que lleguen a tu zona.\n\nPodés buscar otra cosa o ver todos los locales disponibles diciendo "ver locales".`;
-          }
-
-          // Formatear resultados con distancia
-          let resultado = `Encontré ${searchResults.totalVendors} negocios cerca tuyo con ${searchResults.totalProducts} productos:\n\n`;
-          searchResults.results.forEach((r: any, i: number) => {
-            const vendorDistance = vendorsInRange.find((v: any) => v.vendor_id === r.vendor.id);
-            resultado += `${i + 1}. ${r.vendor.name}`;
-            if (vendorDistance) {
-              resultado += ` (${vendorDistance.distance_km.toFixed(1)} km)`;
-            }
-            resultado += `\n`;
-            resultado += `   ID: ${r.vendor.id}\n`;
-            resultado += `   Rating: ${r.vendor.average_rating || "N/A"}⭐\n`;
-            resultado += `   Productos disponibles:\n`;
-            r.products.forEach((p: any, j: number) => {
-              resultado += `     ${j + 1}. ${p.name} - $${p.price}\n`;
-              resultado += `        ID: ${p.id}\n`;
-            });
-            resultado += `\n`;
-          });
-
-          return resultado;
-        } else {
-          // Sin ubicación, búsqueda normal pero informar al usuario
-          const { data, error } = await supabase.functions.invoke("search-products", {
-            body: { searchQuery: args.consulta },
-          });
-
-          console.log("Search products result:", JSON.stringify(data, null, 2));
-
-          if (error || !data?.found) {
-            return `No encontré negocios abiertos con "${args.consulta}".`;
-          }
-
-          // Formatear resultados
-          let resultado = `Encontré ${data.totalVendors} negocios con ${data.totalProducts} productos:\n\n`;
-          data.results.forEach((r: any, i: number) => {
-            resultado += `${i + 1}. ${r.vendor.name}\n`;
-            resultado += `   ID: ${r.vendor.id}\n`;
-            resultado += `   Rating: ${r.vendor.average_rating || "N/A"}⭐\n`;
-            resultado += `   Productos disponibles:\n`;
-            r.products.forEach((p: any, j: number) => {
-              resultado += `     ${j + 1}. ${p.name} - $${p.price}\n`;
-              resultado += `        ID: ${p.id}\n`;
-            });
-            resultado += `\n`;
-          });
-
-          return resultado;
+        if (error || !data?.found) {
+          return `No encontré negocios abiertos con "${args.consulta}".`;
         }
+
+        // Formatear resultados
+        let resultado = `Encontré ${data.totalVendors} negocios con ${data.totalProducts} productos:\n\n`;
+        data.results.forEach((r: any, i: number) => {
+          resultado += `${i + 1}. ${r.vendor.name}\n`;
+          resultado += `   ID: ${r.vendor.id}\n`;
+          resultado += `   Rating: ${r.vendor.average_rating || "N/A"}⭐\n`;
+          resultado += `   Productos disponibles:\n`;
+          r.products.forEach((p: any, j: number) => {
+            resultado += `     ${j + 1}. ${p.name} - $${p.price}\n`;
+            resultado += `        ID: ${p.id}\n`;
+          });
+          resultado += `\n`;
+        });
+
+        return resultado;
       }
 
       case "ver_locales_abiertos": {
@@ -1093,7 +1038,7 @@ async function ejecutarHerramienta(
             
             return `⚠️ El método "${args.metodo_pago}" no está disponible en ${context.selected_vendor_name}.\n\n` +
                    `Métodos aceptados:\n` +
-                   context.available_payment_methods.map(m => 
+                   (context.available_payment_methods || []).map(m => 
                      `- ${m.charAt(0).toUpperCase() + m.slice(1)} ${methodIcons[m] || '💰'}`
                    ).join('\n') + 
                    `\n\n¿Con cuál querés continuar?`;
@@ -1214,13 +1159,12 @@ async function ejecutarHerramienta(
           }
         }
 
-        // 📍 VALIDACIÓN DE UBICACIÓN Y COBERTURA
+        // 📍 VALIDACIÓN DE UBICACIÓN Y COSTO DE DELIVERY
         let deliveryCost = 0;
-        let deliveryDistance = 0;
         
         // ⭐ Si es PICKUP, NO pedir dirección ni calcular delivery
         if (context.delivery_type === 'pickup') {
-          console.log(`✅ Order is PICKUP - skipping address validation and delivery calculation`);
+          console.log(`✅ Order is PICKUP - skipping address validation`);
           
           // Obtener dirección del vendor como dirección del pedido
           const { data: vendor } = await supabase
@@ -1230,69 +1174,35 @@ async function ejecutarHerramienta(
             .single();
           
           context.delivery_address = `RETIRO EN LOCAL: ${vendor?.address || 'Dirección no disponible'}`;
-          deliveryCost = 0;  // Sin costo de delivery
+          deliveryCost = 0;
           
         } else {
-          // ⭐ Si es DELIVERY, validar dirección y calcular costo
-
-          if (context.user_latitude && context.user_longitude) {
-          // Usuario tiene ubicación, validar cobertura
-          const { data: vendor } = await supabase
-            .from("vendors")
-            .select("id, name, latitude, longitude, delivery_radius_km, delivery_pricing_type, delivery_price_per_km, delivery_fixed_price, delivery_additional_per_km, address")
-            .eq("id", context.selected_vendor_id)
-            .single();
-
-          if (vendor?.latitude && vendor?.longitude && vendor?.delivery_radius_km) {
-            // Calcular distancia
-            const { data: distanceResult, error: distError } = await supabase.rpc("calculate_distance", {
-              lat1: context.user_latitude,
-              lon1: context.user_longitude,
-              lat2: vendor.latitude,
-              lon2: vendor.longitude,
-            });
-
-            if (!distError && distanceResult !== null) {
-              deliveryDistance = distanceResult;
-              console.log(`📏 Distance: ${distanceResult}km`);
-            }
-
-            // 🚚 DELIVERY FIJO: Siempre usar precio fijo sin validar radio
-            // El negocio validará manualmente si hace delivery a esa zona
-            deliveryCost = vendor.delivery_fixed_price || 0;
-            deliveryCost = Math.round(deliveryCost);
-            console.log(`🚚 Delivery cost (fixed): ${deliveryCost} $`);
-          }
-
-          // ⚠️ CRÍTICO: SIEMPRE usar la dirección del contexto si existe
-          // Esto evita que el AI use incorrectamente la dirección del vendor
-          if (context.delivery_address) {
-            args.direccion = context.delivery_address;
-            console.log(`✅ Using saved context address (forced): ${args.direccion}`);
-          } else if (!args.direccion || args.direccion.trim() === "") {
-            args.direccion = `Lat: ${context.user_latitude.toFixed(6)}, Lon: ${context.user_longitude.toFixed(6)}`;
-            console.log(`✅ Using coordinates as address: ${args.direccion}`);
-          }
-        } else {
-          // Sin ubicación GPS - aplicar delivery fijo de todos modos
+          // ⭐ Si es DELIVERY, validar dirección y obtener costo fijo
+          
+          // Obtener costo de delivery fijo del vendor
           const { data: vendor } = await supabase
             .from("vendors")
             .select("delivery_fixed_price")
             .eq("id", context.selected_vendor_id)
             .single();
           
-          if (vendor) {
-            deliveryCost = vendor.delivery_fixed_price || 0;
-            deliveryCost = Math.round(deliveryCost);
-            console.log(`🚚 Delivery cost (fixed, no GPS): ${deliveryCost} $`);
-          }
-          
-          // Aceptar dirección de texto manual
-          if (!args.direccion || args.direccion.trim() === "") {
+          deliveryCost = vendor?.delivery_fixed_price || 0;
+          deliveryCost = Math.round(deliveryCost);
+          console.log(`🚚 Delivery cost (fixed): ${deliveryCost} $`);
+
+          // Validar que tengamos una dirección
+          if (!args.direccion && !context.delivery_address) {
             return `📍 Para confirmar tu pedido, necesito tu dirección de entrega.\n\n✍️ Escribí tu dirección completa (calle y número).\n\nEl negocio confirmará si hace delivery a tu zona. 🚗`;
           }
-        }  // ⭐ Fin del if/else de ubicación GPS
-        }  // ⭐ Fin del else de delivery_type === 'delivery'
+
+          // Usar la dirección del contexto si existe, de lo contrario usar la de los argumentos
+          if (context.delivery_address) {
+            args.direccion = context.delivery_address;
+          } else {
+            context.delivery_address = args.direccion;
+          }
+        }
+  // ⭐ Fin del else de delivery_type === 'delivery'
 
         // 🚫 Verificar si el usuario ya tiene un pedido activo (SIEMPRE desde BD)
         const { data: activeOrders } = await supabase
@@ -1380,7 +1290,6 @@ async function ejecutarHerramienta(
           items_count: context.cart.length,
           subtotal,
           delivery_cost: deliveryCost,
-          delivery_distance: deliveryDistance,
           total,
           address: context.delivery_address,
           payment_method: context.payment_method,
@@ -1397,7 +1306,7 @@ async function ejecutarHerramienta(
             status: "pending",
             address: context.delivery_address,
             payment_method: context.payment_method,
-            address_is_manual: context.delivery_type === 'pickup' ? false : (!context.user_latitude || context.user_latitude === 0), // Marca si es manual (pickup es siempre false)
+            address_is_manual: context.delivery_type !== 'pickup', // Marca como manual si es delivery
             delivery_type: context.delivery_type || 'delivery',  // ⭐ NUEVO CAMPO
           })
           .select()
@@ -1677,28 +1586,8 @@ async function ejecutarHerramienta(
             : "No hay ofertas disponibles en este momento. 😔";
         }
 
-        // Filtrar ofertas por ubicación y horarios
-        let filteredOffers = offers;
-
-        if (!targetVendorId && context.user_latitude && context.user_longitude) {
-          // Si no hay vendor específico pero sí ubicación, filtrar por alcance
-          const { data: vendorsInRange } = await supabase.rpc("get_vendors_in_range", {
-            user_lat: context.user_latitude,
-            user_lon: context.user_longitude,
-          });
-
-          if (vendorsInRange && vendorsInRange.length > 0) {
-            const openVendorIds = vendorsInRange.filter((v: any) => v.is_open).map((v: any) => v.vendor_id);
-
-            filteredOffers = offers.filter((offer: any) => openVendorIds.includes(offer.vendor_id));
-          } else {
-            filteredOffers = [];
-          }
-        }
-
-        if (filteredOffers.length === 0) {
-          return "No hay ofertas disponibles de negocios que estén abiertos y te hagan delivery en este momento. 😔";
-        }
+        // Filtrar ofertas por horarios (la ubicación ya no se filtra)
+        const filteredOffers = offers;
 
         let resultado = `🎁 ${filteredOffers.length === 1 ? "Oferta disponible" : `${filteredOffers.length} ofertas disponibles`}:\n\n`;
 
@@ -2273,372 +2162,6 @@ async function ejecutarHerramienta(
 Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
       }
 
-      case "guardar_direccion": {
-        // Primero intentar obtener las coordenadas del contexto
-        let lat = context.user_latitude;
-        let lng = context.user_longitude;
-        let address = context.delivery_address;
-
-        // Si no están en el contexto, buscar en la sesión más reciente
-        if (!lat || !lng) {
-          console.log("⚠️ Coordinates not in context, fetching from database...");
-          const { data: session } = await supabase
-            .from("user_sessions")
-            .select("user_latitude, user_longitude, last_bot_message")
-            .eq("phone", context.phone)
-            .maybeSingle();
-
-          if (session?.user_latitude && session?.user_longitude) {
-            lat = session.user_latitude;
-            lng = session.user_longitude;
-            console.log(`✅ Found coordinates in session: ${lat}, ${lng}`);
-
-            // Actualizar el contexto para futuras operaciones
-            context.user_latitude = lat;
-            context.user_longitude = lng;
-          }
-        }
-
-        // Si aún no tenemos coordenadas, pedir que las comparta
-        if (!lat || !lng) {
-          return (
-            'Parece que no tengo tu ubicación guardada. Necesito que compartas tu ubicación tocando el clip 📎 en WhatsApp y eligiendo "Ubicación". \n\nUna vez que lo hagas, podré guardarla como "' +
-            args.nombre +
-            '". 😊'
-          );
-        }
-
-        // Validar nombre
-        const nombre = args.nombre.trim();
-        if (!nombre || nombre.length < 2) {
-          return "Por favor elegí un nombre más descriptivo para tu dirección (mínimo 2 caracteres).";
-        }
-
-        // Buscar si ya existe una dirección con ese nombre
-        const { data: existing } = await supabase
-          .from("saved_addresses")
-          .select("id")
-          .eq("phone", context.phone)
-          .eq("name", nombre)
-          .maybeSingle();
-
-        if (existing) {
-          return `Ya tenés una dirección guardada con el nombre "${nombre}". Podés borrarla primero o usar otro nombre.`;
-        }
-
-        // Guardar dirección
-        const { error } = await supabase.from("saved_addresses").insert({
-          phone: context.phone,
-          name: nombre,
-          address: address || "Ubicación guardada",
-          latitude: lat,
-          longitude: lng,
-          is_temporary: false,
-        });
-
-        if (error) {
-          console.error("Error saving address:", error);
-          return "Hubo un problema al guardar tu dirección. Intentá de nuevo.";
-        }
-
-        console.log(`✅ Address saved: ${nombre} at ${lat}, ${lng}`);
-        return `✅ Listo, guardé tu dirección como "${nombre}" 📍\n\nLa próxima vez podés decir *"Enviar a ${nombre}"* para usarla rápido. 😊`;
-      }
-
-      case "usar_direccion_temporal": {
-        if (!context.user_latitude || !context.user_longitude) {
-          return "⚠️ No tengo tu ubicación guardada. Por favor compartí tu ubicación usando el botón 📍 de WhatsApp primero.";
-        }
-
-        // Marcar como temporal
-        context.pending_location_decision = false;
-
-        return `Perfecto 👍 Usaré esta ubicación solo para este pedido.\n\n⚠️ *Importante:* Esta dirección se eliminará automáticamente al finalizar el pedido.\n\n¿Qué te gustaría pedir? 😊`;
-      }
-
-      case "listar_direcciones": {
-        const { data: addresses, error } = await supabase
-          .from("saved_addresses")
-          .select("*")
-          .eq("phone", context.phone)
-          .eq("is_temporary", false)
-          .order("created_at", { ascending: false });
-
-        if (error) {
-          console.error("Error fetching addresses:", error);
-          return "Hubo un problema al obtener tus direcciones. Intentá de nuevo.";
-        }
-
-        if (!addresses || addresses.length === 0) {
-          return '📍 No tenés direcciones guardadas todavía.\n\nPodés compartir tu ubicación 📍 y guardarla con un nombre (ej: "Casa", "Trabajo") para usarla en futuros pedidos. 😊';
-        }
-
-        let resultado = `📍 *Tus direcciones guardadas:*\n\n`;
-        addresses.forEach((addr: any, i: number) => {
-          resultado += `${i + 1}. 🏠 *${addr.name}*\n`;
-          resultado += `   ${addr.address}\n`;
-          resultado += `   _Guardada el ${new Date(addr.created_at).toLocaleDateString("es-AR")}_\n\n`;
-        });
-        resultado += `💡 Podés decir *"Enviar a ${addresses[0].name}"* para usar una dirección o *"Borrar ${addresses[0].name}"* para eliminarla.`;
-
-        return resultado;
-      }
-
-      case "borrar_direccion": {
-        const nombre = args.nombre.trim();
-
-        const { data: address } = await supabase
-          .from("saved_addresses")
-          .select("id")
-          .eq("phone", context.phone)
-          .eq("name", nombre)
-          .eq("is_temporary", false)
-          .maybeSingle();
-
-        if (!address) {
-          return `No encontré una dirección llamada "${nombre}".\n\nPodés ver tus direcciones diciendo "Mis direcciones". 📍`;
-        }
-
-        const { error } = await supabase.from("saved_addresses").delete().eq("id", address.id);
-
-        if (error) {
-          console.error("Error deleting address:", error);
-          return "Hubo un problema al borrar la dirección. Intentá de nuevo.";
-        }
-
-        return `✅ Listo, eliminé la dirección "${nombre}". 🗑️`;
-      }
-
-      case "renombrar_direccion": {
-        const nombreViejo = args.nombre_viejo.trim();
-        const nombreNuevo = args.nombre_nuevo.trim();
-
-        if (!nombreNuevo || nombreNuevo.length < 2) {
-          return "Por favor elegí un nombre más descriptivo (mínimo 2 caracteres).";
-        }
-
-        // Buscar dirección a renombrar
-        const { data: address } = await supabase
-          .from("saved_addresses")
-          .select("id")
-          .eq("phone", context.phone)
-          .eq("name", nombreViejo)
-          .eq("is_temporary", false)
-          .maybeSingle();
-
-        if (!address) {
-          return `No encontré una dirección llamada "${nombreViejo}".\n\nPodés ver tus direcciones diciendo "Mis direcciones". 📍`;
-        }
-
-        // Verificar que el nuevo nombre no exista
-        const { data: existing } = await supabase
-          .from("saved_addresses")
-          .select("id")
-          .eq("phone", context.phone)
-          .eq("name", nombreNuevo)
-          .maybeSingle();
-
-        if (existing) {
-          return `Ya tenés una dirección con el nombre "${nombreNuevo}". Elegí otro nombre. 😊`;
-        }
-
-        // Renombrar
-        const { error } = await supabase.from("saved_addresses").update({ name: nombreNuevo }).eq("id", address.id);
-
-        if (error) {
-          console.error("Error renaming address:", error);
-          return "Hubo un problema al renombrar la dirección. Intentá de nuevo.";
-        }
-
-        return `✅ Listo, renombré "${nombreViejo}" a "${nombreNuevo}". 📝`;
-      }
-
-      case "usar_direccion_guardada": {
-        const nombre = args.nombre.trim();
-
-        const { data: address, error } = await supabase
-          .from("saved_addresses")
-          .select("*")
-          .eq("phone", context.phone)
-          .eq("name", nombre)
-          .eq("is_temporary", false)
-          .maybeSingle();
-
-        if (error || !address) {
-          return `No encontré una dirección llamada "${nombre}".\n\nPodés ver tus direcciones diciendo "Mis direcciones" 📍 o compartir una nueva ubicación.`;
-        }
-
-        // Actualizar contexto con la dirección guardada
-        context.user_latitude = parseFloat(address.latitude);
-        context.user_longitude = parseFloat(address.longitude);
-        context.delivery_address = address.address;
-
-        // Actualizar en user_sessions
-        await supabase.from("user_sessions").upsert(
-          {
-            phone: context.phone,
-            user_latitude: context.user_latitude,
-            user_longitude: context.user_longitude,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "phone" },
-        );
-
-        return `📍 Perfecto, voy a usar tu dirección "${nombre}".\n\n${address.address}\n\n¿Qué te gustaría pedir? 😊`;
-      }
-
-      case "eliminar_todas_direcciones": {
-        const { error } = await supabase
-          .from("saved_addresses")
-          .delete()
-          .eq("phone", context.phone)
-          .eq("is_temporary", false);
-
-        if (error) {
-          console.error("Error deleting all addresses:", error);
-          return "Hubo un problema al eliminar tus direcciones. Intentá de nuevo.";
-        }
-
-        return `✅ Listo, eliminé todas tus ubicaciones guardadas. 💬\n\nPodés compartir tu ubicación 📍 cuando quieras hacer un nuevo pedido.`;
-      }
-
-      case "agregar_direccion_manual": {
-        const direccionCompleta = args.direccion_completa.trim();
-        const nombre = args.nombre?.trim();
-
-        if (!direccionCompleta || direccionCompleta.length < 10) {
-          return "Por favor escribí una dirección más completa (calle, número, ciudad, referencias). Mínimo 10 caracteres.";
-        }
-
-        // Si tiene nombre, guardar de forma permanente
-        if (nombre && nombre.length >= 2) {
-          // Verificar si ya existe
-          const { data: existing } = await supabase
-            .from("saved_addresses")
-            .select("id")
-            .eq("phone", context.phone)
-            .eq("name", nombre)
-            .maybeSingle();
-
-          if (existing) {
-            return `Ya tenés una dirección guardada con el nombre "${nombre}". Podés borrarla primero o usar otro nombre.`;
-          }
-
-          // Guardar con coordenadas null e indicador manual
-          const { error } = await supabase.from("saved_addresses").insert({
-            phone: context.phone,
-            name: nombre,
-            address: direccionCompleta,
-            latitude: 0, // Coordenadas en 0,0 indican entrada manual
-            longitude: 0,
-            is_temporary: false,
-            is_manual_entry: true,
-          });
-
-          if (error) {
-            console.error("Error saving manual address:", error);
-            return "Hubo un problema al guardar tu dirección. Intentá de nuevo.";
-          }
-
-          return `✅ Dirección guardada como "${nombre}": ${direccionCompleta}\n\n⚠️ Importante: Esta dirección NO fue validada con GPS. El negocio verá que fue ingresada manualmente y confirmará si hace delivery ahí. 📍`;
-        } else {
-          // Sin nombre = temporal para este pedido
-          context.delivery_address = direccionCompleta;
-          context.user_latitude = 0; // Marca como manual
-          context.user_longitude = 0;
-
-          return `✅ Voy a usar esta dirección para tu pedido: ${direccionCompleta}\n\n⚠️ Esta dirección NO fue validada con GPS. El negocio confirmará si hace delivery ahí. 📍`;
-        }
-      }
-
-      case "calcular_costo_delivery": {
-        // Verificar que hay un negocio seleccionado
-        if (!context.selected_vendor_id) {
-          return "Primero tenés que elegir un negocio para saber el costo del delivery. ¿Querés que te muestre los locales disponibles?";
-        }
-
-        // Verificar que el cliente tiene ubicación
-        if (!context.user_latitude || !context.user_longitude || context.user_latitude === 0) {
-          return `📍 Para calcular el costo del delivery necesito que compartas tu ubicación.\n\n👉 Tocá el clip 📎 en WhatsApp y elegí "Ubicación"\n\nAsí puedo calcular la distancia desde ${context.selected_vendor_name || "el negocio"} hasta tu domicilio. 🚗`;
-        }
-
-        // Obtener información del vendor
-        const { data: vendor, error: vendorError } = await supabase
-          .from("vendors")
-          .select("id, name, latitude, longitude, delivery_radius_km, delivery_pricing_type, delivery_price_per_km, delivery_fixed_price, delivery_additional_per_km")
-          .eq("id", context.selected_vendor_id)
-          .single();
-
-        if (vendorError || !vendor) {
-          console.error("Error fetching vendor for delivery calc:", vendorError);
-          return "Hubo un problema al obtener la información del negocio. Intentá de nuevo.";
-        }
-
-        // Verificar que el vendor tiene ubicación configurada
-        if (!vendor.latitude || !vendor.longitude) {
-          return `${vendor.name} todavía no configuró su ubicación exacta, por lo que no puedo calcular el costo del delivery automáticamente. Podés consultarle directamente al negocio.`;
-        }
-
-        // Calcular distancia
-        const { data: distance, error: distError } = await supabase.rpc("calculate_distance", {
-          lat1: context.user_latitude,
-          lon1: context.user_longitude,
-          lat2: vendor.latitude,
-          lon2: vendor.longitude,
-        });
-
-        if (distError || distance === null) {
-          console.error("Error calculating distance:", distError);
-          return "Hubo un problema al calcular la distancia. Intentá de nuevo.";
-        }
-
-        // Verificar si está dentro del radio
-        if (distance > vendor.delivery_radius_km) {
-          return `😔 Lo siento, ${vendor.name} no hace delivery a tu ubicación.\n\n📍 Tu ubicación está a ${distance.toFixed(1)} km del local.\n🚗 Radio de cobertura: ${vendor.delivery_radius_km} km\n\n💡 Podés buscar otros negocios más cercanos.`;
-        }
-
-        // Calcular costo según el tipo de pricing
-        const pricingType = vendor.delivery_pricing_type || 'per_km';
-        let deliveryCost = 0;
-        let costExplanation = "";
-
-        if (pricingType === 'fixed') {
-          deliveryCost = vendor.delivery_fixed_price || 0;
-          costExplanation = "Precio fijo";
-        } else if (pricingType === 'base_plus_km') {
-          const basePrice = vendor.delivery_fixed_price || 0;
-          const additionalPerKm = vendor.delivery_additional_per_km || 0;
-          const additionalDistance = Math.max(0, distance - 1);
-          deliveryCost = basePrice + (additionalDistance * additionalPerKm);
-          
-          if (distance <= 1) {
-            costExplanation = `Precio base (dentro del primer km)`;
-          } else {
-            costExplanation = `$ ${Math.round(basePrice).toLocaleString("es-PY")} (base) + $ ${Math.round(additionalDistance * additionalPerKm).toLocaleString("es-PY")} (${additionalDistance.toFixed(2)} km adicionales × $ ${Math.round(additionalPerKm).toLocaleString("es-PY")})`;
-          }
-        } else {
-          // per_km
-          const pricePerKm = vendor.delivery_price_per_km || 0;
-          deliveryCost = distance * pricePerKm;
-          costExplanation = `${distance.toFixed(1)} km × $ ${Math.round(pricePerKm).toLocaleString("es-PY")}`;
-        }
-
-        deliveryCost = Math.round(deliveryCost);
-
-        if (deliveryCost === 0) {
-          return `✅ ¡${vendor.name} hace delivery a tu zona!\n\n📏 Distancia: ${distance.toFixed(1)} km\n\n💰 El delivery está incluido en el precio total sin costo adicional. 🎉`;
-        }
-
-        let response = `✅ ¡${vendor.name} hace delivery a tu zona!\n\n📏 Distancia: ${distance.toFixed(1)} km\n💰 Costo del delivery: $ ${deliveryCost.toLocaleString("es-PY")}`;
-        
-        if (costExplanation && pricingType !== 'fixed') {
-          response += `\n   (${costExplanation})`;
-        }
-        
-        response += `\n\nEste monto se suma al total de tu pedido al confirmar. 🚚`;
-
-        return response;
-      }
 
       case "confirmar_direccion_entrega": {
         console.log("📍 ========== CONFIRMAR DIRECCION ENTREGA ==========");

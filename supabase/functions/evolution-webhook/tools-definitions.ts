@@ -26,7 +26,7 @@ export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: "ver_locales_abiertos",
       description:
-        "Muestra la lista completa de negocios/locales disponibles. USA ESTA HERRAMIENTA cuando el cliente diga: 'mostrame los negocios', 'qué negocios hay', 'ver locales', 'locales disponibles', 'que locales hacen delivery', etc. Filtra por ubicación automáticamente si el usuario tiene coordenadas guardadas.",
+        "Muestra la lista completa de negocios/locales disponibles. USA ESTA HERRAMIENTA cuando el cliente diga: 'mostrame los negocios', 'qué negocios hay', 'ver locales', 'locales disponibles', 'que locales hacen delivery', etc.",
       parameters: {
         type: "object",
         properties: {
@@ -436,85 +436,6 @@ MUESTRA:
           },
         },
         required: ["rating"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "guardar_direccion",
-      description: "Guarda la ubicación actual del usuario con un nombre específico para usarla en futuros pedidos.",
-      parameters: {
-        type: "object",
-        properties: {
-          nombre: {
-            type: "string",
-            description: "Nombre para identificar la dirección (ej: 'Casa', 'Trabajo', 'Oficina')",
-          },
-        },
-        required: ["nombre"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "usar_direccion_temporal",
-      description:
-        "Marca la ubicación actual como temporal. Se usará solo para este pedido y se eliminará automáticamente al finalizar.",
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "listar_direcciones",
-      description: "Muestra todas las direcciones guardadas por el cliente.",
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "borrar_direccion",
-      description: "Elimina una dirección guardada específica.",
-      parameters: {
-        type: "object",
-        properties: {
-          nombre: {
-            type: "string",
-            description: "Nombre de la dirección a borrar (ej: 'Casa')",
-          },
-        },
-        required: ["nombre"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "usar_direccion_guardada",
-      description: "Selecciona una dirección guardada para usarla en el pedido actual.",
-      parameters: {
-        type: "object",
-        properties: {
-          nombre: {
-            type: "string",
-            description: "Nombre de la dirección guardada a usar (ej: 'Casa')",
-          },
-        },
-        required: ["nombre"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "calcular_costo_delivery",
-      description:
-        "Calcula el costo de delivery desde el negocio actual hasta la ubicación del cliente. Usa esto cuando el cliente pregunte cuánto sale el delivery.",
-      parameters: {
-        type: "object",
-        properties: {},
-        required: [],
       },
     },
   },
