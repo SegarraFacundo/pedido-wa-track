@@ -232,9 +232,12 @@ async function ejecutarHerramienta(
           });
         }
 
-        // Guardar el mapa en el contexto y actualizar marca de tiempo
+        // Guardar el mapa en el contexto, transicionar a browsing y actualizar marca de tiempo
         context.available_vendors_map = vendorMap;
         context.last_vendors_fetch = new Date().toISOString();
+        const oldState = context.order_state || "idle";
+        context.order_state = "browsing";
+        console.log(`🔄 STATE: ${oldState} → browsing (ver_locales_abiertos)`);
         await saveContext(context, supabase);
 
         const timeStr = argentinaTime.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
