@@ -227,12 +227,14 @@ async function ejecutarHerramienta(
           });
         }
 
-        // Guardar el mapa en el contexto
+        // Guardar el mapa en el contexto y actualizar marca de tiempo
         context.available_vendors_map = vendorMap;
+        context.last_vendors_fetch = new Date().toISOString();
         await saveContext(context, supabase);
 
-        resultado +=
-          "\n💬 Decime el *número* o *nombre* del negocio para ver su menú. 😊";
+        const timeStr = argentinaTime.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+        resultado += `\n\n_🕒 Datos actualizados a las ${timeStr}_`;
+        resultado += "\n💬 Decime el *número* o *nombre* del negocio para ver su menú. 😊";
 
         return resultado;
       }
@@ -484,11 +486,18 @@ async function ejecutarHerramienta(
         // 🚀 STATE TRANSITION: browsing → shopping
         const oldState = context.order_state || "idle";
         context.order_state = "shopping";
+        context.last_menu_fetch = new Date().toISOString();
         console.log(`🔄 STATE TRANSITION: ${oldState} → shopping (menu shown, ready to shop)`);
 
         // 💾 IMPORTANTE: Guardar el contexto después de seleccionar el negocio
         await saveContext(context, supabase);
         console.log(`💾 Context saved with vendor: ${vendor.name} (${vendor.id})`);
+
+        const now = new Date();
+        const argTime = new Date(now.toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
+        const timeStr = argTime.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+        
+        menu += `\n_🕒 Menú actualizado: ${timeStr}_`;
         
         return menu;
       }
@@ -817,6 +826,10 @@ async function ejecutarHerramienta(
         await saveContext(context, supabase);
         
         console.log("✅ Resumen mostrado y marcado en contexto");
+        
+        const argTime = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
+        const timeStr = argTime.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+        resumen += `\n_🕒 Resumen actualizado a las ${timeStr}_`;
         
         return resumen;
       }
@@ -1552,10 +1565,15 @@ async function ejecutarHerramienta(
           cancelled: "❌ Cancelado",
         };
 
-        let estado = `📦 Estado del pedido #${order.id.substring(0, 8)}\n\n`;
+        const argTime = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
+        const timeStr = argTime.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+
+        let estado = `📊 *Estado de tu pedido*\n\n`;
+        estado += `🆔 Pedido #${order.id.substring(0, 8)}\n`;
         estado += `🏪 Negocio: ${order.vendors.name}\n`;
-        estado += `📊 Estado: ${statusEmojis[order.status] || order.status}\n`;
-        estado += `💰 Total: $${order.total}\n`;
+        estado += `✨ Estado: *${statusEmojis[order.status] || order.status}*\n`;
+        estado += `💰 Total: $${Math.round(order.total).toLocaleString("es-AR")}\n\n`;
+        estado += `_🕒 Actualizado hoy ${timeStr}_`;
 
         return estado;
       }
@@ -1605,10 +1623,13 @@ async function ejecutarHerramienta(
 
           const validUntil = new Date(offer.valid_until);
           resultado += `   ⏰ Válido hasta: ${validUntil.toLocaleDateString("es-AR")}\n`;
-          resultado += `   ID Negocio: ${offer.vendor_id}\n`;
-          resultado += `\n`;
+          resultado += `   ID Negocio: ${offer.vendor_id}\n\n`;
         });
 
+        const argTime = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
+        const timeStr = argTime.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+        resultado += `_🕒 Ofertas actualizadas hoy ${timeStr}_`;
+        
         return resultado;
       }
 
@@ -1804,7 +1825,10 @@ async function ejecutarHerramienta(
 
         const metodosNumerados = metodosDisponibles.map((m, i) => `${i + 1}. *${m.replace('- ', '')}*`).join('\n');
 
-        return `${textoMetodos}\n\n${metodosNumerados}${datosTransferencia}\n\nElegí uno (podés escribir el número o el nombre). 😊`;
+        const argTime = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
+        const timeStr = argTime.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+        
+        return `${textoMetodos}\n\n${metodosNumerados}${datosTransferencia}\n\n_🕒 Lista de pagos actualizada: ${timeStr}_\n\nElegí uno (podés escribir el número o el nombre). 😊`;
       }
 
       case "seleccionar_metodo_pago": {

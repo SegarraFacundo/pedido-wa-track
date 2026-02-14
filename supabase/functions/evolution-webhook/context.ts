@@ -94,6 +94,8 @@ export async function getContext(phone: string, supabase: any): Promise<Conversa
         payment_methods_fetched: saved.payment_methods_fetched || false,
         available_payment_methods: saved.available_payment_methods || [],
         available_vendors_map: saved.available_vendors_map || [],
+        last_menu_fetch: saved.last_menu_fetch,
+        last_vendors_fetch: saved.last_vendors_fetch,
       };
       
       // ✅ SINCRONIZAR CON LA DB - verificar si el pedido sigue activo
