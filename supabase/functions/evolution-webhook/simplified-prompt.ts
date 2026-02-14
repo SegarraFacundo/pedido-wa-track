@@ -126,6 +126,12 @@ ${currentState === "browsing" ? `
 - SOLO DESPUÉS llamá ver_menu_negocio con el ID del negocio elegido
 - NO llames ver_menu_negocio hasta que el usuario elija
 - Una vez elegido → cambiar a "shopping"
+
+🚨 DESPUÉS DE buscar_productos:
+- Si el usuario elige un negocio de los resultados → Llamá ver_menu_negocio (NUNCA agregar_al_carrito directo)
+- El usuario DEBE ver el menú completo antes de poder agregar productos
+- NUNCA intentes agregar productos basándote solo en los resultados de búsqueda
+- Los resultados de búsqueda son solo una VISTA PREVIA, no un menú completo
 ` : ""}
 
 ${currentState === "shopping" ? `
