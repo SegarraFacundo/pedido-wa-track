@@ -3352,14 +3352,30 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     const toolCallTracker = new Map<string, number>();
 
     // 🎯 CRÍTICO: Construir mensajes UNA SOLA VEZ antes del loop
-    // 🧹 En estado idle/browsing, limitar historial agresivamente para evitar alucinaciones
-    // El historial viejo contiene menús, precios y vendors de sesiones anteriores
+    // 🧹 Filtrar historial agresivamente para evitar alucinaciones
     const historyLimit = context.order_state === "idle" ? 1 
       : context.order_state === "browsing" ? 2 
-      : 15;
+      : 6;
+    
+    // 🧹 FILTRAR mensajes que contengan menús/listas de productos del historial
+    // Estos causan que el modelo use datos viejos en vez de llamar herramientas
+    const menuPattern = /\d+\.\s+\*?.+\$[\d.,]+/; // Detecta "1. Producto $precio"
+    const filteredHistory = context.conversation_history
+      .slice(-historyLimit)
+      .filter(msg => {
+        // Mantener siempre mensajes del usuario
+        if (msg.role === "user") return true;
+        // Filtrar mensajes del asistente que contengan menús/listas de productos
+        if (msg.role === "assistant" && msg.content && menuPattern.test(msg.content)) {
+          console.log("🧹 Filtered out menu-containing message from history");
+          return false;
+        }
+        return true;
+      });
+    
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       { role: "system", content: buildSystemPrompt(context) },
-      ...context.conversation_history.slice(-historyLimit),
+      ...filteredHistory,
     ];
 
     // Loop de conversación con tool calling
@@ -3374,9 +3390,10 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       // 🔄 Actualizar SOLO el system prompt (primer mensaje) con el estado actualizado
       messages[0] = { role: "system", content: buildSystemPrompt(context) };
 
-      // 🎯 Forzar tool_choice en primera iteración para idle/browsing
+      // 🎯 Forzar tool_choice en primera iteración para TODOS los estados pre-checkout
       // Esto OBLIGA al modelo a llamar una herramienta en vez de alucinar con datos del historial
-      const forceTools = (context.order_state === "idle" || context.order_state === "browsing") 
+      const nonCheckoutStates = ["idle", "browsing", "shopping", "needs_address"];
+      const forceTools = nonCheckoutStates.includes(context.order_state || "idle") 
         && iterationCount === 1;
 
       const completion = await openai.chat.completions.create({
