@@ -2974,6 +2974,33 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       return clarificationResponse;
     }
 
+    // 🔄 MANEJO PROGRAMATICO: Confirmacion de pedido post-resumen
+    // Cuando resumen_mostrado = true y el usuario confirma, llamar crear_pedido
+    // directamente sin pasar por el LLM (que alucina "pedido activo" inexistente)
+    if (context.resumen_mostrado && !context.pending_order_id) {
+      const userResponse = message.toLowerCase().trim();
+      const isConfirmation = /^(s[ií]|si|yes|dale|ok|confirmo|listo|confirmar|vamos|va)$/i.test(userResponse);
+      const isCancellation = /^(no|nop|cancel|cancela|cambiar)/i.test(userResponse);
+      
+      if (isConfirmation) {
+        console.log(`✅ PROGRAMMATIC: User confirmed order post-summary, calling crear_pedido directly`);
+        const result = await ejecutarHerramienta("crear_pedido", {
+          direccion: context.delivery_address,
+          metodo_pago: context.payment_method,
+        }, context, supabase);
+        
+        await saveContext(context, supabase);
+        return result;
+      }
+      
+      if (isCancellation) {
+        console.log(`❌ PROGRAMMATIC: User cancelled post-summary, resetting resumen_mostrado`);
+        context.resumen_mostrado = false;
+        await saveContext(context, supabase);
+        // Dejar que el LLM maneje la cancelacion/modificacion
+      }
+    }
+
     // 🔄 MANEJO ESPECIAL: Usuario en order_pending_mp pide el link de pago
     if (context.order_state === "order_pending_mp") {
       const userMessage = message.toLowerCase().trim();
