@@ -2885,9 +2885,23 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     // 🚫 VALIDACIÓN TEMPRANA: Bloquear pedidos duplicados cuando hay uno activo
     const pendingStates = ['order_pending_cash', 'order_pending_transfer', 'order_pending_mp', 'order_confirmed'];
     const newOrderKeywords = ['quiero pedir', 'quiero hacer un pedido', 'nuevo pedido', 'hacer pedido', 'quiero comprar', 'ver locales', 'ver negocios', 'ver menu', 'ver menú'];
+    const cancelKeywords = ['cancelar pedido', 'cancelar mi pedido', 'cancelar el pedido', 'quiero cancelar', 'cancela mi pedido', 'cancela el pedido'];
     
     if (pendingStates.includes(context.order_state || '')) {
       const messageLower = message.toLowerCase();
+      
+      // 🔴 INTERCEPTOR: Si el usuario quiere cancelar, activar flujo programático directamente
+      const wantsCancel = cancelKeywords.some(kw => messageLower.includes(kw));
+      if (wantsCancel && !context.pending_cancellation) {
+        console.log(`🔴 CANCEL INTERCEPT: User wants to cancel, activating programmatic flow`);
+        context.pending_cancellation = {
+          step: "awaiting_reason",
+          order_id: context.pending_order_id || context.last_order_id,
+        };
+        await saveContext(context, supabase);
+        return "¿Por qué querés cancelar el pedido? Escribí el motivo:";
+      }
+      
       const wantsNewOrder = newOrderKeywords.some(kw => messageLower.includes(kw));
       
       if (wantsNewOrder && !context.pending_cancellation) {
