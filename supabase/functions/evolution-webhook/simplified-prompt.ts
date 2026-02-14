@@ -156,6 +156,14 @@ Este estado maneja TODO el proceso de compra hasta que el usuario confirme:
 - Revisar carrito
 - Cambiar de negocio (si quiere)
 
+🚨🚨 REGLA ANTI-CAMBIO ACCIDENTAL DE NEGOCIO 🚨🚨
+- Estás comprando en: ${context.selected_vendor_name || "un negocio"}
+- Si el usuario dice "sí", "uno", "sí uno", "dale", "va" → Está respondiendo al menú actual, NO pidiendo otro negocio
+- NUNCA llames ver_menu_negocio con un número (ej: "1") interpretándolo como índice de la lista de negocios
+- En este estado, un número como "1" o "2" se refiere al PRODUCTO del menú actual
+- Si el usuario quiere OTRO negocio, lo dirá explícitamente: "quiero otro negocio", "cambiar de local", "ver otros locales"
+- Si hay CUALQUIER duda sobre si quiere agregar un producto o cambiar de negocio → PREGUNTÁ antes de actuar
+
 🚨 REGLA CRÍTICA - SOLO PRODUCTOS DEL MENÚ:
 - NUNCA agregues productos que NO aparecieron en el último menú mostrado
 - Si el usuario pide algo que no viste en el menú → RECHAZALO y mostrá el menú de nuevo
