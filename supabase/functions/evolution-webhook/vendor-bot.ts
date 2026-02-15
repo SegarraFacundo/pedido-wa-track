@@ -777,7 +777,41 @@ async function ejecutarHerramienta(
           resumen += `\n⚠️ *Tipo de entrega no seleccionado*\n`;
         }
         
-        // 3. Método de pago
+        // 3. Método de pago - VALIDAR contra payment_settings reales del vendor
+        // Fetch payment_settings del vendor para validar
+        const { data: vendorPaymentData } = await supabase
+          .from("vendors")
+          .select("payment_settings")
+          .eq("id", context.selected_vendor_id)
+          .single();
+        
+        const paymentSettings = vendorPaymentData?.payment_settings || {};
+        
+        // Construir lista de métodos realmente habilitados
+        const realAvailableMethods: string[] = [];
+        if (paymentSettings.efectivo === true) realAvailableMethods.push("efectivo");
+        if (paymentSettings.transferencia?.activo === true) realAvailableMethods.push("transferencia");
+        if (paymentSettings.mercadoPago?.activo === true) realAvailableMethods.push("mercadopago");
+        
+        // Validar el método guardado en contexto contra los reales
+        if (context.payment_method) {
+          const normalizedMethod = context.payment_method.toLowerCase();
+          const isValid = realAvailableMethods.includes(normalizedMethod);
+          
+          if (!isValid) {
+            console.log(`⚠️ payment_method "${context.payment_method}" NO es válido para este vendor. Métodos reales: ${realAvailableMethods.join(', ')}`);
+            // Limpiar método inválido
+            context.payment_method = undefined;
+            context.available_payment_methods = realAvailableMethods;
+            await saveContext(context, supabase);
+          }
+        }
+        
+        // Actualizar available_payment_methods siempre con los reales
+        if (realAvailableMethods.length > 0) {
+          context.available_payment_methods = realAvailableMethods;
+        }
+        
         resumen += `\n💳 *Método de pago:* `;
         if (context.payment_method) {
           const paymentIcons: Record<string, string> = {
