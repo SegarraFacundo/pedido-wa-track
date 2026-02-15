@@ -202,16 +202,41 @@ export function useRealtimeOrders(vendorId?: string) {
 
   const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
     try {
-      // Primero verificar el estado actual
-      const currentOrder = orders.find(o => o.id === orderId);
-      if (!currentOrder) {
+      // Primero verificar el estado actual EN LA BASE DE DATOS (no local)
+      const { data: freshOrder, error: fetchError } = await supabase
+        .from('orders')
+        .select('status, delivery_type')
+        .eq('id', orderId)
+        .single();
+
+      if (fetchError || !freshOrder) {
         throw new Error('Pedido no encontrado');
       }
 
+      // Si el pedido ya fue cancelado en la DB, bloquear y sincronizar estado local
+      if (freshOrder.status === 'cancelled') {
+        setOrders(prev => prev.map(order =>
+          order.id === orderId
+            ? { ...order, status: 'cancelled' as OrderStatus, updatedAt: new Date() }
+            : order
+        ));
+        toast({
+          title: "⚠️ Pedido cancelado",
+          description: "Este pedido ya fue cancelado por el cliente. No se puede modificar.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Evitar actualizar al mismo estado
-      if (currentOrder.status === newStatus) {
+      if (freshOrder.status === newStatus) {
         console.log(`Pedido ya está en estado ${newStatus}, ignorando actualización`);
         return;
+      }
+
+      const currentOrder = orders.find(o => o.id === orderId);
+      if (!currentOrder) {
+        throw new Error('Pedido no encontrado localmente');
       }
 
       // Actualizar localmente primero para feedback inmediato
