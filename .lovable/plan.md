@@ -1,34 +1,28 @@
 
 
-# Fix: Cancellation flow blocked by keyword filter
+# Fix: Bot ofrece método de pago no disponible en el resumen
 
-## Problem
+## Problema
 
-The "new order keywords" validation (line 2885) runs BEFORE the `pending_cancellation` handler (line 2983). So when the user writes "Quiero pedir otra cosa" as a cancellation reason, it matches "quiero pedir" and gets blocked with "Ya tenes un pedido activo" before the cancellation handler ever sees it.
+El bot muestra "Transferencia" en el resumen del pedido aunque el negocio no la tiene habilitada. Esto pasa porque `mostrar_resumen_pedido` simplemente muestra lo que hay en `context.payment_method` sin validarlo contra los métodos reales del vendedor. Si el LLM guardó un método incorrecto (o el contexto quedó contaminado de una sesión anterior), el resumen lo muestra como válido, y luego `crear_pedido` lo rechaza.
 
-## Solution
+## Solucion
 
-Add a simple bypass: skip the `newOrderKeywords` block when `context.pending_cancellation` is active.
+Agregar una validacion en `mostrar_resumen_pedido` que verifique el metodo de pago guardado contra los `payment_settings` reales del vendedor. Si no es valido, lo borra del contexto y pide al usuario que elija de nuevo.
 
-## Technical change
+## Cambio tecnico
 
-### File: `supabase/functions/evolution-webhook/vendor-bot.ts` (~line 2893)
+### Archivo: `supabase/functions/evolution-webhook/vendor-bot.ts`
 
-Change the condition from:
+En el case `mostrar_resumen_pedido` (linea ~780), antes de mostrar el metodo de pago:
 
-```
-if (wantsNewOrder) {
-```
+1. Consultar `payment_settings` del vendor actual desde la base de datos
+2. Validar que `context.payment_method` este habilitado
+3. Si NO es valido: limpiar `context.payment_method`, poblar `context.available_payment_methods` con los metodos reales, y mostrar la lista para que el usuario elija
+4. Si ES valido: mostrarlo normalmente en el resumen
 
-To:
-
-```
-if (wantsNewOrder && !context.pending_cancellation) {
-```
-
-This way, when the user is in the cancellation flow, the keyword filter is skipped and the message reaches the `pending_cancellation` handler at line 2983.
+Esto garantiza que el resumen NUNCA muestre un metodo de pago que el negocio no acepta.
 
 ### Deployment
 
-Redeploy `evolution-webhook`.
-
+Redesplegar `evolution-webhook`.
