@@ -1,30 +1,38 @@
 
-# Ocultar numero de cliente en mensaje inicial del chat
+# Reemplazar confirm() nativos por AlertDialog
 
-## Problema
+## Archivos a modificar
 
-Cuando un cliente solicita hablar con el vendedor, el mensaje inicial del sistema en el chat muestra el numero completo del cliente: `Cliente 5493464448309 solicito hablar con el vendedor`. Esto se genera en `vendor-bot.ts` linea 2031.
+### 1. `src/components/VendorOffersManager.tsx`
+- Agregar import de `AlertDialog` y sus subcomponentes
+- Agregar estados `deleteDialogOpen` y `offerToDelete`
+- Reemplazar el `confirm()` en `handleDeleteOffer` por un flujo de dialog: una funcion `requestDelete` que abre el dialog, y `confirmDelete` que ejecuta la eliminacion
+- Agregar el componente `AlertDialog` al final del JSX con mensaje "Esta accion no se puede deshacer"
 
-## Solucion
+### 2. `src/components/VendorProductManager.tsx`
+- Mismo patron: import de `AlertDialog`, estados `deleteDialogOpen` y `productToDelete`
+- Reemplazar el `confirm()` en `handleDeleteProduct` por `requestDeleteProduct` + `confirmDeleteProduct`
+- Agregar el `AlertDialog` al final del JSX
 
-Modificar la linea 2031 en `supabase/functions/evolution-webhook/vendor-bot.ts` para enmascarar el numero del cliente, mostrando solo los ultimos 4 digitos.
+## Patron a seguir
 
-### Cambio
+Exactamente el mismo que ya se implemento en `VendorDirectChat.tsx`:
 
-Antes:
 ```
-message: `Cliente ${context.phone} solicitó hablar con el vendedor`
+const [dialogOpen, setDialogOpen] = useState(false);
+const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+
+const requestDelete = (id: string) => {
+  setItemToDelete(id);
+  setDialogOpen(true);
+};
+
+const confirmDelete = async () => {
+  if (!itemToDelete) return;
+  setDialogOpen(false);
+  // ...logica de eliminacion existente...
+  setItemToDelete(null);
+};
 ```
 
-Despues:
-```
-message: `Un cliente solicitó hablar con el vendedor`
-```
-
-Se elimina el numero por completo del mensaje del sistema, ya que el vendedor puede ver el identificador enmascarado (`Cliente ***8309`) en el encabezado del chat.
-
-### Archivo a modificar
-- `supabase/functions/evolution-webhook/vendor-bot.ts` (linea 2031)
-
-### Despliegue
-- Redesplegar la edge function `evolution-webhook`
+Con estos 2 archivos se eliminan todos los `confirm()` nativos restantes del proyecto.
