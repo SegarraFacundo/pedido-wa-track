@@ -1679,8 +1679,10 @@ async function ejecutarHerramienta(
             resultado += `   💵 Antes: $${offer.original_price} → Ahora: $${offer.offer_price}\n`;
           }
 
-          const validUntil = new Date(offer.valid_until);
-          resultado += `   ⏰ Válido hasta: ${validUntil.toLocaleDateString("es-AR")}\n`;
+          if (offer.valid_until) {
+            const validUntil = new Date(offer.valid_until);
+            resultado += `   ⏰ Válido hasta: ${validUntil.toLocaleDateString("es-AR")}\n`;
+          }
           resultado += `   ID Negocio: ${offer.vendor_id}\n\n`;
         });
 
