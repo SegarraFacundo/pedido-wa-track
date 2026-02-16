@@ -1763,8 +1763,10 @@ async function ejecutarHerramienta(
           .eq("id", orderId);
 
         if (updateError) {
+          console.error(`❌ Error updating order ${orderId} to cancelled:`, JSON.stringify(updateError));
           return "Hubo un error al cancelar el pedido. Intenta de nuevo.";
         }
+        console.log(`✅ Order ${orderId} successfully cancelled`);
 
         // Registrar historial
         await supabase.from("order_status_history").insert({
