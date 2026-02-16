@@ -292,7 +292,7 @@ MUESTRA:
         properties: {
           vendor_id: {
             type: "string",
-            description: "ID del negocio (opcional). Si no se especifica, muestra todas las ofertas activas.",
+            description: "UUID del negocio (opcional). Debe ser un UUID, no el nombre. Si no se especifica, usa el negocio del contexto actual.",
           },
         },
         required: [],
