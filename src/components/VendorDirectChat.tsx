@@ -31,6 +31,11 @@ interface VendorDirectChatProps {
   vendorId: string;
 }
 
+function maskPhone(phone: string): string {
+  if (!phone || phone.length < 4) return 'Cliente';
+  return `Cliente ***${phone.slice(-4)}`;
+}
+
 export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
   const [activeChats, setActiveChats] = useState<Chat[]>([]);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
@@ -95,7 +100,7 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
           
           toast({
             title: '💬 Nuevo chat',
-            description: `Cliente ${newChat.customer_phone} quiere hablar contigo`
+            description: `${maskPhone(newChat.customer_phone)} quiere hablar contigo`
           });
         }
       )
@@ -485,7 +490,7 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
                   <div className="flex items-center gap-2">
                     <User className="h-4 w-4" />
                     <span className="font-medium text-sm">
-                      {chat.customer_phone}
+                      {maskPhone(chat.customer_phone)}
                     </span>
                   </div>
                   <Badge variant="default" className="text-xs">
@@ -522,7 +527,7 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
                 <div className="flex items-center gap-2">
                   <User className="h-5 w-5" />
                   <div>
-                    <p className="font-medium">{selectedChat.customer_phone}</p>
+                    <p className="font-medium">{maskPhone(selectedChat.customer_phone)}</p>
                     <p className="text-xs text-muted-foreground">
                       Chat iniciado {format(selectedChat.started_at, 'HH:mm', { locale: es })}
                     </p>
