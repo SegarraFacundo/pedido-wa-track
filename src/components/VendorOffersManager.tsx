@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Trash2, Edit, Plus, Tag, Calendar as CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -37,6 +38,8 @@ export function VendorOffersManager({ vendorId }: VendorOffersManagerProps) {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingOffer, setEditingOffer] = useState<VendorOffer | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [offerToDelete, setOfferToDelete] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Form state
@@ -132,14 +135,20 @@ export function VendorOffersManager({ vendorId }: VendorOffersManagerProps) {
     }
   };
 
-  const handleDeleteOffer = async (id: string) => {
-    if (!confirm('¿Estás seguro de eliminar esta oferta?')) return;
+  const requestDeleteOffer = (id: string) => {
+    setOfferToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteOffer = async () => {
+    if (!offerToDelete) return;
+    setDeleteDialogOpen(false);
 
     try {
       const { error } = await supabase
         .from('vendor_offers')
         .delete()
-        .eq('id', id);
+        .eq('id', offerToDelete);
 
       if (error) throw error;
 
@@ -155,6 +164,8 @@ export function VendorOffersManager({ vendorId }: VendorOffersManagerProps) {
         description: 'No se pudo eliminar la oferta',
         variant: 'destructive'
       });
+    } finally {
+      setOfferToDelete(null);
     }
   };
 
@@ -288,7 +299,7 @@ export function VendorOffersManager({ vendorId }: VendorOffersManagerProps) {
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => handleDeleteOffer(offer.id)}
+                  onClick={() => requestDeleteOffer(offer.id)}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -437,6 +448,21 @@ export function VendorOffersManager({ vendorId }: VendorOffersManagerProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar oferta?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. La oferta será eliminada permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteOffer}>Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
