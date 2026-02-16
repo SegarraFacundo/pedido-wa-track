@@ -259,6 +259,15 @@ export function OrderCard({
         </div>
       </CardHeader>
 
+      {order.status === "cancelled" && (
+        <div className="mx-6 mb-0 mt-[-0.5rem] flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3">
+          <XCircle className="h-5 w-5 text-destructive shrink-0" />
+          <span className="text-sm font-semibold text-destructive">
+            Este pedido fue cancelado por el cliente
+          </span>
+        </div>
+      )}
+
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-sm">
