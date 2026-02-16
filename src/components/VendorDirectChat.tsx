@@ -4,6 +4,16 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { MessageCircle, Send, User, Bot, Users } from 'lucide-react';
@@ -44,6 +54,8 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
   const [loading, setLoading] = useState(true);
   const [vendorName, setVendorName] = useState<string>('');
   const [vendorPhone, setVendorPhone] = useState<string>('');
+  const [endChatDialogOpen, setEndChatDialogOpen] = useState(false);
+  const [chatToEnd, setChatToEnd] = useState<string | null>(null);
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -400,12 +412,19 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
     }
   };
 
-  const endChat = async (chatId: string) => {
-    if (!confirm('¿Estás seguro de finalizar este chat?')) return;
+  const requestEndChat = (chatId: string) => {
+    setChatToEnd(chatId);
+    setEndChatDialogOpen(true);
+  };
+
+  const confirmEndChat = async () => {
+    if (!chatToEnd) return;
+    const chatId = chatToEnd;
+    setEndChatDialogOpen(false);
+    setChatToEnd(null);
 
     try {
-      // Obtener info del chat antes de cerrarlo
-      const chatToEnd = activeChats.find(c => c.id === chatId);
+      const chat = activeChats.find(c => c.id === chatId);
       
       const { error } = await supabase
         .from('vendor_chats')
@@ -417,18 +436,26 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
 
       if (error) throw error;
 
-      // Desactivar modo chat directo para reactivar el bot
-      if (chatToEnd) {
+      if (chat) {
         await supabase
           .from('user_sessions')
           .update({
             in_vendor_chat: false,
-            assigned_vendor_phone: null
+            assigned_vendor_phone: null,
+            updated_at: new Date().toISOString()
           })
-          .eq('phone', chatToEnd.customer_phone);
+          .eq('phone', chat.customer_phone);
+
+        // Notificar al cliente que el bot está activo nuevamente
+        await supabase.functions.invoke('send-whatsapp-notification', {
+          body: {
+            phoneNumber: chat.customer_phone,
+            message: `✅ El bot está activo nuevamente. Puedes seguir haciendo consultas o pedidos.`
+          }
+        });
       }
 
-      setActiveChats(prev => prev.filter(chat => chat.id !== chatId));
+      setActiveChats(prev => prev.filter(c => c.id !== chatId));
       if (selectedChat?.id === chatId) {
         setSelectedChat(null);
         setMessages([]);
@@ -436,7 +463,7 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
 
       toast({
         title: '✅ Chat finalizado',
-        description: 'El bot se ha reactivado para este cliente'
+        description: 'El bot se ha reactivado y el cliente fue notificado'
       });
     } catch (error) {
       console.error('Error ending chat:', error);
@@ -536,7 +563,7 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
                 <Button
                   size="sm"
                   variant="destructive"
-                  onClick={() => endChat(selectedChat.id)}
+                  onClick={() => requestEndChat(selectedChat.id)}
                 >
                   Finalizar Chat
                 </Button>
@@ -605,6 +632,21 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
           </CardContent>
         )}
       </Card>
+
+      <AlertDialog open={endChatDialogOpen} onOpenChange={setEndChatDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Finalizar este chat?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Al finalizar, el bot se reactivará automáticamente y el cliente será notificado para que pueda seguir interactuando con el bot.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setChatToEnd(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmEndChat}>Finalizar Chat</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
