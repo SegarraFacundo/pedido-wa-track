@@ -176,10 +176,19 @@ export function useRealtimeOrders(vendorId?: string) {
                 );
               });
 
-              toastRef.current({
-                title: '✅ Pedido actualizado',
-                description: `Estado cambiado a ${newStatus}`,
-              });
+              if (newStatus === 'cancelled') {
+                toastRef.current({
+                  title: '🚨 PEDIDO CANCELADO POR EL CLIENTE',
+                  description: `El pedido #${payload.new.id.slice(0, 8)} fue cancelado`,
+                  variant: 'destructive',
+                  duration: 15000,
+                });
+              } else {
+                toastRef.current({
+                  title: '✅ Pedido actualizado',
+                  description: `Estado cambiado a ${newStatus}`,
+                });
+              }
             } else if (payload.eventType === 'DELETE') {
               setOrders(prev => prev.filter(order => order.id !== payload.old.id));
             }
