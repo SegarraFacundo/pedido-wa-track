@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit2, Trash2, Save, X, Upload } from 'lucide-react';
 
@@ -37,6 +38,8 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Form state
@@ -253,14 +256,20 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
     }
   };
 
-  const handleDeleteProduct = async (productId: string) => {
-    if (!confirm('¿Está seguro de eliminar este producto?')) return;
+  const requestDeleteProduct = (productId: string) => {
+    setProductToDelete(productId);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteProduct = async () => {
+    if (!productToDelete) return;
+    setDeleteDialogOpen(false);
 
     try {
       const { error } = await supabase
         .from('products')
         .delete()
-        .eq('id', productId);
+        .eq('id', productToDelete);
 
       if (error) throw error;
 
@@ -276,6 +285,8 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
         description: 'No se pudo eliminar el producto',
         variant: 'destructive'
       });
+    } finally {
+      setProductToDelete(null);
     }
   };
 
@@ -439,7 +450,7 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleDeleteProduct(product.id)}
+                        onClick={() => requestDeleteProduct(product.id)}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
@@ -647,6 +658,21 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar producto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. El producto será eliminado permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteProduct}>Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
