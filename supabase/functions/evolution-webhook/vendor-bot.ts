@@ -2028,7 +2028,7 @@ async function ejecutarHerramienta(
             await supabase.from("chat_messages").insert({
               chat_id: chatId,
               sender_type: "bot",
-              message: `Cliente ${context.phone} solicitó hablar con el vendedor`,
+              message: `Un cliente solicitó hablar con el vendedor`,
             });
 
             // 📧 Notificar al vendedor que un cliente quiere hablar
