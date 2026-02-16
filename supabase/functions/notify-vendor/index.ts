@@ -5,6 +5,19 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function maskCustomerIdentity(orderId: string): string {
+  return `Pedido #${orderId.slice(0, 8)}`;
+}
+
+function simplifyAddress(address: string): string {
+  if (!address) return "Ver en panel";
+  const parts = address.split(",");
+  if (parts.length >= 2) {
+    return `Zona ${parts[1].trim()} (ver panel para detalles)`;
+  }
+  return `Zona ${parts[0].trim()} (ver panel para detalles)`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -123,9 +136,9 @@ Deno.serve(async (req) => {
           return `• ${item.quantity ?? 1}x ${name} - $${subtotal}`;
         })
           .join("\n");
-        message = `🛍️ *Nuevo Pedido #${order.id.slice(0, 8)}*\n\n` +
-          `👤 Cliente: ${order.customer_name}\n` +
-          `📍 Dirección: ${order.address}\n\n` +
+        message = `🛍️ *Nuevo ${maskCustomerIdentity(order.id)}*\n\n` +
+          `👤 Cliente: ${maskCustomerIdentity(order.id)}\n` +
+          `📍 Dirección: ${simplifyAddress(order.address)}\n\n` +
           `*Productos:*\n${itemsList}\n\n` +
           `💰 Total: $${order.total}\n\n` +
           `Por favor, confirma el pedido desde tu panel de vendedor.`;
@@ -135,8 +148,8 @@ Deno.serve(async (req) => {
         if (!order) {
           throw new Error('Order required for order_cancelled event');
         }
-        message = `❌ *Pedido Cancelado #${order.id.slice(0, 8)}*\n\n` +
-          `El pedido de ${order.customer_name} ha sido cancelado.\n` +
+        message = `❌ *${maskCustomerIdentity(order.id)} Cancelado*\n\n` +
+          `El ${maskCustomerIdentity(order.id)} ha sido cancelado.\n` +
           `Total: $${order.total}`;
         break;
 
