@@ -1,48 +1,73 @@
 
-# Fix: Actualizar pedido cancelado en tiempo real en el panel del vendedor
+# Ocultar datos del cliente en notificaciones al vendedor
 
 ## Problema
 
-Cuando un cliente cancela un pedido desde WhatsApp, el panel del vendedor no refleja el cambio de forma visible. El realtime SI actualiza el estado internamente, pero:
-1. El toast de cancelacion es generico ("Pedido actualizado") y facil de ignorar
-2. La tarjeta del pedido solo cambia el badge de color, sin ningun aviso prominente
-3. El vendedor puede no darse cuenta y seguir intentando avanzar el pedido
+Las notificaciones de WhatsApp que recibe el vendedor (nuevo pedido, cancelacion, etc.) incluyen el nombre del cliente y la direccion completa. Como `customer_name` se guarda con el numero de telefono del cliente, el vendedor puede ver el numero y contactarlo por fuera de la plataforma.
 
 ## Solucion
 
-Dos cambios concretos:
+Modificar la edge function `notify-vendor` para enmascarar/eliminar los datos sensibles del cliente en los mensajes que se envian al vendedor por WhatsApp.
 
-### 1. Toast de cancelacion prominente (useRealtimeOrders.ts)
+### Cambios en `supabase/functions/notify-vendor/index.ts`
 
-Cuando llega un evento realtime de cancelacion, mostrar un toast **destructivo** con duracion extendida en lugar del generico "Pedido actualizado":
+1. **Nuevo pedido (`new_order`)** - Linea 126-131:
+   - Reemplazar `order.customer_name` con un identificador corto del pedido (ej: "Cliente #a1b2c3d4")
+   - Simplificar la direccion: mostrar solo el barrio/zona (primer segmento antes de la coma), sin calle exacta
+   - Mantener productos y total intactos
 
-- Titulo: "PEDIDO CANCELADO POR EL CLIENTE"
-- Variante: `destructive` (rojo)
-- Duracion: 15 segundos
-- Solo para cancelaciones; el resto de estados mantiene el toast actual
+   Antes:
+   ```
+   Cliente: 5493512345678
+   Direccion: Av. Colon 1234, Centro, Cordoba
+   ```
 
-### 2. Banner visual en tarjeta cancelada (OrderCard.tsx)
+   Despues:
+   ```
+   Cliente: Pedido #a1b2c3d4
+   Direccion: Zona Centro (ver panel para detalles)
+   ```
 
-Agregar un banner rojo prominente dentro de la tarjeta cuando `order.status === 'cancelled'`, visible inmediatamente debajo del header:
+2. **Pedido cancelado (`order_cancelled`)** - Linea 138-140:
+   - Reemplazar `order.customer_name` con el identificador del pedido
+   
+   Antes: `El pedido de 5493512345678 ha sido cancelado`
+   Despues: `El pedido #a1b2c3d4 ha sido cancelado`
+
+3. **Mensaje de cliente (`customer_message`)** - Linea 143-145:
+   - Ya no muestra datos del cliente, no requiere cambios
+
+### Funcion auxiliar
+
+Agregar una funcion `maskCustomerIdentity` al inicio del archivo:
+
+```typescript
+function maskCustomerIdentity(orderId: string): string {
+  return `Pedido #${orderId.slice(0, 8)}`;
+}
+
+function simplifyAddress(address: string): string {
+  if (!address) return "Ver en panel";
+  const firstPart = address.split(",")[0].trim();
+  return `Zona ${firstPart} (ver panel para detalles)`;
+}
+```
+
+### Resultado final del mensaje de nuevo pedido
 
 ```
----------------------------------------------
-|  El cliente cancelo este pedido           |
----------------------------------------------
+Nueva Pedido #a1b2c3d4
+
+Cliente: Pedido #a1b2c3d4
+Direccion: Zona Av. Colon (ver panel para detalles)
+
+Productos:
+- 2x Pizza - $3000
+- 1x Coca Cola - $1500
+
+Total: $4500
+
+Por favor, confirma el pedido desde tu panel de vendedor.
 ```
 
-- Fondo rojo con icono de alerta
-- Texto claro: "Este pedido fue cancelado"
-- Reemplaza los botones de accion (ya lo hace parcialmente, pero el banner lo hace obvio)
-
-## Detalle tecnico
-
-**Archivo 1: `src/hooks/useRealtimeOrders.ts`**
-- En el handler de UPDATE (linea ~179), verificar si `newStatus === 'cancelled'` antes del toast generico
-- Si es cancelacion: toast destructivo con titulo alarmante y duracion 15s
-- Si no: mantener el toast actual
-
-**Archivo 2: `src/components/OrderCard.tsx`**
-- Despues del CardHeader (linea ~260), agregar un bloque condicional:
-  - Si `order.status === 'cancelled'`: mostrar un `div` con fondo `bg-red-100 border-red-300` con icono `XCircle` y texto "Este pedido fue cancelado por el cliente"
-- Esto es un cambio puramente visual, no afecta logica
+Esto obliga al vendedor a usar el panel para ver los datos completos del cliente, impidiendo el contacto directo por fuera de la plataforma.
