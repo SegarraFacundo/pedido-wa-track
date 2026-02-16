@@ -1623,8 +1623,24 @@ async function ejecutarHerramienta(
       case "ver_ofertas": {
         const nowIso: string = new Date().toISOString();
 
-        // Si el usuario está en una conversación con un vendor específico, solo mostrar sus ofertas
-        const targetVendorId = args.vendor_id || context.selected_vendor_id;
+        // Priorizar el vendor del contexto (siempre tiene UUID correcto)
+        let targetVendorId = context.selected_vendor_id;
+
+        // Si la IA pasó un vendor_id y no hay uno en contexto, verificar si es UUID o nombre
+        if (args.vendor_id && !context.selected_vendor_id) {
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          if (uuidRegex.test(args.vendor_id)) {
+            targetVendorId = args.vendor_id;
+          } else {
+            // Buscar por nombre si no es UUID
+            const { data: vendorByName } = await supabase
+              .from("vendors")
+              .select("id")
+              .ilike("name", args.vendor_id)
+              .maybeSingle();
+            if (vendorByName) targetVendorId = vendorByName.id;
+          }
+        }
 
         let query = supabase
           .from("vendor_offers")
