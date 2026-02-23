@@ -12,7 +12,7 @@ async function syncOrderStateWithDB(context: ConversationContext, supabase: any)
   
   const { data: order, error } = await supabase
     .from("orders")
-    .select("status")
+    .select("status, created_at")
     .eq("id", context.pending_order_id)
     .maybeSingle();
   
@@ -21,8 +21,19 @@ async function syncOrderStateWithDB(context: ConversationContext, supabase: any)
     return;
   }
   
-  // Si el pedido no existe o ya terminó, limpiar el contexto
-  if (!order || order.status === 'delivered' || order.status === 'cancelled') {
+  // Verificar si el pedido es muy viejo (más de 4 horas en pending = abandonado)
+  const isStaleOrder = order && order.status === 'pending' && order.created_at && 
+    (Date.now() - new Date(order.created_at).getTime()) > 4 * 60 * 60 * 1000;
+  
+  if (isStaleOrder) {
+    console.log(`⏰ Order ${context.pending_order_id} is stale (pending for >4h), auto-cancelling`);
+    // Cancelar el pedido viejo en la DB
+    await supabase.from("orders").update({ status: 'cancelled', payment_status: 'cancelled', updated_at: new Date().toISOString() }).eq("id", context.pending_order_id);
+    await supabase.from("order_status_history").insert({ order_id: context.pending_order_id, status: 'cancelled', changed_by: 'system', reason: 'Pedido abandonado (sin actividad por más de 4 horas)' });
+  }
+
+  // Si el pedido no existe, ya terminó, o es muy viejo, limpiar el contexto
+  if (!order || order.status === 'delivered' || order.status === 'cancelled' || isStaleOrder) {
     console.log(`✅ Order ${context.pending_order_id} is ${order?.status || 'not found'}, resetting context`);
     
     // Guardar el ID como último pedido antes de limpiar
