@@ -714,8 +714,6 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
           }
           toolCallTracker.set(toolName, callCount + 1);
 
-          // Save state BEFORE tool execution to detect "already shopping" vs "just transitioned"
-          const stateBeforeToolCall = context.order_state;
           const toolResult = await ejecutarHerramienta(toolName, toolArgs, context, supabase);
 
           if (DIRECT_RESPONSE_TOOLS.has(toolName) && assistantMessage.tool_calls!.length === 1) {
