@@ -249,10 +249,10 @@ export default function Landing() {
             </div>
             
             <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8 text-sm">
-              <Link to="/terminos" className="opacity-70 hover:opacity-100 transition-opacity">
+              <Link to={lp("/terminos")} className="opacity-70 hover:opacity-100 transition-opacity">
                 {t('footer.terms')}
               </Link>
-              <Link to="/privacidad" className="opacity-70 hover:opacity-100 transition-opacity">
+              <Link to={lp("/privacidad")} className="opacity-70 hover:opacity-100 transition-opacity">
                 {t('footer.privacy')}
               </Link>
               <a href="mailto:contacto@lapacho.ar" className="opacity-70 hover:opacity-100 transition-opacity">
