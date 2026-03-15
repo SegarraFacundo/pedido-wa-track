@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,12 +17,19 @@ const languages = [
 
 export default function LanguageSelector() {
   const { i18n } = useTranslation();
+  const navigate = useNavigate();
+  const { locale } = useParams<{ locale: string }>();
+  const location = useLocation();
 
   const currentLang = languages.find(l => l.code === i18n.language) || languages[0];
 
   const changeLang = (code: string) => {
-    i18n.changeLanguage(code);
+    // Replace the locale prefix in the current path
+    const pathWithoutLocale = locale
+      ? location.pathname.replace(`/${locale}`, '') || '/'
+      : location.pathname;
     localStorage.setItem('i18n_lang', code);
+    navigate(`/${code}${pathWithoutLocale}${location.search}${location.hash}`);
   };
 
   return (

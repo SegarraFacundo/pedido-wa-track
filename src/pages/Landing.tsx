@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { useLocalePath } from "@/hooks/useLocalePath";
 import { 
   MessageSquare, 
   Clock, 
@@ -18,7 +19,7 @@ import LanguageSelector from "@/components/LanguageSelector";
 
 export default function Landing() {
   const { t } = useTranslation();
-
+  const lp = useLocalePath();
   const handleProbarClick = () => {
     const whatsappNumber = '5493464448309';
     const message = encodeURIComponent('Hola, quiero probar Lapacho');
@@ -77,7 +78,7 @@ export default function Landing() {
           </div>
           <nav className="flex items-center gap-2 sm:gap-4">
             <LanguageSelector />
-            <Link to="/contacto" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <Link to={lp("/contacto")} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
               {t('header.contact')}
             </Link>
             <Button variant="outline" size="sm" onClick={handleProbarClick}>
@@ -248,10 +249,10 @@ export default function Landing() {
             </div>
             
             <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8 text-sm">
-              <Link to="/terminos" className="opacity-70 hover:opacity-100 transition-opacity">
+              <Link to={lp("/terminos")} className="opacity-70 hover:opacity-100 transition-opacity">
                 {t('footer.terms')}
               </Link>
-              <Link to="/privacidad" className="opacity-70 hover:opacity-100 transition-opacity">
+              <Link to={lp("/privacidad")} className="opacity-70 hover:opacity-100 transition-opacity">
                 {t('footer.privacy')}
               </Link>
               <a href="mailto:contacto@lapacho.ar" className="opacity-70 hover:opacity-100 transition-opacity">

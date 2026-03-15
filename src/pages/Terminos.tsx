@@ -2,9 +2,11 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, Leaf } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
+import { useLocalePath } from "@/hooks/useLocalePath";
 
 export default function Terminos() {
   const { t } = useTranslation();
+  const lp = useLocalePath();
 
   const renderSection = (titleKey: string, textKey?: string, introKey?: string, itemsKey?: string) => (
     <section>
@@ -26,12 +28,12 @@ export default function Terminos() {
       <header className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-3">
+            <Link to={lp("/")} className="flex items-center gap-3">
               <Leaf className="h-6 w-6 text-primary" />
               <span className="font-semibold">Lapacho</span>
             </Link>
             <Button variant="ghost" size="sm" asChild>
-              <Link to="/">
+              <Link to={lp("/")}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 {t('common.back')}
               </Link>
