@@ -1,4 +1,3 @@
-// evolution-webhook entry - v2
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
 import { handleVendorBot } from './vendor-bot.ts';
