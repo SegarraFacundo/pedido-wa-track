@@ -1068,7 +1068,7 @@ export async function ejecutarHerramienta(
             confirmacion += t('order.transfer_data', lang) + `\n\n`;
             confirmacion += `• *Alias:* ${transferData.alias}\n`;
             confirmacion += `• *CBU/CVU:* ${transferData.cbu}\n`;
-            confirmacion += `• *${lang === 'es' ? 'Titular' : lang === 'en' ? 'Account holder' : lang === 'pt' ? 'Titular' : '名義人'}:* ${transferData.titular}\n\n`;
+            confirmacion += `• *${t('label.account_holder', lang)}:* ${transferData.titular}\n\n`;
             confirmacion += t('order.transfer_confirm_prompt', lang);
           } else {
             confirmacion += t('order.transfer_data_error', lang);
