@@ -1038,7 +1038,7 @@ export async function ejecutarHerramienta(
           if (context.pickup_instructions) {
             confirmacion += `📝 ${context.pickup_instructions}\n\n`;
           }
-          confirmacion += `💳 ${lang === 'es' ? 'Pago' : lang === 'en' ? 'Payment' : lang === 'pt' ? 'Pagamento' : '支払い'}: ${context.payment_method}\n`;
+          confirmacion += `💳 ${t('label.payment', lang)}: ${context.payment_method}\n`;
         } else {
           confirmacion += `🛒 Subtotal: $ ${Math.round(subtotal).toLocaleString("es-PY")}\n`;
           confirmacion += `🚚 Delivery: $ ${Math.round(deliveryCost).toLocaleString("es-PY")}\n`;
