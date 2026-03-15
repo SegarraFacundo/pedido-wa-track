@@ -14,6 +14,8 @@ export async function ejecutarHerramienta(
   console.log(`🔧 [TOOL CALL] ${toolName}`, JSON.stringify(args, null, 2));
   console.log(`Ejecutando herramienta: ${toolName}`, args);
 
+  const lang = (context.language || 'es') as Language;
+
   try {
     switch (toolName) {
       case "buscar_productos": {
@@ -30,11 +32,11 @@ export async function ejecutarHerramienta(
         console.log("Search products result:", JSON.stringify(data, null, 2));
 
         if (error || !data?.found) {
-          return `No encontré negocios abiertos con "${args.consulta}".`;
+          return t('search.no_results', lang, { query: args.consulta });
         }
 
         const vendorMap: Array<{ index: number; name: string; vendor_id: string }> = [];
-        let resultado = `Encontré estos negocios con "${args.consulta}":\n\n`;
+        let resultado = t('search.results_header', lang, { query: args.consulta }) + `\n\n`;
         data.results.forEach((r: any, i: number) => {
           const idx = i + 1;
           resultado += `${idx}. *${r.vendor.name}*\n`;
@@ -49,7 +51,7 @@ export async function ejecutarHerramienta(
         context.last_vendors_fetch = new Date().toISOString();
         await saveContext(context, supabase);
 
-        resultado += `Decime el número o nombre del negocio para ver su menú completo.`;
+        resultado += t('search.select_prompt', lang);
         return resultado;
       }
 
@@ -58,7 +60,7 @@ export async function ejecutarHerramienta(
         const pendingStates = ['order_pending_cash', 'order_pending_transfer', 'order_pending_mp', 'order_confirmed'];
         if (pendingStates.includes(context.order_state || '')) {
           const orderId = context.pending_order_id ? context.pending_order_id.substring(0, 8) : 'activo';
-          return `⏳ Ya tenés un pedido activo (#${orderId}). Esperá a que se complete o cancelalo antes de hacer otro. 😊`;
+          return t('order.active_exists', lang, { id: orderId });
         }
         
         const now = new Date();
@@ -77,11 +79,11 @@ export async function ejecutarHerramienta(
 
         if (error) {
           console.error("Error fetching vendors:", error);
-          return "⚠️ Ocurrió un error al buscar negocios. Intentalo nuevamente.";
+          return t('error.vendor_fetch', lang);
         }
 
         if (!vendorsInRange || vendorsInRange.length === 0) {
-          return "😔 No hay negocios disponibles en este momento.";
+          return t('vendors.no_available', lang);
         }
         
         const vendorIds = vendorsInRange.map((v: any) => v.id);
@@ -115,16 +117,16 @@ export async function ejecutarHerramienta(
         const openVendors = vendorsInRange.filter((v: any) => isVendorOpen(v.id));
         const closedVendors = vendorsInRange.filter((v: any) => !isVendorOpen(v.id));
 
-        let resultado = "¡Aquí tenés los negocios disponibles! 🚗\n\n";
+        let resultado = t('vendors.header', lang) + "\n\n";
 
         const vendorMap: Array<{ index: number; name: string; vendor_id: string }> = [];
         let currentIndex = 1;
 
         if (openVendors.length > 0) {
-          resultado += `🟢 *ABIERTOS AHORA* (${openVendors.length}):\n\n`;
+          resultado += `${t('vendors.open_now', lang)} (${openVendors.length}):\n\n`;
           openVendors.forEach((v: any) => {
             resultado += `${currentIndex}. *${v.name}*\n`;
-            resultado += `📍 ${v.address || "Dirección no disponible"}\n`;
+            resultado += `📍 ${v.address || t('vendors.address_unavailable', lang)}\n`;
             
             vendorMap.push({ index: currentIndex, name: v.name, vendor_id: v.id });
             currentIndex++;
@@ -138,21 +140,21 @@ export async function ejecutarHerramienta(
                     ? "24 hs"
                     : `${h.opening_time.slice(0, 5)} - ${h.closing_time.slice(0, 5)}`
                 );
-              if (slots.length > 0) resultado += `⏰ Horario: ${slots.join(", ")}\n`;
+              if (slots.length > 0) resultado += `⏰ ${t('vendors.schedule', lang)}: ${slots.join(", ")}\n`;
             }
 
             if (v.average_rating && v.total_reviews)
-              resultado += `⭐ Rating: ${v.average_rating.toFixed(1)} (${v.total_reviews} reseñas)\n`;
+              resultado += `⭐ ${t('vendors.rating', lang)}: ${v.average_rating.toFixed(1)} (${v.total_reviews} ${t('vendors.reviews', lang)})\n`;
 
             resultado += `\n`;
           });
         }
 
         if (closedVendors.length > 0) {
-          resultado += `🔴 *CERRADOS* (${closedVendors.length}):\n\n`;
+          resultado += `${t('vendors.closed', lang)} (${closedVendors.length}):\n\n`;
           closedVendors.forEach((v: any) => {
             resultado += `${currentIndex}. *${v.name}* 🔒\n`;
-            resultado += `📍 ${v.address || "Dirección no disponible"}\n`;
+            resultado += `📍 ${v.address || t('vendors.address_unavailable', lang)}\n`;
             
             vendorMap.push({ index: currentIndex, name: v.name, vendor_id: v.id });
             currentIndex++;
@@ -166,11 +168,11 @@ export async function ejecutarHerramienta(
                     ? "24 hs"
                     : `${h.opening_time.slice(0, 5)} - ${h.closing_time.slice(0, 5)}`
                 );
-              if (slots.length > 0) resultado += `⏰ Horario: ${slots.join(", ")}\n`;
+              if (slots.length > 0) resultado += `⏰ ${t('vendors.schedule', lang)}: ${slots.join(", ")}\n`;
             }
 
             if (v.average_rating && v.total_reviews)
-              resultado += `⭐ Rating: ${v.average_rating.toFixed(1)} (${v.total_reviews} reseñas)\n`;
+              resultado += `⭐ ${t('vendors.rating', lang)}: ${v.average_rating.toFixed(1)} (${v.total_reviews} ${t('vendors.reviews', lang)})\n`;
 
             resultado += `\n`;
           });
@@ -184,8 +186,8 @@ export async function ejecutarHerramienta(
         await saveContext(context, supabase);
 
         const timeStr = argentinaTime.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
-        resultado += `\n\n_🕒 Datos actualizados a las ${timeStr}_`;
-        resultado += "\n💬 Decime el *número* o *nombre* del negocio para ver su menú. 😊";
+        resultado += `\n\n_${t('vendors.updated_at', lang, { time: timeStr })}_`;
+        resultado += "\n" + t('vendors.select_menu', lang);
 
         return resultado;
       }
@@ -197,7 +199,7 @@ export async function ejecutarHerramienta(
         const pendingStates = ['order_pending_cash', 'order_pending_transfer', 'order_pending_mp', 'order_confirmed'];
         if (pendingStates.includes(context.order_state || '')) {
           const orderId = context.pending_order_id ? context.pending_order_id.substring(0, 8) : 'activo';
-          return `⏳ Ya tenés un pedido activo (#${orderId}). Esperá a que se complete o cancelalo antes de hacer otro. 😊`;
+          return t('order.active_exists', lang, { id: orderId });
         }
 
         const currentState = context.order_state || "idle";
@@ -304,7 +306,7 @@ export async function ejecutarHerramienta(
         
         if (!vendor) {
           console.log(`❌ Vendor not found: ${args.vendor_id}`);
-          return "No encontré ese negocio. Por favor usá el ID exacto que te mostré en la lista de locales abiertos.";
+          return t('menu.not_found', lang);
         }
         
         const vendorId = vendor.id;
@@ -326,17 +328,17 @@ export async function ejecutarHerramienta(
           await saveContext(context, supabase);
           
           const currentTotal = context.cart.reduce((s, i) => s + i.price * i.quantity, 0);
+          const itemsList = context.cart.map((item, i) => 
+            `${i + 1}. ${item.product_name} x${item.quantity}`
+          ).join('\n');
           
-          return `⚠️ *¡Atención!*\n\n` +
-                 `Tenés ${context.cart.length} producto(s) en el carrito de *${context.selected_vendor_name}*:\n\n` +
-                 context.cart.map((item, i) => 
-                   `${i + 1}. ${item.product_name} x${item.quantity}`
-                 ).join('\n') +
-                 `\n\n💰 Total actual: $${currentTotal}\n\n` +
-                 `Si querés ver el menú de *${vendor.name}*, voy a tener que *vaciar tu carrito actual*.\n\n` +
-                 `¿Querés cambiar de negocio?\n\n` +
-                 `✅ Escribe *"sí"* para vaciar el carrito y cambiar a ${vendor.name}\n` +
-                 `❌ Escribe *"no"* para seguir con tu pedido de ${context.selected_vendor_name}`;
+          return t('vendor_change.warning', lang, {
+            count: String(context.cart.length),
+            current_vendor: context.selected_vendor_name || '',
+            items: itemsList,
+            total: String(currentTotal),
+            new_vendor: vendor.name,
+          });
         }
 
         context.selected_vendor_id = vendor.id;
@@ -352,14 +354,14 @@ export async function ejecutarHerramienta(
 
         if (productsError) {
           console.error(`❌ Error fetching products:`, productsError);
-          return `Hubo un error al buscar los productos de "${vendor.name}". Por favor intentá de nuevo.`;
+          return t('menu.fetch_error', lang, { vendor: vendor.name });
         }
 
         console.log(`📦 Products found: ${products?.length || 0}`);
         
         if (!products || products.length === 0) {
           console.log(`⚠️ No products available for vendor: ${vendor.name} (${vendor.id})`);
-          return `${vendor.name} no tiene productos disponibles en este momento. 😔\n\nPodés buscar otros negocios con productos disponibles.`;
+          return t('menu.no_products', lang, { vendor: vendor.name });
         }
 
         const { data: vendorDetails } = await supabase
@@ -381,11 +383,11 @@ export async function ejecutarHerramienta(
         let menu = `*${vendor.name}*\n`;
         
         if (context.vendor_allows_delivery && context.vendor_allows_pickup) {
-          menu += `📍 ${vendorDetails?.address || ''} | 🚚 Delivery y 🏪 Retiro\n\n`;
+          menu += `📍 ${vendorDetails?.address || ''} | ${t('menu.delivery_and_pickup', lang)}\n\n`;
         } else if (context.vendor_allows_pickup && !context.vendor_allows_delivery) {
-          menu += `📍 ${vendorDetails?.address || ''} | Solo 🏪 Retiro\n\n`;
+          menu += `📍 ${vendorDetails?.address || ''} | ${t('menu.pickup_only', lang)}\n\n`;
         } else {
-          menu += `Solo 🚚 Delivery\n\n`;
+          menu += `${t('menu.delivery_only', lang)}\n\n`;
         }
         
         for (const [i, p] of products.entries()) {
@@ -393,11 +395,11 @@ export async function ejecutarHerramienta(
           const lowStock = p.stock_enabled && p.stock_quantity !== null && p.stock_quantity > 0 && p.stock_quantity <= 3;
           
           if (isOutOfStock) {
-            menu += `${i + 1}. ~${p.name}~ ❌ AGOTADO\n`;
+            menu += `${i + 1}. ~${p.name}~ ❌ ${t('menu.out_of_stock', lang)}\n`;
             if (p.description) menu += `   _${p.description}_\n`;
           } else {
             menu += `${i + 1}. *${p.name}* $${Math.round(p.price).toLocaleString("es-PY")}`;
-            if (lowStock) menu += ` ⚠️ (${p.stock_quantity} disponibles)`;
+            if (lowStock) menu += ` ⚠️ (${p.stock_quantity} ${t('menu.low_stock', lang)})`;
             if (p.image) menu += ` 📷 lapacho.ar/p/${p.id}`;
             menu += `\n`;
             if (p.description) menu += `   _${p.description}_\n`;
@@ -418,7 +420,7 @@ export async function ejecutarHerramienta(
         const argTime = new Date(now2.toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
         const timeStr = argTime.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
         
-        menu += `\n_🕒 Menú actualizado: ${timeStr}_`;
+        menu += `\n_${t('menu.updated_at', lang, { time: timeStr })}_`;
         
         return menu;
       }
@@ -427,7 +429,7 @@ export async function ejecutarHerramienta(
         const pendingStates = ['order_pending_cash', 'order_pending_transfer', 'order_pending_mp', 'order_confirmed'];
         if (pendingStates.includes(context.order_state || '')) {
           const orderId = context.pending_order_id ? context.pending_order_id.substring(0, 8) : 'activo';
-          return `⏳ Ya tenés un pedido activo (#${orderId}). Esperá a que se complete o cancelalo antes de hacer otro. 😊`;
+          return t('order.active_exists', lang, { id: orderId });
         }
         
         const items = args.items as CartItem[];
@@ -436,14 +438,14 @@ export async function ejecutarHerramienta(
 
         if (context.order_state !== "shopping") {
           console.error(`❌ INVALID STATE: Cannot add to cart in state "${context.order_state}"`);
-          return `⚠️ Para agregar productos, primero necesito mostrarte el menú.\n\n¿De qué negocio querés ver el menú?`;
+          return t('shopping.need_menu', lang);
         }
 
         if (!context.selected_vendor_id) {
           console.error(`❌ CRITICAL: No selected_vendor_id in context despite being in shopping state`);
           context.order_state = "shopping";
           await saveContext(context, supabase);
-          return `⚠️ Necesito que elijas un negocio primero. ¿Cuál negocio te interesa?`;
+          return t('shopping.need_vendor', lang);
         }
 
         let vendorId: string = context.selected_vendor_id;
@@ -457,23 +459,23 @@ export async function ejecutarHerramienta(
         
         if (vendorError) {
           console.error("❌ Error finding vendor by context ID:", vendorError);
-          return `Hubo un error al validar el negocio. Por favor intentá de nuevo.`;
+          return t('shopping.vendor_error', lang);
         }
         
         if (!data) {
           console.error(`❌ Vendor ${vendorId} from context not found in database`);
-          return `El negocio seleccionado ya no está disponible. Por favor elegí otro negocio.`;
+          return t('shopping.vendor_unavailable', lang);
         }
         
         const vendor = data;
         console.log(`✅ Vendor validated: ${vendor.name} (Active: ${vendor.is_active}, Payment: ${vendor.payment_status})`);
         
         if (!vendor.is_active || vendor.payment_status !== 'active') {
-          return `❌ El negocio "${vendor.name}" no está disponible en este momento.\n\nPor favor elegí otro negocio de los disponibles.`;
+          return t('shopping.vendor_inactive', lang, { vendor: vendor.name });
         }
 
         if (!context.selected_vendor_id) {
-          return "⚠️ Primero tenés que elegir un negocio. ¿De dónde querés pedir?";
+          return t('shopping.need_vendor_first', lang);
         }
 
         for (const item of items) {
@@ -487,8 +489,7 @@ export async function ejecutarHerramienta(
             
             if (product && product.vendor_id !== context.selected_vendor_id) {
               console.error(`❌ Product ${item.product_id} belongs to different vendor!`);
-              return `⚠️ Ese producto no pertenece a ${context.selected_vendor_name}.\n\n` +
-                     `Solo podés agregar productos de un negocio a la vez. 🏪`;
+              return t('shopping.wrong_vendor', lang, { vendor: context.selected_vendor_name || '' });
             }
           }
         }
@@ -496,8 +497,7 @@ export async function ejecutarHerramienta(
         if (context.cart.length > 0 && 
             context.selected_vendor_id && 
             vendorId !== context.selected_vendor_id) {
-          return `⚠️ Error interno: Detecté productos de otro negocio en el carrito. ` +
-                 `Por favor vacía el carrito con "vaciar carrito" antes de agregar productos de otro negocio.`;
+          return t('shopping.cart_vendor_mismatch', lang);
         }
 
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -526,16 +526,15 @@ export async function ejecutarHerramienta(
               
               if (currentStock <= 0) {
                 console.warn(`❌ STOCK: ${product.name} is OUT OF STOCK`);
-                return `❌ *${product.name}* está AGOTADO.\n\nElegí otro producto del menú. 😊`;
+                return t('stock.out_of_stock', lang, { product: product.name });
               }
               
               if (totalRequested > currentStock) {
                 const canAdd = currentStock - alreadyInCart;
                 if (canAdd <= 0) {
-                  return `⚠️ Ya tenés ${alreadyInCart} de *${product.name}* en el carrito (máximo disponible: ${currentStock}).\n\nNo podés agregar más unidades.`;
+                  return t('stock.max_reached', lang, { count: String(alreadyInCart), product: product.name, max: String(currentStock) });
                 }
-                return `⚠️ Solo hay ${currentStock} unidades de *${product.name}* disponibles.\n\n` +
-                       `Ya tenés ${alreadyInCart} en el carrito. ¿Querés agregar ${canAdd} más?`;
+                return t('stock.limited', lang, { available: String(currentStock), product: product.name, count: String(alreadyInCart), can_add: String(canAdd) });
               }
             }
             
@@ -560,11 +559,9 @@ export async function ejecutarHerramienta(
           
           const productList = availableProducts && availableProducts.length > 0
             ? availableProducts.map((p: any, i: number) => `${i + 1}. ${p.name} - $${p.price}`).join('\n')
-            : "No hay productos disponibles";
+            : t('shopping.no_products_available', lang);
           
-          return `❌ No encontré ese producto en el menú de *${context.selected_vendor_name}*.\n\n` +
-                 `📋 Productos disponibles:\n${productList}\n\n` +
-                 `Por favor, elegí uno de estos productos. 😊`;
+          return t('shopping.product_not_found', lang, { vendor: context.selected_vendor_name || '', products: productList });
         }
 
         for (const item of resolvedItems) {
@@ -575,31 +572,31 @@ export async function ejecutarHerramienta(
 
         const total = context.cart.reduce((s, i) => s + i.price * i.quantity, 0);
         
-        return `✅ Productos agregados al carrito de *${context.selected_vendor_name}*.\n\n💰 Total actual: $${total}\n\n¿Querés agregar algo más o confirmás el pedido? 📦`;
+        return t('cart.added', lang, { vendor: context.selected_vendor_name || '', total: String(total) });
       }
 
       case "ver_carrito": {
         if (context.cart.length === 0) {
-          return "El carrito está vacío. ¿Qué te gustaría pedir?";
+          return t('cart.empty', lang);
         }
 
-        let carrito = `🛒 *Tu carrito de ${context.selected_vendor_name}:*\n\n`;
+        let carrito = t('cart.header', lang, { vendor: context.selected_vendor_name || '' }) + `\n\n`;
         context.cart.forEach((item, i) => {
           carrito += `${i + 1}. ${item.product_name} x${item.quantity} - $${item.price * item.quantity}\n`;
         });
 
         const total = context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-        carrito += `\n💰 Total: $${total}\n\n`;
+        carrito += `\n💰 ${t('cart.total', lang)}: $${total}\n\n`;
         
         if (context.delivery_type && context.payment_method) {
           context.resumen_mostrado = true;
-          carrito += `✅ *Todo listo para confirmar*\n`;
-          carrito += `📦 Entrega: ${context.delivery_type === 'pickup' ? 'Retiro en local' : 'Delivery'}\n`;
-          carrito += `💳 Pago: ${context.payment_method}\n\n`;
-          carrito += `Respondé *"sí"* para confirmar el pedido.`;
+          carrito += t('cart.ready_to_confirm', lang) + `\n`;
+          carrito += `📦 ${lang === 'es' ? 'Entrega' : lang === 'en' ? 'Delivery' : lang === 'pt' ? 'Entrega' : '配送'}: ${context.delivery_type === 'pickup' ? t('delivery.pickup_label', lang) : 'Delivery'}\n`;
+          carrito += `💳 ${lang === 'es' ? 'Pago' : lang === 'en' ? 'Payment' : lang === 'pt' ? 'Pagamento' : '支払い'}: ${context.payment_method}\n\n`;
+          carrito += t('cart.confirm_yes', lang);
           await saveContext(context, supabase);
         } else {
-          carrito += `Para confirmar, decime "confirmar pedido" o "listo" 📦`;
+          carrito += t('cart.confirm_prompt', lang);
         }
 
         return carrito;
@@ -609,39 +606,39 @@ export async function ejecutarHerramienta(
         console.log("📋 ========== MOSTRAR RESUMEN PEDIDO ==========");
         
         if (context.cart.length === 0) {
-          return "⚠️ Tu carrito está vacío. No hay nada que confirmar todavía.";
+          return t('cart.empty_warning', lang);
         }
 
         if (!context.selected_vendor_id || !context.selected_vendor_name) {
-          return "⚠️ Error: No hay negocio seleccionado.";
+          return t('summary.no_vendor', lang);
         }
 
-        let resumen = `📋 *RESUMEN DE TU PEDIDO*\n\n`;
-        resumen += `🏪 *Negocio:* ${context.selected_vendor_name}\n\n`;
+        let resumen = t('summary.header', lang) + `\n\n`;
+        resumen += t('summary.store', lang, { vendor: context.selected_vendor_name }) + `\n\n`;
         
-        resumen += `📦 *Productos:*\n`;
+        resumen += t('summary.products', lang) + `\n`;
         context.cart.forEach((item, i) => {
           resumen += `${i + 1}. ${item.product_name} x${item.quantity} - $${item.price * item.quantity}\n`;
         });
         
         const subtotal = context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-        resumen += `\n💰 *Subtotal:* $${subtotal}\n`;
+        resumen += `\n` + t('summary.subtotal', lang, { amount: String(subtotal) }) + `\n`;
         
         if (context.delivery_type === 'pickup') {
-          resumen += `\n📍 *Entrega:* Retiro en local\n`;
+          resumen += `\n` + t('summary.pickup', lang) + `\n`;
           if (context.pickup_instructions) {
             resumen += `   ℹ️ ${context.pickup_instructions}\n`;
           }
         } else if (context.delivery_type === 'delivery') {
-          resumen += `\n🚚 *Entrega:* A domicilio\n`;
+          resumen += `\n` + t('summary.delivery', lang) + `\n`;
           if (context.delivery_address) {
-            resumen += `📍 *Dirección:* ${context.delivery_address}\n`;
+            resumen += t('summary.address', lang, { address: context.delivery_address }) + `\n`;
           } else {
-            resumen += `⚠️ *Falta confirmar dirección de entrega*\n`;
+            resumen += t('summary.missing_address', lang) + `\n`;
           }
-          resumen += `🚴 *Costo de envío:* (se calculará según distancia)\n`;
+          resumen += t('summary.shipping_cost', lang) + `\n`;
         } else {
-          resumen += `\n⚠️ *Tipo de entrega no seleccionado*\n`;
+          resumen += `\n` + t('summary.delivery_type_missing', lang) + `\n`;
         }
         
         const { data: vendorPaymentData } = await supabase
@@ -673,7 +670,7 @@ export async function ejecutarHerramienta(
           context.available_payment_methods = realAvailableMethods;
         }
         
-        resumen += `\n💳 *Método de pago:* `;
+        resumen += `\n💳 *${lang === 'es' ? 'Método de pago' : lang === 'en' ? 'Payment method' : lang === 'pt' ? 'Método de pagamento' : '支払い方法'}:* `;
         if (context.payment_method) {
           const paymentIcons: Record<string, string> = {
             'efectivo': '💵', 'transferencia': '🏦', 'mercadopago': '💳'
@@ -681,10 +678,10 @@ export async function ejecutarHerramienta(
           const icon = paymentIcons[context.payment_method.toLowerCase()] || '💰';
           resumen += `${icon} ${context.payment_method.charAt(0).toUpperCase() + context.payment_method.slice(1)}\n`;
         } else {
-          resumen += `⚠️ *No seleccionado*\n`;
+          resumen += t('summary.payment_not_selected', lang) + `\n`;
           
           if (context.available_payment_methods && context.available_payment_methods.length > 0) {
-            resumen += `\nPor favor elegí uno de estos métodos:\n`;
+            resumen += `\n` + t('summary.choose_payment', lang) + `\n`;
             context.available_payment_methods.forEach(method => {
               const methodIcons: Record<string, string> = {
                 'efectivo': '💵', 'transferencia': '🏦', 'mercadopago': '💳'
@@ -695,31 +692,30 @@ export async function ejecutarHerramienta(
           }
         }
         
-        resumen += `\n💰💰 *TOTAL ESTIMADO:* $${subtotal}`;
+        resumen += `\n` + t('summary.total_estimated', lang, { amount: String(subtotal) });
         if (context.delivery_type === 'delivery') {
-          resumen += ` + envío`;
+          resumen += t('summary.plus_shipping', lang);
         }
         resumen += `\n\n`;
         
         const missingInfo = [];
-        if (!context.delivery_type) missingInfo.push("tipo de entrega");
-        if (context.delivery_type === 'delivery' && !context.delivery_address) missingInfo.push("dirección");
-        if (!context.payment_method) missingInfo.push("método de pago");
+        if (!context.delivery_type) missingInfo.push(t('missing.delivery_type', lang));
+        if (context.delivery_type === 'delivery' && !context.delivery_address) missingInfo.push(t('missing.address', lang));
+        if (!context.payment_method) missingInfo.push(t('missing.payment', lang));
         
         if (missingInfo.length > 0) {
-          resumen += `⚠️ *Falta completar:* ${missingInfo.join(', ')}\n`;
+          resumen += t('summary.missing_info', lang, { items: missingInfo.join(', ') }) + `\n`;
           return resumen;
         }
         
-        resumen += `✅ *¿Confirmás el pedido?*\n`;
-        resumen += `Respondé "sí" para confirmar o "no" para cancelar.`;
+        resumen += t('summary.confirm_question', lang);
         
         context.resumen_mostrado = true;
         await saveContext(context, supabase);
         
         const argTime = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
         const timeStr = argTime.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
-        resumen += `\n_🕒 Resumen actualizado a las ${timeStr}_`;
+        resumen += `\n_${t('summary.updated_at', lang, { time: timeStr })}_`;
         
         return resumen;
       }
@@ -728,7 +724,7 @@ export async function ejecutarHerramienta(
         console.log(`🔄 ========== MODIFYING CART COMPLETELY ==========`);
         
         if (!context.selected_vendor_id) {
-          return "⚠️ Primero necesito que elijas un negocio.";
+          return t('shopping.need_vendor_modify', lang);
         }
 
         const newCart: CartItem[] = [];
@@ -753,18 +749,18 @@ export async function ejecutarHerramienta(
         }
         
         if (newCart.length === 0) {
-          return "❌ No encontré ninguno de esos productos en este negocio.";
+          return t('cart.modify_not_found', lang);
         }
         
         context.cart = newCart;
         
         const total = context.cart.reduce((s, i) => s + i.price * i.quantity, 0);
         
-        let response = `✅ Corregí tu pedido de *${context.selected_vendor_name}*:\n\n`;
+        let response = t('cart.modified', lang, { vendor: context.selected_vendor_name || '' }) + `\n\n`;
         context.cart.forEach(item => {
           response += `• ${item.product_name} x${item.quantity} - $${item.price * item.quantity}\n`;
         });
-        response += `\n💰 Total: $${total}\n\n¿Está correcto?`;
+        response += `\n💰 ${t('cart.total', lang)}: $${total}\n\n` + t('cart.is_correct', lang);
         
         return response;
       }
@@ -774,7 +770,7 @@ export async function ejecutarHerramienta(
         context.delivery_type = undefined;
         context.conversation_history = [];
         console.log(`🧹 Cart, delivery_type and conversation history cleared`);
-        return "🗑️ Carrito vaciado";
+        return t('cart.cleared', lang);
       }
 
       case "seleccionar_tipo_entrega": {
@@ -782,127 +778,59 @@ export async function ejecutarHerramienta(
         console.log(`🔄 Real-time vendor config for ${context.selected_vendor_id}:`, vendorConfig);
         
         if (!vendorConfig.allows_pickup && args.tipo === "pickup") {
-          return `⚠️ ${context.selected_vendor_name} no acepta retiro en local. Solo delivery.`;
+          return t('delivery.no_pickup', lang, { vendor: context.selected_vendor_name || '' });
         }
         
         if (!vendorConfig.allows_delivery && args.tipo === "delivery") {
-          return `⚠️ ${context.selected_vendor_name} no hace delivery. Solo retiro en local.`;
+          return t('delivery.no_delivery', lang, { vendor: context.selected_vendor_name || '' });
         }
         
         context.delivery_type = args.tipo;
         await saveContext(context, supabase);
         
         if (args.tipo === "pickup") {
-          let respuesta = `✅ Perfecto! Tu pedido será para *retiro en local*.\n\n`;
-          respuesta += `📍 *Retirá en:*\n${context.selected_vendor_name}\n`;
+          let respuesta = t('delivery.pickup_set', lang) + `\n\n`;
+          respuesta += t('delivery.pickup_location', lang) + `\n${context.selected_vendor_name}\n`;
           
           if (vendorConfig.address) {
             respuesta += `${vendorConfig.address}\n\n`;
             if (vendorConfig.pickup_instructions) {
-              respuesta += `📝 *Instrucciones:*\n${vendorConfig.pickup_instructions}\n\n`;
+              respuesta += t('delivery.instructions', lang) + `\n${vendorConfig.pickup_instructions}\n\n`;
             }
           }
           
-          respuesta += `💰 Total: $${context.cart.reduce((s, i) => s + i.price * i.quantity, 0).toLocaleString("es-PY")}\n\n`;
-          respuesta += `¿Con qué método querés pagar?`;
+          if (!context.payment_method) {
+            if (context.available_payment_methods && context.available_payment_methods.length > 0) {
+              respuesta += t('address.choose_payment', lang) + `\n`;
+              context.available_payment_methods.forEach(method => {
+                const icons: Record<string, string> = { 'efectivo': '💵', 'transferencia': '🏦', 'mercadopago': '💳' };
+                respuesta += `- ${method.charAt(0).toUpperCase() + method.slice(1)} ${icons[method] || '💰'}\n`;
+              });
+            }
+          }
           
           return respuesta;
-        } else {
-          return `✅ Tu pedido será enviado a domicilio.\n\n¿Cuál es tu dirección de entrega?`;
-        }
-      }
-
-      case "quitar_producto_carrito": {
-        const searchTerm = args.product_id.toLowerCase();
-        
-        const index = context.cart.findIndex((item) => 
-          item.product_id === args.product_id || 
-          item.product_name.toLowerCase().includes(searchTerm)
-        );
-        
-        if (index !== -1) {
-          const item = context.cart[index];
-          
-          if (item.quantity > 1) {
-            item.quantity -= 1;
-            return `✅ Quité una unidad de ${item.product_name}. Ahora tenés ${item.quantity} en el carrito.`;
-          } else {
-            const removed = context.cart.splice(index, 1)[0];
-            return `✅ Quité ${removed.product_name} del carrito.`;
-          }
         }
         
-        return "❌ No encontré ese producto en el carrito. ¿Querés que te muestre lo que tenés en el carrito?";
+        return t('delivery.type_set', lang, { type: args.tipo });
       }
 
       case "crear_pedido": {
-        if (args.metodo_pago && !context.payment_method) {
-          const methodMap: Record<string, string> = {
-            'efectivo': 'efectivo', 'cash': 'efectivo',
-            'transferencia': 'transferencia', 'transfer': 'transferencia', 'transferencia bancaria': 'transferencia',
-            'mercadopago': 'mercadopago', 'mercado pago': 'mercadopago', 'mp': 'mercadopago'
-          };
-          const normalizedInput = args.metodo_pago.toLowerCase().trim();
-          const mappedMethod = methodMap[normalizedInput];
-          
-          if (mappedMethod && (!context.available_payment_methods?.length || 
-              context.available_payment_methods.includes(mappedMethod))) {
-            context.payment_method = mappedMethod;
-            console.log(`✅ Pre-set payment_method from args: ${mappedMethod}`);
-            await saveContext(context, supabase);
-          }
+        const pendingStates = ['order_pending_cash', 'order_pending_transfer', 'order_pending_mp', 'order_confirmed'];
+        if (pendingStates.includes(context.order_state || '')) {
+          const orderId = context.pending_order_id ? context.pending_order_id.substring(0, 8) : 'activo';
+          return t('order.active_exists', lang, { id: orderId });
         }
-        
-        if (!context.resumen_mostrado) {
-          console.log("⚠️ resumen_mostrado=false, auto-calling mostrar_resumen_pedido first");
-          const resumenResult = await ejecutarHerramienta("mostrar_resumen_pedido", {}, context, supabase);
-          return resumenResult;
-        }
-        
-        // ⭐ VALIDACIÓN CRÍTICA: Verificar que el método de pago es válido
-        if (args.metodo_pago && context.available_payment_methods?.length > 0) {
-          const normalizedMethod = args.metodo_pago.toLowerCase().trim();
-          const methodMap: Record<string, string> = {
-            'efectivo': 'efectivo', 'cash': 'efectivo',
-            'transferencia': 'transferencia', 'transferencia bancaria': 'transferencia', 'transfer': 'transferencia',
-            'mercadopago': 'mercadopago', 'mercado pago': 'mercadopago', 'mp': 'mercadopago'
-          };
-          
-          const mappedMethod = methodMap[normalizedMethod];
-          
-          if (!mappedMethod || !context.available_payment_methods.includes(mappedMethod)) {
-            const methodIcons: Record<string, string> = { 'efectivo': '💵', 'transferencia': '🏦', 'mercadopago': '💳' };
-            
-            return `⚠️ El método "${args.metodo_pago}" no está disponible en ${context.selected_vendor_name}.\n\n` +
-                   `Métodos aceptados:\n` +
-                   (context.available_payment_methods || []).map(m => 
-                     `- ${m.charAt(0).toUpperCase() + m.slice(1)} ${methodIcons[m] || '💰'}`
-                   ).join('\n') + 
-                   `\n\n¿Con cuál querés continuar?`;
-          }
-        }
-        
-        // ⭐ AUTO-FETCH payment methods si tiene dirección pero no ha visto los métodos
-        if (args.direccion && !context.payment_methods_fetched) {
-          console.log(`⚠️ User has address but hasn't seen payment methods yet. Auto-fetching...`);
-          context.delivery_address = args.direccion;
-          await ejecutarHerramienta("ver_metodos_pago", {}, context, supabase);
-          await saveContext(context, supabase);
-        }
-        
-        const normalized = args.metodo_pago?.toLowerCase().trim() || "";
-        const hasValidPaymentMethod = args.metodo_pago && (
-          normalized === "efectivo" || normalized === "transferencia" ||
-          normalized === "transferencia bancaria" || normalized === "mercadopago" ||
-          normalized === "mercado pago"
-        );
+
+        const hasValidPaymentMethod = context.payment_method && 
+          context.available_payment_methods?.includes(context.payment_method);
         
         if (context.order_state !== "checkout" && !hasValidPaymentMethod) {
           if (context.payment_methods_fetched && context.available_payment_methods) {
             const methodsList = context.available_payment_methods.map(m => `- ${m}`).join('\n');
-            return `⚠️ Por favor elegí uno de los métodos de pago disponibles:\n\n${methodsList}`;
+            return t('payment.choose_available', lang, { methods: methodsList });
           }
-          return "⚠️ Primero necesito que confirmes tu método de pago.";
+          return t('payment.need_confirm', lang);
         }
         
         if (context.order_state === "shopping" && hasValidPaymentMethod) {
@@ -910,7 +838,7 @@ export async function ejecutarHerramienta(
         }
 
         if (context.cart.length === 0) {
-          return "No podés crear un pedido con el carrito vacío. ¿Querés que te muestre productos disponibles?";
+          return t('order.empty_cart', lang);
         }
 
         // 🛡️ VALIDACIÓN FINAL DE STOCK
@@ -926,23 +854,22 @@ export async function ejecutarHerramienta(
             const available = stockProduct.stock_quantity || 0;
             if (cartItem.quantity > available) {
               if (available <= 0) {
-                stockIssues.push(`❌ *${stockProduct.name}* - AGOTADO`);
+                stockIssues.push(`❌ *${stockProduct.name}* - ${t('stock.out_label', lang)}`);
               } else {
-                stockIssues.push(`⚠️ *${stockProduct.name}* - Pediste ${cartItem.quantity}, solo hay ${available}`);
+                stockIssues.push(`⚠️ *${stockProduct.name}* - ${t('stock.ordered_vs_available', lang, { requested: String(cartItem.quantity), available: String(available) })}`);
               }
             }
           }
         }
 
         if (stockIssues.length > 0) {
-          return `🚫 *No se puede crear el pedido*\n\n` +
-                 `Algunos productos ya no tienen stock suficiente:\n\n` +
+          return t('stock.issue_header', lang) +
                  stockIssues.join('\n') +
-                 `\n\nPor favor ajustá tu carrito con "modificar carrito" o eliminá los productos sin stock.`;
+                 `\n\n` + t('stock.adjust_cart', lang);
         }
 
         if (!context.selected_vendor_id) {
-          return "Error: No hay negocio seleccionado. Por favor elegí un negocio antes de hacer el pedido.";
+          return t('order.no_vendor', lang);
         }
 
         // ✅ SIEMPRE consultar en tiempo real para tipo de entrega
@@ -950,7 +877,7 @@ export async function ejecutarHerramienta(
           const vendorConfig = await getVendorConfig(context.selected_vendor_id!, supabase);
           
           if (vendorConfig.allows_pickup && vendorConfig.allows_delivery) {
-            return `¿Querés que te enviemos el pedido a domicilio o lo retirás en el local?\n\nRespondé "delivery" o "retiro"`;
+            return t('order.ask_delivery_type', lang);
           } else if (vendorConfig.allows_pickup && !vendorConfig.allows_delivery) {
             context.delivery_type = 'pickup';
           } else {
@@ -967,7 +894,7 @@ export async function ejecutarHerramienta(
             .eq("id", context.selected_vendor_id)
             .single();
           
-          context.delivery_address = `RETIRO EN LOCAL: ${vendorAddr?.address || 'Dirección no disponible'}`;
+          context.delivery_address = `RETIRO EN LOCAL: ${vendorAddr?.address || t('vendors.address_unavailable', lang)}`;
           deliveryCost = 0;
         } else {
           const { data: vendorDel } = await supabase
@@ -979,7 +906,7 @@ export async function ejecutarHerramienta(
           deliveryCost = Math.round(vendorDel?.delivery_fixed_price || 0);
 
           if (!args.direccion && !context.delivery_address) {
-            return `📍 Para confirmar tu pedido, necesito tu dirección de entrega.\n\n✍️ Escribí tu dirección completa (calle y número).\n\nEl negocio confirmará si hace delivery a tu zona. 🚗`;
+            return t('delivery.need_address', lang);
           }
 
           if (context.delivery_address) {
@@ -1003,16 +930,16 @@ export async function ejecutarHerramienta(
           if (recentOrder.vendor_id === context.selected_vendor_id) {
             context.pending_order_id = recentOrder.id;
             context.last_order_id = recentOrder.id;
-            return `✅ Ya tenés un pedido activo (#${recentOrder.id.substring(0, 8)}).\n\n📊 Podés consultar su estado diciendo "estado del pedido".\n\nSi querés hacer otro pedido, esperá a que este se complete. 😊`;
+            return t('order.duplicate', lang, { id: recentOrder.id.substring(0, 8) });
           }
         }
 
         if (context.delivery_type !== 'pickup' && (!args.direccion || args.direccion.trim() === "")) {
-          return "Por favor indicá tu dirección de entrega.";
+          return t('order.need_address_inline', lang);
         }
 
         if (!args.metodo_pago) {
-          return "Por favor seleccioná un método de pago (efectivo, transferencia o mercadopago).";
+          return t('payment.select', lang);
         }
 
         // ⚠️ VALIDAR método de pago habilitado
@@ -1023,7 +950,7 @@ export async function ejecutarHerramienta(
           .single();
 
         if (vendorPaymentError || !vendorForPayment) {
-          return "Hubo un problema al validar el método de pago. Por favor intentá de nuevo.";
+          return t('order.payment_validate_error', lang);
         }
 
         const pSettings = vendorForPayment.payment_settings || {};
@@ -1035,7 +962,7 @@ export async function ejecutarHerramienta(
         else if (metodoSolicitado === "mercadopago" && pSettings.mercadoPago?.activo === true) metodoValido = true;
 
         if (!metodoValido) {
-          return `⚠️ El método de pago "${metodoSolicitado}" no está disponible en ${vendorForPayment.name}.\n\nPor favor usá ver_metodos_pago para ver las opciones reales disponibles.`;
+          return t('payment.invalid_with_hint', lang, { method: metodoSolicitado, vendor: vendorForPayment.name });
         }
 
         context.delivery_address = args.direccion;
@@ -1064,7 +991,7 @@ export async function ejecutarHerramienta(
 
         if (error || !order) {
           console.error("Error creating order:", error);
-          return "Hubo un error al crear tu pedido. Por favor intentá de nuevo.";
+          return t('error.order_create', lang);
         }
 
         console.log("✅ Order created:", order.id);
@@ -1101,25 +1028,25 @@ export async function ejecutarHerramienta(
             .eq("is_temporary", true);
         } catch (_e) {}
 
-        let confirmacion = `✅ ¡Pedido creado exitosamente!\n\n`;
-        confirmacion += `📦 Pedido #${order.id.substring(0, 8)}\n`;
-        confirmacion += `🏪 Negocio: ${context.selected_vendor_name}\n\n`;
+        let confirmacion = t('order.created', lang) + `\n\n`;
+        confirmacion += `📦 ${lang === 'es' ? 'Pedido' : lang === 'en' ? 'Order' : lang === 'pt' ? 'Pedido' : '注文'} #${order.id.substring(0, 8)}\n`;
+        confirmacion += t('order.store_label', lang, { vendor: context.selected_vendor_name || '' }) + `\n\n`;
 
         if (context.delivery_type === 'pickup') {
-          confirmacion += `🛒 Total: $ ${Math.round(total).toLocaleString("es-PY")}\n\n`;
-          confirmacion += `📍 *Retirá en:*\n${context.delivery_address}\n\n`;
+          confirmacion += `🛒 ${t('cart.total', lang)}: $ ${Math.round(total).toLocaleString("es-PY")}\n\n`;
+          confirmacion += t('order.pickup_at', lang) + `\n${context.delivery_address}\n\n`;
           if (context.pickup_instructions) {
             confirmacion += `📝 ${context.pickup_instructions}\n\n`;
           }
-          confirmacion += `💳 Pago: ${context.payment_method}\n`;
+          confirmacion += `💳 ${lang === 'es' ? 'Pago' : lang === 'en' ? 'Payment' : lang === 'pt' ? 'Pagamento' : '支払い'}: ${context.payment_method}\n`;
         } else {
           confirmacion += `🛒 Subtotal: $ ${Math.round(subtotal).toLocaleString("es-PY")}\n`;
           confirmacion += `🚚 Delivery: $ ${Math.round(deliveryCost).toLocaleString("es-PY")}\n`;
-          confirmacion += `💰 Total: $ ${Math.round(total).toLocaleString("es-PY")}\n\n`;
-          confirmacion += `📍 Dirección: ${context.delivery_address}\n`;
-          confirmacion += `💳 Pago: ${context.payment_method}\n`;
+          confirmacion += `💰 ${t('cart.total', lang)}: $ ${Math.round(total).toLocaleString("es-PY")}\n\n`;
+          confirmacion += `📍 ${lang === 'es' ? 'Dirección' : lang === 'en' ? 'Address' : lang === 'pt' ? 'Endereço' : '住所'}: ${context.delivery_address}\n`;
+          confirmacion += `💳 ${lang === 'es' ? 'Pago' : lang === 'en' ? 'Payment' : lang === 'pt' ? 'Pagamento' : '支払い'}: ${context.payment_method}\n`;
           if (deliveryCost > 0) {
-            confirmacion += `\n📌 *Nota:* El negocio confirmará si hace delivery a tu zona.\n`;
+            confirmacion += `\n` + t('order.delivery_note', lang) + `\n`;
           }
         }
         
@@ -1138,18 +1065,16 @@ export async function ejecutarHerramienta(
           const transferData = vendorData?.payment_settings?.transferencia;
           
           if (transferData && transferData.activo) {
-            confirmacion += `📱 *Datos para transferencia:*\n\n`;
+            confirmacion += t('order.transfer_data', lang) + `\n\n`;
             confirmacion += `• *Alias:* ${transferData.alias}\n`;
             confirmacion += `• *CBU/CVU:* ${transferData.cbu}\n`;
-            confirmacion += `• *Titular:* ${transferData.titular}\n\n`;
-            confirmacion += `¿Confirmás que deseas proceder con la *transferencia bancaria* para completar tu pedido? 😊\n\n`;
-            confirmacion += `Respondé *"sí"* para confirmar o *"no"* para cancelar.`;
+            confirmacion += `• *${lang === 'es' ? 'Titular' : lang === 'en' ? 'Account holder' : lang === 'pt' ? 'Titular' : '名義人'}:* ${transferData.titular}\n\n`;
+            confirmacion += t('order.transfer_confirm_prompt', lang);
           } else {
-            confirmacion += `⚠️ Hubo un problema al obtener los datos de transferencia. Por favor contactá al negocio.`;
+            confirmacion += t('order.transfer_data_error', lang);
           }
         } else if (context.payment_method.toLowerCase().includes("efectivo")) {
-          confirmacion += `💵 Pagás en efectivo al recibir el pedido.\n\n`;
-          confirmacion += `El delivery te contactará pronto. 🚚`;
+          confirmacion += t('order.cash_info', lang);
         } else if (context.payment_method.toLowerCase().includes("mercadopago")) {
           let paymentLinkGenerated = false;
           let paymentLinkUrl = "";
@@ -1161,29 +1086,28 @@ export async function ejecutarHerramienta(
             });
 
             if (paymentError) {
-              paymentErrorMsg = "⚠️ Hubo un problema al generar el link de pago. El negocio te contactará.";
+              paymentErrorMsg = t('order.mp_error', lang);
             } else if (paymentData?.success && paymentData?.payment_link) {
               paymentLinkGenerated = true;
               paymentLinkUrl = paymentData.payment_link;
             } else if (paymentData?.available_methods) {
-              paymentErrorMsg = "⚠️ MercadoPago no está disponible en este momento.\n\n";
-              paymentErrorMsg += "Métodos de pago alternativos:\n\n";
+              paymentErrorMsg = t('order.mp_unavailable', lang);
               for (const method of paymentData.available_methods) {
                 if (method.method === 'transferencia') {
-                  paymentErrorMsg += `📱 *Transferencia bancaria:*\n• Alias: ${method.details.alias}\n• CBU/CVU: ${method.details.cbu}\n• Titular: ${method.details.titular}\n• Monto: $${method.details.amount}\n\n`;
+                  paymentErrorMsg += `📱 *${lang === 'es' ? 'Transferencia bancaria' : lang === 'en' ? 'Bank transfer' : lang === 'pt' ? 'Transferência bancária' : '銀行振込'}:*\n• Alias: ${method.details.alias}\n• CBU/CVU: ${method.details.cbu}\n• ${lang === 'es' ? 'Titular' : 'Holder'}: ${method.details.titular}\n• ${lang === 'es' ? 'Monto' : 'Amount'}: $${method.details.amount}\n\n`;
                 } else if (method.method === 'efectivo') {
-                  paymentErrorMsg += `💵 *Efectivo:* ${method.details.message}\n\n`;
+                  paymentErrorMsg += `💵 *${lang === 'es' ? 'Efectivo' : lang === 'en' ? 'Cash' : lang === 'pt' ? 'Dinheiro' : '現金'}:* ${method.details.message}\n\n`;
                 }
               }
             } else {
-              paymentErrorMsg = "⚠️ No se pudo generar el link de pago. El negocio te contactará para coordinar.";
+              paymentErrorMsg = t('order.mp_link_error', lang);
             }
           } catch (_e) {
-            paymentErrorMsg = "⚠️ Error al procesar el pago. El negocio te contactará.";
+            paymentErrorMsg = t('order.mp_error', lang);
           }
           
           if (paymentLinkGenerated) {
-            confirmacion += `💳 *¡Link de pago listo!*\n\n🔗 ${paymentLinkUrl}\n\n👆 Tocá el link para pagar de forma segura con MercadoPago.\n\nUna vez que completes el pago, recibirás la confirmación automáticamente. 😊`;
+            confirmacion += t('order.mp_link_ready', lang, { link: paymentLinkUrl });
           } else {
             confirmacion += paymentErrorMsg;
           }
@@ -1206,7 +1130,7 @@ export async function ejecutarHerramienta(
         else if (!orderId && context.last_order_id) orderId = context.last_order_id;
         
         if (!orderId) {
-          return "No tengo ningún pedido tuyo registrado recientemente. ¿Querés hacer un nuevo pedido?";
+          return t('status.not_found', lang);
         }
         
         const { data: order, error } = await supabase
@@ -1216,24 +1140,27 @@ export async function ejecutarHerramienta(
           .single();
 
         if (error || !order) {
-          return "No encontré ese pedido. ¿Querés que te ayude con algo más?";
+          return t('status.not_found2', lang);
         }
 
-        const statusEmojis: any = {
-          pending: "⏳ Pendiente", confirmed: "✅ Confirmado",
-          preparing: "👨‍🍳 En preparación", ready: "🎉 Listo para entregar",
-          delivered: "✅ Entregado", cancelled: "❌ Cancelado",
+        const statusMap: Record<string, string> = {
+          pending: t('status.pending', lang),
+          confirmed: t('status.confirmed', lang),
+          preparing: t('status.preparing', lang),
+          ready: t('status.ready', lang),
+          delivered: t('status.delivered', lang),
+          cancelled: t('status.cancelled', lang),
         };
 
         const argTime = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
         const timeStr = argTime.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
 
-        let estado = `📊 *Estado de tu pedido*\n\n`;
-        estado += `🆔 Pedido #${order.id.substring(0, 8)}\n`;
-        estado += `🏪 Negocio: ${order.vendors.name}\n`;
-        estado += `✨ Estado: *${statusEmojis[order.status] || order.status}*\n`;
-        estado += `💰 Total: $${Math.round(order.total).toLocaleString("es-AR")}\n\n`;
-        estado += `_🕒 Actualizado hoy ${timeStr}_`;
+        let estado = t('status.header', lang) + `\n\n`;
+        estado += `🆔 ${lang === 'es' ? 'Pedido' : lang === 'en' ? 'Order' : lang === 'pt' ? 'Pedido' : '注文'} #${order.id.substring(0, 8)}\n`;
+        estado += `🏪 ${lang === 'es' ? 'Negocio' : lang === 'en' ? 'Store' : lang === 'pt' ? 'Loja' : '店舗'}: ${order.vendors.name}\n`;
+        estado += `✨ ${lang === 'es' ? 'Estado' : lang === 'en' ? 'Status' : lang === 'pt' ? 'Status' : '状態'}: *${statusMap[order.status] || order.status}*\n`;
+        estado += `💰 ${t('cart.total', lang)}: $${Math.round(order.total).toLocaleString("es-AR")}\n\n`;
+        estado += `_${t('status.updated_at', lang, { time: timeStr })}_`;
 
         return estado;
       }
@@ -1267,40 +1194,39 @@ export async function ejecutarHerramienta(
 
         if (error || !offers || offers.length === 0) {
           return targetVendorId
-            ? "Este negocio no tiene ofertas activas en este momento."
-            : "No hay ofertas disponibles en este momento. 😔";
+            ? t('offers.no_offers_vendor', lang)
+            : t('offers.no_offers', lang);
         }
 
-        let resultado = `🎁 ${offers.length === 1 ? "Oferta disponible" : `${offers.length} ofertas disponibles`}:\n\n`;
+        let resultado = offers.length === 1 
+          ? t('offers.count_single', lang) 
+          : t('offers.count', lang, { count: String(offers.length) });
+        resultado += `\n\n`;
 
         offers.forEach((offer: any, i: number) => {
           resultado += `${i + 1}. ${offer.title}\n`;
           resultado += `   🏪 ${offer.vendors.name}\n`;
           resultado += `   📝 ${offer.description}\n`;
           if (offer.discount_percentage) resultado += `   💰 ${offer.discount_percentage}% OFF\n`;
-          if (offer.original_price && offer.offer_price) resultado += `   💵 Antes: $${offer.original_price} → Ahora: $${offer.offer_price}\n`;
+          if (offer.original_price && offer.offer_price) resultado += `   💵 ${t('offers.price_before', lang)}: $${offer.original_price} → ${t('offers.price_now', lang)}: $${offer.offer_price}\n`;
           if (offer.valid_until) {
             const validUntil = new Date(offer.valid_until);
-            resultado += `   ⏰ Válido hasta: ${validUntil.toLocaleDateString("es-AR")}\n`;
+            resultado += `   ⏰ ${t('offers.valid_until', lang)}: ${validUntil.toLocaleDateString("es-AR")}\n`;
           }
-          resultado += `   ID Negocio: ${offer.vendor_id}\n\n`;
+          resultado += `   ID ${lang === 'es' ? 'Negocio' : lang === 'en' ? 'Store' : lang === 'pt' ? 'Loja' : '店舗'}: ${offer.vendor_id}\n\n`;
         });
 
-        const argTime = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
-        const timeStr = argTime.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
-        resultado += `_🕒 Ofertas actualizadas hoy ${timeStr}_`;
-        
         return resultado;
       }
 
       case "cancelar_pedido": {
-        if (!args.motivo || args.motivo.trim().length < 5) {
+        if (!args.motivo) {
           context.pending_cancellation = {
             step: "awaiting_reason",
             order_id: args.order_id || context.pending_order_id || context.last_order_id,
           };
           await saveContext(context, supabase);
-          return "¿Por qué querés cancelar el pedido? Escribí el motivo:";
+          return t('cancel.ask_reason', lang);
         }
 
         let orderId = args.order_id;
@@ -1316,7 +1242,7 @@ export async function ejecutarHerramienta(
             .limit(1);
           
           if (!recentOrders || recentOrders.length === 0) {
-            return "No encontré ningún pedido activo para cancelar.";
+            return t('cancel.no_active', lang);
           }
           orderId = recentOrders[0].id;
         }
@@ -1330,7 +1256,7 @@ export async function ejecutarHerramienta(
             .limit(1);
           
           if (!matchingOrders || matchingOrders.length === 0) {
-            return `No encontré un pedido con ID #${orderId}`;
+            return t('cancel.not_found', lang, { id: orderId });
           }
           orderId = matchingOrders[0].id;
         }
@@ -1341,10 +1267,10 @@ export async function ejecutarHerramienta(
           .eq("id", orderId)
           .single();
 
-        if (fetchError || !order) return "No encontré ese pedido. Por favor verificá el número de pedido.";
-        if (order.customer_phone !== context.phone) return "Este pedido no te pertenece.";
-        if (order.status === "cancelled") return "Este pedido ya está cancelado.";
-        if (["delivered", "ready"].includes(order.status)) return `No se puede cancelar un pedido que ya está "${order.status}".`;
+        if (fetchError || !order) return t('cancel.not_found2', lang);
+        if (order.customer_phone !== context.phone) return t('cancel.not_yours', lang);
+        if (order.status === "cancelled") return t('cancel.already_cancelled', lang);
+        if (["delivered", "ready"].includes(order.status)) return t('cancel.cannot_cancel', lang, { status: order.status });
 
         await supabase.from("orders").update({ status: "cancelled" }).eq("id", orderId);
         await supabase.from("order_status_history").insert({
@@ -1371,12 +1297,12 @@ export async function ejecutarHerramienta(
         context.conversation_history = [];
         await saveContext(context, supabase);
 
-        return `✅ Pedido #${orderId.substring(0, 8)} cancelado.\n📝 Motivo: ${args.motivo}\n\nEl vendedor ha sido notificado.\n\n¿Querés hacer un nuevo pedido? 😊`;
+        return t('cancel.success', lang, { id: orderId.substring(0, 8), reason: args.motivo });
       }
 
       case "ver_metodos_pago": {
         if (!context.selected_vendor_id) {
-          return "Primero tenés que elegir un negocio. ¿Querés ver los negocios disponibles?";
+          return t('payment.need_vendor', lang);
         }
 
         context.payment_method = undefined;
@@ -1387,7 +1313,7 @@ export async function ejecutarHerramienta(
           .eq("id", context.selected_vendor_id)
           .single();
 
-        if (vendorError || !vendor) return "Hubo un problema al obtener los métodos de pago del negocio.";
+        if (vendorError || !vendor) return t('payment.fetch_error', lang);
 
         const paymentSettings = vendor.payment_settings || {};
         const metodosDisponibles: string[] = [];
@@ -1395,16 +1321,16 @@ export async function ejecutarHerramienta(
         let datosTransferencia = "";
 
         if (paymentSettings.efectivo === true) {
-          metodosDisponibles.push("- Efectivo 💵");
+          metodosDisponibles.push(`- ${lang === 'es' ? 'Efectivo' : lang === 'en' ? 'Cash' : lang === 'pt' ? 'Dinheiro' : '現金'} 💵`);
           availableKeys.push("efectivo");
         }
 
         if (paymentSettings.transferencia?.activo === true) {
-          metodosDisponibles.push("- Transferencia bancaria 🏦");
+          metodosDisponibles.push(`- ${lang === 'es' ? 'Transferencia bancaria' : lang === 'en' ? 'Bank transfer' : lang === 'pt' ? 'Transferência bancária' : '銀行振込'} 🏦`);
           availableKeys.push("transferencia");
           const { alias, cbu, titular } = paymentSettings.transferencia;
           if (alias && cbu && titular) {
-            datosTransferencia = `\n\n📋 *Datos para transferencia:*\n• Alias: ${alias}\n• CBU/CVU: ${cbu}\n• Titular: ${titular}`;
+            datosTransferencia = `\n\n📋 *${lang === 'es' ? 'Datos para transferencia' : lang === 'en' ? 'Transfer details' : lang === 'pt' ? 'Dados para transferência' : '振込情報'}:*\n• Alias: ${alias}\n• CBU/CVU: ${cbu}\n• ${lang === 'es' ? 'Titular' : lang === 'en' ? 'Account holder' : lang === 'pt' ? 'Titular' : '名義人'}: ${titular}`;
           }
         }
 
@@ -1414,22 +1340,22 @@ export async function ejecutarHerramienta(
         }
 
         if (metodosDisponibles.length === 0) {
-          return `⚠️ ${vendor.name} todavía no configuró métodos de pago. Por favor contactá directamente con el negocio.`;
+          return t('payment.not_configured', lang, { vendor: vendor.name });
         }
 
         context.payment_methods_fetched = true;
         context.available_payment_methods = availableKeys;
 
         const textoMetodos = metodosDisponibles.length === 1 
-          ? "Tenés disponible el siguiente método de pago:"
-          : "Estos son los métodos de pago disponibles:";
+          ? t('payment.single_available', lang)
+          : t('payment.multiple_available', lang);
 
         const metodosNumerados = metodosDisponibles.map((m, i) => `${i + 1}. *${m.replace('- ', '')}*`).join('\n');
 
         const argTime = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
         const timeStr = argTime.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
         
-        return `${textoMetodos}\n\n${metodosNumerados}${datosTransferencia}\n\n_🕒 Lista de pagos actualizada: ${timeStr}_\n\nElegí uno (podés escribir el número o el nombre). 😊`;
+        return `${textoMetodos}\n\n${metodosNumerados}${datosTransferencia}\n\n_${t('payment.updated_at', lang, { time: timeStr })}_\n\n${t('payment.choose', lang)}`;
       }
 
       case "seleccionar_metodo_pago": {
@@ -1453,12 +1379,12 @@ export async function ejecutarHerramienta(
         }
         
         if (!context.available_payment_methods || context.available_payment_methods.length === 0) {
-          return `⚠️ Primero necesito ver qué métodos de pago acepta el negocio. Dame un momento...`;
+          return t('payment.need_methods', lang);
         }
         
         if (!context.available_payment_methods.includes(normalizedMethod)) {
           const available = context.available_payment_methods.map((m, i) => `${i + 1}. ${m}`).join('\n');
-          return `❌ "${metodo}" no está disponible para este negocio.\n\nMétodos disponibles:\n${available}`;
+          return t('payment.not_available', lang, { method: metodo, available });
         }
         
         context.payment_method = normalizedMethod;
@@ -1467,14 +1393,14 @@ export async function ejecutarHerramienta(
         const icons: Record<string, string> = { 'efectivo': '💵', 'transferencia': '🏦', 'mercadopago': '💳' };
         const labels: Record<string, string> = { 'efectivo': 'Efectivo', 'transferencia': 'Transferencia', 'mercadopago': 'MercadoPago' };
         
-        return `✅ Método de pago: ${icons[normalizedMethod] || '💰'} ${labels[normalizedMethod] || normalizedMethod}`;
+        return `✅ ${lang === 'es' ? 'Método de pago' : lang === 'en' ? 'Payment method' : lang === 'pt' ? 'Método de pagamento' : '支払い方法'}: ${icons[normalizedMethod] || '💰'} ${labels[normalizedMethod] || normalizedMethod}`;
       }
 
       case "hablar_con_vendedor": {
         let vendorId = context.selected_vendor_id;
 
         if (!vendorId) {
-          return "Primero necesito que selecciones un negocio. Podés buscar productos o locales para elegir con quién querés hablar.";
+          return t('chat.need_vendor', lang);
         }
 
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -1486,14 +1412,14 @@ export async function ejecutarHerramienta(
             vendorId = foundVendor.id;
             context.selected_vendor_id = foundVendor.id;
           } else {
-            return "No pude encontrar el negocio seleccionado. Por favor buscá locales o productos de nuevo.";
+            return t('chat.vendor_not_found', lang);
           }
         }
 
         const { data: vendor, error: vendorError } = await supabase
           .from("vendors").select("phone, whatsapp_number, name").eq("id", vendorId).single();
 
-        if (vendorError || !vendor) return "Hubo un problema al conectar con el negocio. Por favor intentá de nuevo.";
+        if (vendorError || !vendor) return t('chat.error', lang);
 
         const vendorPhone = vendor.whatsapp_number || vendor.phone;
 
@@ -1529,12 +1455,12 @@ export async function ejecutarHerramienta(
           { onConflict: "phone" },
         );
 
-        return `👤 *Conectando con ${vendor.name}*\n\nUn representante del negocio te atenderá en breve. Los mensajes que envíes ahora irán directamente al vendedor.\n\nPara volver al bot automático, el vendedor puede reactivarlo desde su panel.`;
+        return t('chat.connected', lang, { vendor: vendor.name });
       }
 
       case "registrar_calificacion": {
         if (!args.delivery_rating && !args.service_rating && !args.product_rating && !args.comment) {
-          return "Por favor proporciona al menos una calificación (delivery, atención o producto) o un comentario.";
+          return t('rating.need_rating', lang);
         }
 
         const { data: recentOrder } = await supabase
@@ -1542,7 +1468,7 @@ export async function ejecutarHerramienta(
           .eq("customer_phone", context.phone)
           .order("created_at", { ascending: false }).limit(1).maybeSingle();
 
-        if (!recentOrder) return "No encontré ningún pedido reciente para calificar.";
+        if (!recentOrder) return t('rating.no_order', lang);
 
         const ratings = [args.delivery_rating, args.service_rating, args.product_rating].filter(r => r !== null && r !== undefined);
         const averageRating = ratings.length > 0 ? Math.round(ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length) : null;
@@ -1554,21 +1480,21 @@ export async function ejecutarHerramienta(
           service_rating: args.service_rating, product_rating: args.product_rating, comment: args.comment,
         });
 
-        if (error) return "Hubo un error al guardar tu calificación. Por favor intenta de nuevo.";
+        if (error) return t('rating.save_error', lang);
 
-        let respuesta = "⭐ *¡Gracias por tu calificación!*\n\n📊 *Tu calificación:*\n";
-        if (args.delivery_rating) respuesta += `🚚 Tiempo de entrega: ${args.delivery_rating}/5\n`;
-        if (args.service_rating) respuesta += `👥 Atención: ${args.service_rating}/5\n`;
-        if (args.product_rating) respuesta += `📦 Producto: ${args.product_rating}/5\n`;
-        if (args.comment) respuesta += `\n💬 Comentario: "${args.comment}"\n`;
-        respuesta += "\nTu opinión nos ayuda a mejorar. ¡Gracias por confiar en nosotros! 😊";
+        let respuesta = t('rating.thanks', lang) + `\n`;
+        if (args.delivery_rating) respuesta += `${t('rating.delivery', lang)}: ${args.delivery_rating}/5\n`;
+        if (args.service_rating) respuesta += `${t('rating.service', lang)}: ${args.service_rating}/5\n`;
+        if (args.product_rating) respuesta += `${t('rating.product', lang)}: ${args.product_rating}/5\n`;
+        if (args.comment) respuesta += `\n${t('rating.comment', lang)}: "${args.comment}"\n`;
+        respuesta += "\n" + t('rating.helps', lang);
 
         return respuesta;
       }
 
       case "calificar_plataforma": {
         if (!args.rating || args.rating < 1 || args.rating > 5) {
-          return "Por favor proporciona una calificación válida entre 1 y 5 estrellas.";
+          return t('platform.invalid_rating', lang);
         }
 
         const { error } = await supabase.from("platform_reviews").insert({
@@ -1577,12 +1503,12 @@ export async function ejecutarHerramienta(
           rating: args.rating, comment: args.comment || null,
         });
 
-        if (error) return "Hubo un error al guardar tu reseña. Por favor intenta de nuevo.";
+        if (error) return t('platform.save_error', lang);
 
-        let respuesta = "🌟 *¡Gracias por tu reseña de Lapacho!*\n\n";
-        respuesta += `⭐ Tu calificación: ${args.rating}/5\n`;
-        if (args.comment) respuesta += `\n💬 Comentario: "${args.comment}"\n`;
-        respuesta += "\n¡Tu opinión nos ayuda a mejorar la plataforma! 😊";
+        let respuesta = t('platform.thanks', lang) + `\n\n`;
+        respuesta += `⭐ ${lang === 'es' ? 'Tu calificación' : lang === 'en' ? 'Your rating' : lang === 'pt' ? 'Sua avaliação' : 'あなたの評価'}: ${args.rating}/5\n`;
+        if (args.comment) respuesta += `\n${t('rating.comment', lang)}: "${args.comment}"\n`;
+        respuesta += "\n" + t('platform.helps', lang);
 
         return respuesta;
       }
@@ -1604,14 +1530,14 @@ export async function ejecutarHerramienta(
 
         if (error) {
           console.error("Error creating ticket:", error);
-          return "Hubo un error al crear el ticket. Intenta de nuevo o contacta directamente con soporte.";
+          return t('ticket.error', lang);
         }
 
         await supabase.from("support_messages").insert({
           ticket_id: ticket.id, sender_type: "customer", message: args.descripcion,
         });
 
-        return `✅ *Ticket de soporte creado*\n\n📋 ID: #${ticket.id.substring(0, 8)}\n🏷️ Asunto: ${args.asunto}\n⚡ Prioridad: ${prioridad}\n\nNuestro equipo de soporte te contactará pronto. Los mensajes que envíes ahora irán directamente al equipo de soporte.\n\n💡 *Importante:* El bot se desactivará hasta que el equipo de soporte cierre tu ticket.`;
+        return t('ticket.created', lang, { id: ticket.id.substring(0, 8), subject: args.asunto, priority: prioridad });
       }
 
       case "mostrar_menu_ayuda": {
@@ -1624,7 +1550,7 @@ export async function ejecutarHerramienta(
         const direccion = args.direccion?.trim();
         
         if (!direccion || direccion.length < 3) {
-          return "⚠️ Por favor proporcioná una dirección más completa (calle y número).";
+          return t('address.too_short', lang);
         }
         
         context.delivery_address = direccion;
@@ -1635,21 +1561,21 @@ export async function ejecutarHerramienta(
         
         await saveContext(context, supabase);
         
-        let response = `📍 Perfecto, tu pedido será enviado a: **${direccion}**\n\n`;
+        let response = t('address.confirmed', lang, { address: direccion }) + `\n\n`;
         
         if (context.cart.length > 0 && context.selected_vendor_id) {
           if (!context.payment_method) {
             if (context.available_payment_methods && context.available_payment_methods.length > 0) {
-              response += `¿Con qué método de pago querés confirmar?\n`;
+              response += t('address.choose_payment', lang) + `\n`;
               context.available_payment_methods.forEach(method => {
                 const icons: Record<string, string> = { 'efectivo': '💵', 'transferencia': '🏦', 'mercadopago': '💳' };
                 response += `- ${method.charAt(0).toUpperCase() + method.slice(1)} ${icons[method] || '💰'}\n`;
               });
             } else {
-              response += `¿Querés confirmar el pedido? 📦`;
+              response += t('address.confirm_order', lang);
             }
           } else {
-            response += `¿Confirmás el pedido con pago en ${context.payment_method}? 📦`;
+            response += t('address.confirm_with_payment', lang, { method: context.payment_method });
           }
         }
         
