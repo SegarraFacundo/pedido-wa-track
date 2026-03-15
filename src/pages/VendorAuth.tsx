@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { User } from '@supabase/supabase-js';
 import { MessageSquare } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useLocalePath } from '@/hooks/useLocalePath';
 import lapachoIcon from '@/assets/lapacho-icon.png';
 
 export default function VendorAuth() {
@@ -20,6 +21,7 @@ export default function VendorAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [hasVendorProfile, setHasVendorProfile] = useState<boolean | null>(null);
   const navigate = useNavigate();
+  const localePath = useLocalePath();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -53,7 +55,7 @@ export default function VendorAuth() {
 
     if (vendor) {
       setHasVendorProfile(true);
-      navigate('/vendor-dashboard');
+      navigate(localePath('/vendor-dashboard'));
     } else {
       setHasVendorProfile(false);
     }
@@ -84,7 +86,7 @@ export default function VendorAuth() {
         description: t('vendorAuth.profileCreatedDesc'),
       });
 
-      navigate('/vendor-dashboard');
+      navigate(localePath('/vendor-dashboard'));
     } catch (error: any) {
       toast({
         title: t('common.error'),
@@ -175,7 +177,7 @@ export default function VendorAuth() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    navigate('/');
+    navigate(localePath('/'));
   };
 
   if (user) {
@@ -226,7 +228,7 @@ export default function VendorAuth() {
             <CardDescription>{user.email}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button onClick={() => navigate('/vendor-dashboard')} className="w-full">
+            <Button onClick={() => navigate(localePath('/vendor-dashboard'))} className="w-full">
               {t('vendorAuth.goToDashboard')}
             </Button>
             <Button onClick={handleSignOut} variant="outline" className="w-full">
@@ -273,7 +275,7 @@ export default function VendorAuth() {
               {t('vendorAuth.contactToRegister')}
             </Button>
           </div>
-          <Button variant="ghost" className="w-full mt-4" onClick={() => navigate('/')}>{t('common.backHome')}</Button>
+          <Button variant="ghost" className="w-full mt-4" onClick={() => navigate(localePath('/'))}>{t('common.backHome')}</Button>
         </CardContent>
       </Card>
     </div>

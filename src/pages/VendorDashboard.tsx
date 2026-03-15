@@ -24,6 +24,7 @@ import { Loader2, Package, Clock, Settings, LayoutDashboard, Tag, Star, MessageC
 import { PWAInstallPrompt } from '@/components/PWAInstallPrompt';
 import lapachoIcon from "@/assets/lapacho-icon.png";
 import { cn } from "@/lib/utils";
+import { useLocalePath } from '@/hooks/useLocalePath';
 
 export default function VendorDashboard() {
   const { t } = useTranslation();
@@ -33,6 +34,7 @@ export default function VendorDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const navigate = useNavigate();
+  const localePath = useLocalePath();
   const { toast } = useToast();
 
   const menuItems = [
@@ -61,19 +63,19 @@ export default function VendorDashboard() {
   const checkAuth = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) { navigate('/vendor-auth'); return; }
+      if (!session?.user) { navigate(localePath('/vendor-auth')); return; }
       setUser(session.user);
       const { data: vendorData, error } = await supabase.from('vendors').select('*').eq('user_id', session.user.id).single();
       if (error || !vendorData) {
         toast({ title: t('common.error'), description: t('vendor.noVendorProfile'), variant: 'destructive' });
-        navigate('/vendor-auth'); return;
+        navigate(localePath('/vendor-auth')); return;
       }
       setVendor(vendorData);
-    } catch (error) { console.error('Error checking auth:', error); navigate('/vendor-auth'); }
+    } catch (error) { console.error('Error checking auth:', error); navigate(localePath('/vendor-auth')); }
     finally { setLoading(false); }
   };
 
-  const handleSignOut = async () => { await supabase.auth.signOut(); navigate('/vendor-auth'); };
+  const handleSignOut = async () => { await supabase.auth.signOut(); navigate(localePath('/vendor-auth')); };
   const handleMenuItemClick = (value: string) => { setActiveTab(value); setDrawerOpen(false); };
 
   if (loading) return <div className="min-h-screen bg-background flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
