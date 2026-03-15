@@ -3598,8 +3598,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       
       // 🆕 Si el usuario confirma con "Si/Ok/Dale" y hay UN solo método disponible, auto-seleccionarlo
       if (!selectedMethod) {
-        const confirmKeywords = /^(s[ií]|si|yes|dale|ok|confirmo|listo|confirmar)$/i;
-        if (confirmKeywords.test(normalizedMsg) && 
+        if (isConfirmation(normalizedMsg) && 
             context.available_payment_methods?.length === 1) {
           selectedMethod = context.available_payment_methods[0];
           console.log(`✅ Auto-selected single available method: ${selectedMethod}`);
