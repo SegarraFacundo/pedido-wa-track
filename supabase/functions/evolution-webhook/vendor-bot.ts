@@ -3722,7 +3722,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         console.log(`🧹 Order cancelled, full context reset`);
         await saveContext(context, supabase);
         
-        const response = `Pedido cancelado. ¿En qué más puedo ayudarte? 😊`;
+        const response = t('order.cancelled', lang);
         
         context.conversation_history.push({
           role: "assistant",
