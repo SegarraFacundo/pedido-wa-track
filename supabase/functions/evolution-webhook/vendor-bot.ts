@@ -1,5 +1,6 @@
 import OpenAI from "https://esm.sh/openai@4.77.3";
 import type { ConversationContext, CartItem } from "./types.ts";
+import type { ConversationContext, CartItem } from "./types.ts";
 import { getPendingStateForPayment } from "./types.ts";
 import { normalizeArgentinePhone } from "./utils.ts";
 import { getContext, saveContext } from "./context.ts";
@@ -4050,3 +4051,4 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     return "Disculpá, tuve un problema técnico. Por favor intentá de nuevo en un momento.";
   }
 }
+
