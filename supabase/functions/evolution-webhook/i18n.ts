@@ -253,17 +253,151 @@ const translations: Record<string, Record<Language, string>> = {
   },
 
   // === AYUDA ===
-  'help.header': {
-    es: '📋 *¿Qué puedo hacer?*',
-    en: '📋 *What can I do?*',
-    pt: '📋 *O que posso fazer?*',
-    ja: '📋 *何ができますか？*',
-  },
-  'help.body': {
-    es: '🔍 *Ver negocios* - "mostrame los locales"\n🍕 *Buscar productos* - "quiero pizza", "busco helado"\n🛒 *Ver carrito* - "ver carrito", "qué tengo"\n📦 *Estado de pedido* - "estado de mi pedido"\n❌ *Cancelar pedido* - "cancelar pedido"\n🗣️ *Hablar con negocio* - "hablar con vendedor"\n⭐ *Calificar* - "quiero calificar"\n\nEscribí lo que necesitás y te ayudo 😊',
-    en: '🔍 *See stores* - "show me stores"\n🍕 *Search products* - "I want pizza", "looking for ice cream"\n🛒 *View cart* - "view cart", "what do I have"\n📦 *Order status* - "my order status"\n❌ *Cancel order* - "cancel order"\n🗣️ *Talk to store* - "talk to vendor"\n⭐ *Rate* - "I want to rate"\n\nWrite what you need and I\'ll help 😊',
-    pt: '🔍 *Ver lojas* - "mostre as lojas"\n🍕 *Buscar produtos* - "quero pizza", "procuro sorvete"\n🛒 *Ver carrinho* - "ver carrinho", "o que tenho"\n📦 *Status do pedido* - "status do meu pedido"\n❌ *Cancelar pedido* - "cancelar pedido"\n🗣️ *Falar com loja* - "falar com vendedor"\n⭐ *Avaliar* - "quero avaliar"\n\nEscreva o que precisa e eu ajudo 😊',
-    ja: '🔍 *店舗を見る* - 「お店を見せて」\n🍕 *商品を探す* - 「ピザが欲しい」\n🛒 *カートを見る* - 「カートを見る」\n📦 *注文状況* - 「注文の状況」\n❌ *注文キャンセル* - 「注文キャンセル」\n🗣️ *店舗に連絡* - 「店舗と話す」\n⭐ *評価* - 「評価したい」\n\n何が必要か書いてください 😊',
+  'help.full': {
+    es: `🤖 *MENÚ DE AYUDA - LAPACHO DELIVERY*
+
+¿Qué podés hacer?
+
+🔍 *BUSCAR Y PEDIR*
+• Buscar productos (ej: "Quiero pizza")
+• Ver locales abiertos ahora
+• Ver ofertas y promociones
+• Ver el menú de un negocio
+• Hacer un pedido
+
+🛒 *MI CARRITO*
+• Ver mi carrito actual
+• Agregar productos al carrito
+• Quitar productos del carrito
+• Vaciar el carrito
+
+📦 *MIS PEDIDOS*
+• Ver el estado de mi pedido
+• Cancelar un pedido
+
+📍 *MIS DIRECCIONES*
+• Guardar direcciones para pedidos futuros
+• Ver mis direcciones guardadas
+• Usar una dirección guardada
+• Borrar o renombrar direcciones
+
+⭐ *CALIFICAR*
+• Calificar mi pedido
+• Calificar la plataforma Lapacho
+
+💬 *SOPORTE*
+• Hablar con un vendedor
+• Crear un ticket de soporte
+
+Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`,
+    en: `🤖 *HELP MENU - LAPACHO DELIVERY*
+
+What can you do?
+
+🔍 *SEARCH & ORDER*
+• Search products (e.g. "I want pizza")
+• See stores open now
+• View deals and promotions
+• See a store's menu
+• Place an order
+
+🛒 *MY CART*
+• View my current cart
+• Add products to cart
+• Remove products from cart
+• Empty my cart
+
+📦 *MY ORDERS*
+• Check my order status
+• Cancel an order
+
+📍 *MY ADDRESSES*
+• Save addresses for future orders
+• View my saved addresses
+• Use a saved address
+• Delete or rename addresses
+
+⭐ *RATE*
+• Rate my order
+• Rate the Lapacho platform
+
+💬 *SUPPORT*
+• Talk to a vendor
+• Create a support ticket
+
+Write what you need and I'll help. It's easy! 😊`,
+    pt: `🤖 *MENU DE AJUDA - LAPACHO DELIVERY*
+
+O que você pode fazer?
+
+🔍 *BUSCAR E PEDIR*
+• Buscar produtos (ex: "Quero pizza")
+• Ver lojas abertas agora
+• Ver ofertas e promoções
+• Ver o cardápio de uma loja
+• Fazer um pedido
+
+🛒 *MEU CARRINHO*
+• Ver meu carrinho atual
+• Adicionar produtos ao carrinho
+• Remover produtos do carrinho
+• Esvaziar o carrinho
+
+📦 *MEUS PEDIDOS*
+• Ver o status do meu pedido
+• Cancelar um pedido
+
+📍 *MEUS ENDEREÇOS*
+• Salvar endereços para pedidos futuros
+• Ver meus endereços salvos
+• Usar um endereço salvo
+• Excluir ou renomear endereços
+
+⭐ *AVALIAR*
+• Avaliar meu pedido
+• Avaliar a plataforma Lapacho
+
+💬 *SUPORTE*
+• Falar com um vendedor
+• Criar um ticket de suporte
+
+Escreva o que precisa e eu ajudo. É muito fácil! 😊`,
+    ja: `🤖 *ヘルプメニュー - LAPACHO DELIVERY*
+
+何ができますか？
+
+🔍 *検索と注文*
+• 商品を検索（例：「ピザが欲しい」）
+• 営業中の店舗を見る
+• セールやプロモーションを見る
+• 店舗のメニューを見る
+• 注文する
+
+🛒 *カート*
+• カートを確認する
+• 商品をカートに追加する
+• カートから商品を削除する
+• カートを空にする
+
+📦 *注文履歴*
+• 注文状況を確認する
+• 注文をキャンセルする
+
+📍 *住所*
+• 今後の注文用に住所を保存する
+• 保存した住所を確認する
+• 保存した住所を使う
+• 住所を削除・名前変更する
+
+⭐ *評価*
+• 注文を評価する
+• Lapachoプラットフォームを評価する
+
+💬 *サポート*
+• 店舗と話す
+• サポートチケットを作成する
+
+必要なことを書いてください。お手伝いします！😊`,
   },
 
   // === ERRORES ===

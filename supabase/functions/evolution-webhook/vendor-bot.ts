@@ -1,13 +1,10 @@
 import OpenAI from "https://esm.sh/openai@4.77.3";
-import type { ConversationContext, CartItem } from "./types.ts";
-import type { ConversationContext, CartItem } from "./types.ts";
-import { getPendingStateForPayment } from "./types.ts";
+import { ConversationContext, CartItem, getPendingStateForPayment } from "./types.ts";
 import { normalizeArgentinePhone } from "./utils.ts";
 import { getContext, saveContext } from "./context.ts";
 import { tools } from "./tools-definitions.ts";
 import { buildSystemPrompt } from "./simplified-prompt.ts";
-import { t, detectLanguage, HELP_REGEX, isConfirmation, isCancellation, detectPaymentMethod } from "./i18n.ts";
-import type { Language } from "./i18n.ts";
+import { t, detectLanguage, HELP_REGEX, isConfirmation, isCancellation, detectPaymentMethod, Language } from "./i18n.ts";
 
 // ==================== FASE 1: FILTRADO DE HERRAMIENTAS POR ESTADO ====================
 
@@ -2427,42 +2424,7 @@ async function ejecutarHerramienta(
       }
 
       case "mostrar_menu_ayuda": {
-        return `🤖 *MENÚ DE AYUDA - LAPACHO DELIVERY*
-
-¿Qué podés hacer?
-
-🔍 *BUSCAR Y PEDIR*
-• Buscar productos (ej: "Quiero pizza")
-• Ver locales abiertos ahora
-• Ver ofertas y promociones
-• Ver el menú de un negocio
-• Hacer un pedido
-
-🛒 *MI CARRITO*
-• Ver mi carrito actual
-• Agregar productos al carrito
-• Quitar productos del carrito
-• Vaciar el carrito
-
-📦 *MIS PEDIDOS*
-• Ver el estado de mi pedido
-• Cancelar un pedido
-
-📍 *MIS DIRECCIONES*
-• Guardar direcciones para pedidos futuros
-• Ver mis direcciones guardadas
-• Usar una dirección guardada
-• Borrar o renombrar direcciones
-
-⭐ *CALIFICAR*
-• Calificar mi pedido
-• Calificar la plataforma Lapacho
-
-💬 *SOPORTE*
-• Hablar con un vendedor
-• Crear un ticket de soporte
-
-Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
+        return t('help.full', context.language || 'es');
       }
 
 
@@ -3019,10 +2981,13 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       console.log(`💳 Payment validation: method=${context.payment_method || 'none'}, available=[${context.available_payment_methods?.join(',') || 'none'}]`);
     }
     
-    // 🌐 DETECCIÓN DE IDIOMA: En el primer mensaje o si no hay idioma guardado
-    if (!context.language) {
-      context.language = detectLanguage(message);
-      console.log(`🌐 Language detected: ${context.language} from message: "${message.substring(0, 50)}"`);
+    // 🌐 DETECCIÓN DE IDIOMA: Detecta en cada mensaje y actualiza si cambia
+    const detectedLang = detectLanguage(message);
+    if (!context.language || (detectedLang !== 'es' && detectedLang !== context.language)) {
+      // Only update if: no language yet, or user switched to a non-default language
+      // (We don't downgrade to 'es' because short messages like "2" default to 'es')
+      context.language = detectedLang;
+      console.log(`🌐 Language updated: ${context.language} from message: "${message.substring(0, 50)}"`);
       await saveContext(context, supabase);
     }
     
@@ -3804,7 +3769,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     // 🎯 FASE 5: Menú de ayuda estático (multi-idioma)
     if (HELP_REGEX.test(message.trim())) {
       console.log(`📋 INTERCEPTOR: Static help menu (lang: ${lang})`);
-      const helpText = `${t('help.header', lang)}\n\n${t('help.body', lang)}`;
+      const helpText = t('help.full', lang);
       
       context.conversation_history.push({ role: "assistant", content: helpText });
       await saveContext(context, supabase);
