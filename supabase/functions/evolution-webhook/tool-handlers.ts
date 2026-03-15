@@ -1213,7 +1213,7 @@ export async function ejecutarHerramienta(
             const validUntil = new Date(offer.valid_until);
             resultado += `   ⏰ ${t('offers.valid_until', lang)}: ${validUntil.toLocaleDateString("es-AR")}\n`;
           }
-          resultado += `   ID ${lang === 'es' ? 'Negocio' : lang === 'en' ? 'Store' : lang === 'pt' ? 'Loja' : '店舗'}: ${offer.vendor_id}\n\n`;
+          resultado += `   ID ${t('label.store', lang)}: ${offer.vendor_id}\n\n`;
         });
 
         return resultado;
