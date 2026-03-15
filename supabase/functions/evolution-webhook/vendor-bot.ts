@@ -2427,42 +2427,8 @@ async function ejecutarHerramienta(
       }
 
       case "mostrar_menu_ayuda": {
-        return `🤖 *MENÚ DE AYUDA - LAPACHO DELIVERY*
-
-¿Qué podés hacer?
-
-🔍 *BUSCAR Y PEDIR*
-• Buscar productos (ej: "Quiero pizza")
-• Ver locales abiertos ahora
-• Ver ofertas y promociones
-• Ver el menú de un negocio
-• Hacer un pedido
-
-🛒 *MI CARRITO*
-• Ver mi carrito actual
-• Agregar productos al carrito
-• Quitar productos del carrito
-• Vaciar el carrito
-
-📦 *MIS PEDIDOS*
-• Ver el estado de mi pedido
-• Cancelar un pedido
-
-📍 *MIS DIRECCIONES*
-• Guardar direcciones para pedidos futuros
-• Ver mis direcciones guardadas
-• Usar una dirección guardada
-• Borrar o renombrar direcciones
-
-⭐ *CALIFICAR*
-• Calificar mi pedido
-• Calificar la plataforma Lapacho
-
-💬 *SOPORTE*
-• Hablar con un vendedor
-• Crear un ticket de soporte
-
-Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
+        const helpLang = (context.language || 'es') as Language;
+        return t('help.full', helpLang);
       }
 
 
