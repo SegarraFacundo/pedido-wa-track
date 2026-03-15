@@ -19,6 +19,7 @@ export default function LocaleRouter({ children }: { children: React.ReactNode }
         i18n.changeLanguage(locale);
         localStorage.setItem('i18n_lang', locale);
       }
+      document.documentElement.lang = locale;
     }
   }, [locale, i18n]);
 
