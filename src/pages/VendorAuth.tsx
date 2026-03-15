@@ -275,7 +275,7 @@ export default function VendorAuth() {
               {t('vendorAuth.contactToRegister')}
             </Button>
           </div>
-          <Button variant="ghost" className="w-full mt-4" onClick={() => navigate('/')}>{t('common.backHome')}</Button>
+          <Button variant="ghost" className="w-full mt-4" onClick={() => navigate(localePath('/'))}>{t('common.backHome')}</Button>
         </CardContent>
       </Card>
     </div>

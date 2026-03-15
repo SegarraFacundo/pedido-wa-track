@@ -75,7 +75,7 @@ export default function VendorDashboard() {
     finally { setLoading(false); }
   };
 
-  const handleSignOut = async () => { await supabase.auth.signOut(); navigate('/vendor-auth'); };
+  const handleSignOut = async () => { await supabase.auth.signOut(); navigate(localePath('/vendor-auth')); };
   const handleMenuItemClick = (value: string) => { setActiveTab(value); setDrawerOpen(false); };
 
   if (loading) return <div className="min-h-screen bg-background flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
