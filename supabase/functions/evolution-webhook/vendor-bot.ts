@@ -1,3 +1,4 @@
+// vendor-bot v2 - updated 2026-03-15
 import OpenAI from "https://esm.sh/openai@4.77.3";
 import type { ConversationContext, CartItem } from "./types.ts";
 import { getPendingStateForPayment } from "./types.ts";
