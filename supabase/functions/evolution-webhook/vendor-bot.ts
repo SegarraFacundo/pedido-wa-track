@@ -206,7 +206,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       const messageLower = message.toLowerCase().trim();
 
       // 🔴 INTERCEPTOR: Cancelar
-      const wantsCancel = cancelKeywords.some(kw => messageLower.includes(kw));
+      const wantsCancel = cancelIntentRegex.test(messageLower);
       if (wantsCancel && !context.pending_cancellation) {
         context.pending_cancellation = {
           step: "awaiting_reason",
@@ -217,7 +217,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
 
       // 📦 INTERCEPTOR: Estado
-      const wantsStatus = statusKeywords.some(kw => messageLower.includes(kw));
+      const wantsStatus = statusIntentRegex.test(messageLower);
       if (wantsStatus) {
         const statusResult = await ejecutarHerramienta("ver_estado_pedido", {}, context, supabase);
         context.conversation_history.push({ role: "assistant", content: statusResult });
@@ -226,7 +226,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
 
       // 🗣️ INTERCEPTOR: Vendor chat
-      const wantsVendorChat = vendorChatKeywords.some(kw => messageLower.includes(kw));
+      const wantsVendorChat = vendorChatIntentRegex.test(messageLower);
       if (wantsVendorChat) {
         const chatResult = await ejecutarHerramienta("hablar_con_vendedor", {}, context, supabase);
         context.conversation_history.push({ role: "assistant", content: chatResult });
@@ -234,7 +234,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         return chatResult;
       }
 
-      const wantsNewOrder = newOrderKeywords.some(kw => messageLower.includes(kw));
+      const wantsNewOrder = newOrderIntentRegex.test(messageLower);
       if (wantsNewOrder && !context.pending_cancellation) {
         const orderId = context.pending_order_id ? context.pending_order_id.substring(0, 8) : 'activo';
         const stateDisplay = context.order_state?.replace('order_pending_', '').replace('_', ' ').toUpperCase() || 'ACTIVO';
