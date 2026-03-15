@@ -3500,6 +3500,80 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       return clarificationResponse;
     }
 
+    // 🎯 FASE 2: Interceptores deterministas pre-LLM
+    
+    // INTERCEPTOR: Estado needs_address - todo lo que no sea cancelar/volver se trata como dirección
+    if ((context.order_state === "needs_address" || 
+        (context.order_state === "shopping" && context.delivery_type === "delivery" && !context.delivery_address && context.cart.length > 0)) 
+        && message.trim().length > 3) {
+      const msgLower = message.toLowerCase().trim();
+      const notAddress = /^(cancel|volver|cambiar|no|menu|carrito|ayuda|estado|hola)/i.test(msgLower);
+      
+      if (!notAddress) {
+        console.log(`📍 INTERCEPTOR: Treating message as address in needs_address state: "${message}"`);
+        const result = await ejecutarHerramienta("confirmar_direccion_entrega", {
+          direccion: message.trim(),
+        }, context, supabase);
+        
+        context.conversation_history.push({ role: "assistant", content: result });
+        await saveContext(context, supabase);
+        return result;
+      }
+    }
+
+    // INTERCEPTOR: Estado idle/browsing + palabras de comida → buscar_productos directo
+    if ((context.order_state === "idle" || context.order_state === "browsing" || !context.order_state) && !context.selected_vendor_id) {
+      const foodKeywords = /\b(pizza|hamburguesa|empanada|milanesa|sushi|helado|cerveza|coca|fanta|sprite|agua|café|cafe|pollo|asado|lomito|sandwich|tarta|torta|postre|ensalada|papas|sándwich|medialunas?|facturas?|alfajor|ravioles?|ñoquis?|pastas?)\b/i;
+      if (foodKeywords.test(message)) {
+        console.log(`🍕 INTERCEPTOR: Food keyword detected in idle/browsing, calling buscar_productos`);
+        const result = await ejecutarHerramienta("buscar_productos", {
+          consulta: message.trim(),
+        }, context, supabase);
+        
+        context.conversation_history.push({ role: "assistant", content: result });
+        await saveContext(context, supabase);
+        return result;
+      }
+    }
+    
+    // INTERCEPTOR: Estado browsing + número solo → seleccionar negocio de la lista
+    if (context.order_state === "browsing" && context.available_vendors_map && context.available_vendors_map.length > 0) {
+      const numMatch = message.trim().match(/^(\d+)$/);
+      if (numMatch) {
+        const idx = parseInt(numMatch[1]);
+        const vendor = context.available_vendors_map.find(v => v.index === idx);
+        if (vendor) {
+          console.log(`🏪 INTERCEPTOR: Numeric selection in browsing → ver_menu_negocio for "${vendor.name}"`);
+          const result = await ejecutarHerramienta("ver_menu_negocio", {
+            vendor_id: String(idx),
+          }, context, supabase);
+          
+          context.conversation_history.push({ role: "assistant", content: result });
+          await saveContext(context, supabase);
+          return result;
+        }
+      }
+    }
+
+    // 🎯 FASE 5: Menú de ayuda estático
+    const helpKeywords = /^(ayuda|help|menu|opciones|que puedo hacer|qué puedo hacer|como funciona|cómo funciona|\?|info)$/i;
+    if (helpKeywords.test(message.trim())) {
+      console.log(`📋 INTERCEPTOR: Static help menu`);
+      const helpText = `📋 *¿Qué puedo hacer?*\n\n` +
+        `🔍 *Ver negocios* - "mostrame los locales"\n` +
+        `🍕 *Buscar productos* - "quiero pizza", "busco helado"\n` +
+        `🛒 *Ver carrito* - "ver carrito", "qué tengo"\n` +
+        `📦 *Estado de pedido* - "estado de mi pedido"\n` +
+        `❌ *Cancelar pedido* - "cancelar pedido"\n` +
+        `🗣️ *Hablar con negocio* - "hablar con vendedor"\n` +
+        `⭐ *Calificar* - "quiero calificar"\n\n` +
+        `Escribí lo que necesitás y te ayudo 😊`;
+      
+      context.conversation_history.push({ role: "assistant", content: helpText });
+      await saveContext(context, supabase);
+      return helpText;
+    }
+
     // Inicializar OpenAI
     const openai = new OpenAI({
       apiKey: Deno.env.get("OPENAI_API_KEY"),
