@@ -305,12 +305,14 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
             console.error('❌ Error updating user_sessions:', sessionError);
           }
 
-          // Notificar al cliente que el bot está activo
+          // Notificar al cliente que el bot está activo (traducido)
+          const { getTranslatedNotification } = await import('@/lib/notificationTranslation');
+          const translatedMsg = await getTranslatedNotification(phone, 'bot_active');
           
           const { error: notifyError } = await supabase.functions.invoke('send-whatsapp-notification', {
             body: {
               phoneNumber: phone,
-              message: `✅ El bot está activo nuevamente.`
+              message: translatedMsg || `✅ El bot está activo nuevamente.`
             }
           });
 
