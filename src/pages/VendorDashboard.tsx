@@ -63,7 +63,7 @@ export default function VendorDashboard() {
   const checkAuth = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) { navigate('/vendor-auth'); return; }
+      if (!session?.user) { navigate(localePath('/vendor-auth')); return; }
       setUser(session.user);
       const { data: vendorData, error } = await supabase.from('vendors').select('*').eq('user_id', session.user.id).single();
       if (error || !vendorData) {
