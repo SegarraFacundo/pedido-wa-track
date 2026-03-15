@@ -1,4 +1,4 @@
-import type OpenAI from "https://esm.sh/openai@4.77.3";
+import type OpenAI from "npm:openai@4.77.3";
 
 // ==================== DEFINICIONES DE HERRAMIENTAS ====================
 
