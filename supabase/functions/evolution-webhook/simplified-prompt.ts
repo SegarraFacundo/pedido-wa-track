@@ -19,8 +19,10 @@ export function buildSystemPrompt(context: ConversationContext): string {
   // Instrucciones específicas por estado (solo el relevante)
   const stateInstructions = getStateInstructions(currentState, context);
 
-  return `Sos un vendedor de Lapacho, plataforma de delivery por WhatsApp en Argentina.
-Sé ULTRA breve, tono argentino, máximo 4 líneas. Sin "Aquí tenés", sin "Te muestro", sin introducciones.
+  const lang = context.language || 'es';
+  const langInstructions = getLangInstructions(lang);
+
+  return `${langInstructions}
 
 ${stateInfo}
 
