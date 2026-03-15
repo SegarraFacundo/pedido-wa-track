@@ -3180,6 +3180,16 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
     }
 
+    // 🛒 INTERCEPTOR: Estado shopping + número/producto → agregar al carrito directamente
+    if (context.order_state === "shopping" && context.selected_vendor_id) {
+      const shoppingResult = await handleShoppingInterceptor(message, context, supabase);
+      if (shoppingResult) {
+        context.conversation_history.push({ role: "assistant", content: shoppingResult });
+        await saveContext(context, supabase);
+        return shoppingResult;
+      }
+    }
+
 
     // Cuando resumen_mostrado = true y el usuario confirma, llamar crear_pedido
     // directamente sin pasar por el LLM (que alucina "pedido activo" inexistente)
