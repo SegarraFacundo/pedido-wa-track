@@ -86,7 +86,7 @@ export default function VendorAuth() {
         description: t('vendorAuth.profileCreatedDesc'),
       });
 
-      navigate('/vendor-dashboard');
+      navigate(localePath('/vendor-dashboard'));
     } catch (error: any) {
       toast({
         title: t('common.error'),
