@@ -1094,9 +1094,9 @@ export async function ejecutarHerramienta(
               paymentErrorMsg = t('order.mp_unavailable', lang);
               for (const method of paymentData.available_methods) {
                 if (method.method === 'transferencia') {
-                  paymentErrorMsg += `📱 *${lang === 'es' ? 'Transferencia bancaria' : lang === 'en' ? 'Bank transfer' : lang === 'pt' ? 'Transferência bancária' : '銀行振込'}:*\n• Alias: ${method.details.alias}\n• CBU/CVU: ${method.details.cbu}\n• ${lang === 'es' ? 'Titular' : 'Holder'}: ${method.details.titular}\n• ${lang === 'es' ? 'Monto' : 'Amount'}: $${method.details.amount}\n\n`;
+                  paymentErrorMsg += `📱 *${t('label.bank_transfer', lang)}:*\n• Alias: ${method.details.alias}\n• CBU/CVU: ${method.details.cbu}\n• ${t('label.account_holder', lang)}: ${method.details.titular}\n• ${t('label.amount', lang)}: $${method.details.amount}\n\n`;
                 } else if (method.method === 'efectivo') {
-                  paymentErrorMsg += `💵 *${lang === 'es' ? 'Efectivo' : lang === 'en' ? 'Cash' : lang === 'pt' ? 'Dinheiro' : '現金'}:* ${method.details.message}\n\n`;
+                  paymentErrorMsg += `💵 *${t('label.cash', lang)}:* ${method.details.message}\n\n`;
                 }
               }
             } else {
