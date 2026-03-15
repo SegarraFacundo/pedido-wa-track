@@ -1321,7 +1321,7 @@ export async function ejecutarHerramienta(
         let datosTransferencia = "";
 
         if (paymentSettings.efectivo === true) {
-          metodosDisponibles.push(`- ${lang === 'es' ? 'Efectivo' : lang === 'en' ? 'Cash' : lang === 'pt' ? 'Dinheiro' : '現金'} 💵`);
+          metodosDisponibles.push(`- ${t('label.cash', lang)} 💵`);
           availableKeys.push("efectivo");
         }
 
