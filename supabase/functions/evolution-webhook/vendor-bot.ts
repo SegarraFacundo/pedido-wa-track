@@ -1,4 +1,4 @@
-import OpenAI from "https://esm.sh/openai@4.77.3?target=deno";
+import OpenAI from "npm:openai@4.77.3";
 import type { ConversationContext, CartItem } from "./types.ts";
 import type { ConversationContext, CartItem } from "./types.ts";
 import { getPendingStateForPayment } from "./types.ts";
