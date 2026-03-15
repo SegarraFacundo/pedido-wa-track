@@ -2424,8 +2424,7 @@ async function ejecutarHerramienta(
       }
 
       case "mostrar_menu_ayuda": {
-        const helpLang = (context.language || 'es') as Language;
-        return t('help.full', helpLang);
+        return t('help.full', context.language || 'es');
       }
 
 
