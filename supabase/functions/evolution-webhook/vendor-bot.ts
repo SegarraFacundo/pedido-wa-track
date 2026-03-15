@@ -3800,19 +3800,10 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
     }
 
-    // 🎯 FASE 5: Menú de ayuda estático
-    const helpKeywords = /^(ayuda|help|menu|opciones|que puedo hacer|qué puedo hacer|como funciona|cómo funciona|\?|info)$/i;
-    if (helpKeywords.test(message.trim())) {
-      console.log(`📋 INTERCEPTOR: Static help menu`);
-      const helpText = `📋 *¿Qué puedo hacer?*\n\n` +
-        `🔍 *Ver negocios* - "mostrame los locales"\n` +
-        `🍕 *Buscar productos* - "quiero pizza", "busco helado"\n` +
-        `🛒 *Ver carrito* - "ver carrito", "qué tengo"\n` +
-        `📦 *Estado de pedido* - "estado de mi pedido"\n` +
-        `❌ *Cancelar pedido* - "cancelar pedido"\n` +
-        `🗣️ *Hablar con negocio* - "hablar con vendedor"\n` +
-        `⭐ *Calificar* - "quiero calificar"\n\n` +
-        `Escribí lo que necesitás y te ayudo 😊`;
+    // 🎯 FASE 5: Menú de ayuda estático (multi-idioma)
+    if (HELP_REGEX.test(message.trim())) {
+      console.log(`📋 INTERCEPTOR: Static help menu (lang: ${lang})`);
+      const helpText = `${t('help.header', lang)}\n\n${t('help.body', lang)}`;
       
       context.conversation_history.push({ role: "assistant", content: helpText });
       await saveContext(context, supabase);
