@@ -71,7 +71,7 @@ export default function VendorDashboard() {
         navigate(localePath('/vendor-auth')); return;
       }
       setVendor(vendorData);
-    } catch (error) { console.error('Error checking auth:', error); navigate('/vendor-auth'); }
+    } catch (error) { console.error('Error checking auth:', error); navigate(localePath('/vendor-auth')); }
     finally { setLoading(false); }
   };
 
