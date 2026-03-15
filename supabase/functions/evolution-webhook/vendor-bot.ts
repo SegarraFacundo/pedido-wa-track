@@ -714,9 +714,11 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
           }
           toolCallTracker.set(toolName, callCount + 1);
 
+          // Save state BEFORE tool execution to detect "already shopping" vs "just transitioned"
+          const stateBeforeToolCall = context.order_state;
           const toolResult = await ejecutarHerramienta(toolName, toolArgs, context, supabase);
 
-          if (toolName === "ver_menu_negocio" && (context.order_state === "shopping")) {
+          if (toolName === "ver_menu_negocio" && stateBeforeToolCall === "shopping") {
             messages.push({
               role: "tool",
               tool_call_id: toolCall.id,
