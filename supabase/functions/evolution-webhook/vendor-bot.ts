@@ -3018,6 +3018,16 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       console.log(`💳 Payment validation: method=${context.payment_method || 'none'}, available=[${context.available_payment_methods?.join(',') || 'none'}]`);
     }
     
+    // 🌐 DETECCIÓN DE IDIOMA: En el primer mensaje o si no hay idioma guardado
+    if (!context.language) {
+      context.language = detectLanguage(message);
+      console.log(`🌐 Language detected: ${context.language} from message: "${message.substring(0, 50)}"`);
+      await saveContext(context, supabase);
+    }
+    
+    // Helper shorthand for translations
+    const lang = context.language || 'es';
+
     // 🧹 LIMPIAR CONTEXTO si hay un pedido ACTIVO del mismo vendor O si el vendor ya no existe
     // SOLO limpiamos si el usuario está en estados seguros (idle/order_placed)
     // NO limpiamos si está en medio de un flujo activo
