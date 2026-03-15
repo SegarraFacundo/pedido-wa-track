@@ -1043,8 +1043,8 @@ export async function ejecutarHerramienta(
           confirmacion += `🛒 Subtotal: $ ${Math.round(subtotal).toLocaleString("es-PY")}\n`;
           confirmacion += `🚚 Delivery: $ ${Math.round(deliveryCost).toLocaleString("es-PY")}\n`;
           confirmacion += `💰 ${t('cart.total', lang)}: $ ${Math.round(total).toLocaleString("es-PY")}\n\n`;
-          confirmacion += `📍 ${lang === 'es' ? 'Dirección' : lang === 'en' ? 'Address' : lang === 'pt' ? 'Endereço' : '住所'}: ${context.delivery_address}\n`;
-          confirmacion += `💳 ${lang === 'es' ? 'Pago' : lang === 'en' ? 'Payment' : lang === 'pt' ? 'Pagamento' : '支払い'}: ${context.payment_method}\n`;
+          confirmacion += `📍 ${t('label.address', lang)}: ${context.delivery_address}\n`;
+          confirmacion += `💳 ${t('label.payment', lang)}: ${context.payment_method}\n`;
           if (deliveryCost > 0) {
             confirmacion += `\n` + t('order.delivery_note', lang) + `\n`;
           }
