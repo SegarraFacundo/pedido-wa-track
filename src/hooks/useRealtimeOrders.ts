@@ -1,7 +1,8 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Order, OrderStatus } from '@/types/order';
 import { useToast } from '@/hooks/use-toast';
+import { formatOrder } from '@/lib/order-utils';
 
 export function useRealtimeOrders(vendorId?: string) {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -12,40 +13,6 @@ export function useRealtimeOrders(vendorId?: string) {
 
   useEffect(() => {
     let channel: any;
-
-    const formatOrder = (data: any): Order => ({
-      id: data.id,
-      customerName: data.customer_name,
-      customerPhone: data.customer_phone,
-      vendorId: data.vendor_id,
-      vendorName: data.vendor?.name || '',
-      items: (Array.isArray(data.items) ? data.items : []).map((item: any) => ({
-        id: item.product_id || item.id,
-        name: item.product_name || item.name,
-        quantity: item.quantity,
-        price: Number(item.price),
-        notes: item.notes
-      })),
-      total: Number(data.total),
-      status: data.status as OrderStatus,
-      address: data.address,
-      coordinates: data.coordinates ? (data.coordinates as any) : undefined,
-      estimatedDelivery: data.estimated_delivery ? new Date(data.estimated_delivery) : undefined,
-      createdAt: new Date(data.created_at),
-      updatedAt: new Date(data.updated_at),
-      notes: data.notes,
-      deliveryPersonName: data.delivery_person_name,
-      deliveryPersonPhone: data.delivery_person_phone,
-      payment_receipt_url: data.payment_receipt_url,
-      address_is_manual: data.address_is_manual || false,
-      payment_status: data.payment_status,
-      payment_method: data.payment_method as 'efectivo' | 'transferencia' | 'mercadopago' | undefined,
-      paid_at: data.paid_at ? new Date(data.paid_at) : undefined,
-      delivery_type: (data.delivery_type as 'delivery' | 'pickup') || 'delivery',
-      customerNameMasked: data.customer_name?.substring(0, 3) + '***',
-      customerPhoneMasked: '****' + data.customer_phone?.slice(-4),
-      addressSimplified: data.address?.split(',')[0]
-    });
 
     const fetchOrders = async () => {
       try {
@@ -91,7 +58,7 @@ export function useRealtimeOrders(vendorId?: string) {
           },
           async (payload) => {
             console.log('Order change received:', payload);
-            
+
             if (payload.eventType === 'INSERT') {
               const { data } = await supabase
                 .from('orders')
@@ -107,7 +74,7 @@ export function useRealtimeOrders(vendorId?: string) {
                   if (prev.some(o => o.id === newOrder.id)) return prev;
                   return [newOrder, ...prev];
                 });
-                
+
                 await supabase.from('vendor_notification_history').insert({
                   vendor_id: newOrder.vendorId,
                   type: 'new_order',
@@ -124,10 +91,10 @@ export function useRealtimeOrders(vendorId?: string) {
               }
             } else if (payload.eventType === 'UPDATE') {
               const newStatus = payload.new.status as OrderStatus;
-              
+
               setOrders(prev => {
                 const oldOrder = prev.find(o => o.id === payload.new.id);
-                
+
                 // Fire notifications asynchronously based on old state
                 if (oldOrder && oldOrder.status !== newStatus) {
                   let notificationType: 'order_cancelled' | 'order_updated' | 'payment_received' = 'order_updated';
@@ -159,19 +126,19 @@ export function useRealtimeOrders(vendorId?: string) {
                   });
                 }
 
-                return prev.map(order => 
+                return prev.map(order =>
                   order.id === payload.new.id
                     ? {
-                        ...order,
-                        status: newStatus,
-                        updatedAt: new Date(payload.new.updated_at),
-                        deliveryPersonName: payload.new.delivery_person_name,
-                        deliveryPersonPhone: payload.new.delivery_person_phone,
-                        notes: payload.new.notes,
-                        payment_status: payload.new.payment_status,
-                        payment_method: payload.new.payment_method,
-                        paid_at: payload.new.paid_at ? new Date(payload.new.paid_at) : undefined
-                      }
+                      ...order,
+                      status: newStatus,
+                      updatedAt: new Date(payload.new.updated_at),
+                      deliveryPersonName: payload.new.delivery_person_name,
+                      deliveryPersonPhone: payload.new.delivery_person_phone,
+                      notes: payload.new.notes,
+                      payment_status: payload.new.payment_status,
+                      payment_method: payload.new.payment_method,
+                      paid_at: payload.new.paid_at ? new Date(payload.new.paid_at) : undefined
+                    }
                     : order
                 );
               });
@@ -249,7 +216,7 @@ export function useRealtimeOrders(vendorId?: string) {
       }
 
       // Actualizar localmente primero para feedback inmediato
-      setOrders(prev => prev.map(order => 
+      setOrders(prev => prev.map(order =>
         order.id === orderId
           ? { ...order, status: newStatus, updatedAt: new Date() }
           : order
@@ -257,7 +224,7 @@ export function useRealtimeOrders(vendorId?: string) {
 
       const { error } = await supabase
         .from('orders')
-        .update({ 
+        .update({
           status: newStatus,
           updated_at: new Date().toISOString()
         })
@@ -295,8 +262,8 @@ export function useRealtimeOrders(vendorId?: string) {
       const statusDescriptions = {
         confirmed: 'El vendedor está preparando tu pedido.',
         preparing: 'Tu pedido está siendo preparado.',
-        ready: isPickup 
-          ? 'Tu pedido está listo para retirar en el local.' 
+        ready: isPickup
+          ? 'Tu pedido está listo para retirar en el local.'
           : 'Tu pedido está listo para entrega.',
         delivering: 'Tu pedido está en camino.',
         delivered: isPickup
@@ -306,7 +273,7 @@ export function useRealtimeOrders(vendorId?: string) {
       };
 
       let notificationMessage = `Tu pedido #${orderId.slice(0, 8)} ${statusMessages[newStatus as keyof typeof statusMessages]}. ${statusDescriptions[newStatus as keyof typeof statusDescriptions]}`;
-      
+
       // Si el estado es delivered, enviar mensaje con prompt de calificación
       if (newStatus === 'delivered') {
         // Actualizar sesión del usuario para que esté en modo RATING_ORDER
@@ -321,7 +288,7 @@ export function useRealtimeOrders(vendorId?: string) {
             }),
             updated_at: new Date().toISOString()
           }, { onConflict: 'phone' });
-        
+
         // Enviar mensaje de entrega con prompt de calificación
         notificationMessage = `🎉 ¡Tu pedido #${orderId.slice(0, 8)} ha sido entregado! 
 
@@ -361,19 +328,19 @@ Solo escribí "quiero calificar" o "calificar" cuando quieras hacerlo. Es opcion
         `)
         .eq('id', orderId)
         .single();
-      
+
       if (data) {
-        setOrders(prev => prev.map(order => 
+        setOrders(prev => prev.map(order =>
           order.id === orderId
             ? {
-                ...order,
-                status: data.status as OrderStatus,
-                updatedAt: new Date(data.updated_at)
-              }
+              ...order,
+              status: data.status as OrderStatus,
+              updatedAt: new Date(data.updated_at)
+            }
             : order
         ));
       }
-      
+
       toast({
         title: 'Error',
         description: 'No se pudo actualizar el estado del pedido',

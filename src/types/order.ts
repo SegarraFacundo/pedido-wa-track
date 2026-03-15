@@ -1,4 +1,4 @@
-export type OrderStatus = 
+export type OrderStatus =
   | 'pending'
   | 'confirmed'
   | 'preparing'
@@ -38,15 +38,15 @@ export interface Order {
   deliveryPersonName?: string;
   deliveryPersonPhone?: string;
   payment_receipt_url?: string;
-  address_is_manual?: boolean;  // Nueva: indica si la dirección fue ingresada manualmente
-  payment_status?: string;  // Estado de pago: 'pending', 'paid', etc.
-  payment_method?: PaymentMethod;  // Método de pago: 'efectivo', 'transferencia', 'mercadopago'
-  paid_at?: Date;  // Fecha y hora del pago
-  delivery_type?: 'delivery' | 'pickup';  // ⭐ NUEVO: Tipo de entrega
+  address_is_manual?: boolean;
+  payment_status?: string;
+  payment_method?: PaymentMethod;
+  paid_at?: Date;
+  delivery_type?: 'delivery' | 'pickup';
   // Masked fields for vendor view
-  customerNameMasked?: string;
-  customerPhoneMasked?: string;
-  addressSimplified?: string;
+  customerNameMasked: string;
+  customerPhoneMasked: string;
+  addressSimplified: string;
 }
 
 export interface Vendor {

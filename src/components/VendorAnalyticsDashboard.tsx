@@ -5,6 +5,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, TrendingUp, Package, Clock, DollarSign, ShoppingCart, Star } from 'lucide-react';
 import { format, subDays, startOfDay, parseISO, getHours } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Database } from '@/integrations/supabase/types';
 import {
   ChartContainer,
   ChartTooltip,
@@ -21,6 +22,8 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
+
+type OrderRow = Database['public']['Tables']['orders']['Row'];
 
 interface VendorAnalyticsDashboardProps {
   vendorId: string;
@@ -45,7 +48,7 @@ interface PeakHour {
   orders: number;
 }
 
-interface OrderItem {
+interface OrderItemData {
   product_id?: string;
   product_name?: string;
   name?: string;
@@ -69,6 +72,7 @@ export function VendorAnalyticsDashboard({ vendorId }: VendorAnalyticsDashboardP
 
   useEffect(() => {
     fetchAnalytics();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendorId, period]);
 
   const getDateFilter = () => {
@@ -87,7 +91,7 @@ export function VendorAnalyticsDashboard({ vendorId }: VendorAnalyticsDashboardP
     setLoading(true);
     try {
       const dateFilter = getDateFilter();
-      
+
       let query = supabase
         .from('orders')
         .select('total, created_at, items, status')
@@ -125,21 +129,21 @@ export function VendorAnalyticsDashboard({ vendorId }: VendorAnalyticsDashboardP
       const productSales = new Map<string, { quantity: number; revenue: number }>();
       const hourCounts = new Map<number, number>();
 
-      orders.forEach((order) => {
+      orders.forEach((order: OrderRow) => {
         // Daily sales
-        const date = startOfDay(parseISO(order.created_at)).toISOString();
+        const date = startOfDay(parseISO(order.created_at || new Date().toISOString())).toISOString();
         const existing = salesByDay.get(date) || { total: 0, orders: 0 };
         salesByDay.set(date, {
-          total: existing.total + order.total,
+          total: existing.total + (order.total || 0),
           orders: existing.orders + 1,
         });
 
         // Peak hours
-        const hour = getHours(parseISO(order.created_at));
+        const hour = getHours(parseISO(order.created_at || new Date().toISOString()));
         hourCounts.set(hour, (hourCounts.get(hour) || 0) + 1);
 
         // Top products
-        const items = order.items as unknown as OrderItem[];
+        const items = order.items as unknown as OrderItemData[];
         if (Array.isArray(items)) {
           items.forEach((item) => {
             const productName = item.product_name || item.name || 'Producto';
@@ -186,7 +190,7 @@ export function VendorAnalyticsDashboard({ vendorId }: VendorAnalyticsDashboardP
       const totalRevenue = orders.reduce((sum, o) => sum + o.total, 0);
       const totalOrders = orders.length;
       const avgTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-      
+
       let maxHour = 0;
       let maxHourCount = 0;
       hourCounts.forEach((count, hour) => {
@@ -347,27 +351,27 @@ export function VendorAnalyticsDashboard({ vendorId }: VendorAnalyticsDashboardP
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis 
-                    dataKey="dateLabel" 
+                  <XAxis
+                    dataKey="dateLabel"
                     tick={{ fontSize: 12 }}
                     tickLine={false}
                     axisLine={false}
                   />
-                  <YAxis 
+                  <YAxis
                     tick={{ fontSize: 12 }}
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={(value) => `₲${(value / 1000).toFixed(0)}k`}
                   />
-                  <ChartTooltip 
+                  <ChartTooltip
                     content={
-                      <ChartTooltipContent 
+                      <ChartTooltipContent
                         formatter={(value, name) => {
                           if (name === 'total') return [`₲${Number(value).toLocaleString()}`, 'Ventas'];
                           return [value, 'Pedidos'];
                         }}
                       />
-                    } 
+                    }
                   />
                   <Area
                     type="monotone"
@@ -397,23 +401,23 @@ export function VendorAnalyticsDashboard({ vendorId }: VendorAnalyticsDashboardP
               <CardContent>
                 {topProducts.length > 0 ? (
                   <ChartContainer config={chartConfig} className="h-[300px] w-full">
-                    <BarChart 
-                      data={topProducts} 
+                    <BarChart
+                      data={topProducts}
                       layout="vertical"
                       margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
                       <XAxis type="number" tick={{ fontSize: 12 }} />
-                      <YAxis 
-                        type="category" 
-                        dataKey="name" 
+                      <YAxis
+                        type="category"
+                        dataKey="name"
                         tick={{ fontSize: 11 }}
                         width={100}
                         tickLine={false}
                       />
-                      <ChartTooltip 
+                      <ChartTooltip
                         content={
-                          <ChartTooltipContent 
+                          <ChartTooltipContent
                             formatter={(value, name, item) => {
                               const payload = item.payload as TopProduct;
                               return [
@@ -427,8 +431,8 @@ export function VendorAnalyticsDashboard({ vendorId }: VendorAnalyticsDashboardP
                           />
                         }
                       />
-                      <Bar 
-                        dataKey="quantity" 
+                      <Bar
+                        dataKey="quantity"
                         fill="hsl(var(--chart-3))"
                         radius={[0, 4, 4, 0]}
                       />
@@ -457,28 +461,28 @@ export function VendorAnalyticsDashboard({ vendorId }: VendorAnalyticsDashboardP
                 <ChartContainer config={chartConfig} className="h-[300px] w-full">
                   <BarChart data={peakHours} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
-                    <XAxis 
-                      dataKey="hour" 
+                    <XAxis
+                      dataKey="hour"
                       tick={{ fontSize: 10 }}
                       tickLine={false}
                       interval={1}
                     />
-                    <YAxis 
+                    <YAxis
                       tick={{ fontSize: 12 }}
                       tickLine={false}
                       axisLine={false}
                       allowDecimals={false}
                     />
-                    <ChartTooltip 
+                    <ChartTooltip
                       content={
-                        <ChartTooltipContent 
+                        <ChartTooltipContent
                           formatter={(value) => [`${value} pedidos`, '']}
                         />
                       }
                     />
                     <Bar dataKey="orders" radius={[4, 4, 0, 0]}>
                       {peakHours.map((entry, index) => (
-                        <Cell 
+                        <Cell
                           key={`cell-${index}`}
                           fill={entry.orders === maxOrders && entry.orders > 0
                             ? 'hsl(var(--chart-1))'
