@@ -90,13 +90,6 @@ export type Database = {
             foreignKeyName: "bot_error_logs_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
-            referencedRelation: "vendor_change_summary"
-            referencedColumns: ["vendor_id"]
-          },
-          {
-            foreignKeyName: "bot_error_logs_vendor_id_fkey"
-            columns: ["vendor_id"]
-            isOneToOne: false
             referencedRelation: "vendor_details"
             referencedColumns: ["id"]
           },
@@ -265,13 +258,6 @@ export type Database = {
             foreignKeyName: "commission_invoices_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
-            referencedRelation: "vendor_change_summary"
-            referencedColumns: ["vendor_id"]
-          },
-          {
-            foreignKeyName: "commission_invoices_vendor_id_fkey"
-            columns: ["vendor_id"]
-            isOneToOne: false
             referencedRelation: "vendor_details"
             referencedColumns: ["id"]
           },
@@ -328,13 +314,6 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "public_vendors"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "commission_settings_vendor_id_fkey"
-            columns: ["vendor_id"]
-            isOneToOne: true
-            referencedRelation: "vendor_change_summary"
-            referencedColumns: ["vendor_id"]
           },
           {
             foreignKeyName: "commission_settings_vendor_id_fkey"
@@ -450,13 +429,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "public_vendors"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "mercadopago_token_refresh_log_vendor_id_fkey"
-            columns: ["vendor_id"]
-            isOneToOne: false
-            referencedRelation: "vendor_change_summary"
-            referencedColumns: ["vendor_id"]
           },
           {
             foreignKeyName: "mercadopago_token_refresh_log_vendor_id_fkey"
@@ -737,13 +709,6 @@ export type Database = {
             foreignKeyName: "orders_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
-            referencedRelation: "vendor_change_summary"
-            referencedColumns: ["vendor_id"]
-          },
-          {
-            foreignKeyName: "orders_vendor_id_fkey"
-            columns: ["vendor_id"]
-            isOneToOne: false
             referencedRelation: "vendor_details"
             referencedColumns: ["id"]
           },
@@ -908,13 +873,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "public_vendors"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "products_vendor_id_fkey"
-            columns: ["vendor_id"]
-            isOneToOne: false
-            referencedRelation: "vendor_change_summary"
-            referencedColumns: ["vendor_id"]
           },
           {
             foreignKeyName: "products_vendor_id_fkey"
@@ -1229,13 +1187,6 @@ export type Database = {
             foreignKeyName: "vendor_change_analytics_current_vendor_id_fkey"
             columns: ["current_vendor_id"]
             isOneToOne: false
-            referencedRelation: "vendor_change_summary"
-            referencedColumns: ["vendor_id"]
-          },
-          {
-            foreignKeyName: "vendor_change_analytics_current_vendor_id_fkey"
-            columns: ["current_vendor_id"]
-            isOneToOne: false
             referencedRelation: "vendor_details"
             referencedColumns: ["id"]
           },
@@ -1252,13 +1203,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "public_vendors"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "vendor_change_analytics_pending_vendor_id_fkey"
-            columns: ["pending_vendor_id"]
-            isOneToOne: false
-            referencedRelation: "vendor_change_summary"
-            referencedColumns: ["vendor_id"]
           },
           {
             foreignKeyName: "vendor_change_analytics_pending_vendor_id_fkey"
@@ -1314,13 +1258,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "public_vendors"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "vendor_chats_vendor_id_fkey"
-            columns: ["vendor_id"]
-            isOneToOne: false
-            referencedRelation: "vendor_change_summary"
-            referencedColumns: ["vendor_id"]
           },
           {
             foreignKeyName: "vendor_chats_vendor_id_fkey"
@@ -1401,13 +1338,6 @@ export type Database = {
             foreignKeyName: "vendor_commissions_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
-            referencedRelation: "vendor_change_summary"
-            referencedColumns: ["vendor_id"]
-          },
-          {
-            foreignKeyName: "vendor_commissions_vendor_id_fkey"
-            columns: ["vendor_id"]
-            isOneToOne: false
             referencedRelation: "vendor_details"
             referencedColumns: ["id"]
           },
@@ -1469,13 +1399,6 @@ export type Database = {
             foreignKeyName: "vendor_hours_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
-            referencedRelation: "vendor_change_summary"
-            referencedColumns: ["vendor_id"]
-          },
-          {
-            foreignKeyName: "vendor_hours_vendor_id_fkey"
-            columns: ["vendor_id"]
-            isOneToOne: false
             referencedRelation: "vendor_details"
             referencedColumns: ["id"]
           },
@@ -1531,13 +1454,6 @@ export type Database = {
             foreignKeyName: "vendor_notification_history_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
-            referencedRelation: "vendor_change_summary"
-            referencedColumns: ["vendor_id"]
-          },
-          {
-            foreignKeyName: "vendor_notification_history_vendor_id_fkey"
-            columns: ["vendor_id"]
-            isOneToOne: false
             referencedRelation: "vendor_details"
             referencedColumns: ["id"]
           },
@@ -1585,13 +1501,6 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "public_vendors"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "vendor_notification_settings_vendor_id_fkey"
-            columns: ["vendor_id"]
-            isOneToOne: true
-            referencedRelation: "vendor_change_summary"
-            referencedColumns: ["vendor_id"]
           },
           {
             foreignKeyName: "vendor_notification_settings_vendor_id_fkey"
@@ -1663,13 +1572,6 @@ export type Database = {
             foreignKeyName: "vendor_notifications_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
-            referencedRelation: "vendor_change_summary"
-            referencedColumns: ["vendor_id"]
-          },
-          {
-            foreignKeyName: "vendor_notifications_vendor_id_fkey"
-            columns: ["vendor_id"]
-            isOneToOne: false
             referencedRelation: "vendor_details"
             referencedColumns: ["id"]
           },
@@ -1732,13 +1634,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "public_vendors"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "vendor_offers_vendor_id_fkey"
-            columns: ["vendor_id"]
-            isOneToOne: false
-            referencedRelation: "vendor_change_summary"
-            referencedColumns: ["vendor_id"]
           },
           {
             foreignKeyName: "vendor_offers_vendor_id_fkey"
@@ -1817,13 +1712,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "public_vendors"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "vendor_reviews_vendor_id_fkey"
-            columns: ["vendor_id"]
-            isOneToOne: false
-            referencedRelation: "vendor_change_summary"
-            referencedColumns: ["vendor_id"]
           },
           {
             foreignKeyName: "vendor_reviews_vendor_id_fkey"
@@ -2030,7 +1918,29 @@ export type Database = {
           vendor_id: string | null
           vendor_name: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "vendor_change_analytics_current_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "public_vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_change_analytics_current_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_change_analytics_current_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vendor_details: {
         Row: {
@@ -2174,13 +2084,6 @@ export type Database = {
             foreignKeyName: "orders_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
-            referencedRelation: "vendor_change_summary"
-            referencedColumns: ["vendor_id"]
-          },
-          {
-            foreignKeyName: "orders_vendor_id_fkey"
-            columns: ["vendor_id"]
-            isOneToOne: false
             referencedRelation: "vendor_details"
             referencedColumns: ["id"]
           },
@@ -2225,13 +2128,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "public_vendors"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "vendor_reviews_vendor_id_fkey"
-            columns: ["vendor_id"]
-            isOneToOne: false
-            referencedRelation: "vendor_change_summary"
-            referencedColumns: ["vendor_id"]
           },
           {
             foreignKeyName: "vendor_reviews_vendor_id_fkey"
