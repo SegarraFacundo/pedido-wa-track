@@ -1,11 +1,10 @@
 import OpenAI from "https://esm.sh/openai@4.77.3";
-import type { ConversationContext, CartItem } from "./types.ts";
-import { getPendingStateForPayment } from "./types.ts";
+import { ConversationContext, CartItem, getPendingStateForPayment } from "./types.ts";
 import { normalizeArgentinePhone } from "./utils.ts";
 import { getContext, saveContext } from "./context.ts";
 import { tools } from "./tools-definitions.ts";
 import { buildSystemPrompt } from "./simplified-prompt.ts";
-import { t, detectLanguage, HELP_REGEX, isConfirmation, isCancellation, detectPaymentMethod, type Language } from "./i18n.ts";
+import { t, detectLanguage, HELP_REGEX, isConfirmation, isCancellation, detectPaymentMethod, Language } from "./i18n.ts";
 
 // ==================== FASE 1: FILTRADO DE HERRAMIENTAS POR ESTADO ====================
 
