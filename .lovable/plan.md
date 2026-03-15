@@ -35,3 +35,9 @@
 
 ## Fase 2 (Pendiente)
 - Migrar resto de páginas web (Términos, Privacidad, Contacto, Auth, Dashboards)
+
+## Bot: Inline ternary → t() migration ✅
+- Added 13 label keys to `i18n.ts` (label.order, label.payment, label.cash, etc.)
+- Replaced all ~15 inline `lang === 'es' ? ...` ternaries in `tool-handlers.ts` and `vendor-bot.ts`
+- Fixed missing PT/JA translations (e.g., "Holder" → proper `t('label.account_holder', lang)`)
+- Zero remaining inline ternaries in bot code
