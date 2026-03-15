@@ -3734,8 +3734,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
       
       // Si la respuesta no es clara, recordar que debe confirmar
-      const clarificationResponse = `Por favor confirmá si vas a hacer la transferencia bancaria.\n\n` +
-                                    `Respondé *"sí"* para confirmar o *"no"* para cancelar el pedido.`;
+      const clarificationResponse = t('transfer.clarify', lang);
       
       context.conversation_history.push({
         role: "assistant",
