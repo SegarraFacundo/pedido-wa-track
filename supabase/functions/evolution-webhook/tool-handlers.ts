@@ -591,8 +591,8 @@ export async function ejecutarHerramienta(
         if (context.delivery_type && context.payment_method) {
           context.resumen_mostrado = true;
           carrito += t('cart.ready_to_confirm', lang) + `\n`;
-          carrito += `📦 ${lang === 'es' ? 'Entrega' : lang === 'en' ? 'Delivery' : lang === 'pt' ? 'Entrega' : '配送'}: ${context.delivery_type === 'pickup' ? t('delivery.pickup_label', lang) : 'Delivery'}\n`;
-          carrito += `💳 ${lang === 'es' ? 'Pago' : lang === 'en' ? 'Payment' : lang === 'pt' ? 'Pagamento' : '支払い'}: ${context.payment_method}\n\n`;
+          carrito += `📦 ${t('label.delivery_label', lang)}: ${context.delivery_type === 'pickup' ? t('delivery.pickup_label', lang) : 'Delivery'}\n`;
+          carrito += `💳 ${t('label.payment', lang)}: ${context.payment_method}\n\n`;
           carrito += t('cart.confirm_yes', lang);
           await saveContext(context, supabase);
         } else {
@@ -670,7 +670,7 @@ export async function ejecutarHerramienta(
           context.available_payment_methods = realAvailableMethods;
         }
         
-        resumen += `\n💳 *${lang === 'es' ? 'Método de pago' : lang === 'en' ? 'Payment method' : lang === 'pt' ? 'Método de pagamento' : '支払い方法'}:* `;
+        resumen += `\n💳 *${t('label.payment_method', lang)}:* `;
         if (context.payment_method) {
           const paymentIcons: Record<string, string> = {
             'efectivo': '💵', 'transferencia': '🏦', 'mercadopago': '💳'
@@ -1029,7 +1029,7 @@ export async function ejecutarHerramienta(
         } catch (_e) {}
 
         let confirmacion = t('order.created', lang) + `\n\n`;
-        confirmacion += `📦 ${lang === 'es' ? 'Pedido' : lang === 'en' ? 'Order' : lang === 'pt' ? 'Pedido' : '注文'} #${order.id.substring(0, 8)}\n`;
+        confirmacion += `📦 ${t('label.order', lang)} #${order.id.substring(0, 8)}\n`;
         confirmacion += t('order.store_label', lang, { vendor: context.selected_vendor_name || '' }) + `\n\n`;
 
         if (context.delivery_type === 'pickup') {
@@ -1038,13 +1038,13 @@ export async function ejecutarHerramienta(
           if (context.pickup_instructions) {
             confirmacion += `📝 ${context.pickup_instructions}\n\n`;
           }
-          confirmacion += `💳 ${lang === 'es' ? 'Pago' : lang === 'en' ? 'Payment' : lang === 'pt' ? 'Pagamento' : '支払い'}: ${context.payment_method}\n`;
+          confirmacion += `💳 ${t('label.payment', lang)}: ${context.payment_method}\n`;
         } else {
           confirmacion += `🛒 Subtotal: $ ${Math.round(subtotal).toLocaleString("es-PY")}\n`;
           confirmacion += `🚚 Delivery: $ ${Math.round(deliveryCost).toLocaleString("es-PY")}\n`;
           confirmacion += `💰 ${t('cart.total', lang)}: $ ${Math.round(total).toLocaleString("es-PY")}\n\n`;
-          confirmacion += `📍 ${lang === 'es' ? 'Dirección' : lang === 'en' ? 'Address' : lang === 'pt' ? 'Endereço' : '住所'}: ${context.delivery_address}\n`;
-          confirmacion += `💳 ${lang === 'es' ? 'Pago' : lang === 'en' ? 'Payment' : lang === 'pt' ? 'Pagamento' : '支払い'}: ${context.payment_method}\n`;
+          confirmacion += `📍 ${t('label.address', lang)}: ${context.delivery_address}\n`;
+          confirmacion += `💳 ${t('label.payment', lang)}: ${context.payment_method}\n`;
           if (deliveryCost > 0) {
             confirmacion += `\n` + t('order.delivery_note', lang) + `\n`;
           }
@@ -1068,7 +1068,7 @@ export async function ejecutarHerramienta(
             confirmacion += t('order.transfer_data', lang) + `\n\n`;
             confirmacion += `• *Alias:* ${transferData.alias}\n`;
             confirmacion += `• *CBU/CVU:* ${transferData.cbu}\n`;
-            confirmacion += `• *${lang === 'es' ? 'Titular' : lang === 'en' ? 'Account holder' : lang === 'pt' ? 'Titular' : '名義人'}:* ${transferData.titular}\n\n`;
+            confirmacion += `• *${t('label.account_holder', lang)}:* ${transferData.titular}\n\n`;
             confirmacion += t('order.transfer_confirm_prompt', lang);
           } else {
             confirmacion += t('order.transfer_data_error', lang);
@@ -1094,9 +1094,9 @@ export async function ejecutarHerramienta(
               paymentErrorMsg = t('order.mp_unavailable', lang);
               for (const method of paymentData.available_methods) {
                 if (method.method === 'transferencia') {
-                  paymentErrorMsg += `📱 *${lang === 'es' ? 'Transferencia bancaria' : lang === 'en' ? 'Bank transfer' : lang === 'pt' ? 'Transferência bancária' : '銀行振込'}:*\n• Alias: ${method.details.alias}\n• CBU/CVU: ${method.details.cbu}\n• ${lang === 'es' ? 'Titular' : 'Holder'}: ${method.details.titular}\n• ${lang === 'es' ? 'Monto' : 'Amount'}: $${method.details.amount}\n\n`;
+                  paymentErrorMsg += `📱 *${t('label.bank_transfer', lang)}:*\n• Alias: ${method.details.alias}\n• CBU/CVU: ${method.details.cbu}\n• ${t('label.account_holder', lang)}: ${method.details.titular}\n• ${t('label.amount', lang)}: $${method.details.amount}\n\n`;
                 } else if (method.method === 'efectivo') {
-                  paymentErrorMsg += `💵 *${lang === 'es' ? 'Efectivo' : lang === 'en' ? 'Cash' : lang === 'pt' ? 'Dinheiro' : '現金'}:* ${method.details.message}\n\n`;
+                  paymentErrorMsg += `💵 *${t('label.cash', lang)}:* ${method.details.message}\n\n`;
                 }
               }
             } else {
@@ -1156,9 +1156,9 @@ export async function ejecutarHerramienta(
         const timeStr = argTime.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
 
         let estado = t('status.header', lang) + `\n\n`;
-        estado += `🆔 ${lang === 'es' ? 'Pedido' : lang === 'en' ? 'Order' : lang === 'pt' ? 'Pedido' : '注文'} #${order.id.substring(0, 8)}\n`;
-        estado += `🏪 ${lang === 'es' ? 'Negocio' : lang === 'en' ? 'Store' : lang === 'pt' ? 'Loja' : '店舗'}: ${order.vendors.name}\n`;
-        estado += `✨ ${lang === 'es' ? 'Estado' : lang === 'en' ? 'Status' : lang === 'pt' ? 'Status' : '状態'}: *${statusMap[order.status] || order.status}*\n`;
+        estado += `🆔 ${t('label.order', lang)} #${order.id.substring(0, 8)}\n`;
+        estado += `🏪 ${t('label.store', lang)}: ${order.vendors.name}\n`;
+        estado += `✨ ${t('label.status', lang)}: *${statusMap[order.status] || order.status}*\n`;
         estado += `💰 ${t('cart.total', lang)}: $${Math.round(order.total).toLocaleString("es-AR")}\n\n`;
         estado += `_${t('status.updated_at', lang, { time: timeStr })}_`;
 
@@ -1213,7 +1213,7 @@ export async function ejecutarHerramienta(
             const validUntil = new Date(offer.valid_until);
             resultado += `   ⏰ ${t('offers.valid_until', lang)}: ${validUntil.toLocaleDateString("es-AR")}\n`;
           }
-          resultado += `   ID ${lang === 'es' ? 'Negocio' : lang === 'en' ? 'Store' : lang === 'pt' ? 'Loja' : '店舗'}: ${offer.vendor_id}\n\n`;
+          resultado += `   ID ${t('label.store', lang)}: ${offer.vendor_id}\n\n`;
         });
 
         return resultado;
@@ -1321,16 +1321,16 @@ export async function ejecutarHerramienta(
         let datosTransferencia = "";
 
         if (paymentSettings.efectivo === true) {
-          metodosDisponibles.push(`- ${lang === 'es' ? 'Efectivo' : lang === 'en' ? 'Cash' : lang === 'pt' ? 'Dinheiro' : '現金'} 💵`);
+          metodosDisponibles.push(`- ${t('label.cash', lang)} 💵`);
           availableKeys.push("efectivo");
         }
 
         if (paymentSettings.transferencia?.activo === true) {
-          metodosDisponibles.push(`- ${lang === 'es' ? 'Transferencia bancaria' : lang === 'en' ? 'Bank transfer' : lang === 'pt' ? 'Transferência bancária' : '銀行振込'} 🏦`);
+          metodosDisponibles.push(`- ${t('label.bank_transfer', lang)} 🏦`);
           availableKeys.push("transferencia");
           const { alias, cbu, titular } = paymentSettings.transferencia;
           if (alias && cbu && titular) {
-            datosTransferencia = `\n\n📋 *${lang === 'es' ? 'Datos para transferencia' : lang === 'en' ? 'Transfer details' : lang === 'pt' ? 'Dados para transferência' : '振込情報'}:*\n• Alias: ${alias}\n• CBU/CVU: ${cbu}\n• ${lang === 'es' ? 'Titular' : lang === 'en' ? 'Account holder' : lang === 'pt' ? 'Titular' : '名義人'}: ${titular}`;
+            datosTransferencia = `\n\n📋 *${t('label.transfer_details', lang)}:*\n• Alias: ${alias}\n• CBU/CVU: ${cbu}\n• ${t('label.account_holder', lang)}: ${titular}`;
           }
         }
 
@@ -1393,7 +1393,7 @@ export async function ejecutarHerramienta(
         const icons: Record<string, string> = { 'efectivo': '💵', 'transferencia': '🏦', 'mercadopago': '💳' };
         const labels: Record<string, string> = { 'efectivo': 'Efectivo', 'transferencia': 'Transferencia', 'mercadopago': 'MercadoPago' };
         
-        return `✅ ${lang === 'es' ? 'Método de pago' : lang === 'en' ? 'Payment method' : lang === 'pt' ? 'Método de pagamento' : '支払い方法'}: ${icons[normalizedMethod] || '💰'} ${labels[normalizedMethod] || normalizedMethod}`;
+        return `✅ ${t('label.payment_method', lang)}: ${icons[normalizedMethod] || '💰'} ${labels[normalizedMethod] || normalizedMethod}`;
       }
 
       case "hablar_con_vendedor": {
@@ -1506,7 +1506,7 @@ export async function ejecutarHerramienta(
         if (error) return t('platform.save_error', lang);
 
         let respuesta = t('platform.thanks', lang) + `\n\n`;
-        respuesta += `⭐ ${lang === 'es' ? 'Tu calificación' : lang === 'en' ? 'Your rating' : lang === 'pt' ? 'Sua avaliação' : 'あなたの評価'}: ${args.rating}/5\n`;
+        respuesta += `⭐ ${t('label.your_rating', lang)}: ${args.rating}/5\n`;
         if (args.comment) respuesta += `\n${t('rating.comment', lang)}: "${args.comment}"\n`;
         respuesta += "\n" + t('platform.helps', lang);
 
