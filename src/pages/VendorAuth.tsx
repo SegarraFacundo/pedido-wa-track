@@ -177,7 +177,7 @@ export default function VendorAuth() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    navigate('/');
+    navigate(localePath('/'));
   };
 
   if (user) {
