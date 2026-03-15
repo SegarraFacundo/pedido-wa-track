@@ -7,8 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
+import { useTranslation } from "react-i18next";
 
 export default function Contacto() {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     nombre: "",
     email: "",
@@ -20,12 +22,11 @@ export default function Contacto() {
     e.preventDefault();
     setIsSubmitting(true);
     
-    // Simular envío del formulario
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     toast({
-      title: "Mensaje enviado",
-      description: "Nos pondremos en contacto contigo pronto.",
+      title: t('contacto.messageSentTitle'),
+      description: t('contacto.messageSentDesc'),
     });
     
     setFormData({ nombre: "", email: "", mensaje: "" });
@@ -33,14 +34,13 @@ export default function Contacto() {
   };
 
   const handleWhatsAppClick = () => {
-    const whatsappNumber = '5493464448309'; // Placeholder - reemplazar con número real
+    const whatsappNumber = '5493464448309';
     const message = encodeURIComponent('Hola, tengo una consulta sobre Lapacho');
     window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');
   };
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -51,34 +51,32 @@ export default function Contacto() {
             <Button variant="ghost" size="sm" asChild>
               <Link to="/">
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Volver
+                {t('common.back')}
               </Link>
             </Button>
           </div>
         </div>
       </header>
 
-      {/* Content */}
       <main className="container mx-auto px-4 py-12 max-w-4xl">
         <div className="text-center mb-12">
-          <h1 className="text-3xl md:text-4xl font-bold mb-4">Contacto</h1>
+          <h1 className="text-3xl md:text-4xl font-bold mb-4">{t('contacto.title')}</h1>
           <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-            ¿Tenés alguna pregunta o querés más información? Estamos para ayudarte.
+            {t('contacto.subtitle')}
           </p>
         </div>
 
         <div className="grid md:grid-cols-2 gap-8">
-          {/* Formulario */}
           <Card className="border-0 shadow-lg">
             <CardContent className="p-8">
-              <h2 className="text-xl font-semibold mb-6">Envianos un mensaje</h2>
+              <h2 className="text-xl font-semibold mb-6">{t('contacto.formTitle')}</h2>
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="nombre">Nombre</Label>
+                  <Label htmlFor="nombre">{t('contacto.nameLabel')}</Label>
                   <Input
                     id="nombre"
                     type="text"
-                    placeholder="Tu nombre"
+                    placeholder={t('contacto.namePlaceholder')}
                     value={formData.nombre}
                     onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
                     required
@@ -86,7 +84,7 @@ export default function Contacto() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">{t('contacto.emailLabel')}</Label>
                   <Input
                     id="email"
                     type="email"
@@ -98,10 +96,10 @@ export default function Contacto() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="mensaje">Mensaje</Label>
+                  <Label htmlFor="mensaje">{t('common.message')}</Label>
                   <Textarea
                     id="mensaje"
-                    placeholder="¿En qué podemos ayudarte?"
+                    placeholder={t('contacto.messagePlaceholder')}
                     rows={5}
                     value={formData.mensaje}
                     onChange={(e) => setFormData({ ...formData, mensaje: e.target.value })}
@@ -111,10 +109,10 @@ export default function Contacto() {
 
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
                   {isSubmitting ? (
-                    "Enviando..."
+                    t('common.sending')
                   ) : (
                     <>
-                      Enviar mensaje
+                      {t('contacto.sendMessage')}
                       <Send className="ml-2 h-4 w-4" />
                     </>
                   )}
@@ -123,7 +121,6 @@ export default function Contacto() {
             </CardContent>
           </Card>
 
-          {/* Información de contacto */}
           <div className="space-y-6">
             <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow cursor-pointer" onClick={handleWhatsAppClick}>
               <CardContent className="p-8">
@@ -132,13 +129,9 @@ export default function Contacto() {
                     <MessageCircle className="h-6 w-6 text-whatsapp" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold mb-1">WhatsApp</h3>
-                    <p className="text-muted-foreground mb-2">
-                      Escribinos directamente por WhatsApp para una respuesta más rápida.
-                    </p>
-                    <p className="text-primary font-medium">
-                      Abrir chat →
-                    </p>
+                    <h3 className="text-lg font-semibold mb-1">{t('contacto.whatsappTitle')}</h3>
+                    <p className="text-muted-foreground mb-2">{t('contacto.whatsappDesc')}</p>
+                    <p className="text-primary font-medium">{t('contacto.openChat')}</p>
                   </div>
                 </div>
               </CardContent>
@@ -151,10 +144,8 @@ export default function Contacto() {
                     <Mail className="h-6 w-6 text-primary" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold mb-1">Email</h3>
-                    <p className="text-muted-foreground mb-2">
-                      Para consultas formales o información detallada.
-                    </p>
+                    <h3 className="text-lg font-semibold mb-1">{t('contacto.emailTitle')}</h3>
+                    <p className="text-muted-foreground mb-2">{t('contacto.emailDesc')}</p>
                     <a 
                       href="mailto:contacto@lapacho.ar" 
                       className="text-primary font-medium hover:underline"
@@ -167,18 +158,15 @@ export default function Contacto() {
             </Card>
 
             <div className="bg-muted/50 rounded-lg p-6 text-center">
-              <p className="text-sm text-muted-foreground">
-                Respondemos todas las consultas en un plazo máximo de 24 horas hábiles.
-              </p>
+              <p className="text-sm text-muted-foreground">{t('contacto.responseTime')}</p>
             </div>
           </div>
         </div>
       </main>
 
-      {/* Footer */}
       <footer className="border-t py-8 mt-12">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>© 2025 Lapacho. Todos los derechos reservados.</p>
+          <p>{t('common.rights')}</p>
         </div>
       </footer>
     </div>
