@@ -670,7 +670,7 @@ export async function ejecutarHerramienta(
           context.available_payment_methods = realAvailableMethods;
         }
         
-        resumen += `\n💳 *${lang === 'es' ? 'Método de pago' : lang === 'en' ? 'Payment method' : lang === 'pt' ? 'Método de pagamento' : '支払い方法'}:* `;
+        resumen += `\n💳 *${t('label.payment_method', lang)}:* `;
         if (context.payment_method) {
           const paymentIcons: Record<string, string> = {
             'efectivo': '💵', 'transferencia': '🏦', 'mercadopago': '💳'
