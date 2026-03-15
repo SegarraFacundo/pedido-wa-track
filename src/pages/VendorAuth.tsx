@@ -55,7 +55,7 @@ export default function VendorAuth() {
 
     if (vendor) {
       setHasVendorProfile(true);
-      navigate('/vendor-dashboard');
+      navigate(localePath('/vendor-dashboard'));
     } else {
       setHasVendorProfile(false);
     }
