@@ -3698,7 +3698,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
       
       // ❌ Usuario cancela el pedido
-      if (userResponse.match(/^(no|nop|cancel|cancela|cancelar)/)) {
+      if (isCancellation(userResponse) || userResponse.match(/^(cancela|cancelar)/)) {
         console.log(`❌ User cancelled order during transfer confirmation`);
         
         // Cancelar el pedido si existe
