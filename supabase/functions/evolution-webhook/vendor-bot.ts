@@ -722,7 +722,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
             messages.push({
               role: "tool",
               tool_call_id: toolCall.id,
-              content: "⚠️ El usuario ya está viendo este menú. Interpretá su mensaje como un pedido de producto y usá agregar_al_carrito.",
+              content: t('menu.already_viewing', lang),
             });
             continue;
           }
