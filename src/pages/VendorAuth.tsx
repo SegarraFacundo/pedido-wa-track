@@ -228,7 +228,7 @@ export default function VendorAuth() {
             <CardDescription>{user.email}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button onClick={() => navigate('/vendor-dashboard')} className="w-full">
+            <Button onClick={() => navigate(localePath('/vendor-dashboard'))} className="w-full">
               {t('vendorAuth.goToDashboard')}
             </Button>
             <Button onClick={handleSignOut} variant="outline" className="w-full">
