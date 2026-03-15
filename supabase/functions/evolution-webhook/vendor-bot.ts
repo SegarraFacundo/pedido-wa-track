@@ -629,7 +629,17 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
     }
 
-    // 🎯 FASE 5: Menú de ayuda estático (multi-idioma)
+    // INTERCEPTOR: Shopping + "menú"/"menu"/"show menu" → mostrar menú del vendor actual
+    if (context.order_state === "shopping" && context.selected_vendor_id) {
+      const menuRequest = /^(men[uú]|show\s*menu|ver\s*men[uú]|cardápio|メニュー)$/i;
+      if (menuRequest.test(message.trim())) {
+        const result = await ejecutarHerramienta("ver_menu_negocio", { vendor_id: context.selected_vendor_id }, context, supabase);
+        context.conversation_history.push({ role: "assistant", content: result });
+        await saveContext(context, supabase);
+        return result;
+      }
+    }
+
     if (HELP_REGEX.test(message.trim())) {
       const helpText = t('help.full', lang);
       context.conversation_history.push({ role: "assistant", content: helpText });
