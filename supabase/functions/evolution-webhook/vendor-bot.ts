@@ -704,7 +704,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
               messages.push({
                 role: "tool",
                 tool_call_id: toolCall.id,
-                content: "⚠️ Solo puedo mostrarte un menú a la vez. Elegí un negocio de la lista y te muestro su menú.",
+                content: t('menu.one_at_a_time', lang),
               });
               continue;
             }
