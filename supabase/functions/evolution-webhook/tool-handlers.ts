@@ -591,8 +591,8 @@ export async function ejecutarHerramienta(
         if (context.delivery_type && context.payment_method) {
           context.resumen_mostrado = true;
           carrito += t('cart.ready_to_confirm', lang) + `\n`;
-          carrito += `📦 ${lang === 'es' ? 'Entrega' : lang === 'en' ? 'Delivery' : lang === 'pt' ? 'Entrega' : '配送'}: ${context.delivery_type === 'pickup' ? t('delivery.pickup_label', lang) : 'Delivery'}\n`;
-          carrito += `💳 ${lang === 'es' ? 'Pago' : lang === 'en' ? 'Payment' : lang === 'pt' ? 'Pagamento' : '支払い'}: ${context.payment_method}\n\n`;
+          carrito += `📦 ${t('label.delivery_label', lang)}: ${context.delivery_type === 'pickup' ? t('delivery.pickup_label', lang) : 'Delivery'}\n`;
+          carrito += `💳 ${t('label.payment', lang)}: ${context.payment_method}\n\n`;
           carrito += t('cart.confirm_yes', lang);
           await saveContext(context, supabase);
         } else {
