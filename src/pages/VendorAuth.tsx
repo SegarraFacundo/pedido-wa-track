@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { User } from '@supabase/supabase-js';
 import { MessageSquare } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useLocalePath } from '@/hooks/useLocalePath';
 import lapachoIcon from '@/assets/lapacho-icon.png';
 
 export default function VendorAuth() {
