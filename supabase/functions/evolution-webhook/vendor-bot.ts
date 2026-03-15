@@ -4050,3 +4050,4 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     return "Disculpá, tuve un problema técnico. Por favor intentá de nuevo en un momento.";
   }
 }
+
