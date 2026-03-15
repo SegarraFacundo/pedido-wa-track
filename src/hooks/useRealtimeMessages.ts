@@ -193,10 +193,16 @@ export function useRealtimeMessages(orderId: string, customerPhone?: string) {
           // Si el bot NO estaba pausado, primero notificar que el vendedor va a responder
           if (!wasBotPaused) {
             console.log('Sending bot paused notification to:', orderData.customer_phone);
+            const { getTranslatedNotification } = await import('@/lib/notificationTranslation');
+            const pausedMsg = await getTranslatedNotification(
+              orderData.customer_phone,
+              'bot_paused',
+              { vendorName }
+            );
             await supabase.functions.invoke('send-whatsapp-notification', {
               body: {
                 phoneNumber: orderData.customer_phone,
-                message: `⚠️ *${vendorName}* va a responderte personalmente.\n\n🤖 El bot está pausado.\n\n_Escribí *"menu"* para volver al bot._`
+                message: pausedMsg || `⚠️ *${vendorName}* va a responderte personalmente.\n\n🤖 El bot está pausado.\n\n_Escribí *"menu"* para volver al bot._`
               }
             });
           }
