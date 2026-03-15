@@ -248,35 +248,37 @@ export function useRealtimeOrders(vendorId?: string) {
         });
       }
 
-      // Send WhatsApp notification to customer
-      const statusMessages = {
-        confirmed: 'confirmado',
-        preparing: 'está siendo preparado',
-        ready: 'está listo',
-        delivering: 'está en camino',
-        delivered: 'ha sido entregado',
-        cancelled: 'ha sido cancelado'
-      };
-
+      // Send WhatsApp notification to customer (translated)
       const isPickup = currentOrder.delivery_type === 'pickup';
-      const statusDescriptions = {
-        confirmed: 'El vendedor está preparando tu pedido.',
-        preparing: 'Tu pedido está siendo preparado.',
-        ready: isPickup
-          ? 'Tu pedido está listo para retirar en el local.'
-          : 'Tu pedido está listo para entrega.',
-        delivering: 'Tu pedido está en camino.',
-        delivered: isPickup
-          ? '¡Gracias por retirarlo!'
-          : '¡Gracias por tu compra!',
-        cancelled: 'Si tienes alguna duda, contacta al vendedor.'
-      };
+      let notificationType = '';
+      let notificationMessage = '';
 
-      let notificationMessage = `Tu pedido #${orderId.slice(0, 8)} ${statusMessages[newStatus as keyof typeof statusMessages]}. ${statusDescriptions[newStatus as keyof typeof statusDescriptions]}`;
+      if (newStatus === 'confirmed') notificationType = 'status_confirmed';
+      else if (newStatus === 'preparing') notificationType = 'status_preparing';
+      else if (newStatus === 'ready') notificationType = isPickup ? 'status_ready_pickup' : 'status_ready_delivery';
+      else if (newStatus === 'delivering') notificationType = 'status_delivering';
+      else if (newStatus === 'cancelled') notificationType = 'status_cancelled';
+      else if (newStatus === 'delivered') {
+        // For delivered with rating prompt or pickup
+        if (isPickup) {
+          notificationType = 'delivered_pickup';
+        } else {
+          notificationType = 'delivered_rating';
+        }
+      }
 
-      // Si el estado es delivered, enviar mensaje con prompt de calificación
+      if (notificationType) {
+        const { getTranslatedNotification } = await import('@/lib/notificationTranslation');
+        const translated = await getTranslatedNotification(
+          currentOrder.customerPhone,
+          notificationType,
+          { orderId: orderId.slice(0, 8) }
+        );
+        notificationMessage = translated || `Tu pedido #${orderId.slice(0, 8)} actualizado.`;
+      }
+
+      // Si el estado es delivered, actualizar sesión para modo RATING_ORDER
       if (newStatus === 'delivered') {
-        // Actualizar sesión del usuario para que esté en modo RATING_ORDER
         await supabase
           .from('user_sessions')
           .upsert({
@@ -288,21 +290,6 @@ export function useRealtimeOrders(vendorId?: string) {
             }),
             updated_at: new Date().toISOString()
           }, { onConflict: 'phone' });
-
-        // Enviar mensaje de entrega con prompt de calificación
-        notificationMessage = `🎉 ¡Tu pedido #${orderId.slice(0, 8)} ha sido entregado! 
-
-¡Esperamos que lo disfrutes! 🍽️
-
-📝 *¿Querés calificar tu experiencia?*
-Tu opinión nos ayuda a mejorar.
-
-Podés calificar:
-⏱️ Tiempo de entrega (1-5 estrellas)
-👥 Atención del negocio (1-5 estrellas)
-📦 Calidad del producto (1-5 estrellas)
-
-Solo escribí "quiero calificar" o "calificar" cuando quieras hacerlo. Es opcional 😊`;
       }
 
       await supabase.functions.invoke('send-whatsapp-notification', {

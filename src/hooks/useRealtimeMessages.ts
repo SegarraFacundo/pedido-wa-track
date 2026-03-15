@@ -52,11 +52,13 @@ export function useRealtimeMessages(orderId: string, customerPhone?: string) {
     
     setIsBotPaused(false);
     
-    // Notify customer
+    // Notify customer (translated)
+    const { getTranslatedNotification } = await import('@/lib/notificationTranslation');
+    const translatedMsg = await getTranslatedNotification(customerPhone, 'bot_active');
     await supabase.functions.invoke('send-whatsapp-notification', {
       body: {
         phoneNumber: customerPhone,
-        message: '✅ El asistente virtual está activo nuevamente.'
+        message: translatedMsg || '✅ El asistente virtual está activo nuevamente.'
       }
     });
     

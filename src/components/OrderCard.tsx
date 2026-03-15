@@ -175,13 +175,19 @@ export function OrderCard({
 
       if (error) throw error;
 
-      // Enviar notificación al cliente
+      // Enviar notificación al cliente (traducida)
       try {
+        const { getTranslatedNotification } = await import('@/lib/notificationTranslation');
+        const translatedMsg = await getTranslatedNotification(
+          order.customerPhone,
+          'payment_problem',
+          { orderId: order.id.slice(0, 8) }
+        );
         await supabase.functions.invoke("send-whatsapp-notification", {
           body: {
             orderId: order.id,
             phoneNumber: order.customerPhone,
-            message: `⚠️ Hay un problema con tu pago\n\nPedido: #${order.id.slice(0, 8)}\n\nPor favor, verificá tu comprobante de pago o contactá con nosotros. 📞`,
+            message: translatedMsg || `⚠️ Hay un problema con tu pago\n\nPedido: #${order.id.slice(0, 8)}\n\nPor favor, verificá tu comprobante de pago o contactá con nosotros. 📞`,
           },
         });
       } catch (notifyError) {
