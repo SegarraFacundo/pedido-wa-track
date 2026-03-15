@@ -1326,11 +1326,11 @@ export async function ejecutarHerramienta(
         }
 
         if (paymentSettings.transferencia?.activo === true) {
-          metodosDisponibles.push(`- ${lang === 'es' ? 'Transferencia bancaria' : lang === 'en' ? 'Bank transfer' : lang === 'pt' ? 'Transferência bancária' : '銀行振込'} 🏦`);
+          metodosDisponibles.push(`- ${t('label.bank_transfer', lang)} 🏦`);
           availableKeys.push("transferencia");
           const { alias, cbu, titular } = paymentSettings.transferencia;
           if (alias && cbu && titular) {
-            datosTransferencia = `\n\n📋 *${lang === 'es' ? 'Datos para transferencia' : lang === 'en' ? 'Transfer details' : lang === 'pt' ? 'Dados para transferência' : '振込情報'}:*\n• Alias: ${alias}\n• CBU/CVU: ${cbu}\n• ${lang === 'es' ? 'Titular' : lang === 'en' ? 'Account holder' : lang === 'pt' ? 'Titular' : '名義人'}: ${titular}`;
+            datosTransferencia = `\n\n📋 *${t('label.transfer_details', lang)}:*\n• Alias: ${alias}\n• CBU/CVU: ${cbu}\n• ${t('label.account_holder', lang)}: ${titular}`;
           }
         }
 
