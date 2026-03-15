@@ -3735,6 +3735,18 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
           const toolResult = await ejecutarHerramienta(toolName, toolArgs, context, supabase);
           console.log(`✅ Tool ${toolName} result preview:`, toolResult.slice(0, 100));
 
+          // 🎯 FASE 4: Si es una herramienta de respuesta directa Y es el único tool call,
+          // retornar resultado directamente sin pasar por el LLM para reformateo
+          if (DIRECT_RESPONSE_TOOLS.has(toolName) && assistantMessage.tool_calls!.length === 1) {
+            console.log(`⚡ DIRECT RESPONSE: Returning ${toolName} result directly (no LLM reformatting)`);
+            finalResponse = toolResult;
+            continueLoop = false;
+            
+            // 💾 Guardar contexto
+            await saveContext(context, supabase);
+            break;
+          }
+
           // 📌 Agregar resultado de la herramienta
           messages.push({
             role: "tool",
@@ -3743,7 +3755,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
           });
         }
         
-        // Si se detectó loop, salir
+        // Si se detectó loop o direct response, salir
         if (!continueLoop) {
           break;
         }
