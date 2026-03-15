@@ -1393,7 +1393,7 @@ export async function ejecutarHerramienta(
         const icons: Record<string, string> = { 'efectivo': '💵', 'transferencia': '🏦', 'mercadopago': '💳' };
         const labels: Record<string, string> = { 'efectivo': 'Efectivo', 'transferencia': 'Transferencia', 'mercadopago': 'MercadoPago' };
         
-        return `✅ ${lang === 'es' ? 'Método de pago' : lang === 'en' ? 'Payment method' : lang === 'pt' ? 'Método de pagamento' : '支払い方法'}: ${icons[normalizedMethod] || '💰'} ${labels[normalizedMethod] || normalizedMethod}`;
+        return `✅ ${t('label.payment_method', lang)}: ${icons[normalizedMethod] || '💰'} ${labels[normalizedMethod] || normalizedMethod}`;
       }
 
       case "hablar_con_vendedor": {
