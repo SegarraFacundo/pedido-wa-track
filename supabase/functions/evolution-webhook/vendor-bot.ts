@@ -3590,15 +3590,10 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         }
       }
       
-      // Detectar método seleccionado explícitamente por texto
+      // Detectar método seleccionado explícitamente por texto (multi-idioma)
       if (!selectedMethod) {
-        if (normalizedMsg.includes('efectivo') || normalizedMsg.includes('cash')) {
-          selectedMethod = 'efectivo';
-        } else if (normalizedMsg.includes('transferencia') || normalizedMsg.includes('transfer')) {
-          selectedMethod = 'transferencia';
-        } else if (normalizedMsg.includes('mercado') || normalizedMsg.includes('mp') || normalizedMsg.includes('mercadopago')) {
-          selectedMethod = 'mercadopago';
-        }
+        selectedMethod = detectPaymentMethod(normalizedMsg);
+      }
       }
       
       // 🆕 Si el usuario confirma con "Si/Ok/Dale" y hay UN solo método disponible, auto-seleccionarlo
