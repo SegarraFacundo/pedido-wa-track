@@ -71,6 +71,129 @@ async function getVendorConfig(vendorId: string, supabase: any) {
   };
 }
 
+// ==================== INTERCEPTOR: SHOPPING + NÚMERO/PRODUCTO ====================
+
+async function handleShoppingInterceptor(
+  message: string,
+  context: ConversationContext,
+  supabase: any
+): Promise<string | null> {
+  const text = message.trim();
+  const vendorId = context.selected_vendor_id;
+  if (!vendorId) return null;
+
+  // Pattern 1: número solo ("2") → producto #2 del menú, cantidad 1
+  // Pattern 2: "cantidad producto" ("2 remeras", "3 pizzas")
+  // Pattern 3: "quiero/dame N producto" ("quiero 2 remeras", "dame 3 pizzas")
+  
+  let quantity = 1;
+  let searchTerm: string | null = null;
+  let menuIndex: number | null = null;
+
+  // Pattern: solo número → interpretar como producto #N del menú
+  const soloNumero = text.match(/^(\d+)$/);
+  if (soloNumero) {
+    menuIndex = parseInt(soloNumero[1]);
+  }
+  
+  // Pattern: "N producto" o "producto x N"
+  if (!menuIndex) {
+    const cantidadProducto = text.match(/^(\d+)\s+(.+)/i);
+    if (cantidadProducto) {
+      quantity = parseInt(cantidadProducto[1]);
+      searchTerm = cantidadProducto[2].trim();
+    }
+  }
+  
+  // Pattern: "quiero/dame/poneme N producto"
+  if (!menuIndex && !searchTerm) {
+    const quieroPattern = text.match(/^(?:quiero|dame|poneme|agregame|mandame)\s+(\d+)\s+(.+)/i);
+    if (quieroPattern) {
+      quantity = parseInt(quieroPattern[1]);
+      searchTerm = quieroPattern[2].trim();
+    }
+  }
+
+  // Pattern: "quiero/dame producto" (sin número = cantidad 1)
+  if (!menuIndex && !searchTerm) {
+    const quieroSimple = text.match(/^(?:quiero|dame|poneme|agregame|mandame)\s+(.+)/i);
+    if (quieroSimple) {
+      searchTerm = quieroSimple[1].trim();
+    }
+  }
+
+  // Si no matcheó ningún patrón de shopping, dejar pasar al LLM
+  if (!menuIndex && !searchTerm) return null;
+
+  // Validar cantidad
+  if (quantity < 1 || quantity > 50) return null;
+
+  console.log(`🛒 SHOPPING INTERCEPTOR: menuIndex=${menuIndex}, searchTerm="${searchTerm}", quantity=${quantity}`);
+
+  // Buscar productos del vendor en la DB
+  const { data: products, error } = await supabase
+    .from("products")
+    .select("id, name, price, is_available, stock_enabled, stock_quantity")
+    .eq("vendor_id", vendorId)
+    .eq("is_available", true)
+    .order("name");
+
+  if (error || !products || products.length === 0) {
+    console.error("❌ Shopping interceptor: Error fetching products or no products found");
+    return null; // Fallback to LLM
+  }
+
+  let matchedProduct: any = null;
+
+  if (menuIndex !== null) {
+    // Resolver por índice del menú (1-based)
+    if (menuIndex >= 1 && menuIndex <= products.length) {
+      matchedProduct = products[menuIndex - 1];
+      console.log(`✅ Product resolved by menu index #${menuIndex}: ${matchedProduct.name}`);
+    } else {
+      return `⚠️ No existe el producto #${menuIndex}. El menú tiene ${products.length} productos. Decime el número del 1 al ${products.length}.`;
+    }
+  } else if (searchTerm) {
+    // Resolver por nombre (búsqueda fuzzy)
+    const searchLower = searchTerm.toLowerCase()
+      // Remover plurales básicos del español
+      .replace(/s$/, '');
+    
+    matchedProduct = products.find((p: any) => 
+      p.name.toLowerCase().includes(searchLower) ||
+      searchLower.includes(p.name.toLowerCase().replace(/s$/, ''))
+    );
+
+    if (!matchedProduct) {
+      // Intentar match más agresivo (cada palabra)
+      const words = searchLower.split(/\s+/);
+      matchedProduct = products.find((p: any) => 
+        words.some((w: string) => w.length > 2 && p.name.toLowerCase().includes(w))
+      );
+    }
+
+    if (!matchedProduct) {
+      console.log(`❌ No product matched for "${searchTerm}" in vendor ${vendorId}`);
+      return `No encontré "${searchTerm}" en el menú de ${context.selected_vendor_name}.\n\nProductos disponibles:\n${products.map((p: any, i: number) => `${i + 1}. ${p.name} - $${p.price}`).join('\n')}\n\nDecime el número o nombre del producto.`;
+    }
+    console.log(`✅ Product resolved by name "${searchTerm}": ${matchedProduct.name}`);
+  }
+
+  if (!matchedProduct) return null;
+
+  // Llamar agregar_al_carrito con los datos reales
+  const result = await ejecutarHerramienta("agregar_al_carrito", {
+    items: [{
+      product_id: matchedProduct.id,
+      product_name: matchedProduct.name,
+      quantity: quantity,
+      price: matchedProduct.price,
+    }],
+  }, context, supabase);
+
+  return result;
+}
+
 // ==================== EJECUTORES DE HERRAMIENTAS ====================
 
 async function ejecutarHerramienta(
@@ -3180,6 +3303,16 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
     }
 
+    // 🛒 INTERCEPTOR: Estado shopping + número/producto → agregar al carrito directamente
+    if (context.order_state === "shopping" && context.selected_vendor_id) {
+      const shoppingResult = await handleShoppingInterceptor(message, context, supabase);
+      if (shoppingResult) {
+        context.conversation_history.push({ role: "assistant", content: shoppingResult });
+        await saveContext(context, supabase);
+        return shoppingResult;
+      }
+    }
+
 
     // Cuando resumen_mostrado = true y el usuario confirma, llamar crear_pedido
     // directamente sin pasar por el LLM (que alucina "pedido activo" inexistente)
@@ -3765,6 +3898,17 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
 
           // 🎯 FASE 4: Si es una herramienta de respuesta directa Y es el único tool call,
           // retornar resultado directamente sin pasar por el LLM para reformateo
+          // ⚠️ EXCEPCIÓN: En estado shopping, bloquear ver_menu_negocio redundante
+          if (toolName === "ver_menu_negocio" && (context.order_state === "shopping")) {
+            console.log(`🚫 BLOCKED: ver_menu_negocio in shopping state - user likely wants to add products`);
+            messages.push({
+              role: "tool",
+              tool_call_id: toolCall.id,
+              content: "⚠️ El usuario ya está viendo este menú. Interpretá su mensaje como un pedido de producto y usá agregar_al_carrito. Si dice un número, es el producto #N del menú.",
+            });
+            continue;
+          }
+          
           if (DIRECT_RESPONSE_TOOLS.has(toolName) && assistantMessage.tool_calls!.length === 1) {
             console.log(`⚡ DIRECT RESPONSE: Returning ${toolName} result directly (no LLM reformatting)`);
             finalResponse = toolResult;
