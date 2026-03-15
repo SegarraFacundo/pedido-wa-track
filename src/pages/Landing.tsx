@@ -78,7 +78,7 @@ export default function Landing() {
           </div>
           <nav className="flex items-center gap-2 sm:gap-4">
             <LanguageSelector />
-            <Link to="/contacto" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <Link to={lp("/contacto")} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
               {t('header.contact')}
             </Link>
             <Button variant="outline" size="sm" onClick={handleProbarClick}>
