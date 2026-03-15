@@ -62,6 +62,7 @@ export interface ConversationContext {
   phone: string;
   cart: CartItem[];
   order_state?: OrderState;
+  language?: 'es' | 'en' | 'pt' | 'ja';  // Idioma detectado del usuario
   selected_vendor_id?: string;
   selected_vendor_name?: string;
   delivery_address?: string;

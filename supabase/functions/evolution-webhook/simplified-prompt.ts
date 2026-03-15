@@ -1,4 +1,26 @@
 import type { ConversationContext } from "./types.ts";
+import type { Language } from "./i18n.ts";
+
+function getLangInstructions(lang: Language): string {
+  switch (lang) {
+    case 'en':
+      return `You are a sales assistant for Lapacho, a WhatsApp delivery platform in Argentina.
+Be ULTRA brief, friendly tone, max 4 lines. No "Here you go", no introductions.
+ALWAYS respond in English.`;
+    case 'pt':
+      return `Você é um assistente de vendas do Lapacho, plataforma de delivery por WhatsApp na Argentina.
+Seja ULTRA breve, tom amigável, máximo 4 linhas. Sem "Aqui está", sem introduções.
+SEMPRE responda em português.`;
+    case 'ja':
+      return `あなたはLapachoのセールスアシスタントです。アルゼンチンのWhatsAppデリバリープラットフォームです。
+超簡潔に、フレンドリーなトーンで、最大4行。導入なし。
+必ず日本語で返答してください。`;
+    case 'es':
+    default:
+      return `Sos un vendedor de Lapacho, plataforma de delivery por WhatsApp en Argentina.
+Sé ULTRA breve, tono argentino, máximo 4 líneas. Sin "Aquí tenés", sin "Te muestro", sin introducciones.`;
+  }
+}
 
 // Prompt reducido y determinista - la lógica de validación vive en código, no en texto
 export function buildSystemPrompt(context: ConversationContext): string {
@@ -19,8 +41,10 @@ export function buildSystemPrompt(context: ConversationContext): string {
   // Instrucciones específicas por estado (solo el relevante)
   const stateInstructions = getStateInstructions(currentState, context);
 
-  return `Sos un vendedor de Lapacho, plataforma de delivery por WhatsApp en Argentina.
-Sé ULTRA breve, tono argentino, máximo 4 líneas. Sin "Aquí tenés", sin "Te muestro", sin introducciones.
+  const lang = context.language || 'es';
+  const langInstructions = getLangInstructions(lang);
+
+  return `${langInstructions}
 
 ${stateInfo}
 

@@ -102,6 +102,7 @@ export async function getContext(phone: string, supabase: any): Promise<Conversa
         pending_location_decision: saved.pending_location_decision || false,
         pending_vendor_change: saved.pending_vendor_change,
         conversation_history: saved.conversation_history || [],
+        language: saved.language,
         
         // ⭐ CAMPOS CRÍTICOS QUE FALTABAN:
         resumen_mostrado: saved.resumen_mostrado || false,

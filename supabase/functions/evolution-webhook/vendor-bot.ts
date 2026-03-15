@@ -5,6 +5,8 @@ import { normalizeArgentinePhone } from "./utils.ts";
 import { getContext, saveContext } from "./context.ts";
 import { tools } from "./tools-definitions.ts";
 import { buildSystemPrompt } from "./simplified-prompt.ts";
+import { t, detectLanguage, HELP_REGEX, isConfirmation, isCancellation, detectPaymentMethod } from "./i18n.ts";
+import type { Language } from "./i18n.ts";
 
 // ==================== FASE 1: FILTRADO DE HERRAMIENTAS POR ESTADO ====================
 
@@ -3016,6 +3018,16 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       console.log(`💳 Payment validation: method=${context.payment_method || 'none'}, available=[${context.available_payment_methods?.join(',') || 'none'}]`);
     }
     
+    // 🌐 DETECCIÓN DE IDIOMA: En el primer mensaje o si no hay idioma guardado
+    if (!context.language) {
+      context.language = detectLanguage(message);
+      console.log(`🌐 Language detected: ${context.language} from message: "${message.substring(0, 50)}"`);
+      await saveContext(context, supabase);
+    }
+    
+    // Helper shorthand for translations
+    const lang = context.language || 'es';
+
     // 🧹 LIMPIAR CONTEXTO si hay un pedido ACTIVO del mismo vendor O si el vendor ya no existe
     // SOLO limpiamos si el usuario está en estados seguros (idle/order_placed)
     // NO limpiamos si está en medio de un flujo activo
@@ -3578,21 +3590,15 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         }
       }
       
-      // Detectar método seleccionado explícitamente por texto
+      // Detectar método seleccionado explícitamente por texto (multi-idioma)
       if (!selectedMethod) {
-        if (normalizedMsg.includes('efectivo') || normalizedMsg.includes('cash')) {
-          selectedMethod = 'efectivo';
-        } else if (normalizedMsg.includes('transferencia') || normalizedMsg.includes('transfer')) {
-          selectedMethod = 'transferencia';
-        } else if (normalizedMsg.includes('mercado') || normalizedMsg.includes('mp') || normalizedMsg.includes('mercadopago')) {
-          selectedMethod = 'mercadopago';
-        }
+        selectedMethod = detectPaymentMethod(normalizedMsg);
+      }
       }
       
       // 🆕 Si el usuario confirma con "Si/Ok/Dale" y hay UN solo método disponible, auto-seleccionarlo
       if (!selectedMethod) {
-        const confirmKeywords = /^(s[ií]|si|yes|dale|ok|confirmo|listo|confirmar)$/i;
-        if (confirmKeywords.test(normalizedMsg) && 
+        if (isConfirmation(normalizedMsg) && 
             context.available_payment_methods?.length === 1) {
           selectedMethod = context.available_payment_methods[0];
           console.log(`✅ Auto-selected single available method: ${selectedMethod}`);
@@ -3661,13 +3667,9 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       const userResponse = message.toLowerCase().trim();
       
       // 🔄 Ignorar menciones repetidas de "transferencia" - el usuario ya lo eligió
-      if (userResponse.match(/transfer/i) && !userResponse.match(/^(s[ií]|si|yes|dale|ok|confirmo|no|nop|cancel)/)) {
+      if (userResponse.match(/transfer/i) && !isConfirmation(userResponse) && !isCancellation(userResponse)) {
         console.log(`ℹ️ User mentioned "transferencia" again - reminding about confirmation`);
-        const reminder = `Ya seleccionaste transferencia bancaria como método de pago. 👍\n\n` +
-                        `Solo necesito que *confirmes* si querés continuar con el pedido.\n\n` +
-                        `Respondé:\n` +
-                        `• *"Sí"* para confirmar el pedido\n` +
-                        `• *"No"* para cancelar`;
+        const reminder = t('transfer.reminder', lang);
         
         context.conversation_history.push({
           role: "assistant",
@@ -3678,15 +3680,13 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
       
       // ✅ Usuario confirma la transferencia
-      if (userResponse.match(/^(s[ií]|si|yes|dale|ok|confirmo|listo|perfecto|continua|continuar)/)) {
+      if (isConfirmation(userResponse) || userResponse.match(/^(perfecto|continua|continuar)/)) {
         console.log(`✅ User confirmed bank transfer payment`);
         
         context.order_state = "order_confirmed";
         await saveContext(context, supabase);
         
-        const response = `✅ ¡Perfecto! Tu pedido está confirmado.\n\n` +
-                        `📸 Ahora enviame el *comprobante de transferencia* para que el negocio pueda procesar tu pedido.\n\n` +
-                        `Podés enviar una foto o captura del comprobante. 📱`;
+        const response = t('transfer.confirmed', lang);
         
         context.conversation_history.push({
           role: "assistant",
@@ -3698,7 +3698,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
       
       // ❌ Usuario cancela el pedido
-      if (userResponse.match(/^(no|nop|cancel|cancela|cancelar)/)) {
+      if (isCancellation(userResponse) || userResponse.match(/^(cancela|cancelar)/)) {
         console.log(`❌ User cancelled order during transfer confirmation`);
         
         // Cancelar el pedido si existe
@@ -3722,7 +3722,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         console.log(`🧹 Order cancelled, full context reset`);
         await saveContext(context, supabase);
         
-        const response = `Pedido cancelado. ¿En qué más puedo ayudarte? 😊`;
+        const response = t('order.cancelled', lang);
         
         context.conversation_history.push({
           role: "assistant",
@@ -3734,8 +3734,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
       
       // Si la respuesta no es clara, recordar que debe confirmar
-      const clarificationResponse = `Por favor confirmá si vas a hacer la transferencia bancaria.\n\n` +
-                                    `Respondé *"sí"* para confirmar o *"no"* para cancelar el pedido.`;
+      const clarificationResponse = t('transfer.clarify', lang);
       
       context.conversation_history.push({
         role: "assistant",
@@ -3801,19 +3800,10 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
     }
 
-    // 🎯 FASE 5: Menú de ayuda estático
-    const helpKeywords = /^(ayuda|help|menu|opciones|que puedo hacer|qué puedo hacer|como funciona|cómo funciona|\?|info)$/i;
-    if (helpKeywords.test(message.trim())) {
-      console.log(`📋 INTERCEPTOR: Static help menu`);
-      const helpText = `📋 *¿Qué puedo hacer?*\n\n` +
-        `🔍 *Ver negocios* - "mostrame los locales"\n` +
-        `🍕 *Buscar productos* - "quiero pizza", "busco helado"\n` +
-        `🛒 *Ver carrito* - "ver carrito", "qué tengo"\n` +
-        `📦 *Estado de pedido* - "estado de mi pedido"\n` +
-        `❌ *Cancelar pedido* - "cancelar pedido"\n` +
-        `🗣️ *Hablar con negocio* - "hablar con vendedor"\n` +
-        `⭐ *Calificar* - "quiero calificar"\n\n` +
-        `Escribí lo que necesitás y te ayudo 😊`;
+    // 🎯 FASE 5: Menú de ayuda estático (multi-idioma)
+    if (HELP_REGEX.test(message.trim())) {
+      console.log(`📋 INTERCEPTOR: Static help menu (lang: ${lang})`);
+      const helpText = `${t('help.header', lang)}\n\n${t('help.body', lang)}`;
       
       context.conversation_history.push({ role: "assistant", content: helpText });
       await saveContext(context, supabase);
@@ -3930,7 +3920,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
             }
             console.warn(`⚠️ Tool ${toolName} called ${callCount} times, forcing text response`);
             continueLoop = false;
-            finalResponse = "Disculpá, tuve un problema. ¿Podés reformular tu pedido?";
+            finalResponse = t('error.reformulate', lang);
             break;
           }
           toolCallTracker.set(toolName, callCount + 1);
@@ -3987,13 +3977,13 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       // Si no hay tool calls, es la respuesta final
       console.log("✅ No tool calls - AI responding with text");
       console.log("   Content preview:", assistantMessage.content?.slice(0, 200));
-      finalResponse = assistantMessage.content || "Perdón, no entendí. ¿Podés repetir?";
+      finalResponse = assistantMessage.content || t('error.not_understood', lang);
       continueLoop = false;
     }
 
     if (iterationCount >= MAX_ITERATIONS) {
       console.warn("⚠️ Max iterations reached, forcing response");
-      finalResponse = "Disculpá, tuve un problema procesando tu mensaje. ¿Podés intentar de nuevo?";
+      finalResponse = t('error.max_iterations', lang);
     }
 
     // Agregar respuesta del asistente al historial
