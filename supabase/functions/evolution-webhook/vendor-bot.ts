@@ -2984,10 +2984,12 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     const pendingStates = ['order_pending_cash', 'order_pending_transfer', 'order_pending_mp', 'order_confirmed'];
     const newOrderKeywords = ['quiero pedir', 'quiero hacer un pedido', 'nuevo pedido', 'hacer pedido', 'quiero comprar', 'ver locales', 'ver negocios', 'ver menu', 'ver menú'];
     const cancelKeywords = ['cancelar pedido', 'cancelar mi pedido', 'cancelar el pedido', 'quiero cancelar', 'cancela mi pedido', 'cancela el pedido'];
-    
+    const statusKeywords = ['estado', 'como va', 'cómo va', 'donde viene', 'dónde viene', 'mi pedido', 'pedido'];
+    const vendorChatKeywords = ['hablar con vendedor', 'hablar con negocio', 'hablar con local', 'contactar negocio', 'contactar vendedor'];
+
     if (pendingStates.includes(context.order_state || '')) {
-      const messageLower = message.toLowerCase();
-      
+      const messageLower = message.toLowerCase().trim();
+
       // 🔴 INTERCEPTOR: Si el usuario quiere cancelar, activar flujo programático directamente
       const wantsCancel = cancelKeywords.some(kw => messageLower.includes(kw));
       if (wantsCancel && !context.pending_cancellation) {
@@ -2999,15 +3001,41 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         await saveContext(context, supabase);
         return "¿Por qué querés cancelar el pedido? Escribí el motivo:";
       }
-      
+
+      // 📦 INTERCEPTOR: Consulta de estado sin pasar por LLM
+      const wantsStatus = statusKeywords.some(kw => messageLower.includes(kw));
+      if (wantsStatus) {
+        console.log(`📦 STATUS INTERCEPT: returning order status deterministically`);
+        const statusResult = await ejecutarHerramienta("ver_estado_pedido", {}, context, supabase);
+        context.conversation_history.push({ role: "assistant", content: statusResult });
+        await saveContext(context, supabase);
+        return statusResult;
+      }
+
+      // 🗣️ INTERCEPTOR: Contacto con negocio sin pasar por LLM
+      const wantsVendorChat = vendorChatKeywords.some(kw => messageLower.includes(kw));
+      if (wantsVendorChat) {
+        console.log(`🗣️ VENDOR CHAT INTERCEPT: opening vendor chat deterministically`);
+        const chatResult = await ejecutarHerramienta("hablar_con_vendedor", {}, context, supabase);
+        context.conversation_history.push({ role: "assistant", content: chatResult });
+        await saveContext(context, supabase);
+        return chatResult;
+      }
+
       const wantsNewOrder = newOrderKeywords.some(kw => messageLower.includes(kw));
-      
       if (wantsNewOrder && !context.pending_cancellation) {
         console.log(`🚫 BLOCKED: User tried to start new order with active order in state: ${context.order_state}`);
         const orderId = context.pending_order_id ? context.pending_order_id.substring(0, 8) : 'activo';
         const stateDisplay = context.order_state?.replace('order_pending_', '').replace('_', ' ').toUpperCase() || 'ACTIVO';
-        
+
         return `⏳ Ya tenés un pedido activo (#${orderId}) en estado *${stateDisplay}*.\n\n📊 Podés:\n- Decir "estado de mi pedido" para ver cómo va\n- Decir "cancelar pedido" si querés cancelarlo\n\nUna vez completado o cancelado, podés hacer un nuevo pedido. 😊`;
+      }
+
+      // 🧭 FALLBACK determinista en estados con pedido activo (evita delirios del LLM)
+      const isHelpRequest = /^(ayuda|help|menu|opciones|\?|info)/i.test(messageLower);
+      if (!isHelpRequest && context.order_state !== 'order_pending_transfer' && !context.pending_cancellation) {
+        const orderId = context.pending_order_id ? context.pending_order_id.substring(0, 8) : 'activo';
+        return `⏳ Tenés un pedido activo (#${orderId}).\n\nPuedo ayudarte con:\n- "estado de mi pedido"\n- "cancelar pedido"\n- "hablar con vendedor"`;
       }
     }
 
