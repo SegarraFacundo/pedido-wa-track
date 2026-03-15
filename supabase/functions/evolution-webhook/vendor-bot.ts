@@ -3920,7 +3920,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
             }
             console.warn(`⚠️ Tool ${toolName} called ${callCount} times, forcing text response`);
             continueLoop = false;
-            finalResponse = "Disculpá, tuve un problema. ¿Podés reformular tu pedido?";
+            finalResponse = t('error.reformulate', lang);
             break;
           }
           toolCallTracker.set(toolName, callCount + 1);

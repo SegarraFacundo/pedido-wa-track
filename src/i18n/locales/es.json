@@ -1,0 +1,87 @@
+{
+  "header": {
+    "tagline": "Simple por naturaleza.",
+    "contact": "Contacto",
+    "try": "Probar Lapacho"
+  },
+  "hero": {
+    "badge": "Simple por naturaleza.",
+    "title": "Lapacho – Simple por naturaleza.",
+    "subtitle": "Pedidos claros, rápidos y sin errores. Todo por WhatsApp.",
+    "cta_order": "Hacer un pedido",
+    "cta_business": "Soy un negocio"
+  },
+  "what": {
+    "title": "¿Qué es Lapacho?",
+    "p1": "Lapacho es un asistente automatizado que toma pedidos por WhatsApp, los organiza y te los envía listos para preparar.",
+    "p2": "No necesitás instalar nada ni aprender nuevas herramientas.",
+    "p3": "Tu negocio trabaja igual, pero sin caos."
+  },
+  "business": {
+    "title": "Beneficios para negocios",
+    "simplicity": {
+      "title": "Simplicidad total",
+      "items": [
+        "Pedidos claros por WhatsApp",
+        "Sin audios eternos",
+        "Sin errores de interpretación",
+        "Sin cambiar tu forma de trabajar"
+      ]
+    },
+    "time": {
+      "title": "Ahorro de tiempo real",
+      "items": [
+        "El sistema arma el pedido completo",
+        "Atiende a muchos clientes a la vez",
+        "Menos chat, más productividad",
+        "Vos solo preparás el pedido"
+      ]
+    },
+    "errors": {
+      "title": "Cero errores",
+      "items": [
+        "Productos correctos",
+        "Cantidades exactas",
+        "Dirección y pago confirmados",
+        "Menos reclamos y pérdida de plata"
+      ]
+    }
+  },
+  "clients": {
+    "title": "Beneficios para clientes",
+    "single": {
+      "title": "Un solo número de WhatsApp",
+      "desc": "Todos los negocios en un mismo lugar, sin buscar teléfonos."
+    },
+    "fast": {
+      "title": "Pedido rápido y simple",
+      "desc": "El bot arma el pedido en segundos, sin complicaciones."
+    },
+    "tracking": {
+      "title": "Seguimiento automático",
+      "desc": "Notificaciones: recibido, preparando, listo, en camino."
+    }
+  },
+  "how": {
+    "title": "Cómo funciona",
+    "steps": [
+      "El cliente escribe al número de Lapacho",
+      "Selecciona negocio y productos",
+      "Lapacho arma el pedido completo",
+      "El negocio recibe el pedido en WhatsApp",
+      "Cambia el estado con un clic",
+      "El cliente recibe la notificación automática"
+    ]
+  },
+  "cta": {
+    "title": "Simplificá tu negocio desde hoy.",
+    "subtitle": "Menos chat. Menos errores. Más tiempo para crecer.",
+    "button": "Probar Lapacho"
+  },
+  "footer": {
+    "tagline": "Simple por naturaleza.",
+    "terms": "Términos y Condiciones",
+    "privacy": "Política de Privacidad",
+    "rights": "© 2025 Lapacho. Todos los derechos reservados."
+  }
+}
