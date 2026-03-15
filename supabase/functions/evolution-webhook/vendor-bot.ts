@@ -56,7 +56,9 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         })
         .eq('phone', normalizedPhone);
       
-      return '🔄 ¡Listo! Borré toda tu memoria de conversación.\n\n¡Empecemos de nuevo! ¿Qué estás buscando hoy? 😊';
+      // Detect language from the reset command itself
+      const resetLang = detectLanguage(message) as Language;
+      return t('reset.done', resetLang);
     }
     
     // Cargar contexto
@@ -105,7 +107,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       await saveContext(context, supabase);
     }
     
-    const lang = context.language || 'es';
+    const lang = (context.language || 'es') as Language;
 
     // 🧹 LIMPIAR CONTEXTO si hay un pedido ACTIVO del mismo vendor
     if (context.selected_vendor_id || context.cart.length > 0) {
@@ -177,13 +179,13 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         .eq('id', context.pending_order_id);
       
       if (updateError) {
-        return '❌ Hubo un problema al procesar tu comprobante. Por favor, intenta enviarlo de nuevo o contactá con el negocio.';
+        return t('receipt.error', lang);
       }
       
       context.payment_receipt_url = imageUrl;
       await saveContext(context, supabase);
       
-      return `✅ ¡Perfecto! Recibí tu comprobante de pago. 📄\n\nEl negocio lo revisará y confirmará tu pedido pronto.\n\nPodés seguir el estado de tu pedido en cualquier momento. 😊\n\n¿Necesitás algo más?`;
+      return t('receipt.success', lang);
     }
 
     console.log("📋 Context loaded:", {
@@ -211,7 +213,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
           order_id: context.pending_order_id || context.last_order_id,
         };
         await saveContext(context, supabase);
-        return "¿Por qué querés cancelar el pedido? Escribí el motivo:";
+        return t('cancel.ask_reason', lang);
       }
 
       // 📦 INTERCEPTOR: Estado
@@ -236,14 +238,14 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       if (wantsNewOrder && !context.pending_cancellation) {
         const orderId = context.pending_order_id ? context.pending_order_id.substring(0, 8) : 'activo';
         const stateDisplay = context.order_state?.replace('order_pending_', '').replace('_', ' ').toUpperCase() || 'ACTIVO';
-        return `⏳ Ya tenés un pedido activo (#${orderId}) en estado *${stateDisplay}*.\n\n📊 Podés:\n- Decir "estado de mi pedido" para ver cómo va\n- Decir "cancelar pedido" si querés cancelarlo\n\nUna vez completado o cancelado, podés hacer un nuevo pedido. 😊`;
+        return t('active_order.blocked', lang, { id: orderId, status: stateDisplay });
       }
 
       // 🧭 FALLBACK determinista
       const isHelpRequest = /^(ayuda|help|menu|opciones|\?|info)/i.test(messageLower);
       if (!isHelpRequest && context.order_state !== 'order_pending_transfer' && !context.pending_cancellation) {
         const orderId = context.pending_order_id ? context.pending_order_id.substring(0, 8) : 'activo';
-        return `⏳ Tenés un pedido activo (#${orderId}).\n\nPuedo ayudarte con:\n- "estado de mi pedido"\n- "cancelar pedido"\n- "hablar con vendedor"`;
+        return t('active_order.fallback', lang, { id: orderId });
       }
     }
 
@@ -269,7 +271,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         context.conversation_history = [];
         await saveContext(context, supabase);
         
-        const response = `✅ Perfecto, carrito vaciado.\n\nAhora estás viendo el menú de *${context.selected_vendor_name}*.\n\n¿Qué querés pedir? 🍕`;
+        const response = t('vendor_change.confirmed', lang, { vendor: context.selected_vendor_name || '' });
         context.conversation_history.push({ role: "assistant", content: response });
         await saveContext(context, supabase);
         return response;
@@ -280,13 +282,16 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         context.pending_vendor_change = undefined;
         await saveContext(context, supabase);
         
-        const response = `Ok, seguimos con ${context.selected_vendor_name}. ¿Qué más querés agregar al pedido?`;
+        const response = t('vendor_change.cancelled', lang, { vendor: context.selected_vendor_name || '' });
         context.conversation_history.push({ role: "assistant", content: response });
         await saveContext(context, supabase);
         return response;
       }
       
-      const clarificationResponse = `Por favor confirmá si querés cambiar de negocio.\n\nRespondé *"sí"* para cambiar a ${context.pending_vendor_change.new_vendor_name} o *"no"* para seguir con ${context.selected_vendor_name}.`;
+      const clarificationResponse = t('vendor_change.clarify', lang, {
+        new_vendor: context.pending_vendor_change.new_vendor_name,
+        current_vendor: context.selected_vendor_name || '',
+      });
       context.conversation_history.push({ role: "assistant", content: clarificationResponse });
       await saveContext(context, supabase);
       return clarificationResponse;
@@ -308,7 +313,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         };
         await saveContext(context, supabase);
         
-        const response = `Vas a cancelar el pedido #${orderShort}.\n📝 Motivo: "${userResponse}"\n\n¿Confirmás la cancelación? (sí/no)`;
+        const response = t('cancel.confirm_prompt', lang, { id: orderShort, reason: userResponse });
         context.conversation_history.push({ role: "assistant", content: response });
         await saveContext(context, supabase);
         return response;
@@ -333,13 +338,13 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
           context.pending_cancellation = undefined;
           await saveContext(context, supabase);
           
-          const response = "Ok, no se cancela el pedido. ¿Necesitás algo más? 😊";
+          const response = t('cancel.keep', lang);
           context.conversation_history.push({ role: "assistant", content: response });
           await saveContext(context, supabase);
           return response;
         }
         
-        const clarification = `Respondé *"sí"* para confirmar la cancelación o *"no"* para mantener el pedido.`;
+        const clarification = t('cancel.confirm_clarify', lang);
         context.conversation_history.push({ role: "assistant", content: clarification });
         await saveContext(context, supabase);
         return clarification;
@@ -364,8 +369,8 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       
       if (isConfirmRes) {
         const result = await ejecutarHerramienta("crear_pedido", {
-          direccion: context.delivery_address,
-          metodo_pago: context.payment_method,
+          direccion: context.delivery_address || '',
+          metodo_pago: context.payment_method
         }, context, supabase);
         await saveContext(context, supabase);
         return result;
@@ -383,7 +388,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       
       if (userMessage.match(/link|pag(o|ar|ame)|mercadopago|mp/i)) {
         if (!context.pending_order_id) {
-          return "❌ No encontré un pedido pendiente. Por favor iniciá un nuevo pedido.";
+          return t('mp.no_pending', lang);
         }
         
         try {
@@ -394,27 +399,27 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
           let response = "";
           
           if (paymentError) {
-            response = `⚠️ Hubo un problema al generar el link de pago.\n\nPor favor contactá al negocio para coordinar el pago.`;
+            response = t('mp.error', lang);
           } else if (paymentData?.success && paymentData?.payment_link) {
-            response = `🔗 *Link de pago de MercadoPago:*\n${paymentData.payment_link}\n\n👆 Tocá el link para completar tu pago de forma segura.\n\nUna vez que pagues, recibirás la confirmación automáticamente. 😊`;
+            response = t('mp.link_header', lang, { link: paymentData.payment_link });
           } else if (paymentData?.available_methods) {
-            response = `⚠️ MercadoPago no está disponible en este momento.\n\nMétodos de pago alternativos:\n\n`;
+            response = t('order.mp_unavailable', lang);
             for (const method of paymentData.available_methods) {
               if (method.method === 'transferencia') {
-                response += `📱 *Transferencia bancaria:*\n• Alias: ${method.details.alias}\n• CBU/CVU: ${method.details.cbu}\n• Titular: ${method.details.titular}\n• Monto: $${method.details.amount}\n\n`;
+                response += `📱 *${lang === 'es' ? 'Transferencia bancaria' : lang === 'en' ? 'Bank transfer' : lang === 'pt' ? 'Transferência bancária' : '銀行振込'}:*\n• Alias: ${method.details.alias}\n• CBU/CVU: ${method.details.cbu}\n• ${lang === 'es' ? 'Titular' : 'Holder'}: ${method.details.titular}\n• ${lang === 'es' ? 'Monto' : 'Amount'}: $${method.details.amount}\n\n`;
               } else if (method.method === 'efectivo') {
-                response += `💵 *Efectivo:* ${method.details.message}\n\n`;
+                response += `💵 *${lang === 'es' ? 'Efectivo' : lang === 'en' ? 'Cash' : lang === 'pt' ? 'Dinheiro' : '現金'}:* ${method.details.message}\n\n`;
               }
             }
           } else {
-            response = `⚠️ No se pudo generar el link de pago. El negocio te contactará para coordinar.`;
+            response = t('mp.not_generated', lang);
           }
           
           context.conversation_history.push({ role: "assistant", content: response });
           await saveContext(context, supabase);
           return response;
         } catch (_error) {
-          return `⚠️ Error al procesar tu solicitud. Por favor intentá de nuevo o contactá al negocio.`;
+          return t('mp.request_error', lang);
         }
       }
     }
@@ -426,8 +431,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
 
     if (isConfirming && context.order_state === 'shopping') {
       if (context.cart.length === 0) {
-        const emptyCartResponse = "⚠️ Tu carrito está vacío. Primero agregá productos del menú de " +
-               `${context.selected_vendor_name || 'un negocio'}.\n\n¿Querés que te muestre el menú?`;
+        const emptyCartResponse = t('confirm.empty_cart', lang, { vendor: context.selected_vendor_name || '' });
         context.conversation_history.push({ role: "assistant", content: emptyCartResponse });
         await saveContext(context, supabase);
         return emptyCartResponse;
@@ -454,9 +458,9 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       let confirmResponse = cartSummary;
       
       if (!context.delivery_type) {
-        confirmResponse += "\n\n¿Lo retirás en el local o te lo enviamos? 🏪🚚";
+        confirmResponse += "\n\n" + t('delivery.ask_type', lang);
       } else if (context.delivery_type === 'delivery' && !context.delivery_address) {
-        confirmResponse += "\n\n✍️ Escribí tu dirección de entrega (calle y número)";
+        confirmResponse += "\n\n" + t('delivery.ask_address', lang);
       } else if (!context.payment_method) {
         const paymentResult = await ejecutarHerramienta("ver_metodos_pago", {}, context, supabase);
         confirmResponse += "\n\n" + paymentResult;
@@ -472,7 +476,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         context.order_state === 'checkout' &&
         !context.payment_method &&
         message.match(/\d{2,}/) && !message.match(/^[123]$/)) {
-      const pickupReminder = `📍 Tu pedido es para *retiro en local*, no necesito dirección de entrega.\n\nLo vas a retirar en: ${context.selected_vendor_name}\n\n¿Con qué método querés pagar? Respondé con el número o nombre del método.`;
+      const pickupReminder = t('pickup.reminder', lang, { vendor: context.selected_vendor_name || '' });
       context.conversation_history.push({ role: "assistant", content: pickupReminder });
       await saveContext(context, supabase);
       return pickupReminder;
@@ -504,7 +508,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       if (selectedMethod) {
         if (!context.available_payment_methods || !context.available_payment_methods.includes(selectedMethod)) {
           const availableList = context.available_payment_methods?.map(m => `- ${m}`).join('\n') || '- (ninguno disponible)';
-          const errorResponse = `⚠️ El método "${selectedMethod}" no está disponible en ${context.selected_vendor_name}.\n\nPor favor elegí uno de estos:\n${availableList}`;
+          const errorResponse = t('payment.invalid', lang, { method: selectedMethod, vendor: context.selected_vendor_name || '' }) + `\n\n${availableList}`;
           context.conversation_history.push({ role: "assistant", content: errorResponse });
           await saveContext(context, supabase);
           return errorResponse;
@@ -514,7 +518,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         await saveContext(context, supabase);
         
         const orderAddress = context.delivery_type === 'pickup' 
-          ? `Retiro en local: ${context.selected_vendor_name}` 
+          ? `${t('delivery.pickup_label', lang)}: ${context.selected_vendor_name}` 
           : context.delivery_address;
         
         try {
@@ -527,7 +531,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
           await saveContext(context, supabase);
           return orderResult;
         } catch (_error) {
-          return "Hubo un error al crear tu pedido. Por favor intentá de nuevo.";
+          return t('error.order_create', lang);
         }
       }
     }
@@ -779,6 +783,6 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       await logBotError(supabase, 'BOT_ERROR', errorMessage, normalizedPhone, undefined, { name: error.name });
     }
     
-    return "Disculpá, tuve un problema técnico. Por favor intentá de nuevo en un momento.";
+    return t('error.generic', 'es');
   }
 }
