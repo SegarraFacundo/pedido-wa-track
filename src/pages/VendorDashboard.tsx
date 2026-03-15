@@ -34,6 +34,7 @@ export default function VendorDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const navigate = useNavigate();
+  const localePath = useLocalePath();
   const { toast } = useToast();
 
   const menuItems = [
