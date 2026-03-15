@@ -1029,7 +1029,7 @@ export async function ejecutarHerramienta(
         } catch (_e) {}
 
         let confirmacion = t('order.created', lang) + `\n\n`;
-        confirmacion += `📦 ${lang === 'es' ? 'Pedido' : lang === 'en' ? 'Order' : lang === 'pt' ? 'Pedido' : '注文'} #${order.id.substring(0, 8)}\n`;
+        confirmacion += `📦 ${t('label.order', lang)} #${order.id.substring(0, 8)}\n`;
         confirmacion += t('order.store_label', lang, { vendor: context.selected_vendor_name || '' }) + `\n\n`;
 
         if (context.delivery_type === 'pickup') {
