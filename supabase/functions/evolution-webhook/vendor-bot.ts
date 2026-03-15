@@ -5,6 +5,8 @@ import { normalizeArgentinePhone } from "./utils.ts";
 import { getContext, saveContext } from "./context.ts";
 import { tools } from "./tools-definitions.ts";
 import { buildSystemPrompt } from "./simplified-prompt.ts";
+import { t, detectLanguage, HELP_REGEX, isConfirmation, isCancellation, detectPaymentMethod } from "./i18n.ts";
+import type { Language } from "./i18n.ts";
 
 // ==================== FASE 1: FILTRADO DE HERRAMIENTAS POR ESTADO ====================
 
