@@ -3318,8 +3318,8 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     // directamente sin pasar por el LLM (que alucina "pedido activo" inexistente)
     if (context.resumen_mostrado && !context.pending_order_id) {
       const userResponse = message.toLowerCase().trim();
-      const isConfirmation = /^(s[ií]|si|yes|dale|ok|confirmo|listo|confirmar|vamos|va)$/i.test(userResponse);
-      const isCancellation = /^(no|nop|cancel|cancela|cambiar)/i.test(userResponse);
+      const isConfirmation = /^(s[ií]|si|yes|dale|ok|confirmo|listo|confirmar|vamos|va|claro|obvio|seguro|por supuesto|manda|dale que si)\b/i.test(userResponse);
+      const isCancellation = /^(no\b|nop|cancel|cancela|cambiar)/i.test(userResponse);
       
       if (isConfirmation) {
         console.log(`✅ PROGRAMMATIC: User confirmed order post-summary, calling crear_pedido directly`);
