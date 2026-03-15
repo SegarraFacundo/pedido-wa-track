@@ -1,37 +1,29 @@
 
-# Bot Anti-Alucinaciones: 5 Fases + Fix Shopping Loop ✅
 
-## Fases 1-5: Implementadas ✅
-- Filtrado de herramientas por estado (TOOLS_BY_STATE)
-- Interceptores deterministas pre-LLM
-- Prompt reducido ~70 líneas
-- Respuestas directas sin reformateo (DIRECT_RESPONSE_TOOLS)
-- Menú de ayuda estático
+## Plan: Bot multi-language help menu + dynamic language switching
 
-## Fix: Shopping Loop (menú en loop) ✅
-### Problema: En estado `shopping`, el LLM llamaba `ver_menu_negocio` en vez de `agregar_al_carrito`
-### Solución:
-1. **Interceptor determinista shopping**: Detecta números ("2"), "N producto" ("2 remeras"), "quiero N producto" antes del LLM → busca en DB → `agregar_al_carrito` directo
-2. **Bloqueo ver_menu_negocio en shopping**: Si el LLM llama `ver_menu_negocio` estando en shopping, retorna error forzando `agregar_al_carrito`
-3. **Función `handleShoppingInterceptor`**: Busca productos del vendor en DB por índice o nombre fuzzy
+### Problem
+1. **Help menu hardcoded in Spanish**: The `mostrar_menu_ayuda` tool case (line ~2429 in `vendor-bot.ts`) returns a detailed help menu always in Spanish. The interceptor at line ~3807 uses `i18n.ts` but with a simplified version (`help.body`).
+2. **Language never updates**: `detectLanguage()` only runs once (`if (!context.language)`), so if a user starts in Spanish and then writes in English, the bot keeps responding in Spanish.
 
----
+### Changes
 
-# Soporte Multi-idioma (ES, EN, PT, JA) — Fase 1 ✅
+**1. `supabase/functions/evolution-webhook/i18n.ts` — Add detailed help menu translations**
 
-## Bot de WhatsApp — Auto-detección ✅
-- `i18n.ts`: Diccionario con ~30 strings en 4 idiomas + detectLanguage() + regex multi-idioma
-- `types.ts`: Campo `language` en ConversationContext
-- `context.ts`: Persiste y carga `language`
-- `simplified-prompt.ts`: getLangInstructions() adapta tono/idioma del system prompt
-- `vendor-bot.ts`: Detecta idioma en primer mensaje, usa t() para strings fijos, regex multi-idioma (confirm/cancel/payment/help)
+Replace the current `help.header` and `help.body` with a richer `help.full` key containing the detailed menu (BUSCAR Y PEDIR, MI CARRITO, MIS PEDIDOS, MIS DIRECCIONES, CALIFICAR, SOPORTE sections) translated into all 4 languages. Keep the same visual structure with emojis and bullet points.
 
-## Web — Selector manual (sin auto-detección) ✅
-- `react-i18next` + `i18next` instalados
-- `src/i18n/index.ts`: Config con lng='es', lee de localStorage
-- `src/i18n/locales/{es,en,pt,ja}.json`: Traducciones de la Landing
-- `src/components/LanguageSelector.tsx`: Dropdown con banderas
-- `src/pages/Landing.tsx`: Migrado a t('key')
+**2. `supabase/functions/evolution-webhook/vendor-bot.ts` — Use i18n for tool + re-detect language**
 
-## Fase 2 (Pendiente)
-- Migrar resto de páginas web (Términos, Privacidad, Contacto, Auth, Dashboards)
+- **Tool handler (`mostrar_menu_ayuda`)**: Replace the hardcoded Spanish string with `t('help.full', lang)` using the context language.
+- **Interceptor (FASE 5)**: Update to use `t('help.full', lang)` instead of combining header+body.
+- **Language re-detection (line ~3022)**: Change from `if (!context.language)` to always re-detect and update when the detected language differs from the stored one. This way if a user switches to English mid-conversation, the bot adapts.
+
+**3. Pass `lang` to tool execution**
+
+Ensure the `lang` variable is accessible inside `executeTool()` so `mostrar_menu_ayuda` can use it. Currently `executeTool` receives `context` which has `context.language`, so we can use `context.language || 'es'` directly.
+
+### Summary of scope
+- 2 files modified: `i18n.ts` (add translations), `vendor-bot.ts` (use translations + re-detect language)
+- No database changes needed
+- Will need redeployment of `evolution-webhook` edge function
+
