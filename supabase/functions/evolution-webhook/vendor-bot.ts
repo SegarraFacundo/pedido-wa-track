@@ -3667,13 +3667,9 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       const userResponse = message.toLowerCase().trim();
       
       // 🔄 Ignorar menciones repetidas de "transferencia" - el usuario ya lo eligió
-      if (userResponse.match(/transfer/i) && !userResponse.match(/^(s[ií]|si|yes|dale|ok|confirmo|no|nop|cancel)/)) {
+      if (userResponse.match(/transfer/i) && !isConfirmation(userResponse) && !isCancellation(userResponse)) {
         console.log(`ℹ️ User mentioned "transferencia" again - reminding about confirmation`);
-        const reminder = `Ya seleccionaste transferencia bancaria como método de pago. 👍\n\n` +
-                        `Solo necesito que *confirmes* si querés continuar con el pedido.\n\n` +
-                        `Respondé:\n` +
-                        `• *"Sí"* para confirmar el pedido\n` +
-                        `• *"No"* para cancelar`;
+        const reminder = t('transfer.reminder', lang);
         
         context.conversation_history.push({
           role: "assistant",
