@@ -509,8 +509,19 @@ const translations: Record<string, Record<Language, string>> = {
     pt: '🕒 Cardápio atualizado: {time}',
     ja: '🕒 メニュー更新: {time}',
   },
+  'menu.one_at_a_time': {
+    es: '⚠️ Solo puedo mostrarte un menú a la vez. Elegí un negocio de la lista y te muestro su menú.',
+    en: '⚠️ I can only show one menu at a time. Pick a store from the list and I\'ll show you its menu.',
+    pt: '⚠️ Só posso mostrar um cardápio por vez. Escolha uma loja da lista e mostrarei o cardápio.',
+    ja: '⚠️ メニューは一度に1つだけ表示できます。リストからお店を選んでください。',
+  },
+  'menu.already_viewing': {
+    es: '⚠️ El usuario ya está viendo este menú. Interpretá su mensaje como un pedido de producto y usá agregar_al_carrito.',
+    en: '⚠️ The user is already viewing this menu. Interpret their message as a product order and use agregar_al_carrito.',
+    pt: '⚠️ O usuário já está vendo este cardápio. Interprete a mensagem como pedido de produto e use agregar_al_carrito.',
+    ja: '⚠️ ユーザーはすでにこのメニューを表示しています。メッセージを商品注文として解釈し、agregar_al_carritoを使用してください。',
+  },
 
-  // === ENTREGA ===
   'delivery.ask_type': {
     es: '¿Lo retirás en el local o te lo enviamos? 🏪🚚',
     en: 'Pick up at the store or delivery? 🏪🚚',
