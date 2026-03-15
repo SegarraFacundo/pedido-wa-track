@@ -247,6 +247,46 @@ async function ejecutarHerramienta(
         return resultado;
       }
 
+// ==================== FASE 1: FILTRADO DE HERRAMIENTAS POR ESTADO ====================
+
+const TOOLS_BY_STATE: Record<string, string[]> = {
+  idle: ["buscar_productos", "ver_locales_abiertos", "mostrar_menu_ayuda", "ver_estado_pedido"],
+  browsing: ["ver_menu_negocio", "buscar_productos", "ver_locales_abiertos", "mostrar_menu_ayuda"],
+  shopping: [
+    "agregar_al_carrito", "quitar_producto_carrito", "ver_carrito",
+    "modificar_carrito_completo", "ver_menu_negocio", "ver_ofertas",
+    "seleccionar_tipo_entrega", "confirmar_direccion_entrega",
+    "ver_metodos_pago", "seleccionar_metodo_pago",
+    "mostrar_resumen_pedido", "vaciar_carrito", "crear_pedido",
+  ],
+  needs_address: ["confirmar_direccion_entrega", "vaciar_carrito", "ver_carrito"],
+  checkout: ["seleccionar_metodo_pago", "mostrar_resumen_pedido", "crear_pedido", "ver_carrito", "vaciar_carrito"],
+  order_pending_cash: ["ver_estado_pedido", "cancelar_pedido", "hablar_con_vendedor", "registrar_calificacion", "calificar_plataforma"],
+  order_pending_transfer: ["ver_estado_pedido", "cancelar_pedido", "hablar_con_vendedor", "registrar_calificacion", "calificar_plataforma"],
+  order_pending_mp: ["ver_estado_pedido", "cancelar_pedido", "hablar_con_vendedor", "registrar_calificacion", "calificar_plataforma"],
+  order_confirmed: ["ver_estado_pedido", "cancelar_pedido", "hablar_con_vendedor", "registrar_calificacion", "calificar_plataforma"],
+  order_completed: ["ver_estado_pedido", "registrar_calificacion", "calificar_plataforma", "buscar_productos", "ver_locales_abiertos"],
+  order_cancelled: ["buscar_productos", "ver_locales_abiertos", "ver_estado_pedido"],
+};
+
+// Herramientas cuya salida se retorna directamente al usuario sin pasar por el LLM
+const DIRECT_RESPONSE_TOOLS = new Set([
+  "ver_locales_abiertos",
+  "ver_menu_negocio", 
+  "ver_carrito",
+  "mostrar_resumen_pedido",
+  "mostrar_menu_ayuda",
+  "ver_estado_pedido",
+  "ver_ofertas",
+  "buscar_productos",
+]);
+
+function filterToolsByState(state: string, context: ConversationContext) {
+  const allowedNames = TOOLS_BY_STATE[state] || TOOLS_BY_STATE["idle"];
+  // Agregar crear_ticket_soporte siempre (soporte técnico)
+  const withSupport = [...allowedNames, "crear_ticket_soporte"];
+  return tools.filter(t => withSupport.includes(t.function.name));
+}
 
       case "ver_menu_negocio": {
         console.log(`🔍 ========== VER MENU NEGOCIO ==========`);
