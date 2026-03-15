@@ -3,6 +3,7 @@
 import { ConversationContext, CartItem } from "./types.ts";
 import { saveContext } from "./context.ts";
 import { tools } from "./tools-definitions.ts";
+import { t, Language } from "./i18n.ts";
 
 // ==================== FASE 1: FILTRADO DE HERRAMIENTAS POR ESTADO ====================
 
@@ -77,6 +78,8 @@ export async function handleShoppingInterceptor(
   const text = message.trim();
   const vendorId = context.selected_vendor_id;
   if (!vendorId) return null;
+
+  const lang = (context.language || 'es') as Language;
 
   // 🔍 Pre-process: extract multi-intent parts
   let productPart = text;
@@ -154,14 +157,14 @@ export async function handleShoppingInterceptor(
     const totalRequested = alreadyInCart + quantity;
 
     if (available <= 0) {
-      return `❌ *${selectedProduct.name}* está AGOTADO.\n\nElegí otro producto del menú. 😊`;
+      return t('stock.out_of_stock', lang, { product: selectedProduct.name });
     }
     if (totalRequested > available) {
       const canAdd = available - alreadyInCart;
       if (canAdd <= 0) {
-        return `⚠️ Ya tenés ${alreadyInCart} de *${selectedProduct.name}* (máximo: ${available}).`;
+        return t('stock.max_interceptor', lang, { count: String(alreadyInCart), product: selectedProduct.name, max: String(available) });
       }
-      return `⚠️ Solo hay ${available} unidades de *${selectedProduct.name}*. Ya tenés ${alreadyInCart} en el carrito.`;
+      return t('stock.limited_interceptor', lang, { available: String(available), product: selectedProduct.name, count: String(alreadyInCart) });
     }
   }
 
@@ -202,7 +205,7 @@ export async function handleShoppingInterceptor(
 
   await saveContext(context, supabase);
 
-  return `✅ Productos agregados al carrito de *${context.selected_vendor_name}*.\n\n💰 Total actual: $${total}\n\n¿Querés agregar algo más o confirmás el pedido? 📦`;
+  return t('cart.added', lang, { vendor: context.selected_vendor_name || '', total: String(total) });
 }
 
 // ==================== HELPER: TRACK VENDOR CHANGE ====================
