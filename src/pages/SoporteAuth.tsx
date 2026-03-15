@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Headphones } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import lapachoLogo from "@/assets/lapacho-logo.png";
 
 export default function SoporteAuth() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -27,10 +29,9 @@ export default function SoporteAuth() {
       if (authError) throw authError;
 
       if (!authData.user) {
-        throw new Error("No se pudo obtener la información del usuario");
+        throw new Error(t('vendorAuth.noAuthUser'));
       }
 
-      // Verificar que el usuario tiene rol de soporte o admin
       const { data: roles, error: rolesError } = await supabase
         .from('user_roles')
         .select('role')
@@ -39,14 +40,14 @@ export default function SoporteAuth() {
 
       if (rolesError) {
         console.error('Error checking roles:', rolesError);
-        throw new Error("Error al verificar permisos");
+        throw new Error(t('common.error'));
       }
 
       if (!roles || roles.length === 0) {
         await supabase.auth.signOut();
         toast({
-          title: "Acceso denegado",
-          description: "No tienes permisos para acceder al panel de soporte",
+          title: t('soporteAuth.accessDenied'),
+          description: t('soporteAuth.accessDeniedDesc'),
           variant: "destructive",
         });
         setLoading(false);
@@ -54,16 +55,16 @@ export default function SoporteAuth() {
       }
 
       toast({
-        title: "Inicio de sesión exitoso",
-        description: "Bienvenido al panel de soporte",
+        title: t('soporteAuth.loginSuccess'),
+        description: t('soporteAuth.loginSuccessDesc'),
       });
 
       navigate("/soporte");
     } catch (error: any) {
       console.error('Login error:', error);
       toast({
-        title: "Error al iniciar sesión",
-        description: error.message || "Verifica tus credenciales e intenta nuevamente",
+        title: t('soporteAuth.loginError'),
+        description: error.message || t('soporteAuth.loginErrorDesc'),
         variant: "destructive",
       });
     } finally {
@@ -77,18 +78,14 @@ export default function SoporteAuth() {
         <div className="text-center mb-8">
           <img src={lapachoLogo} alt="Lapacho Logo" className="h-16 mx-auto mb-4" />
           <Headphones className="h-12 w-12 text-primary mx-auto mb-4" />
-          <h1 className="text-3xl font-bold mb-2">Panel de Soporte</h1>
-          <p className="text-muted-foreground">
-            Ingresa con tu cuenta de soporte
-          </p>
+          <h1 className="text-3xl font-bold mb-2">{t('soporteAuth.panelTitle')}</h1>
+          <p className="text-muted-foreground">{t('soporteAuth.panelDesc')}</p>
         </div>
 
         <div className="bg-card border rounded-lg p-6 shadow-sm">
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium">
-                Correo electrónico
-              </label>
+              <label htmlFor="email" className="text-sm font-medium">{t('soporteAuth.emailLabel')}</label>
               <Input
                 id="email"
                 type="email"
@@ -101,9 +98,7 @@ export default function SoporteAuth() {
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">
-                Contraseña
-              </label>
+              <label htmlFor="password" className="text-sm font-medium">{t('soporteAuth.passwordLabel')}</label>
               <Input
                 id="password"
                 type="password"
@@ -116,14 +111,14 @@ export default function SoporteAuth() {
             </div>
 
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Iniciando sesión..." : "Iniciar sesión"}
+              {loading ? t('soporteAuth.signingIn') : t('common.signIn')}
             </Button>
           </form>
         </div>
 
         <div className="mt-4 text-center">
           <Button variant="ghost" onClick={() => navigate('/')}>
-            Volver al Inicio
+            {t('common.backHome')}
           </Button>
         </div>
       </div>
