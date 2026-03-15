@@ -386,11 +386,17 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
           updated_at: new Date().toISOString()
         }, { onConflict: 'phone' });
 
-      // Enviar mensaje por WhatsApp al cliente con el nombre del negocio
+      // Enviar mensaje por WhatsApp al cliente con el nombre del negocio (traducido)
+      const { getTranslatedNotification: getTranslation } = await import('@/lib/notificationTranslation');
+      const translatedVendorMsg = await getTranslation(
+        selectedChat.customer_phone,
+        'vendor_message',
+        { vendorName, message: newMessage }
+      );
       await supabase.functions.invoke('send-whatsapp-notification', {
         body: {
           phoneNumber: selectedChat.customer_phone,
-          message: `📩 Mensaje de *${vendorName}*:\n${newMessage}`,
+          message: translatedVendorMsg || `📩 Mensaje de *${vendorName}*:\n${newMessage}`,
           orderId: selectedChat.id
         }
       });
