@@ -132,13 +132,19 @@ export function OrderCard({
         reason: `Pago confirmado por el vendedor (${order.payment_method || "efectivo"})`,
       });
 
-      // Enviar notificación al cliente
+      // Enviar notificación al cliente (traducida)
       try {
+        const { getTranslatedNotification } = await import('@/lib/notificationTranslation');
+        const translatedMsg = await getTranslatedNotification(
+          order.customerPhone,
+          'payment_confirmed',
+          { orderId: order.id.slice(0, 8), statusLabel: statusConfig[order.status].label }
+        );
         await supabase.functions.invoke("send-whatsapp-notification", {
           body: {
             orderId: order.id,
             phoneNumber: order.customerPhone,
-            message: `✅ ¡Tu pago ha sido confirmado!\n\nPedido: #${order.id.slice(0, 8)}\nEstado: ${statusConfig[order.status].label}\n\n¡Gracias por tu compra! 😊`,
+            message: translatedMsg || `✅ ¡Tu pago ha sido confirmado!\n\nPedido: #${order.id.slice(0, 8)}\n\n¡Gracias por tu compra! 😊`,
           },
         });
       } catch (notifyError) {
