@@ -3977,7 +3977,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       // Si no hay tool calls, es la respuesta final
       console.log("✅ No tool calls - AI responding with text");
       console.log("   Content preview:", assistantMessage.content?.slice(0, 200));
-      finalResponse = assistantMessage.content || "Perdón, no entendí. ¿Podés repetir?";
+      finalResponse = assistantMessage.content || t('error.not_understood', lang);
       continueLoop = false;
     }
 
