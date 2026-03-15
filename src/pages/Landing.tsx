@@ -19,7 +19,7 @@ import LanguageSelector from "@/components/LanguageSelector";
 
 export default function Landing() {
   const { t } = useTranslation();
-
+  const lp = useLocalePath();
   const handleProbarClick = () => {
     const whatsappNumber = '5493464448309';
     const message = encodeURIComponent('Hola, quiero probar Lapacho');
