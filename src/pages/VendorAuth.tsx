@@ -21,6 +21,7 @@ export default function VendorAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [hasVendorProfile, setHasVendorProfile] = useState<boolean | null>(null);
   const navigate = useNavigate();
+  const localePath = useLocalePath();
   const { toast } = useToast();
 
   useEffect(() => {
