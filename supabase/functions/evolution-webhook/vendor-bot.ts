@@ -2985,10 +2985,13 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       console.log(`💳 Payment validation: method=${context.payment_method || 'none'}, available=[${context.available_payment_methods?.join(',') || 'none'}]`);
     }
     
-    // 🌐 DETECCIÓN DE IDIOMA: En el primer mensaje o si no hay idioma guardado
-    if (!context.language) {
-      context.language = detectLanguage(message);
-      console.log(`🌐 Language detected: ${context.language} from message: "${message.substring(0, 50)}"`);
+    // 🌐 DETECCIÓN DE IDIOMA: Detecta en cada mensaje y actualiza si cambia
+    const detectedLang = detectLanguage(message);
+    if (!context.language || (detectedLang !== 'es' && detectedLang !== context.language)) {
+      // Only update if: no language yet, or user switched to a non-default language
+      // (We don't downgrade to 'es' because short messages like "2" default to 'es')
+      context.language = detectedLang;
+      console.log(`🌐 Language updated: ${context.language} from message: "${message.substring(0, 50)}"`);
       await saveContext(context, supabase);
     }
     
