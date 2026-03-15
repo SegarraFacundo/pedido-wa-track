@@ -1975,8 +1975,8 @@ export type Database = {
           total_orders: number | null
         }
         Insert: {
-          address_area?: string | null
-          available_products?: never
+          address_area?: never
+          available_products?: Json | null
           category?: string | null
           closing_time?: string | null
           days_open?: string[] | null
@@ -1991,8 +1991,8 @@ export type Database = {
           total_orders?: number | null
         }
         Update: {
-          address_area?: string | null
-          available_products?: never
+          address_area?: never
+          available_products?: Json | null
           category?: string | null
           closing_time?: string | null
           days_open?: string[] | null
@@ -2066,9 +2066,9 @@ export type Database = {
           closing_time?: string | null
           created_at?: string | null
           days_open?: string[] | null
-          full_address?: never
-          full_phone?: never
-          full_whatsapp?: never
+          full_address?: string | null
+          full_phone?: string | null
+          full_whatsapp?: string | null
           id?: string | null
           image?: string | null
           is_active?: boolean | null
@@ -2091,9 +2091,9 @@ export type Database = {
           closing_time?: string | null
           created_at?: string | null
           days_open?: string[] | null
-          full_address?: never
-          full_phone?: never
-          full_whatsapp?: never
+          full_address?: string | null
+          full_phone?: string | null
+          full_whatsapp?: string | null
           id?: string | null
           image?: string | null
           is_active?: boolean | null
@@ -2198,7 +2198,6 @@ export type Database = {
           comment: string | null
           created_at: string | null
           customer_name: string | null
-          customer_phone: string | null
           id: string | null
           rating: number | null
           vendor_id: string | null
@@ -2207,7 +2206,6 @@ export type Database = {
           comment?: string | null
           created_at?: string | null
           customer_name?: never
-          customer_phone?: never
           id?: string | null
           rating?: number | null
           vendor_id?: string | null
@@ -2216,7 +2214,6 @@ export type Database = {
           comment?: string | null
           created_at?: string | null
           customer_name?: never
-          customer_phone?: never
           id?: string | null
           rating?: number | null
           vendor_id?: string | null
