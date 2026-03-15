@@ -24,6 +24,7 @@ import { Loader2, Package, Clock, Settings, LayoutDashboard, Tag, Star, MessageC
 import { PWAInstallPrompt } from '@/components/PWAInstallPrompt';
 import lapachoIcon from "@/assets/lapacho-icon.png";
 import { cn } from "@/lib/utils";
+import { useLocalePath } from '@/hooks/useLocalePath';
 
 export default function VendorDashboard() {
   const { t } = useTranslation();
