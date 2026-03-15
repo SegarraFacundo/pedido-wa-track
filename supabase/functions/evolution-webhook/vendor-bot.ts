@@ -704,7 +704,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
               messages.push({
                 role: "tool",
                 tool_call_id: toolCall.id,
-                content: "⚠️ Solo puedo mostrarte un menú a la vez. Elegí un negocio de la lista y te muestro su menú.",
+                content: t('menu.one_at_a_time', lang),
               });
               continue;
             }
@@ -714,13 +714,15 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
           }
           toolCallTracker.set(toolName, callCount + 1);
 
+          // Save state BEFORE tool execution to detect "already shopping" vs "just transitioned"
+          const stateBeforeToolCall = context.order_state;
           const toolResult = await ejecutarHerramienta(toolName, toolArgs, context, supabase);
 
-          if (toolName === "ver_menu_negocio" && (context.order_state === "shopping")) {
+          if (toolName === "ver_menu_negocio" && stateBeforeToolCall === "shopping") {
             messages.push({
               role: "tool",
               tool_call_id: toolCall.id,
-              content: "⚠️ El usuario ya está viendo este menú. Interpretá su mensaje como un pedido de producto y usá agregar_al_carrito.",
+              content: t('menu.already_viewing', lang),
             });
             continue;
           }
