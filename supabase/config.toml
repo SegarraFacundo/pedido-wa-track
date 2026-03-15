@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.notify-admin-emergency]
 verify_jwt = false
+
+[functions.translate-customer-notification]
+verify_jwt = false
