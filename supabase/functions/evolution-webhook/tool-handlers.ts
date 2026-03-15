@@ -1156,9 +1156,9 @@ export async function ejecutarHerramienta(
         const timeStr = argTime.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
 
         let estado = t('status.header', lang) + `\n\n`;
-        estado += `🆔 ${lang === 'es' ? 'Pedido' : lang === 'en' ? 'Order' : lang === 'pt' ? 'Pedido' : '注文'} #${order.id.substring(0, 8)}\n`;
-        estado += `🏪 ${lang === 'es' ? 'Negocio' : lang === 'en' ? 'Store' : lang === 'pt' ? 'Loja' : '店舗'}: ${order.vendors.name}\n`;
-        estado += `✨ ${lang === 'es' ? 'Estado' : lang === 'en' ? 'Status' : lang === 'pt' ? 'Status' : '状態'}: *${statusMap[order.status] || order.status}*\n`;
+        estado += `🆔 ${t('label.order', lang)} #${order.id.substring(0, 8)}\n`;
+        estado += `🏪 ${t('label.store', lang)}: ${order.vendors.name}\n`;
+        estado += `✨ ${t('label.status', lang)}: *${statusMap[order.status] || order.status}*\n`;
         estado += `💰 ${t('cart.total', lang)}: $${Math.round(order.total).toLocaleString("es-AR")}\n\n`;
         estado += `_${t('status.updated_at', lang, { time: timeStr })}_`;
 
