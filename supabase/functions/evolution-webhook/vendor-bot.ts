@@ -718,15 +718,6 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
           const stateBeforeToolCall = context.order_state;
           const toolResult = await ejecutarHerramienta(toolName, toolArgs, context, supabase);
 
-          if (toolName === "ver_menu_negocio" && stateBeforeToolCall === "shopping") {
-            messages.push({
-              role: "tool",
-              tool_call_id: toolCall.id,
-              content: t('menu.already_viewing', lang),
-            });
-            continue;
-          }
-          
           if (DIRECT_RESPONSE_TOOLS.has(toolName) && assistantMessage.tool_calls!.length === 1) {
             finalResponse = toolResult;
             continueLoop = false;
