@@ -197,16 +197,16 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
 
     // 🚫 VALIDACIÓN TEMPRANA: Bloquear pedidos duplicados cuando hay uno activo
     const pendingStates = ['order_pending_cash', 'order_pending_transfer', 'order_pending_mp', 'order_confirmed'];
-    const newOrderKeywords = ['quiero pedir', 'quiero hacer un pedido', 'nuevo pedido', 'hacer pedido', 'quiero comprar', 'ver locales', 'ver negocios', 'ver menu', 'ver menú'];
-    const cancelKeywords = ['cancelar pedido', 'cancelar mi pedido', 'cancelar el pedido', 'quiero cancelar', 'cancela mi pedido', 'cancela el pedido'];
-    const statusKeywords = ['estado', 'como va', 'cómo va', 'donde viene', 'dónde viene', 'mi pedido', 'pedido'];
-    const vendorChatKeywords = ['hablar con vendedor', 'hablar con negocio', 'hablar con local', 'contactar negocio', 'contactar vendedor'];
+    const newOrderIntentRegex = /\b(quiero\s+(hacer\s+)?(un\s+)?pedido|nuevo\s+pedido|hacer\s+pedido|quiero\s+comprar|ver\s+(locales|negocios|tiendas)|ver\s*men[uú]|show\s+(stores|shops)|show\s*menu|new\s+order|novo\s+pedido)\b/i;
+    const cancelIntentRegex = /\b(cancelar\s+(mi\s+|el\s+)?pedido|quiero\s+cancelar|cancela\s+mi\s+pedido|cancel\s+order|cancel\s+my\s+order|cancelamento|注文キャンセル)\b/i;
+    const statusIntentRegex = /\b(estado(?:\s+de\s+mi\s+pedido)?|mi\s+pedido|order\s*status|status(?:\s+do\s+pedido)?|status|pedido\s+status|注文状況)\b/i;
+    const vendorChatIntentRegex = /\b(hablar\s+con\s+(vendedor|negocio|local)|contactar\s+(negocio|vendedor)|talk\s+to\s+(vendor|store)|falar\s+com\s+(vendedor|loja)|店舗に連絡)\b/i;
 
     if (pendingStates.includes(context.order_state || '')) {
       const messageLower = message.toLowerCase().trim();
 
       // 🔴 INTERCEPTOR: Cancelar
-      const wantsCancel = cancelKeywords.some(kw => messageLower.includes(kw));
+      const wantsCancel = cancelIntentRegex.test(messageLower);
       if (wantsCancel && !context.pending_cancellation) {
         context.pending_cancellation = {
           step: "awaiting_reason",
@@ -217,7 +217,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
 
       // 📦 INTERCEPTOR: Estado
-      const wantsStatus = statusKeywords.some(kw => messageLower.includes(kw));
+      const wantsStatus = statusIntentRegex.test(messageLower);
       if (wantsStatus) {
         const statusResult = await ejecutarHerramienta("ver_estado_pedido", {}, context, supabase);
         context.conversation_history.push({ role: "assistant", content: statusResult });
@@ -226,7 +226,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
 
       // 🗣️ INTERCEPTOR: Vendor chat
-      const wantsVendorChat = vendorChatKeywords.some(kw => messageLower.includes(kw));
+      const wantsVendorChat = vendorChatIntentRegex.test(messageLower);
       if (wantsVendorChat) {
         const chatResult = await ejecutarHerramienta("hablar_con_vendedor", {}, context, supabase);
         context.conversation_history.push({ role: "assistant", content: chatResult });
@@ -234,7 +234,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         return chatResult;
       }
 
-      const wantsNewOrder = newOrderKeywords.some(kw => messageLower.includes(kw));
+      const wantsNewOrder = newOrderIntentRegex.test(messageLower);
       if (wantsNewOrder && !context.pending_cancellation) {
         const orderId = context.pending_order_id ? context.pending_order_id.substring(0, 8) : 'activo';
         const stateDisplay = context.order_state?.replace('order_pending_', '').replace('_', ' ').toUpperCase() || 'ACTIVO';
