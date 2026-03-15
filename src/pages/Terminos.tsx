@@ -2,9 +2,11 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, Leaf } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
+import { useLocalePath } from "@/hooks/useLocalePath";
 
 export default function Terminos() {
   const { t } = useTranslation();
+  const lp = useLocalePath();
 
   const renderSection = (titleKey: string, textKey?: string, introKey?: string, itemsKey?: string) => (
     <section>

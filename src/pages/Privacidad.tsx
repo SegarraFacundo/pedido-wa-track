@@ -2,9 +2,11 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, Leaf } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
+import { useLocalePath } from "@/hooks/useLocalePath";
 
 export default function Privacidad() {
   const { t } = useTranslation();
+  const lp = useLocalePath();
 
   return (
     <div className="min-h-screen bg-background">

@@ -8,9 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
+import { useLocalePath } from "@/hooks/useLocalePath";
 
 export default function Contacto() {
   const { t } = useTranslation();
+  const lp = useLocalePath();
   const [formData, setFormData] = useState({
     nombre: "",
     email: "",
