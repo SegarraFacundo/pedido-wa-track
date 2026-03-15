@@ -97,7 +97,7 @@ Deno.test("getContext - should handle location data correctly", async () => {
   assertEquals(context.user_longitude, -58.3816);
 });
 
-Deno.test("saveContext - should truncate conversation history to 20 messages", async () => {
+Deno.test("saveContext - should truncate conversation history to 10 messages", async () => {
   const context: ConversationContext = {
     phone: "5493464448309",
     cart: [],
@@ -107,8 +107,8 @@ Deno.test("saveContext - should truncate conversation history to 20 messages", a
   const mockSupabase = createMockSupabase(null);
   await saveContext(context, mockSupabase);
 
-  // After save, history should be truncated
-  assertEquals(context.conversation_history.length, 20);
+  // After save, history should be truncated to 10
+  assertEquals(context.conversation_history.length, 10);
 });
 
 Deno.test("saveContext - should not save if phone is missing", async () => {
