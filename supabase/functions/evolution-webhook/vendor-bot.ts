@@ -6,6 +6,46 @@ import { getContext, saveContext } from "./context.ts";
 import { tools } from "./tools-definitions.ts";
 import { buildSystemPrompt } from "./simplified-prompt.ts";
 
+// ==================== FASE 1: FILTRADO DE HERRAMIENTAS POR ESTADO ====================
+
+const TOOLS_BY_STATE: Record<string, string[]> = {
+  idle: ["buscar_productos", "ver_locales_abiertos", "mostrar_menu_ayuda", "ver_estado_pedido"],
+  browsing: ["ver_menu_negocio", "buscar_productos", "ver_locales_abiertos", "mostrar_menu_ayuda"],
+  shopping: [
+    "agregar_al_carrito", "quitar_producto_carrito", "ver_carrito",
+    "modificar_carrito_completo", "ver_menu_negocio", "ver_ofertas",
+    "seleccionar_tipo_entrega", "confirmar_direccion_entrega",
+    "ver_metodos_pago", "seleccionar_metodo_pago",
+    "mostrar_resumen_pedido", "vaciar_carrito", "crear_pedido",
+  ],
+  needs_address: ["confirmar_direccion_entrega", "vaciar_carrito", "ver_carrito"],
+  checkout: ["seleccionar_metodo_pago", "mostrar_resumen_pedido", "crear_pedido", "ver_carrito", "vaciar_carrito"],
+  order_pending_cash: ["ver_estado_pedido", "cancelar_pedido", "hablar_con_vendedor", "registrar_calificacion", "calificar_plataforma"],
+  order_pending_transfer: ["ver_estado_pedido", "cancelar_pedido", "hablar_con_vendedor", "registrar_calificacion", "calificar_plataforma"],
+  order_pending_mp: ["ver_estado_pedido", "cancelar_pedido", "hablar_con_vendedor", "registrar_calificacion", "calificar_plataforma"],
+  order_confirmed: ["ver_estado_pedido", "cancelar_pedido", "hablar_con_vendedor", "registrar_calificacion", "calificar_plataforma"],
+  order_completed: ["ver_estado_pedido", "registrar_calificacion", "calificar_plataforma", "buscar_productos", "ver_locales_abiertos"],
+  order_cancelled: ["buscar_productos", "ver_locales_abiertos", "ver_estado_pedido"],
+};
+
+// FASE 4: Herramientas cuya salida se retorna directamente sin reformateo del LLM
+const DIRECT_RESPONSE_TOOLS = new Set([
+  "ver_locales_abiertos",
+  "ver_menu_negocio",
+  "ver_carrito",
+  "mostrar_resumen_pedido",
+  "mostrar_menu_ayuda",
+  "ver_estado_pedido",
+  "ver_ofertas",
+  "buscar_productos",
+]);
+
+function filterToolsByState(state: string, _context: ConversationContext) {
+  const allowedNames = TOOLS_BY_STATE[state] || TOOLS_BY_STATE["idle"];
+  const withSupport = [...allowedNames, "crear_ticket_soporte"];
+  return tools.filter(t => withSupport.includes(t.function.name));
+}
+
 // ==================== HELPER: REAL-TIME VENDOR CONFIG ====================
 
 // ✅ SIEMPRE consulta la DB para obtener la configuración actual del vendor
@@ -246,6 +286,7 @@ async function ejecutarHerramienta(
 
         return resultado;
       }
+
 
 
       case "ver_menu_negocio": {
@@ -3500,6 +3541,80 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       return clarificationResponse;
     }
 
+    // 🎯 FASE 2: Interceptores deterministas pre-LLM
+    
+    // INTERCEPTOR: Estado needs_address - todo lo que no sea cancelar/volver se trata como dirección
+    if ((context.order_state === "needs_address" || 
+        (context.order_state === "shopping" && context.delivery_type === "delivery" && !context.delivery_address && context.cart.length > 0)) 
+        && message.trim().length > 3) {
+      const msgLower = message.toLowerCase().trim();
+      const notAddress = /^(cancel|volver|cambiar|no|menu|carrito|ayuda|estado|hola)/i.test(msgLower);
+      
+      if (!notAddress) {
+        console.log(`📍 INTERCEPTOR: Treating message as address in needs_address state: "${message}"`);
+        const result = await ejecutarHerramienta("confirmar_direccion_entrega", {
+          direccion: message.trim(),
+        }, context, supabase);
+        
+        context.conversation_history.push({ role: "assistant", content: result });
+        await saveContext(context, supabase);
+        return result;
+      }
+    }
+
+    // INTERCEPTOR: Estado idle/browsing + palabras de comida → buscar_productos directo
+    if ((context.order_state === "idle" || context.order_state === "browsing" || !context.order_state) && !context.selected_vendor_id) {
+      const foodKeywords = /\b(pizza|hamburguesa|empanada|milanesa|sushi|helado|cerveza|coca|fanta|sprite|agua|café|cafe|pollo|asado|lomito|sandwich|tarta|torta|postre|ensalada|papas|sándwich|medialunas?|facturas?|alfajor|ravioles?|ñoquis?|pastas?)\b/i;
+      if (foodKeywords.test(message)) {
+        console.log(`🍕 INTERCEPTOR: Food keyword detected in idle/browsing, calling buscar_productos`);
+        const result = await ejecutarHerramienta("buscar_productos", {
+          consulta: message.trim(),
+        }, context, supabase);
+        
+        context.conversation_history.push({ role: "assistant", content: result });
+        await saveContext(context, supabase);
+        return result;
+      }
+    }
+    
+    // INTERCEPTOR: Estado browsing + número solo → seleccionar negocio de la lista
+    if (context.order_state === "browsing" && context.available_vendors_map && context.available_vendors_map.length > 0) {
+      const numMatch = message.trim().match(/^(\d+)$/);
+      if (numMatch) {
+        const idx = parseInt(numMatch[1]);
+        const vendor = context.available_vendors_map.find(v => v.index === idx);
+        if (vendor) {
+          console.log(`🏪 INTERCEPTOR: Numeric selection in browsing → ver_menu_negocio for "${vendor.name}"`);
+          const result = await ejecutarHerramienta("ver_menu_negocio", {
+            vendor_id: String(idx),
+          }, context, supabase);
+          
+          context.conversation_history.push({ role: "assistant", content: result });
+          await saveContext(context, supabase);
+          return result;
+        }
+      }
+    }
+
+    // 🎯 FASE 5: Menú de ayuda estático
+    const helpKeywords = /^(ayuda|help|menu|opciones|que puedo hacer|qué puedo hacer|como funciona|cómo funciona|\?|info)$/i;
+    if (helpKeywords.test(message.trim())) {
+      console.log(`📋 INTERCEPTOR: Static help menu`);
+      const helpText = `📋 *¿Qué puedo hacer?*\n\n` +
+        `🔍 *Ver negocios* - "mostrame los locales"\n` +
+        `🍕 *Buscar productos* - "quiero pizza", "busco helado"\n` +
+        `🛒 *Ver carrito* - "ver carrito", "qué tengo"\n` +
+        `📦 *Estado de pedido* - "estado de mi pedido"\n` +
+        `❌ *Cancelar pedido* - "cancelar pedido"\n` +
+        `🗣️ *Hablar con negocio* - "hablar con vendedor"\n` +
+        `⭐ *Calificar* - "quiero calificar"\n\n` +
+        `Escribí lo que necesitás y te ayudo 😊`;
+      
+      context.conversation_history.push({ role: "assistant", content: helpText });
+      await saveContext(context, supabase);
+      return helpText;
+    }
+
     // Inicializar OpenAI
     const openai = new OpenAI({
       apiKey: Deno.env.get("OPENAI_API_KEY"),
@@ -3561,13 +3676,9 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         && iterationCount === 1
         && !context.resumen_mostrado;
 
-      // 🎯 Filtrar herramientas por estado para evitar confusiones
+      // 🎯 FASE 1: Filtrado agresivo de herramientas por estado
       const currentState = context.order_state || "idle";
-      let filteredTools = tools;
-      if (currentState === "shopping" && context.selected_vendor_id) {
-        // En shopping, no necesita ver_locales_abiertos (evita cambios accidentales de negocio)
-        filteredTools = tools.filter(t => t.function.name !== "ver_locales_abiertos");
-      }
+      const filteredTools = filterToolsByState(currentState, context);
 
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
@@ -3624,6 +3735,18 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
           const toolResult = await ejecutarHerramienta(toolName, toolArgs, context, supabase);
           console.log(`✅ Tool ${toolName} result preview:`, toolResult.slice(0, 100));
 
+          // 🎯 FASE 4: Si es una herramienta de respuesta directa Y es el único tool call,
+          // retornar resultado directamente sin pasar por el LLM para reformateo
+          if (DIRECT_RESPONSE_TOOLS.has(toolName) && assistantMessage.tool_calls!.length === 1) {
+            console.log(`⚡ DIRECT RESPONSE: Returning ${toolName} result directly (no LLM reformatting)`);
+            finalResponse = toolResult;
+            continueLoop = false;
+            
+            // 💾 Guardar contexto
+            await saveContext(context, supabase);
+            break;
+          }
+
           // 📌 Agregar resultado de la herramienta
           messages.push({
             role: "tool",
@@ -3632,7 +3755,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
           });
         }
         
-        // Si se detectó loop, salir
+        // Si se detectó loop o direct response, salir
         if (!continueLoop) {
           break;
         }
