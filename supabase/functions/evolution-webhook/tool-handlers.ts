@@ -1506,7 +1506,7 @@ export async function ejecutarHerramienta(
         if (error) return t('platform.save_error', lang);
 
         let respuesta = t('platform.thanks', lang) + `\n\n`;
-        respuesta += `⭐ ${lang === 'es' ? 'Tu calificación' : lang === 'en' ? 'Your rating' : lang === 'pt' ? 'Sua avaliação' : 'あなたの評価'}: ${args.rating}/5\n`;
+        respuesta += `⭐ ${t('label.your_rating', lang)}: ${args.rating}/5\n`;
         if (args.comment) respuesta += `\n${t('rating.comment', lang)}: "${args.comment}"\n`;
         respuesta += "\n" + t('platform.helps', lang);
 

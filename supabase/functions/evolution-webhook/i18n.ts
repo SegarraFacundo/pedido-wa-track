@@ -1400,6 +1400,47 @@ Escreva o que precisa e eu ajudo. É muito fácil! 😊`,
     pt: 'Houve um erro ao criar seu pedido. Por favor tente novamente.',
     ja: '注文の作成中にエラーが発生しました。もう一度お試しください。',
   },
+
+  // === LABELS (inline ternary replacements) ===
+  'label.order': {
+    es: 'Pedido', en: 'Order', pt: 'Pedido', ja: '注文',
+  },
+  'label.payment': {
+    es: 'Pago', en: 'Payment', pt: 'Pagamento', ja: '支払い',
+  },
+  'label.payment_method': {
+    es: 'Método de pago', en: 'Payment method', pt: 'Método de pagamento', ja: '支払い方法',
+  },
+  'label.delivery_label': {
+    es: 'Entrega', en: 'Delivery', pt: 'Entrega', ja: '配送',
+  },
+  'label.address': {
+    es: 'Dirección', en: 'Address', pt: 'Endereço', ja: '住所',
+  },
+  'label.store': {
+    es: 'Negocio', en: 'Store', pt: 'Loja', ja: '店舗',
+  },
+  'label.status': {
+    es: 'Estado', en: 'Status', pt: 'Status', ja: '状態',
+  },
+  'label.your_rating': {
+    es: 'Tu calificación', en: 'Your rating', pt: 'Sua avaliação', ja: 'あなたの評価',
+  },
+  'label.account_holder': {
+    es: 'Titular', en: 'Account holder', pt: 'Titular', ja: '名義人',
+  },
+  'label.amount': {
+    es: 'Monto', en: 'Amount', pt: 'Valor', ja: '金額',
+  },
+  'label.bank_transfer': {
+    es: 'Transferencia bancaria', en: 'Bank transfer', pt: 'Transferência bancária', ja: '銀行振込',
+  },
+  'label.cash': {
+    es: 'Efectivo', en: 'Cash', pt: 'Dinheiro', ja: '現金',
+  },
+  'label.transfer_details': {
+    es: 'Datos para transferencia', en: 'Transfer details', pt: 'Dados para transferência', ja: '振込情報',
+  },
 };
 
 /**
