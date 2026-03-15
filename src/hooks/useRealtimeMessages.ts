@@ -207,14 +207,21 @@ export function useRealtimeMessages(orderId: string, customerPhone?: string) {
             });
           }
           
-          // Send WhatsApp notification with vendor message
+          // Send WhatsApp notification with vendor message (translated)
           console.log('Sending WhatsApp notification to:', orderData.customer_phone);
+          
+          const { getTranslatedNotification: getTranslation } = await import('@/lib/notificationTranslation');
+          const vendorMsg = await getTranslation(
+            orderData.customer_phone,
+            'vendor_message',
+            { vendorName, message: content }
+          );
           
           const { data: whatsappResponse, error: whatsappError } = await supabase.functions.invoke('send-whatsapp-notification', {
             body: {
               orderId,
               phoneNumber: orderData.customer_phone,
-              message: `📩 Mensaje de *${vendorName}*: ${content}`
+              message: vendorMsg || `📩 Mensaje de *${vendorName}*: ${content}`
             }
           });
 

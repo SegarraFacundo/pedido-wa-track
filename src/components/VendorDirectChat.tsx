@@ -454,11 +454,13 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
           })
           .eq('phone', chat.customer_phone);
 
-        // Notificar al cliente que el bot está activo nuevamente
+        // Notificar al cliente que el bot está activo nuevamente (traducido)
+        const { getTranslatedNotification: getEndTranslation } = await import('@/lib/notificationTranslation');
+        const endMsg = await getEndTranslation(chat.customer_phone, 'bot_active_full');
         await supabase.functions.invoke('send-whatsapp-notification', {
           body: {
             phoneNumber: chat.customer_phone,
-            message: `✅ El bot está activo nuevamente. Puedes seguir haciendo consultas o pedidos.`
+            message: endMsg || `✅ El bot está activo nuevamente. Puedes seguir haciendo consultas o pedidos.`
           }
         });
       }
