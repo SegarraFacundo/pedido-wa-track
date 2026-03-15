@@ -68,7 +68,7 @@ export default function VendorDashboard() {
       const { data: vendorData, error } = await supabase.from('vendors').select('*').eq('user_id', session.user.id).single();
       if (error || !vendorData) {
         toast({ title: t('common.error'), description: t('vendor.noVendorProfile'), variant: 'destructive' });
-        navigate('/vendor-auth'); return;
+        navigate(localePath('/vendor-auth')); return;
       }
       setVendor(vendorData);
     } catch (error) { console.error('Error checking auth:', error); navigate('/vendor-auth'); }
