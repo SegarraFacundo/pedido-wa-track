@@ -82,50 +82,73 @@ async function handleShoppingInterceptor(
   const vendorId = context.selected_vendor_id;
   if (!vendorId) return null;
 
-  // Pattern 1: número solo ("2") → producto #2 del menú, cantidad 1
-  // Pattern 2: "cantidad producto" ("2 remeras", "3 pizzas")
-  // Pattern 3: "quiero/dame N producto" ("quiero 2 remeras", "dame 3 pizzas")
-  
+  // 🔍 Pre-process: extract multi-intent parts
+  // Split by "y" / "," to separate product from address/payment
+  // "2 remeras quiero y enviamelo a Av. Villada 1582 y pago en efectivo"
+  let productPart = text;
+  let addressPart: string | null = null;
+  let paymentPart: string | null = null;
+
+  // Extract address: "enviamelo a ...", "a la dirección ...", "enviar a ..."
+  const addressMatch = text.match(/(?:enviam?elo?\s+a|enviar\s+a|direcci[oó]n\s+|a\s+la\s+direcci[oó]n\s+)([\w\s.,]+?)(?:\s+y\s+pago|\s+pago\s+|$)/i);
+  if (addressMatch) {
+    addressPart = addressMatch[1].trim();
+    productPart = text.substring(0, text.indexOf(addressMatch[0])).trim();
+  }
+
+  // Extract payment: "pago en efectivo", "pago con transferencia", "efectivo"
+  const paymentMatch = text.match(/pago\s+(?:en\s+|con\s+)?(efectivo|transferencia|mercadopago|mp)/i);
+  if (paymentMatch) {
+    paymentPart = paymentMatch[1].trim();
+    if (!addressPart) {
+      // If no address was extracted, trim the payment part from productPart
+      productPart = text.substring(0, text.indexOf(paymentMatch[0])).trim();
+    }
+  }
+
+  // Clean productPart: remove trailing "y", "quiero", connectors
+  productPart = productPart.replace(/\s+y\s*$/i, '').replace(/\s+quiero\s*$/i, '').trim();
+
+  console.log(`🛒 SHOPPING INTERCEPTOR: productPart="${productPart}", addressPart="${addressPart}", paymentPart="${paymentPart}"`);
+
   let quantity = 1;
   let searchTerm: string | null = null;
   let menuIndex: number | null = null;
 
-  // Pattern: solo número → interpretar como producto #N del menú
-  const soloNumero = text.match(/^(\d+)$/);
+  // Pattern: solo número → producto #N del menú
+  const soloNumero = productPart.match(/^(\d+)$/);
   if (soloNumero) {
     menuIndex = parseInt(soloNumero[1]);
   }
   
-  // Pattern: "N producto" o "producto x N"
+  // Pattern: "N producto" ("2 remeras")
   if (!menuIndex) {
-    const cantidadProducto = text.match(/^(\d+)\s+(.+)/i);
+    const cantidadProducto = productPart.match(/^(\d+)\s+(.+)/i);
     if (cantidadProducto) {
       quantity = parseInt(cantidadProducto[1]);
       searchTerm = cantidadProducto[2].trim();
     }
   }
   
-  // Pattern: "quiero/dame/poneme N producto"
+  // Pattern: "quiero/dame N producto"
   if (!menuIndex && !searchTerm) {
-    const quieroPattern = text.match(/^(?:quiero|dame|poneme|agregame|mandame)\s+(\d+)\s+(.+)/i);
+    const quieroPattern = productPart.match(/^(?:quiero|dame|poneme|agregame|mandame)\s+(\d+)\s+(.+)/i);
     if (quieroPattern) {
       quantity = parseInt(quieroPattern[1]);
       searchTerm = quieroPattern[2].trim();
     }
   }
 
-  // Pattern: "quiero/dame producto" (sin número = cantidad 1)
+  // Pattern: "quiero/dame producto" (cantidad 1)
   if (!menuIndex && !searchTerm) {
-    const quieroSimple = text.match(/^(?:quiero|dame|poneme|agregame|mandame)\s+(.+)/i);
+    const quieroSimple = productPart.match(/^(?:quiero|dame|poneme|agregame|mandame)\s+(.+)/i);
     if (quieroSimple) {
       searchTerm = quieroSimple[1].trim();
     }
   }
 
-  // Si no matcheó ningún patrón de shopping, dejar pasar al LLM
+  // Si no matcheó ningún patrón, dejar pasar al LLM
   if (!menuIndex && !searchTerm) return null;
-
-  // Validar cantidad
   if (quantity < 1 || quantity > 50) return null;
 
   console.log(`🛒 SHOPPING INTERCEPTOR: menuIndex=${menuIndex}, searchTerm="${searchTerm}", quantity=${quantity}`);
@@ -140,13 +163,12 @@ async function handleShoppingInterceptor(
 
   if (error || !products || products.length === 0) {
     console.error("❌ Shopping interceptor: Error fetching products or no products found");
-    return null; // Fallback to LLM
+    return null;
   }
 
   let matchedProduct: any = null;
 
   if (menuIndex !== null) {
-    // Resolver por índice del menú (1-based)
     if (menuIndex >= 1 && menuIndex <= products.length) {
       matchedProduct = products[menuIndex - 1];
       console.log(`✅ Product resolved by menu index #${menuIndex}: ${matchedProduct.name}`);
@@ -154,10 +176,7 @@ async function handleShoppingInterceptor(
       return `⚠️ No existe el producto #${menuIndex}. El menú tiene ${products.length} productos. Decime el número del 1 al ${products.length}.`;
     }
   } else if (searchTerm) {
-    // Resolver por nombre (búsqueda fuzzy)
-    const searchLower = searchTerm.toLowerCase()
-      // Remover plurales básicos del español
-      .replace(/s$/, '');
+    const searchLower = searchTerm.toLowerCase().replace(/s$/, '');
     
     matchedProduct = products.find((p: any) => 
       p.name.toLowerCase().includes(searchLower) ||
@@ -165,7 +184,6 @@ async function handleShoppingInterceptor(
     );
 
     if (!matchedProduct) {
-      // Intentar match más agresivo (cada palabra)
       const words = searchLower.split(/\s+/);
       matchedProduct = products.find((p: any) => 
         words.some((w: string) => w.length > 2 && p.name.toLowerCase().includes(w))
@@ -181,7 +199,7 @@ async function handleShoppingInterceptor(
 
   if (!matchedProduct) return null;
 
-  // Llamar agregar_al_carrito con los datos reales
+  // 1. Agregar al carrito
   const result = await ejecutarHerramienta("agregar_al_carrito", {
     items: [{
       product_id: matchedProduct.id,
@@ -191,7 +209,33 @@ async function handleShoppingInterceptor(
     }],
   }, context, supabase);
 
-  return result;
+  // 2. Multi-intent: si hay dirección, procesarla
+  let multiResult = result;
+  if (addressPart && addressPart.length > 3) {
+    console.log(`📍 MULTI-INTENT: Processing address "${addressPart}"`);
+    // Set delivery type to delivery
+    context.delivery_type = "delivery";
+    const addressResult = await ejecutarHerramienta("confirmar_direccion_entrega", {
+      direccion: addressPart,
+    }, context, supabase);
+    multiResult += `\n\n${addressResult}`;
+  }
+
+  // 3. Multi-intent: si hay método de pago, guardarlo
+  if (paymentPart) {
+    console.log(`💳 MULTI-INTENT: Setting payment method "${paymentPart}"`);
+    const methodMap: Record<string, string> = {
+      'efectivo': 'efectivo', 'transferencia': 'transferencia',
+      'mercadopago': 'mercadopago', 'mp': 'mercadopago',
+    };
+    const mapped = methodMap[paymentPart.toLowerCase()];
+    if (mapped) {
+      context.payment_method = mapped;
+      await saveContext(context, supabase);
+    }
+  }
+
+  return multiResult;
 }
 
 // ==================== EJECUTORES DE HERRAMIENTAS ====================
