@@ -3680,15 +3680,13 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
       
       // ✅ Usuario confirma la transferencia
-      if (userResponse.match(/^(s[ií]|si|yes|dale|ok|confirmo|listo|perfecto|continua|continuar)/)) {
+      if (isConfirmation(userResponse) || userResponse.match(/^(perfecto|continua|continuar)/)) {
         console.log(`✅ User confirmed bank transfer payment`);
         
         context.order_state = "order_confirmed";
         await saveContext(context, supabase);
         
-        const response = `✅ ¡Perfecto! Tu pedido está confirmado.\n\n` +
-                        `📸 Ahora enviame el *comprobante de transferencia* para que el negocio pueda procesar tu pedido.\n\n` +
-                        `Podés enviar una foto o captura del comprobante. 📱`;
+        const response = t('transfer.confirmed', lang);
         
         context.conversation_history.push({
           role: "assistant",
