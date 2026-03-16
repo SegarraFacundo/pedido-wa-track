@@ -41,3 +41,18 @@
 - Replaced all ~15 inline `lang === 'es' ? ...` ternaries in `tool-handlers.ts` and `vendor-bot.ts`
 - Fixed missing PT/JA translations (e.g., "Holder" → proper `t('label.account_holder', lang)`)
 - Zero remaining inline ternaries in bot code
+
+## Ver horario de negocio + Pausa temporal vendor ✅
+### Bot: `ver_horario_negocio` (determinista)
+- Tool definition en `tools-definitions.ts`
+- Handler en `tool-handlers.ts`: busca vendor, consulta `vendor_hours`, formatea por día con estado actual
+- `TOOLS_BY_STATE`: disponible en todos los estados
+- `DIRECT_RESPONSE_TOOLS`: respuesta directa sin reformateo LLM
+- Interceptor regex en `vendor-bot.ts`: "horario", "schedule", "horários", "営業時間", "a qué hora", "what time"
+- i18n: `schedule.header`, `schedule.closed`, `schedule.currently_open/closed`, `schedule.no_hours`, `schedule.ask_vendor`
+- Help menu actualizado en 4 idiomas con sección de horarios
+
+### Dashboard: Pausa temporal
+- `VendorSettings.tsx`: Toggle `is_active` mejorado con card prominente, estados visuales y descripción clara
+- `VendorDashboard.tsx`: Banner destructive cuando `vendor.is_active === false`
+- Sin cambios de DB (usa campo `is_active` existente)
