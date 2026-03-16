@@ -942,6 +942,8 @@ serve(async (req) => {
 
         console.log('✅ Message saved to vendor chat, bot will not respond');
 
+        stopTypingIndicator();
+
         // Liberar lock antes de salir
         await releaseLock(supabase, normalizedPhone);
 
