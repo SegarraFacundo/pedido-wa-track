@@ -750,6 +750,26 @@ serve(async (req) => {
           .eq('id', openTicket.id);
 
         console.log('🔄 Support ticket auto-resolved by customer reactivation command:', finalMessageText);
+
+        // Notificar al cliente que el ticket fue cerrado
+        try {
+          const evolutionApiUrlTicket = Deno.env.get('EVOLUTION_API_URL');
+          const evolutionApiKeyTicket = Deno.env.get('EVOLUTION_API_KEY');
+          const instanceNameTicket = Deno.env.get('EVOLUTION_INSTANCE_NAME');
+          const chatIdTicket = rawJid.includes('@lid') ? rawJid : `${normalizedPhone}@s.whatsapp.net`;
+          
+          await fetch(`${evolutionApiUrlTicket}/message/sendText/${instanceNameTicket}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKeyTicket! },
+            body: JSON.stringify({
+              number: chatIdTicket,
+              text: `✅ Tu ticket de soporte *"${openTicket.subject}"* fue cerrado.\n\n_Ahora estás de vuelta con el bot. ¡Procesando tu solicitud!_ 🤖`
+            })
+          });
+        } catch (e) {
+          console.error('Error notifying ticket closure:', e);
+        }
+
         openTicket = null;
       } else {
         // Guardar el mensaje del usuario en support_messages

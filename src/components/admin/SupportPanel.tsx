@@ -45,18 +45,15 @@ export default function SupportPanel() {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchTickets();
-    setupRealtimeSubscription();
-  }, []);
+  const selectedTicketRef = React.useRef<Ticket | null>(null);
 
   useEffect(() => {
-    if (selectedTicket) {
-      fetchMessages(selectedTicket.id);
-    }
+    selectedTicketRef.current = selectedTicket;
   }, [selectedTicket]);
 
-  const setupRealtimeSubscription = () => {
+  useEffect(() => {
+    fetchTickets();
+
     const channel = supabase
       .channel('support-changes')
       .on(
@@ -73,8 +70,9 @@ export default function SupportPanel() {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'support_messages' },
         (payload: any) => {
-          if (selectedTicket && payload.new.ticket_id === selectedTicket.id) {
-            fetchMessages(selectedTicket.id);
+          const current = selectedTicketRef.current;
+          if (current && payload.new.ticket_id === current.id) {
+            fetchMessages(current.id);
           }
         }
       )
@@ -83,7 +81,13 @@ export default function SupportPanel() {
     return () => {
       supabase.removeChannel(channel);
     };
-  };
+  }, []);
+
+  useEffect(() => {
+    if (selectedTicket) {
+      fetchMessages(selectedTicket.id);
+    }
+  }, [selectedTicket]);
 
   const fetchTickets = async () => {
     try {
