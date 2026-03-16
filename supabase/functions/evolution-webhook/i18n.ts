@@ -1324,11 +1324,6 @@ O que você pode fazer?
 • Ver o status do meu pedido
 • Cancelar um pedido
 
-📍 *MEUS ENDEREÇOS*
-• Salvar endereços para pedidos futuros
-• Ver meus endereços salvos
-• Usar um endereço salvo
-• Excluir ou renomear endereços
 
 ⭐ *AVALIAR*
 • Avaliar meu pedido
