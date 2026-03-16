@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Building2, Save, Upload, X } from 'lucide-react';
+import { Building2, Save, Upload, X, PauseCircle, PlayCircle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { VendorNotificationSettings } from '@/components/VendorNotificationSettings';
 
 interface VendorData {
