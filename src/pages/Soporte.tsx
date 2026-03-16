@@ -129,7 +129,7 @@ export default function Soporte() {
                 {t('common.signIn')}
               </Button>
               <Button 
-                onClick={() => navigate('/')} 
+                onClick={() => navigate(lp('/'))} 
                 variant="ghost"
                 className="w-full"
               >
