@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Download, Sun, Moon, ArrowLeft, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useLocalePath } from "@/hooks/useLocalePath";
 
 interface LogoVariant {
   name: string;
