@@ -471,7 +471,7 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
         {/* ⏸️ SECCIÓN: Pausa temporal del negocio */}
         <div className="border-t pt-4 mt-4">
           <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
-            {vendorData.is_active ? <PlayCircle className="h-5 w-5 text-green-500" /> : <PauseCircle className="h-5 w-5 text-destructive" />}
+            {vendorData.is_active ? <PlayCircle className="h-5 w-5 text-primary" /> : <PauseCircle className="h-5 w-5 text-destructive" />}
             Estado del Negocio
           </h3>
           
