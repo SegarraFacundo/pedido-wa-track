@@ -745,7 +745,7 @@ serve(async (req) => {
       console.log('🎫 User has open support ticket:', openTicket.id);
 
       // Permitir volver al bot con comandos explícitos (menu, bot, horario, etc.)
-      if (isReactivateCommand) {
+      if (isReactivateCommand || isRatingIntent) {
         await supabase
           .from('support_tickets')
           .update({
