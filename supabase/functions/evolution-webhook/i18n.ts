@@ -1293,6 +1293,9 @@ What can you do?
 • Rate my order
 • Rate the Lapacho platform
 
+🕐 *SCHEDULE*
+• View a store's schedule
+
 💬 *SUPPORT*
 • Talk to a vendor
 • Create a support ticket
