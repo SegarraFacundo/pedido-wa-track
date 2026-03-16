@@ -8,8 +8,8 @@ import { t, Language } from "./i18n.ts";
 // ==================== FASE 1: FILTRADO DE HERRAMIENTAS POR ESTADO ====================
 
 export const TOOLS_BY_STATE: Record<string, string[]> = {
-  idle: ["buscar_productos", "ver_locales_abiertos", "mostrar_menu_ayuda", "ver_estado_pedido", "registrar_calificacion", "calificar_plataforma"],
-  browsing: ["ver_menu_negocio", "buscar_productos", "ver_locales_abiertos", "mostrar_menu_ayuda"],
+  idle: ["buscar_productos", "ver_locales_abiertos", "mostrar_menu_ayuda", "ver_estado_pedido", "registrar_calificacion", "calificar_plataforma", "ver_horario_negocio"],
+  browsing: ["ver_menu_negocio", "buscar_productos", "ver_locales_abiertos", "mostrar_menu_ayuda", "ver_horario_negocio"],
   shopping: [
     "agregar_al_carrito", "quitar_producto_carrito", "ver_carrito",
     "modificar_carrito_completo", "ver_ofertas",
