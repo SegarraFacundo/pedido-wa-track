@@ -55,18 +55,18 @@ export default function Admin() {
   const checkAdminAccess = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { navigate('/admin-auth'); return; }
+      if (!session) { navigate(lp('/admin-auth')); return; }
       const { data: roles, error } = await supabase.from('user_roles').select('role').eq('user_id', session.user.id).eq('role', 'admin').single();
       if (error || !roles) {
         toast({ title: t('admin.accessDenied'), description: t('admin.noAdminPermission'), variant: "destructive" });
-        navigate('/'); return;
+        navigate(lp('/')); return;
       }
       setIsAdmin(true);
-    } catch (error) { console.error('Error checking admin access:', error); navigate('/admin-auth'); }
+    } catch (error) { console.error('Error checking admin access:', error); navigate(lp('/admin-auth')); }
     finally { setLoading(false); }
   };
 
-  const handleSignOut = async () => { await supabase.auth.signOut(); navigate('/admin-auth'); };
+  const handleSignOut = async () => { await supabase.auth.signOut(); navigate(lp('/admin-auth')); };
   const handleMenuItemClick = (value: string) => { setActiveTab(value); setDrawerOpen(false); };
 
   if (loading) {
