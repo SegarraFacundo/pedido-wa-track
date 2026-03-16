@@ -90,7 +90,7 @@ const BrandAssets = () => {
       setLoading(false);
     } catch (error) {
       console.error('Error checking admin access:', error);
-      navigate('/admin-auth');
+      navigate(lp('/admin-auth'));
     }
   };
 
