@@ -121,7 +121,7 @@ export default function Soporte() {
             <p className="text-muted-foreground mb-6">{t('soporte.noAccess')}</p>
             <div className="space-y-3">
               <Button 
-                onClick={() => navigate('/soporte-auth')} 
+                onClick={() => navigate(lp('/soporte-auth'))} 
                 variant="default"
                 className="w-full"
                 size="lg"
