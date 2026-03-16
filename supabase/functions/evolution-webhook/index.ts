@@ -968,10 +968,7 @@ serve(async (req) => {
     let responseMessage = await processWithVendorBot(normalizedPhone, finalMessageText, finalImageUrl || undefined);
     
     // 🛑 Detener el typing indicator después del procesamiento
-    if (typingInterval) {
-      clearInterval(typingInterval);
-      console.log('🛑 Typing indicator stopped');
-    }
+    stopTypingIndicator();
 
     // --- ENVÍO FINAL ---
     if (responseMessage) {
