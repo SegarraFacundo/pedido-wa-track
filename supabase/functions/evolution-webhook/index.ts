@@ -676,6 +676,11 @@ serve(async (req) => {
     const messageLines = finalMessageText.toLowerCase().trim().split('\n').map(l => l.trim());
     const isReactivateCommand = messageLines.some(line => clientBotCommands.includes(line));
 
+    // Also check for rating intents (these should bypass support tickets)
+    const ratePlatformPattern = /\b(calificar\s+(a\s+)?lapacho|calificar\s+(la\s+)?plataforma|rate\s+lapacho|rate\s+(the\s+)?platform|avaliar\s+(o\s+)?lapacho)\b/i;
+    const rateOrderPattern = /\b(calificar\s+(mi\s+)?(orden|pedido)|rate\s+(my\s+)?(order)|avaliar\s+(meu\s+)?pedido)\b/i;
+    const isRatingIntent = ratePlatformPattern.test(finalMessageText) || rateOrderPattern.test(finalMessageText);
+
     // 🎫 Verificar si hay un ticket de soporte abierto RECIENTE (últimas 48 horas)
     let openTicket = await supabase
       .from('support_tickets')
@@ -740,7 +745,7 @@ serve(async (req) => {
       console.log('🎫 User has open support ticket:', openTicket.id);
 
       // Permitir volver al bot con comandos explícitos (menu, bot, horario, etc.)
-      if (isReactivateCommand) {
+      if (isReactivateCommand || isRatingIntent) {
         await supabase
           .from('support_tickets')
           .update({
