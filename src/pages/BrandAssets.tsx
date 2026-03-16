@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Download, Sun, Moon, ArrowLeft, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useLocalePath } from "@/hooks/useLocalePath";
 
 interface LogoVariant {
   name: string;
@@ -55,6 +56,7 @@ const pngSizes = [64, 128, 256, 512, 1024];
 
 const BrandAssets = () => {
   const navigate = useNavigate();
+  const lp = useLocalePath();
   const [downloading, setDownloading] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -68,7 +70,7 @@ const BrandAssets = () => {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
-        navigate('/admin-auth');
+        navigate(lp('/admin-auth'));
         return;
       }
 
@@ -80,7 +82,7 @@ const BrandAssets = () => {
         .single();
 
       if (!roles) {
-        navigate('/admin');
+        navigate(lp('/admin'));
         return;
       }
       
@@ -88,7 +90,7 @@ const BrandAssets = () => {
       setLoading(false);
     } catch (error) {
       console.error('Error checking admin access:', error);
-      navigate('/admin-auth');
+      navigate(lp('/admin-auth'));
     }
   };
 

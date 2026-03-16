@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Headphones } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useLocalePath } from "@/hooks/useLocalePath";
 import lapachoLogo from "@/assets/lapacho-logo.png";
 
 export default function SoporteAuth() {
@@ -14,6 +15,7 @@ export default function SoporteAuth() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const lp = useLocalePath();
   const { toast } = useToast();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -59,7 +61,7 @@ export default function SoporteAuth() {
         description: t('soporteAuth.loginSuccessDesc'),
       });
 
-      navigate("/soporte");
+      navigate(lp("/soporte"));
     } catch (error: any) {
       console.error('Login error:', error);
       toast({
@@ -117,7 +119,7 @@ export default function SoporteAuth() {
         </div>
 
         <div className="mt-4 text-center">
-          <Button variant="ghost" onClick={() => navigate('/')}>
+          <Button variant="ghost" onClick={() => navigate(lp('/'))}>
             {t('common.backHome')}
           </Button>
         </div>

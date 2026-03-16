@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { LogOut, Headphones } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useLocalePath } from "@/hooks/useLocalePath";
 import SupportPanel from "@/components/admin/SupportPanel";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import lapachoLogo from "@/assets/lapacho-logo.png";
@@ -16,6 +17,7 @@ export default function Soporte() {
   const [hasAccess, setHasAccess] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   const navigate = useNavigate();
+  const lp = useLocalePath();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -27,7 +29,7 @@ export default function Soporte() {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
-        navigate('/soporte-auth');
+        navigate(lp('/soporte-auth'));
         return;
       }
 
@@ -119,7 +121,7 @@ export default function Soporte() {
             <p className="text-muted-foreground mb-6">{t('soporte.noAccess')}</p>
             <div className="space-y-3">
               <Button 
-                onClick={() => navigate('/soporte-auth')} 
+                onClick={() => navigate(lp('/soporte-auth'))} 
                 variant="default"
                 className="w-full"
                 size="lg"
@@ -127,7 +129,7 @@ export default function Soporte() {
                 {t('common.signIn')}
               </Button>
               <Button 
-                onClick={() => navigate('/')} 
+                onClick={() => navigate(lp('/'))} 
                 variant="ghost"
                 className="w-full"
               >
@@ -155,11 +157,11 @@ export default function Soporte() {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <Button variant="ghost" onClick={() => navigate('/')}>
+              <Button variant="ghost" onClick={() => navigate(lp('/'))}>
                 {t('common.home')}
               </Button>
               {userRole === 'admin' && (
-                <Button variant="ghost" onClick={() => navigate('/admin')}>
+                <Button variant="ghost" onClick={() => navigate(lp('/admin'))}>
                   {t('soporte.adminPanel')}
                 </Button>
               )}
