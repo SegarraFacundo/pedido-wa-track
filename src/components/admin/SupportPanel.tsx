@@ -45,7 +45,7 @@ export default function SupportPanel() {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const selectedTicketRef = React.useRef<Ticket | null>(null);
+  const selectedTicketRef = useRef<Ticket | null>(null);
 
   useEffect(() => {
     selectedTicketRef.current = selectedTicket;
