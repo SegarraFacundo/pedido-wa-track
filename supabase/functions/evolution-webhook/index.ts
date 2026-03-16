@@ -738,26 +738,42 @@ serve(async (req) => {
 
     if (openTicket) {
       console.log('🎫 User has open support ticket:', openTicket.id);
-      
-      // Guardar el mensaje del usuario en support_messages
-      await supabase
-        .from('support_messages')
-        .insert({
-          ticket_id: openTicket.id,
-          sender_type: 'customer',
-          message: finalMessageText
+
+      // Permitir volver al bot con comandos explícitos (menu, bot, horario, etc.)
+      if (isReactivateCommand) {
+        await supabase
+          .from('support_tickets')
+          .update({
+            status: 'resolved',
+            resolved_at: new Date().toISOString(),
+          })
+          .eq('id', openTicket.id);
+
+        console.log('🔄 Support ticket auto-resolved by customer reactivation command:', finalMessageText);
+        openTicket = null;
+      } else {
+        // Guardar el mensaje del usuario en support_messages
+        await supabase
+          .from('support_messages')
+          .insert({
+            ticket_id: openTicket.id,
+            sender_type: 'customer',
+            message: finalMessageText
+          });
+
+        console.log('📝 Message saved to support ticket, bot will not respond');
+
+        stopTypingIndicator();
+
+        // Liberar lock antes de salir
+        await releaseLock(supabase, normalizedPhone);
+
+        // NO procesamos con el bot si hay un ticket abierto
+        return new Response(JSON.stringify({ status: 'support_mode', ticket_id: openTicket.id }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200
         });
-      
-      console.log('📝 Message saved to support ticket, bot will not respond');
-      
-      // Liberar lock antes de salir
-      await releaseLock(supabase, normalizedPhone);
-      
-      // NO procesamos con el bot si hay un ticket abierto
-      return new Response(JSON.stringify({ status: 'support_mode', ticket_id: openTicket.id }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
-      });
+      }
     }
 
     // 💬 Verificar si el usuario está en modo chat directo con vendedor
