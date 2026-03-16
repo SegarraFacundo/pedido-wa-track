@@ -761,16 +761,28 @@ serve(async (req) => {
           const evolutionApiUrlTicket = Deno.env.get('EVOLUTION_API_URL');
           const evolutionApiKeyTicket = Deno.env.get('EVOLUTION_API_KEY');
           const instanceNameTicket = Deno.env.get('EVOLUTION_INSTANCE_NAME');
-          const chatIdTicket = rawJid.includes('@lid') ? rawJid : `${normalizedPhone}@s.whatsapp.net`;
+          const chatIdTicket = rawJid?.includes('@lid') ? rawJid : `${normalizedPhone}@s.whatsapp.net`;
           
-          await fetch(`${evolutionApiUrlTicket}/message/sendText/${instanceNameTicket}`, {
+          const notifyResp = await fetch(`${evolutionApiUrlTicket}/message/sendText/${instanceNameTicket}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKeyTicket! },
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': evolutionApiKeyTicket!,
+              'ngrok-skip-browser-warning': 'true',
+              'User-Agent': 'SupabaseFunction/1.0'
+            },
             body: JSON.stringify({
               number: chatIdTicket,
               text: `✅ Tu ticket de soporte *"${openTicket.subject}"* fue cerrado.\n\n_Ahora estás de vuelta con el bot. ¡Procesando tu solicitud!_ 🤖`
             })
           });
+
+          const notifyData = await notifyResp.json();
+          if (!notifyResp.ok) {
+            console.error('Error notifying ticket closure (Evolution):', notifyData);
+          } else {
+            console.log('✅ Ticket closure notification sent:', notifyData);
+          }
         } catch (e) {
           console.error('Error notifying ticket closure:', e);
         }
