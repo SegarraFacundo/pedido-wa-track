@@ -1004,6 +1004,18 @@ const translations: Record<string, Record<Language, string>> = {
   },
 
   // === RATING ===
+  'rating.prompt_order': {
+    es: '⭐ ¡Genial que quieras calificar tu pedido!\n\nEnviame 3 números del 1 al 5 separados por guión:\n*Entrega - Atención - Producto*\n\nEjemplo: *4-5-3*\n\nOpcionalmente podés agregar un comentario después.',
+    en: '⭐ Great that you want to rate your order!\n\nSend me 3 numbers from 1 to 5 separated by dashes:\n*Delivery - Service - Product*\n\nExample: *4-5-3*\n\nYou can optionally add a comment after.',
+    pt: '⭐ Que bom que quer avaliar seu pedido!\n\nEnvie 3 números de 1 a 5 separados por traço:\n*Entrega - Atendimento - Produto*\n\nExemplo: *4-5-3*\n\nOpcionalmente adicione um comentário depois.',
+    ja: '⭐ 注文を評価いただけるのですね！\n\n1～5の数字を3つハイフンで区切って送ってください:\n*配達 - サービス - 商品*\n\n例: *4-5-3*\n\nコメントも追加できます。',
+  },
+  'rating.prompt_platform': {
+    es: '⭐ ¡Gracias por querer calificar a Lapacho!\n\nEnviame un número del 1 al 5:\n1 ⭐ = Malo\n2 ⭐⭐ = Regular\n3 ⭐⭐⭐ = Bueno\n4 ⭐⭐⭐⭐ = Muy bueno\n5 ⭐⭐⭐⭐⭐ = Excelente\n\nPodés agregar un comentario después del número.',
+    en: '⭐ Thanks for wanting to rate Lapacho!\n\nSend me a number from 1 to 5:\n1 ⭐ = Bad\n2 ⭐⭐ = Fair\n3 ⭐⭐⭐ = Good\n4 ⭐⭐⭐⭐ = Very good\n5 ⭐⭐⭐⭐⭐ = Excellent\n\nYou can add a comment after the number.',
+    pt: '⭐ Obrigado por querer avaliar o Lapacho!\n\nEnvie um número de 1 a 5:\n1 ⭐ = Ruim\n2 ⭐⭐ = Regular\n3 ⭐⭐⭐ = Bom\n4 ⭐⭐⭐⭐ = Muito bom\n5 ⭐⭐⭐⭐⭐ = Excelente\n\nVocê pode adicionar um comentário após o número.',
+    ja: '⭐ Lapachoを評価いただきありがとうございます！\n\n1～5の数字を送ってください:\n1 ⭐ = 悪い\n2 ⭐⭐ = まあまあ\n3 ⭐⭐⭐ = 良い\n4 ⭐⭐⭐⭐ = とても良い\n5 ⭐⭐⭐⭐⭐ = 素晴らしい\n\n数字の後にコメントを追加できます。',
+  },
   'rating.need_rating': {
     es: 'Por favor proporciona al menos una calificación (delivery, atención o producto) o un comentario.',
     en: 'Please provide at least one rating (delivery, service or product) or a comment.',

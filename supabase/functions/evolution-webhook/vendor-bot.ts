@@ -205,6 +205,33 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     if (pendingStates.includes(context.order_state || '')) {
       const messageLower = message.toLowerCase().trim();
 
+      // 🕐 INTERCEPTOR: Horario (allowed even with active order)
+      const scheduleRegexPending = /\b(horarios?|schedule|horários?|営業時間|a qu[eé] hora|what time|when.*open|cuando abre|que hora)\b/i;
+      if (scheduleRegexPending.test(messageLower)) {
+        if (context.selected_vendor_id) {
+          const result = await ejecutarHerramienta("ver_horario_negocio", { vendor_id: context.selected_vendor_id }, context, supabase);
+          context.conversation_history.push({ role: "assistant", content: result });
+          await saveContext(context, supabase);
+          return result;
+        }
+      }
+
+      // ⭐ INTERCEPTOR: Rating (allowed even with active order)
+      const rateOrderRegex = /\b(calificar\s+(mi\s+)?(orden|pedido)|rate\s+(my\s+)?(order)|avaliar\s+(meu\s+)?pedido|注文.*評価)\b/i;
+      const ratePlatformRegex = /\b(calificar\s+(a\s+)?lapacho|calificar\s+(la\s+)?plataforma|rate\s+lapacho|rate\s+(the\s+)?platform|avaliar\s+(o\s+)?lapacho|Lapacho.*評価)\b/i;
+      if (rateOrderRegex.test(messageLower)) {
+        const response = t('rating.prompt_order', lang);
+        context.conversation_history.push({ role: "assistant", content: response });
+        await saveContext(context, supabase);
+        return response;
+      }
+      if (ratePlatformRegex.test(messageLower)) {
+        const response = t('rating.prompt_platform', lang);
+        context.conversation_history.push({ role: "assistant", content: response });
+        await saveContext(context, supabase);
+        return response;
+      }
+
       // 🔴 INTERCEPTOR: Cancelar
       const wantsCancel = cancelIntentRegex.test(messageLower);
       if (wantsCancel && !context.pending_cancellation) {
