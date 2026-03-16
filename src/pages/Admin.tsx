@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
+import { useLocalePath } from "@/hooks/useLocalePath";
 import { Store, DollarSign, BarChart3, LogOut, Headphones, Bot, Star, TrendingUp, Users, Wrench, AlertTriangle, Menu, FileText } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import VendorManagement from "@/components/admin/VendorManagement";
@@ -26,6 +27,7 @@ import { cn } from "@/lib/utils";
 
 export default function Admin() {
   const { t } = useTranslation();
+  const lp = useLocalePath();
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [activeTab, setActiveTab] = useState("vendors");
