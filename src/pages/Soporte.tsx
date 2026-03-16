@@ -29,7 +29,7 @@ export default function Soporte() {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
-        navigate('/soporte-auth');
+        navigate(lp('/soporte-auth'));
         return;
       }
 
