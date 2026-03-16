@@ -56,6 +56,7 @@ const pngSizes = [64, 128, 256, 512, 1024];
 
 const BrandAssets = () => {
   const navigate = useNavigate();
+  const lp = useLocalePath();
   const [downloading, setDownloading] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
