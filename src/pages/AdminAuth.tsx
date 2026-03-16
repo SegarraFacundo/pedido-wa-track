@@ -99,7 +99,7 @@ export default function AdminAuth() {
           description: t('adminAuth.loginSuccessDesc'),
         });
         
-        navigate('/admin');
+        navigate(lp('/admin'));
       }
     } catch (error: any) {
       toast({
