@@ -1558,6 +1558,121 @@ export async function ejecutarHerramienta(
         return response;
       }
 
+      case "ver_horario_negocio": {
+        console.log(`🕐 ========== VER HORARIO NEGOCIO ==========`);
+
+        // Reuse same vendor search logic as ver_menu_negocio
+        const searchVendorSchedule = async (searchTerm: string) => {
+          if (context.available_vendors_map && context.available_vendors_map.length > 0) {
+            const indexNum = parseInt(searchTerm);
+            if (!isNaN(indexNum)) {
+              const byIndex = context.available_vendors_map.find(v => v.index === indexNum);
+              if (byIndex) {
+                const { data } = await supabase.from("vendors").select("id, name, address, is_active").eq("id", byIndex.vendor_id).maybeSingle();
+                if (data) return data;
+              }
+            }
+            const normalized = searchTerm.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            const byName = context.available_vendors_map.find(v => {
+              const vNorm = v.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+              return vNorm.includes(normalized) || normalized.includes(vNorm);
+            });
+            if (byName) {
+              const { data } = await supabase.from("vendors").select("id, name, address, is_active").eq("id", byName.vendor_id).maybeSingle();
+              if (data) return data;
+            }
+          }
+          // UUID
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          if (uuidRegex.test(searchTerm)) {
+            const { data } = await supabase.from("vendors").select("id, name, address, is_active").eq("id", searchTerm).maybeSingle();
+            if (data) return data;
+          }
+          // By name
+          const { data: allVendors } = await supabase.from("vendors").select("id, name, address, is_active").eq("is_active", true);
+          const normalizedSearch = searchTerm.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          return allVendors?.find((v: any) => v.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(normalizedSearch));
+        };
+
+        const vendorSchedule = await searchVendorSchedule(args.vendor_id);
+        if (!vendorSchedule) return t('menu.not_found', lang);
+
+        // Fetch all hours for this vendor
+        const { data: allHours, error: hoursErr } = await supabase
+          .from("vendor_hours")
+          .select("day_of_week, opening_time, closing_time, is_closed, is_open_24_hours, slot_number")
+          .eq("vendor_id", vendorSchedule.id)
+          .order("slot_number");
+
+        if (hoursErr) {
+          console.error("Error fetching vendor hours:", hoursErr);
+          return t('error.vendor_fetch', lang);
+        }
+
+        const dayOrder = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        const dayNames: Record<string, Record<Language, string>> = {
+          monday: { es: 'Lunes', en: 'Monday', pt: 'Segunda', ja: '月曜日' },
+          tuesday: { es: 'Martes', en: 'Tuesday', pt: 'Terça', ja: '火曜日' },
+          wednesday: { es: 'Miércoles', en: 'Wednesday', pt: 'Quarta', ja: '水曜日' },
+          thursday: { es: 'Jueves', en: 'Thursday', pt: 'Quinta', ja: '木曜日' },
+          friday: { es: 'Viernes', en: 'Friday', pt: 'Sexta', ja: '金曜日' },
+          saturday: { es: 'Sábado', en: 'Saturday', pt: 'Sábado', ja: '土曜日' },
+          sunday: { es: 'Domingo', en: 'Sunday', pt: 'Domingo', ja: '日曜日' },
+        };
+
+        let result = t('schedule.header', lang, { vendor: vendorSchedule.name }) + `\n\n`;
+
+        // Current time in Argentina
+        const nowSch = new Date();
+        const argTimeSch = new Date(nowSch.toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
+        const currentDaySch = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][argTimeSch.getDay()];
+        const currentTimeSch = argTimeSch.toTimeString().slice(0, 5);
+
+        if (!allHours || allHours.length === 0) {
+          result += t('schedule.no_hours', lang);
+        } else {
+          // Group hours by day
+          const hoursByDay = new Map<string, any[]>();
+          for (const h of allHours) {
+            const day = h.day_of_week.toLowerCase();
+            if (!hoursByDay.has(day)) hoursByDay.set(day, []);
+            hoursByDay.get(day)!.push(h);
+          }
+
+          for (const day of dayOrder) {
+            const dayLabel = dayNames[day]?.[lang] || day;
+            const isToday = day === currentDaySch;
+            const slots = hoursByDay.get(day);
+
+            if (!slots || slots.length === 0 || slots.every((s: any) => s.is_closed)) {
+              result += `${isToday ? '👉 ' : ''}${dayLabel}: ❌ ${t('schedule.closed', lang)}\n`;
+            } else {
+              const timeSlots = slots
+                .filter((s: any) => !s.is_closed)
+                .map((s: any) => s.is_open_24_hours ? '24hs' : `${s.opening_time.slice(0, 5)} - ${s.closing_time.slice(0, 5)}`);
+              result += `${isToday ? '👉 ' : ''}${dayLabel}: ${timeSlots.join(', ')}\n`;
+            }
+          }
+
+          // Check if open now
+          const todaySlots = hoursByDay.get(currentDaySch);
+          if (todaySlots) {
+            const isOpenNow = todaySlots.some((s: any) => {
+              if (s.is_closed) return false;
+              if (s.is_open_24_hours) return true;
+              return currentTimeSch >= s.opening_time.slice(0, 5) && currentTimeSch <= s.closing_time.slice(0, 5);
+            });
+            result += `\n${isOpenNow ? t('schedule.currently_open', lang) : t('schedule.currently_closed', lang)}`;
+          }
+        }
+
+        if (vendorSchedule.address) {
+          result += `\n📍 ${vendorSchedule.address}`;
+        }
+
+        return result;
+      }
+
       default:
         return `Herramienta ${toolName} no implementada`;
     }

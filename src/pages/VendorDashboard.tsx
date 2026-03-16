@@ -20,7 +20,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from 'react-i18next';
-import { Loader2, Package, Clock, Settings, LayoutDashboard, Tag, Star, MessageCircle, LifeBuoy, CreditCard, Heart, BarChart3, Menu, LogOut } from 'lucide-react';
+import { Loader2, Package, Clock, Settings, LayoutDashboard, Tag, Star, MessageCircle, LifeBuoy, CreditCard, Heart, BarChart3, Menu, LogOut, PauseCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { PWAInstallPrompt } from '@/components/PWAInstallPrompt';
 import lapachoIcon from "@/assets/lapacho-icon.png";
 import { cn } from "@/lib/utils";
@@ -127,6 +128,17 @@ export default function VendorDashboard() {
         </div>
       </div>
       
+      {!vendor.is_active && (
+        <div className="container mx-auto px-4 pt-4">
+          <Alert variant="destructive">
+            <PauseCircle className="h-4 w-4" />
+            <AlertDescription>
+              ⏸️ Tu negocio está <strong>pausado</strong>. No aparece en el listado de WhatsApp ni recibe pedidos. Activalo desde <button className="underline font-semibold" onClick={() => setActiveTab("settings")}>Configuración</button>.
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+
       <div className="container mx-auto p-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="hidden lg:flex flex-wrap gap-2 h-auto p-1 mb-6">

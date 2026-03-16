@@ -1254,6 +1254,9 @@ const translations: Record<string, Record<Language, string>> = {
 • Calificar mi pedido
 • Calificar la plataforma Lapacho
 
+🕐 *HORARIOS*
+• Ver horario de un negocio
+
 💬 *SOPORTE*
 • Hablar con un vendedor
 • Crear un ticket de soporte
@@ -1289,6 +1292,9 @@ What can you do?
 ⭐ *RATE*
 • Rate my order
 • Rate the Lapacho platform
+
+🕐 *SCHEDULE*
+• View a store's schedule
 
 💬 *SUPPORT*
 • Talk to a vendor
@@ -1326,6 +1332,9 @@ O que você pode fazer?
 • Avaliar meu pedido
 • Avaliar a plataforma Lapacho
 
+🕐 *HORÁRIOS*
+• Ver horário de uma loja
+
 💬 *SUPORTE*
 • Falar com um vendedor
 • Criar um ticket de suporte
@@ -1361,6 +1370,9 @@ Escreva o que precisa e eu ajudo. É muito fácil! 😊`,
 ⭐ *評価*
 • 注文を評価する
 • Lapachoプラットフォームを評価する
+
+🕐 *営業時間*
+• 店舗の営業時間を見る
 
 💬 *サポート*
 • 店舗と話す
@@ -1446,6 +1458,44 @@ Escreva o que precisa e eu ajudo. É muito fácil! 😊`,
   },
   'label.transfer_details': {
     es: 'Datos para transferencia', en: 'Transfer details', pt: 'Dados para transferência', ja: '振込情報',
+  },
+
+  // === HORARIOS ===
+  'schedule.header': {
+    es: '🕐 *Horarios de {vendor}*',
+    en: '🕐 *{vendor} Schedule*',
+    pt: '🕐 *Horários de {vendor}*',
+    ja: '🕐 *{vendor}の営業時間*',
+  },
+  'schedule.closed': {
+    es: 'Cerrado',
+    en: 'Closed',
+    pt: 'Fechado',
+    ja: '休業',
+  },
+  'schedule.currently_open': {
+    es: '🟢 *Abierto ahora*',
+    en: '🟢 *Open now*',
+    pt: '🟢 *Aberto agora*',
+    ja: '🟢 *営業中*',
+  },
+  'schedule.currently_closed': {
+    es: '🔴 *Cerrado ahora*',
+    en: '🔴 *Closed now*',
+    pt: '🔴 *Fechado agora*',
+    ja: '🔴 *閉店中*',
+  },
+  'schedule.no_hours': {
+    es: 'Este negocio no tiene horarios configurados. Puede estar abierto las 24hs o contactá al negocio para confirmar.',
+    en: 'This store has no schedule configured. It may be open 24/7 or contact the store to confirm.',
+    pt: 'Esta loja não tem horários configurados. Pode estar aberta 24hs ou entre em contato para confirmar.',
+    ja: 'この店舗の営業時間は設定されていません。24時間営業の可能性があります。店舗にお問い合わせください。',
+  },
+  'schedule.ask_vendor': {
+    es: '¿De qué negocio querés ver el horario? Decime el nombre o número de la lista.',
+    en: 'Which store\'s schedule do you want to see? Tell me the name or number.',
+    pt: 'De qual loja quer ver o horário? Diga o nome ou número.',
+    ja: 'どの店舗の営業時間を見たいですか？名前か番号を教えてください。',
   },
 };
 

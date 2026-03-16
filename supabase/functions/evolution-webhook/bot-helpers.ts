@@ -8,8 +8,8 @@ import { t, Language } from "./i18n.ts";
 // ==================== FASE 1: FILTRADO DE HERRAMIENTAS POR ESTADO ====================
 
 export const TOOLS_BY_STATE: Record<string, string[]> = {
-  idle: ["buscar_productos", "ver_locales_abiertos", "mostrar_menu_ayuda", "ver_estado_pedido", "registrar_calificacion", "calificar_plataforma"],
-  browsing: ["ver_menu_negocio", "buscar_productos", "ver_locales_abiertos", "mostrar_menu_ayuda"],
+  idle: ["buscar_productos", "ver_locales_abiertos", "mostrar_menu_ayuda", "ver_estado_pedido", "registrar_calificacion", "calificar_plataforma", "ver_horario_negocio"],
+  browsing: ["ver_menu_negocio", "buscar_productos", "ver_locales_abiertos", "mostrar_menu_ayuda", "ver_horario_negocio"],
   shopping: [
     "agregar_al_carrito", "quitar_producto_carrito", "ver_carrito",
     "modificar_carrito_completo", "ver_ofertas",
@@ -19,12 +19,12 @@ export const TOOLS_BY_STATE: Record<string, string[]> = {
   ],
   needs_address: ["confirmar_direccion_entrega", "vaciar_carrito", "ver_carrito"],
   checkout: ["seleccionar_metodo_pago", "mostrar_resumen_pedido", "crear_pedido", "ver_carrito", "vaciar_carrito"],
-  order_pending_cash: ["ver_estado_pedido", "cancelar_pedido", "hablar_con_vendedor", "registrar_calificacion", "calificar_plataforma"],
-  order_pending_transfer: ["ver_estado_pedido", "cancelar_pedido", "hablar_con_vendedor", "registrar_calificacion", "calificar_plataforma"],
-  order_pending_mp: ["ver_estado_pedido", "cancelar_pedido", "hablar_con_vendedor", "registrar_calificacion", "calificar_plataforma"],
-  order_confirmed: ["ver_estado_pedido", "cancelar_pedido", "hablar_con_vendedor", "registrar_calificacion", "calificar_plataforma"],
-  order_completed: ["ver_estado_pedido", "registrar_calificacion", "calificar_plataforma", "buscar_productos", "ver_locales_abiertos"],
-  order_cancelled: ["buscar_productos", "ver_locales_abiertos", "ver_estado_pedido"],
+  order_pending_cash: ["ver_estado_pedido", "cancelar_pedido", "hablar_con_vendedor", "registrar_calificacion", "calificar_plataforma", "ver_horario_negocio"],
+  order_pending_transfer: ["ver_estado_pedido", "cancelar_pedido", "hablar_con_vendedor", "registrar_calificacion", "calificar_plataforma", "ver_horario_negocio"],
+  order_pending_mp: ["ver_estado_pedido", "cancelar_pedido", "hablar_con_vendedor", "registrar_calificacion", "calificar_plataforma", "ver_horario_negocio"],
+  order_confirmed: ["ver_estado_pedido", "cancelar_pedido", "hablar_con_vendedor", "registrar_calificacion", "calificar_plataforma", "ver_horario_negocio"],
+  order_completed: ["ver_estado_pedido", "registrar_calificacion", "calificar_plataforma", "buscar_productos", "ver_locales_abiertos", "ver_horario_negocio"],
+  order_cancelled: ["buscar_productos", "ver_locales_abiertos", "ver_estado_pedido", "ver_horario_negocio"],
 };
 
 // FASE 4: Herramientas cuya salida se retorna directamente sin reformateo del LLM
@@ -37,6 +37,7 @@ export const DIRECT_RESPONSE_TOOLS = new Set([
   "ver_estado_pedido",
   "ver_ofertas",
   "buscar_productos",
+  "ver_horario_negocio",
 ]);
 
 export function filterToolsByState(state: string, _context: ConversationContext) {
