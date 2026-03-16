@@ -442,6 +442,23 @@ MUESTRA:
   {
     type: "function",
     function: {
+      name: "ver_horario_negocio",
+      description: "Muestra el horario completo de un negocio específico, incluyendo todos los días de la semana y si está abierto ahora.",
+      parameters: {
+        type: "object",
+        properties: {
+          vendor_id: {
+            type: "string",
+            description: "Número de la lista O nombre del negocio (parcial o completo)",
+          },
+        },
+        required: ["vendor_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "confirmar_direccion_entrega",
       description: `IMPORTANTE: Usa esta herramienta cuando el cliente proporciona una dirección de entrega para el pedido.
       

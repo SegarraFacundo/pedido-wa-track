@@ -37,6 +37,7 @@ export const DIRECT_RESPONSE_TOOLS = new Set([
   "ver_estado_pedido",
   "ver_ofertas",
   "buscar_productos",
+  "ver_horario_negocio",
 ]);
 
 export function filterToolsByState(state: string, _context: ConversationContext) {
