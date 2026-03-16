@@ -1371,6 +1371,9 @@ Escreva o que precisa e eu ajudo. É muito fácil! 😊`,
 • 注文を評価する
 • Lapachoプラットフォームを評価する
 
+🕐 *営業時間*
+• 店舗の営業時間を見る
+
 💬 *サポート*
 • 店舗と話す
 • サポートチケットを作成する
