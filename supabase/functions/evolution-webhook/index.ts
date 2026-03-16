@@ -658,6 +658,24 @@ serve(async (req) => {
       }, 8000);
     }
 
+    const stopTypingIndicator = () => {
+      if (typingInterval) {
+        clearInterval(typingInterval);
+        typingInterval = undefined;
+        console.log('🛑 Typing indicator stopped');
+      }
+    };
+
+    // 🤖 Comandos del cliente para reactivar el bot
+    const clientBotCommands = [
+      'menu', 'bot', 'ayuda', 'salir', 'inicio', 'volver', 'estado', 'mi pedido', 'cancelar', 'nuevo pedido',
+      'horario', 'schedule', 'horário', '営業時間', 'what time', 'a qué hora', 'a que hora'
+    ];
+
+    // Check if ANY line in the combined text is a reactivation command
+    const messageLines = finalMessageText.toLowerCase().trim().split('\n').map(l => l.trim());
+    const isReactivateCommand = messageLines.some(line => clientBotCommands.includes(line));
+
     // 🎫 Verificar si hay un ticket de soporte abierto RECIENTE (últimas 48 horas)
     let openTicket = await supabase
       .from('support_tickets')
@@ -720,26 +738,42 @@ serve(async (req) => {
 
     if (openTicket) {
       console.log('🎫 User has open support ticket:', openTicket.id);
-      
-      // Guardar el mensaje del usuario en support_messages
-      await supabase
-        .from('support_messages')
-        .insert({
-          ticket_id: openTicket.id,
-          sender_type: 'customer',
-          message: finalMessageText
+
+      // Permitir volver al bot con comandos explícitos (menu, bot, horario, etc.)
+      if (isReactivateCommand) {
+        await supabase
+          .from('support_tickets')
+          .update({
+            status: 'resolved',
+            resolved_at: new Date().toISOString(),
+          })
+          .eq('id', openTicket.id);
+
+        console.log('🔄 Support ticket auto-resolved by customer reactivation command:', finalMessageText);
+        openTicket = null;
+      } else {
+        // Guardar el mensaje del usuario en support_messages
+        await supabase
+          .from('support_messages')
+          .insert({
+            ticket_id: openTicket.id,
+            sender_type: 'customer',
+            message: finalMessageText
+          });
+
+        console.log('📝 Message saved to support ticket, bot will not respond');
+
+        stopTypingIndicator();
+
+        // Liberar lock antes de salir
+        await releaseLock(supabase, normalizedPhone);
+
+        // NO procesamos con el bot si hay un ticket abierto
+        return new Response(JSON.stringify({ status: 'support_mode', ticket_id: openTicket.id }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200
         });
-      
-      console.log('📝 Message saved to support ticket, bot will not respond');
-      
-      // Liberar lock antes de salir
-      await releaseLock(supabase, normalizedPhone);
-      
-      // NO procesamos con el bot si hay un ticket abierto
-      return new Response(JSON.stringify({ status: 'support_mode', ticket_id: openTicket.id }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
-      });
+      }
     }
 
     // 💬 Verificar si el usuario está en modo chat directo con vendedor
@@ -789,11 +823,7 @@ serve(async (req) => {
       }
     }
 
-    // 🤖 Comandos del cliente para reactivar el bot
-    const clientBotCommands = ['menu', 'bot', 'ayuda', 'salir', 'inicio', 'volver', 'estado', 'mi pedido', 'cancelar', 'nuevo pedido'];
-    // Check if ANY line in the combined text is a reactivation command
-    const messageLines = finalMessageText.toLowerCase().trim().split('\n').map(l => l.trim());
-    const isReactivateCommand = messageLines.some(line => clientBotCommands.includes(line));
+    // isReactivateCommand se calcula arriba para cubrir también support_mode
     
     if (vendorSession?.in_vendor_chat && !vendorChatExpired && isReactivateCommand) {
       console.log('🔄 Client requested to reactivate bot with command:', finalMessageText);
@@ -837,6 +867,8 @@ serve(async (req) => {
           }),
         });
         
+        stopTypingIndicator();
+
         // Liberar lock y salir
         await releaseLock(supabase, normalizedPhone);
         return new Response(JSON.stringify({ status: 'bot_reactivated_with_active_order' }), {
@@ -876,6 +908,8 @@ serve(async (req) => {
         console.log('✅ Message saved to order chat, bot will not respond');
         console.log('💡 Tip: Customer can write "menu" or "bot" to reactivate the bot');
 
+        stopTypingIndicator();
+
         // Liberar lock antes de salir
         await releaseLock(supabase, normalizedPhone);
 
@@ -908,6 +942,8 @@ serve(async (req) => {
 
         console.log('✅ Message saved to vendor chat, bot will not respond');
 
+        stopTypingIndicator();
+
         // Liberar lock antes de salir
         await releaseLock(supabase, normalizedPhone);
 
@@ -932,10 +968,7 @@ serve(async (req) => {
     let responseMessage = await processWithVendorBot(normalizedPhone, finalMessageText, finalImageUrl || undefined);
     
     // 🛑 Detener el typing indicator después del procesamiento
-    if (typingInterval) {
-      clearInterval(typingInterval);
-      console.log('🛑 Typing indicator stopped');
-    }
+    stopTypingIndicator();
 
     // --- ENVÍO FINAL ---
     if (responseMessage) {
