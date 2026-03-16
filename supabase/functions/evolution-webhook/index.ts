@@ -658,6 +658,24 @@ serve(async (req) => {
       }, 8000);
     }
 
+    const stopTypingIndicator = () => {
+      if (typingInterval) {
+        clearInterval(typingInterval);
+        typingInterval = undefined;
+        console.log('🛑 Typing indicator stopped');
+      }
+    };
+
+    // 🤖 Comandos del cliente para reactivar el bot
+    const clientBotCommands = [
+      'menu', 'bot', 'ayuda', 'salir', 'inicio', 'volver', 'estado', 'mi pedido', 'cancelar', 'nuevo pedido',
+      'horario', 'schedule', 'horário', '営業時間', 'what time', 'a qué hora', 'a que hora'
+    ];
+
+    // Check if ANY line in the combined text is a reactivation command
+    const messageLines = finalMessageText.toLowerCase().trim().split('\n').map(l => l.trim());
+    const isReactivateCommand = messageLines.some(line => clientBotCommands.includes(line));
+
     // 🎫 Verificar si hay un ticket de soporte abierto RECIENTE (últimas 48 horas)
     let openTicket = await supabase
       .from('support_tickets')
