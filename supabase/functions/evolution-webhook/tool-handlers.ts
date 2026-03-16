@@ -151,31 +151,7 @@ export async function ejecutarHerramienta(
         }
 
         if (closedVendors.length > 0) {
-          resultado += `${t('vendors.closed', lang)} (${closedVendors.length}):\n\n`;
-          closedVendors.forEach((v: any) => {
-            resultado += `${currentIndex}. *${v.name}* 🔒\n`;
-            resultado += `📍 ${v.address || t('vendors.address_unavailable', lang)}\n`;
-            
-            vendorMap.push({ index: currentIndex, name: v.name, vendor_id: v.id });
-            currentIndex++;
-
-            const todayHours = hoursMap.get(v.id);
-            if (todayHours && todayHours.length > 0) {
-              const slots = todayHours
-                .filter((h: any) => !h.is_closed)
-                .map((h: any) =>
-                  h.is_open_24_hours
-                    ? "24 hs"
-                    : `${h.opening_time.slice(0, 5)} - ${h.closing_time.slice(0, 5)}`
-                );
-              if (slots.length > 0) resultado += `⏰ ${t('vendors.schedule', lang)}: ${slots.join(", ")}\n`;
-            }
-
-            if (v.average_rating && v.total_reviews)
-              resultado += `⭐ ${t('vendors.rating', lang)}: ${v.average_rating.toFixed(1)} (${v.total_reviews} ${t('vendors.reviews', lang)})\n`;
-
-            resultado += `\n`;
-          });
+          resultado += `\n${t('vendors.closed', lang)} (${closedVendors.length}) - ${t('vendors.closed_hint', lang)}\n`;
         }
 
         context.available_vendors_map = vendorMap;
