@@ -128,6 +128,17 @@ export default function VendorDashboard() {
         </div>
       </div>
       
+      {!vendor.is_active && (
+        <div className="container mx-auto px-4 pt-4">
+          <Alert variant="destructive">
+            <PauseCircle className="h-4 w-4" />
+            <AlertDescription>
+              ⏸️ Tu negocio está <strong>pausado</strong>. No aparece en el listado de WhatsApp ni recibe pedidos. Activalo desde <button className="underline font-semibold" onClick={() => setActiveTab("settings")}>Configuración</button>.
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+
       <div className="container mx-auto p-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="hidden lg:flex flex-wrap gap-2 h-auto p-1 mb-6">

@@ -666,6 +666,31 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
     }
 
+    // INTERCEPTOR: Schedule/horario keywords
+    const scheduleRegex = /\b(horarios?|schedule|horários?|営業時間|a qu[eé] hora|what time|when.*open|cuando abre|que hora)\b/i;
+    if (scheduleRegex.test(message.trim())) {
+      // If user has a selected vendor, show that vendor's schedule
+      if (context.selected_vendor_id) {
+        const result = await ejecutarHerramienta("ver_horario_negocio", { vendor_id: context.selected_vendor_id }, context, supabase);
+        context.conversation_history.push({ role: "assistant", content: result });
+        await saveContext(context, supabase);
+        return result;
+      }
+      // If in browsing with vendor map, ask which one
+      if (context.available_vendors_map && context.available_vendors_map.length > 0) {
+        const askResponse = t('schedule.ask_vendor', lang);
+        context.conversation_history.push({ role: "assistant", content: askResponse });
+        await saveContext(context, supabase);
+        return askResponse;
+      }
+      // Otherwise show stores first
+      const storesResult = await ejecutarHerramienta("ver_locales_abiertos", {}, context, supabase);
+      const response = storesResult + "\n\n" + t('schedule.ask_vendor', lang);
+      context.conversation_history.push({ role: "assistant", content: response });
+      await saveContext(context, supabase);
+      return response;
+    }
+
     if (HELP_REGEX.test(message.trim())) {
       const helpText = t('help.full', lang);
       context.conversation_history.push({ role: "assistant", content: helpText });
