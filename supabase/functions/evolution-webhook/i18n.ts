@@ -1254,6 +1254,9 @@ const translations: Record<string, Record<Language, string>> = {
 • Calificar mi pedido
 • Calificar la plataforma Lapacho
 
+🕐 *HORARIOS*
+• Ver horario de un negocio
+
 💬 *SOPORTE*
 • Hablar con un vendedor
 • Crear un ticket de soporte
