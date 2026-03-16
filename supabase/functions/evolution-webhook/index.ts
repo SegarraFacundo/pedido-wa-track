@@ -823,11 +823,7 @@ serve(async (req) => {
       }
     }
 
-    // 🤖 Comandos del cliente para reactivar el bot
-    const clientBotCommands = ['menu', 'bot', 'ayuda', 'salir', 'inicio', 'volver', 'estado', 'mi pedido', 'cancelar', 'nuevo pedido'];
-    // Check if ANY line in the combined text is a reactivation command
-    const messageLines = finalMessageText.toLowerCase().trim().split('\n').map(l => l.trim());
-    const isReactivateCommand = messageLines.some(line => clientBotCommands.includes(line));
+    // isReactivateCommand se calcula arriba para cubrir también support_mode
     
     if (vendorSession?.in_vendor_chat && !vendorChatExpired && isReactivateCommand) {
       console.log('🔄 Client requested to reactivate bot with command:', finalMessageText);
