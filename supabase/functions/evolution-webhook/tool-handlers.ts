@@ -995,14 +995,6 @@ export async function ejecutarHerramienta(
           }
         }
 
-        // Clean temp addresses
-        try {
-          await supabase
-            .from("saved_addresses")
-            .delete()
-            .eq("phone", context.phone)
-            .eq("is_temporary", true);
-        } catch (_e) {}
 
         let confirmacion = t('order.created', lang) + `\n\n`;
         confirmacion += `📦 ${t('label.order', lang)} #${order.id.substring(0, 8)}\n`;

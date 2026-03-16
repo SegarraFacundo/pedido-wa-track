@@ -1256,11 +1256,6 @@ const translations: Record<string, Record<Language, string>> = {
 • Ver el estado de mi pedido
 • Cancelar un pedido
 
-📍 *MIS DIRECCIONES*
-• Guardar direcciones para pedidos futuros
-• Ver mis direcciones guardadas
-• Usar una dirección guardada
-• Borrar o renombrar direcciones
 
 ⭐ *CALIFICAR*
 • Calificar mi pedido
