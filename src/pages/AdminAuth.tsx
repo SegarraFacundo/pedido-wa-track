@@ -34,7 +34,7 @@ export default function AdminAuth() {
         .single();
       
       if (roles) {
-        navigate('/admin');
+        navigate(lp('/admin'));
       }
     }
   };
