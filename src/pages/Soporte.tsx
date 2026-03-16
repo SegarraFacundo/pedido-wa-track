@@ -157,11 +157,11 @@ export default function Soporte() {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <Button variant="ghost" onClick={() => navigate('/')}>
+              <Button variant="ghost" onClick={() => navigate(lp('/'))}>
                 {t('common.home')}
               </Button>
               {userRole === 'admin' && (
-                <Button variant="ghost" onClick={() => navigate('/admin')}>
+                <Button variant="ghost" onClick={() => navigate(lp('/admin'))}>
                   {t('soporte.adminPanel')}
                 </Button>
               )}
