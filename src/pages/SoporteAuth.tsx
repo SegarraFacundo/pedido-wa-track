@@ -61,7 +61,7 @@ export default function SoporteAuth() {
         description: t('soporteAuth.loginSuccessDesc'),
       });
 
-      navigate("/soporte");
+      navigate(lp("/soporte"));
     } catch (error: any) {
       console.error('Login error:', error);
       toast({
