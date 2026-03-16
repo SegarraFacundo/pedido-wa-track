@@ -119,7 +119,7 @@ export default function SoporteAuth() {
         </div>
 
         <div className="mt-4 text-center">
-          <Button variant="ghost" onClick={() => navigate('/')}>
+          <Button variant="ghost" onClick={() => navigate(lp('/'))}>
             {t('common.backHome')}
           </Button>
         </div>
