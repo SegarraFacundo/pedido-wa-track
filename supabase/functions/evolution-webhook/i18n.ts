@@ -1290,11 +1290,6 @@ What can you do?
 • Check my order status
 • Cancel an order
 
-📍 *MY ADDRESSES*
-• Save addresses for future orders
-• View my saved addresses
-• Use a saved address
-• Delete or rename addresses
 
 ⭐ *RATE*
 • Rate my order
