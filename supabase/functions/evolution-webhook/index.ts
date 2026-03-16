@@ -908,6 +908,8 @@ serve(async (req) => {
         console.log('✅ Message saved to order chat, bot will not respond');
         console.log('💡 Tip: Customer can write "menu" or "bot" to reactivate the bot');
 
+        stopTypingIndicator();
+
         // Liberar lock antes de salir
         await releaseLock(supabase, normalizedPhone);
 
