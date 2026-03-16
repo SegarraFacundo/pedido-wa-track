@@ -82,7 +82,7 @@ const BrandAssets = () => {
         .single();
 
       if (!roles) {
-        navigate('/admin');
+        navigate(lp('/admin'));
         return;
       }
       
