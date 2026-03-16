@@ -867,6 +867,8 @@ serve(async (req) => {
           }),
         });
         
+        stopTypingIndicator();
+
         // Liberar lock y salir
         await releaseLock(supabase, normalizedPhone);
         return new Response(JSON.stringify({ status: 'bot_reactivated_with_active_order' }), {
