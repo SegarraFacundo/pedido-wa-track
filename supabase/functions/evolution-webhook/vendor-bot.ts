@@ -686,8 +686,8 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
     }
 
-    // INTERCEPTOR: Single number platform rating (after prompt)
-    if (context.order_state === "idle" || context.order_state === "order_completed" || !context.order_state) {
+    // INTERCEPTOR: Single number platform rating (after prompt) - works in ANY state
+    {
       const lastAssistant = context.conversation_history
         .filter(m => m.role === 'assistant')
         .slice(-1)[0];
