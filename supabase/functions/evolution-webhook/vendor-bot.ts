@@ -630,6 +630,36 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
     }
 
+    // INTERCEPTOR: Rating keywords → prompt for ratings (before LLM)
+    const rateOrderRegexGeneral = /\b(calificar\s+(mi\s+)?(orden|pedido)|rate\s+(my\s+)?(order)|avaliar\s+(meu\s+)?pedido|注文.*評価)\b/i;
+    const ratePlatformRegexGeneral = /\b(calificar\s+(a\s+)?lapacho|calificar\s+(la\s+)?plataforma|rate\s+lapacho|rate\s+(the\s+)?platform|avaliar\s+(o\s+)?lapacho|Lapacho.*評価)\b/i;
+    
+    if (ratePlatformRegexGeneral.test(message)) {
+      // Check if it's a single number (platform rating response)
+      const platformRatingMatch = message.match(/(\d)\s*(.*)/);
+      if (platformRatingMatch) {
+        const rating = parseInt(platformRatingMatch[1]);
+        const comment = platformRatingMatch[2]?.trim() || undefined;
+        if (rating >= 1 && rating <= 5) {
+          const result = await ejecutarHerramienta("calificar_plataforma", { rating, comment }, context, supabase);
+          context.conversation_history.push({ role: "assistant", content: result });
+          await saveContext(context, supabase);
+          return result;
+        }
+      }
+      const response = t('rating.prompt_platform', lang);
+      context.conversation_history.push({ role: "assistant", content: response });
+      await saveContext(context, supabase);
+      return response;
+    }
+    
+    if (rateOrderRegexGeneral.test(message)) {
+      const response = t('rating.prompt_order', lang);
+      context.conversation_history.push({ role: "assistant", content: response });
+      await saveContext(context, supabase);
+      return response;
+    }
+
     // INTERCEPTOR: Rating patterns (e.g., "5-5-5", "4 4 4", "rate 5 5 5")
     if (context.order_state === "idle" || context.order_state === "order_completed" || !context.order_state) {
       const ratingPattern = /(?:rat[ei]|review|calific|reseña|rese[nñ]a|評価)?\s*(\d)[\/\-\s,]+(\d)[\/\-\s,]+(\d)/i;
@@ -653,6 +683,26 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         context.conversation_history.push({ role: "assistant", content: result });
         await saveContext(context, supabase);
         return result;
+      }
+    }
+
+    // INTERCEPTOR: Single number platform rating (after prompt)
+    if (context.order_state === "idle" || context.order_state === "order_completed" || !context.order_state) {
+      const lastAssistant = context.conversation_history
+        .filter(m => m.role === 'assistant')
+        .slice(-1)[0];
+      if (lastAssistant?.content?.includes('⭐') && lastAssistant?.content?.includes('1 ⭐')) {
+        const singleRating = message.trim().match(/^(\d)\s*(.*)?$/);
+        if (singleRating) {
+          const rating = parseInt(singleRating[1]);
+          const comment = singleRating[2]?.trim() || undefined;
+          if (rating >= 1 && rating <= 5) {
+            const result = await ejecutarHerramienta("calificar_plataforma", { rating, comment }, context, supabase);
+            context.conversation_history.push({ role: "assistant", content: result });
+            await saveContext(context, supabase);
+            return result;
+          }
+        }
       }
     }
 
