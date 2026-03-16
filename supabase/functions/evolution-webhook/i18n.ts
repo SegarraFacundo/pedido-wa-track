@@ -1256,11 +1256,6 @@ const translations: Record<string, Record<Language, string>> = {
 • Ver el estado de mi pedido
 • Cancelar un pedido
 
-📍 *MIS DIRECCIONES*
-• Guardar direcciones para pedidos futuros
-• Ver mis direcciones guardadas
-• Usar una dirección guardada
-• Borrar o renombrar direcciones
 
 ⭐ *CALIFICAR*
 • Calificar mi pedido
@@ -1295,11 +1290,6 @@ What can you do?
 • Check my order status
 • Cancel an order
 
-📍 *MY ADDRESSES*
-• Save addresses for future orders
-• View my saved addresses
-• Use a saved address
-• Delete or rename addresses
 
 ⭐ *RATE*
 • Rate my order
@@ -1334,11 +1324,6 @@ O que você pode fazer?
 • Ver o status do meu pedido
 • Cancelar um pedido
 
-📍 *MEUS ENDEREÇOS*
-• Salvar endereços para pedidos futuros
-• Ver meus endereços salvos
-• Usar um endereço salvo
-• Excluir ou renomear endereços
 
 ⭐ *AVALIAR*
 • Avaliar meu pedido
@@ -1373,11 +1358,6 @@ Escreva o que precisa e eu ajudo. É muito fácil! 😊`,
 • 注文状況を確認する
 • 注文をキャンセルする
 
-📍 *住所*
-• 今後の注文用に住所を保存する
-• 保存した住所を確認する
-• 保存した住所を使う
-• 住所を削除・名前変更する
 
 ⭐ *評価*
 • 注文を評価する
