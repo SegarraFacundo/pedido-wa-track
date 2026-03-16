@@ -26,8 +26,8 @@ const SubdomainRouter = ({ children }: { children: React.ReactNode }) => {
         }
         break;
       case 'soporte':
-        if (location.pathname !== `${prefix}/soporte`) {
-          navigate(`${prefix}/soporte`);
+        if (location.pathname !== `${prefix}/soporte-auth` && location.pathname !== `${prefix}/soporte`) {
+          navigate(`${prefix}/soporte-auth`);
         }
         break;
       case 'plataforma':
