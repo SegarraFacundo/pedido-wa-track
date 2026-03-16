@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { LogOut, Headphones } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useLocalePath } from "@/hooks/useLocalePath";
 import SupportPanel from "@/components/admin/SupportPanel";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import lapachoLogo from "@/assets/lapacho-logo.png";
@@ -16,6 +17,7 @@ export default function Soporte() {
   const [hasAccess, setHasAccess] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   const navigate = useNavigate();
+  const lp = useLocalePath();
   const { toast } = useToast();
 
   useEffect(() => {
