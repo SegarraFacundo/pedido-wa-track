@@ -1332,6 +1332,9 @@ O que você pode fazer?
 • Avaliar meu pedido
 • Avaliar a plataforma Lapacho
 
+🕐 *HORÁRIOS*
+• Ver horário de uma loja
+
 💬 *SUPORTE*
 • Falar com um vendedor
 • Criar um ticket de suporte
