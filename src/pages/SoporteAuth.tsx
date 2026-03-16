@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Headphones } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useLocalePath } from "@/hooks/useLocalePath";
 import lapachoLogo from "@/assets/lapacho-logo.png";
 
 export default function SoporteAuth() {
@@ -14,6 +15,7 @@ export default function SoporteAuth() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const lp = useLocalePath();
   const { toast } = useToast();
 
   const handleLogin = async (e: React.FormEvent) => {
