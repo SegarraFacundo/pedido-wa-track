@@ -603,6 +603,32 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
     }
 
+    // INTERCEPTOR: Rating patterns (e.g., "5-5-5", "4 4 4", "rate 5 5 5")
+    if (context.order_state === "idle" || context.order_state === "order_completed" || !context.order_state) {
+      const ratingPattern = /(?:rat[ei]|review|calific|reseña|rese[nñ]a|評価)?\s*(\d)[\/\-\s,]+(\d)[\/\-\s,]+(\d)/i;
+      const ratingMatch = message.match(ratingPattern);
+      if (ratingMatch) {
+        const [, d, s, p] = ratingMatch;
+        const delivery = Math.min(5, Math.max(1, parseInt(d)));
+        const service = Math.min(5, Math.max(1, parseInt(s)));
+        const product = Math.min(5, Math.max(1, parseInt(p)));
+        
+        // Extract optional comment after the ratings
+        const commentMatch = message.replace(ratingMatch[0], '').trim();
+        const comment = commentMatch.length > 2 ? commentMatch : undefined;
+        
+        const result = await ejecutarHerramienta("registrar_calificacion", {
+          delivery_rating: delivery,
+          service_rating: service,
+          product_rating: product,
+          comment,
+        }, context, supabase);
+        context.conversation_history.push({ role: "assistant", content: result });
+        await saveContext(context, supabase);
+        return result;
+      }
+    }
+
     // INTERCEPTOR: Food keywords in idle/browsing
     if ((context.order_state === "idle" || context.order_state === "browsing" || !context.order_state) && !context.selected_vendor_id) {
       const foodKeywords = /\b(pizza|hamburguesa|empanada|milanesa|sushi|helado|cerveza|coca|fanta|sprite|agua|café|cafe|pollo|asado|lomito|sandwich|tarta|torta|postre|ensalada|papas|sándwich|medialunas?|facturas?|alfajor|ravioles?|ñoquis?|pastas?)\b/i;

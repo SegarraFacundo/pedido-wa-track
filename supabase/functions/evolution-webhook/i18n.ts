@@ -385,6 +385,12 @@ const translations: Record<string, Record<Language, string>> = {
     pt: '🔴 *FECHADOS*',
     ja: '🔴 *閉店*',
   },
+  'vendors.closed_hint': {
+    es: 'no disponibles ahora',
+    en: 'not available now',
+    pt: 'não disponíveis agora',
+    ja: '現在利用不可',
+  },
   'vendors.select_prompt': {
     es: 'Decime el número o nombre del negocio para ver su menú completo.',
     en: 'Tell me the number or name of the store to see the full menu.',
