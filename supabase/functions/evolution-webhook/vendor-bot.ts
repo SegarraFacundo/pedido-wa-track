@@ -6,7 +6,7 @@ import { ConversationContext } from "./types.ts";
 import { normalizeArgentinePhone } from "./utils.ts";
 import { getContext, saveContext } from "./context.ts";
 import { buildSystemPrompt } from "./simplified-prompt.ts";
-import { t, detectLanguage, HELP_REGEX, isConfirmation, isCancellation, detectPaymentMethod, Language } from "./i18n.ts";
+import { t, detectLanguage, detectExplicitLanguageRequest, HELP_REGEX, isConfirmation, isCancellation, detectPaymentMethod, Language } from "./i18n.ts";
 
 import { DIRECT_RESPONSE_TOOLS, filterToolsByState, handleShoppingInterceptor, trackVendorChange } from "./bot-helpers.ts";
 import { ejecutarHerramienta } from "./tool-handlers.ts";
