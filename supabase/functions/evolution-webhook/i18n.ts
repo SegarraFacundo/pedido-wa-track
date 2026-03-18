@@ -1528,30 +1528,30 @@ export function detectExplicitLanguageRequest(text: string): Language | null {
   const lower = text.toLowerCase().trim();
   
   // English explicit requests
-  if (/\b(speak|talk|write|respond|answer|switch)\b.*(english|inglés|inglês)/i.test(lower) ||
+  if (/\b(speak|talk|write|respond|answer|switch|habla|háblame|hablame|escrib[eí]|respond[eé]|cambia)\b.*(english|inglés|inglês)/i.test(lower) ||
       /\b(en inglés|in english|change.*(to|language).*english)\b/i.test(lower) ||
       /^(english|inglés)$/i.test(lower)) {
     return 'en';
   }
   
   // Portuguese explicit requests
-  if (/\b(habla|fala|escrib[eí]|respond[eé]|cambia)\b.*(portugu[eé]s)/i.test(lower) ||
+  if (/\b(habla|háblame|hablame|fala|escrib[eí]|respond[eé]|cambia|speak|talk)\b.*(portugu[eé]s)/i.test(lower) ||
       /\b(em português|in portuguese|change.*(to|language).*portuguese)\b/i.test(lower) ||
       /^(português|portuguese)$/i.test(lower)) {
     return 'pt';
   }
   
   // Japanese explicit requests
-  if (/\b(habla|speak|talk|respond)\b.*(japon[eé]s|japanese)/i.test(lower) ||
+  if (/\b(habla|háblame|hablame|speak|talk|respond)\b.*(japon[eé]s|japanese)/i.test(lower) ||
       /日本語で(話して|お願い|返事)/i.test(lower) ||
       /^(japonés|japanese|日本語)$/i.test(lower)) {
     return 'ja';
   }
   
   // Spanish explicit requests (user switching back)
-  if (/\b(speak|talk|falar?|respond)\b.*(spanish|español|espanhol)/i.test(lower) ||
-      /\b(en español|in spanish|change.*(to|language).*spanish)\b/i.test(lower) ||
-      /^(español|spanish)$/i.test(lower)) {
+  if (/\b(speak|talk|falar?|respond|habla|háblame|hablame)\b.*(spanish|español|espanhol|castellano)/i.test(lower) ||
+      /\b(en español|in spanish|change.*(to|language).*spanish|háblame?\s+en\s+español|hablame?\s+en\s+español)\b/i.test(lower) ||
+      /^(español|spanish|castellano)$/i.test(lower)) {
     return 'es';
   }
   
