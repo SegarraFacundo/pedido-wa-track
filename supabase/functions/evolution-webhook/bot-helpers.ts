@@ -12,7 +12,7 @@ export const TOOLS_BY_STATE: Record<string, string[]> = {
   browsing: ["ver_menu_negocio", "buscar_productos", "ver_locales_abiertos", "mostrar_menu_ayuda", "ver_horario_negocio"],
   shopping: [
     "agregar_al_carrito", "quitar_producto_carrito", "ver_carrito",
-    "modificar_carrito_completo", "ver_ofertas",
+    "modificar_carrito_completo",
     "seleccionar_tipo_entrega", "confirmar_direccion_entrega",
     "ver_metodos_pago", "seleccionar_metodo_pago",
     "mostrar_resumen_pedido", "vaciar_carrito", "crear_pedido",
