@@ -391,6 +391,23 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
     }
 
+    // 🏪 INTERCEPTOR: Cambio de negocio en shopping → bloquear
+    if (context.order_state === "shopping" && context.selected_vendor_id && context.available_vendors_map && context.available_vendors_map.length > 0) {
+      const msgLower = message.toLowerCase().trim();
+      const otherVendor = context.available_vendors_map.find(v => 
+        v.vendor_id !== context.selected_vendor_id && 
+        (msgLower.includes(v.name.toLowerCase()) || 
+         // Also check if user sends a number that matches another vendor's index
+         (msgLower.match(/^(\d+)$/) && parseInt(msgLower) === v.index))
+      );
+      if (otherVendor) {
+        const response = t('shopping.wrong_vendor', lang, { vendor: context.selected_vendor_name || '' });
+        context.conversation_history.push({ role: "assistant", content: response });
+        await saveContext(context, supabase);
+        return response;
+      }
+    }
+
     // 🛒 INTERCEPTOR: Shopping + número/producto
     if (context.order_state === "shopping" && context.selected_vendor_id) {
       const shoppingResult = await handleShoppingInterceptor(message, context, supabase);
