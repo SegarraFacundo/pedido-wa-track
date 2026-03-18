@@ -112,6 +112,14 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       return t('language.changed', context.language);
     }
     
+    // 🛡️ RESET DEFENSIVO: Si el idioma no es español y el usuario NO pidió otro idioma
+    // en este mensaje, resetear a español (corrige sesiones legacy pegadas en otro idioma)
+    if (context.language !== 'es' && !explicitLangRequest) {
+      console.log(`🛡️ Defensive language reset: ${context.language} → es (no explicit request in this message)`);
+      context.language = 'es';
+      // No need to save yet, will be saved later
+    }
+    
     const lang = (context.language || 'es') as Language;
 
     // 🧹 LIMPIAR CONTEXTO si hay un pedido ACTIVO del mismo vendor
