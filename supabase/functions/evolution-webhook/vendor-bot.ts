@@ -904,7 +904,13 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         continue;
       }
 
-      finalResponse = assistantMessage.content || t('error.not_understood', lang);
+      // 🛡️ Si estamos en shopping y el LLM responde texto libre sin herramientas,
+      // dar una respuesta breve con opciones concretas en vez de dejar que el LLM divague
+      if (context.order_state === "shopping" && context.selected_vendor_id) {
+        finalResponse = t('shopping.not_understood', lang);
+      } else {
+        finalResponse = assistantMessage.content || t('error.not_understood', lang);
+      }
       continueLoop = false;
     }
 
