@@ -56,3 +56,35 @@
 - `VendorSettings.tsx`: Toggle `is_active` mejorado con card prominente, estados visuales y descripción clara
 - `VendorDashboard.tsx`: Banner destructive cuando `vendor.is_active === false`
 - Sin cambios de DB (usa campo `is_active` existente)
+
+---
+
+# Fix: Bot pierde hilo y responde en portugués ✅
+
+## Problema
+- Sesiones legacy con `"language":"pt"` → todas las respuestas deterministas en portugués
+- "Háblame en español" no funcionaba (faltaba `habla/háblame` en regex)
+- Usuario en `shopping` de un negocio pero el bot respondía sobre otro
+- LLM divagaba con respuestas irrelevantes en estado `shopping`
+
+## Solución implementada
+
+### 1. `i18n.ts` — Fix regex detección explícita de idioma ✅
+- Agregado `habla|háblame|hablame` a TODOS los patrones de detección (es, en, pt, ja)
+- Agregado `castellano` como alias de español
+
+### 2. `vendor-bot.ts` — Reset defensivo de idioma ✅
+- Si `context.language !== 'es'` y NO hay petición explícita de idioma en el mensaje actual → reset a `'es'`
+- Corrige automáticamente todas las sesiones legacy sin migración SQL
+
+### 3. `vendor-bot.ts` — Interceptor cambio de negocio en `shopping` ✅
+- Si el usuario menciona otro negocio del `available_vendors_map` estando en `shopping`, responde:
+  "⚠️ Estás comprando en *{vendor}*. Si querés ver otro negocio, primero decí 'vaciar carrito' o 'nuevo pedido'."
+
+### 4. `vendor-bot.ts` — Fallback determinista en `shopping` ✅
+- Si el LLM no usa herramientas en estado `shopping`, en vez de devolver texto libre, responde con opciones concretas:
+  "No entendí tu mensaje 🤔\n• Enviar número del menú\n• Decir 'carrito'\n• Decir 'confirmar'\n• Decir 'menú'"
+
+### 5. `i18n.ts` — Nuevas keys ✅
+- `shopping.wrong_vendor`: Mensaje de bloqueo de cambio de negocio (4 idiomas)
+- `shopping.not_understood`: Fallback con opciones concretas (4 idiomas)
