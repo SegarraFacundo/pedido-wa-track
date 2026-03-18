@@ -108,6 +108,8 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       context.language = explicitLangRequest;
       console.log(`🌐 Language explicitly changed to: ${context.language}`);
       await saveContext(context, supabase);
+      // Respond immediately confirming the language change
+      return t('language.changed', context.language);
     }
     
     const lang = (context.language || 'es') as Language;
