@@ -99,11 +99,14 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       await saveContext(context, supabase);
     }
     
-    // 🌐 DETECCIÓN DE IDIOMA: Detecta en cada mensaje y actualiza si cambia
-    const detectedLang = detectLanguage(message);
-    if (!context.language || (detectedLang !== 'es' && detectedLang !== context.language)) {
-      context.language = detectedLang;
-      console.log(`🌐 Language updated: ${context.language}`);
+    // 🌐 IDIOMA: Default español. Solo cambia si el usuario lo pide explícitamente.
+    if (!context.language) {
+      context.language = 'es';
+    }
+    const explicitLangRequest = detectExplicitLanguageRequest(message);
+    if (explicitLangRequest && explicitLangRequest !== context.language) {
+      context.language = explicitLangRequest;
+      console.log(`🌐 Language explicitly changed to: ${context.language}`);
       await saveContext(context, supabase);
     }
     
