@@ -1150,6 +1150,12 @@ const translations: Record<string, Record<Language, string>> = {
     pt: '🔄 Pronto! Apaguei toda a memória da conversa.\n\nVamos começar de novo! O que você procura hoje? 😊',
     ja: '🔄 完了！会話のメモリをすべてクリアしました。\n\n最初からやり直しましょう！今日は何をお探しですか？😊',
   },
+  'language.changed': {
+    es: '🌐 ¡Listo! Ahora te respondo en español. ¿En qué puedo ayudarte? 😊',
+    en: '🌐 Done! I\'ll now respond in English. How can I help you? 😊',
+    pt: '🌐 Pronto! Agora vou responder em português. Como posso ajudar? 😊',
+    ja: '🌐 了解！これから日本語で返答します。何かお手伝いできますか？😊',
+  },
 
   // === RECEIPT ===
   'receipt.error': {
@@ -1514,30 +1520,48 @@ export function t(key: string, lang: Language = 'es', vars?: Record<string, stri
 }
 
 /**
- * Detect language from user message using heuristics.
- * Returns detected language or 'es' as default.
+ * Detect if the user is EXPLICITLY requesting a language change.
+ * Only triggers on phrases like "habla en inglés", "speak in english", "falar em português", etc.
+ * Returns the requested language or null if no explicit request.
  */
-export function detectLanguage(text: string): Language {
+export function detectExplicitLanguageRequest(text: string): Language | null {
   const lower = text.toLowerCase().trim();
   
-  // Japanese: detect katakana, hiragana, or kanji characters
-  if (/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(text)) {
-    return 'ja';
-  }
-  
-  // English keywords (common greetings/phrases)
-  const enKeywords = /\b(hello|hi|hey|good morning|good afternoon|how are you|i want|i need|i would like|please|thank you|thanks|order|menu|what|where|help|show me|looking for)\b/i;
-  if (enKeywords.test(lower)) {
+  // English explicit requests
+  if (/\b(speak|talk|write|respond|answer|switch)\b.*(english|inglés|inglês)/i.test(lower) ||
+      /\b(en inglés|in english|change.*(to|language).*english)\b/i.test(lower) ||
+      /^(english|inglés)$/i.test(lower)) {
     return 'en';
   }
   
-  // Portuguese keywords
-  const ptKeywords = /\b(olá|oi|bom dia|boa tarde|boa noite|como vai|eu quero|preciso|por favor|obrigad[oa]|pedido|cardápio|onde|ajuda|mostre|procuro|quero)\b/i;
-  if (ptKeywords.test(lower)) {
+  // Portuguese explicit requests
+  if (/\b(habla|fala|escrib[eí]|respond[eé]|cambia)\b.*(portugu[eé]s)/i.test(lower) ||
+      /\b(em português|in portuguese|change.*(to|language).*portuguese)\b/i.test(lower) ||
+      /^(português|portuguese)$/i.test(lower)) {
     return 'pt';
   }
   
-  // Default to Spanish
+  // Japanese explicit requests
+  if (/\b(habla|speak|talk|respond)\b.*(japon[eé]s|japanese)/i.test(lower) ||
+      /日本語で(話して|お願い|返事)/i.test(lower) ||
+      /^(japonés|japanese|日本語)$/i.test(lower)) {
+    return 'ja';
+  }
+  
+  // Spanish explicit requests (user switching back)
+  if (/\b(speak|talk|falar?|respond)\b.*(spanish|español|espanhol)/i.test(lower) ||
+      /\b(en español|in spanish|change.*(to|language).*spanish)\b/i.test(lower) ||
+      /^(español|spanish)$/i.test(lower)) {
+    return 'es';
+  }
+  
+  return null;
+}
+
+/**
+ * @deprecated Use detectExplicitLanguageRequest instead. Kept for backward compat.
+ */
+export function detectLanguage(_text: string): Language {
   return 'es';
 }
 
