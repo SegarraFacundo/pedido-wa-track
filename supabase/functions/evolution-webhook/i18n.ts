@@ -1150,6 +1150,12 @@ const translations: Record<string, Record<Language, string>> = {
     pt: '🔄 Pronto! Apaguei toda a memória da conversa.\n\nVamos começar de novo! O que você procura hoje? 😊',
     ja: '🔄 完了！会話のメモリをすべてクリアしました。\n\n最初からやり直しましょう！今日は何をお探しですか？😊',
   },
+  'language.changed': {
+    es: '🌐 ¡Listo! Ahora te respondo en español. ¿En qué puedo ayudarte? 😊',
+    en: '🌐 Done! I\'ll now respond in English. How can I help you? 😊',
+    pt: '🌐 Pronto! Agora vou responder em português. Como posso ajudar? 😊',
+    ja: '🌐 了解！これから日本語で返答します。何かお手伝いできますか？😊',
+  },
 
   // === RECEIPT ===
   'receipt.error': {
