@@ -1495,6 +1495,20 @@ Escreva o que precisa e eu ajudo. É muito fácil! 😊`,
     pt: 'De qual loja quer ver o horário? Diga o nome ou número.',
     ja: 'どの店舗の営業時間を見たいですか？名前か番号を教えてください。',
   },
+
+  // === INTERCEPTORES DE CONTEXTO ===
+  'shopping.wrong_vendor': {
+    es: '⚠️ Estás comprando en *{vendor}*. Si querés ver otro negocio, primero decí "vaciar carrito" o "nuevo pedido".',
+    en: '⚠️ You\'re shopping at *{vendor}*. To browse another store, first say "clear cart" or "new order".',
+    pt: '⚠️ Você está comprando em *{vendor}*. Para ver outra loja, primeiro diga "esvaziar carrinho" ou "novo pedido".',
+    ja: '⚠️ *{vendor}*で買い物中です。他の店舗を見るには、まず「カートをクリア」か「新しい注文」と言ってください。',
+  },
+  'shopping.not_understood': {
+    es: 'No entendí tu mensaje 🤔\n\nPodés:\n• Enviar un *número del menú* para agregar\n• Decir *"carrito"* para ver tu pedido\n• Decir *"confirmar"* para finalizar\n• Decir *"menú"* para ver los productos',
+    en: 'I didn\'t understand your message 🤔\n\nYou can:\n• Send a *menu number* to add\n• Say *"cart"* to see your order\n• Say *"confirm"* to finalize\n• Say *"menu"* to see products',
+    pt: 'Não entendi sua mensagem 🤔\n\nVocê pode:\n• Enviar um *número do cardápio* para adicionar\n• Dizer *"carrinho"* para ver seu pedido\n• Dizer *"confirmar"* para finalizar\n• Dizer *"cardápio"* para ver os produtos',
+    ja: 'メッセージが理解できませんでした 🤔\n\n以下のことができます:\n• *メニュー番号*を送信して追加\n• *「カート」*で注文を確認\n• *「確定」*で注文を完了\n• *「メニュー」*で商品を表示',
+  },
 };
 
 /**
@@ -1528,30 +1542,30 @@ export function detectExplicitLanguageRequest(text: string): Language | null {
   const lower = text.toLowerCase().trim();
   
   // English explicit requests
-  if (/\b(speak|talk|write|respond|answer|switch)\b.*(english|inglés|inglês)/i.test(lower) ||
+  if (/\b(speak|talk|write|respond|answer|switch|habla|háblame|hablame|escrib[eí]|respond[eé]|cambia)\b.*(english|inglés|inglês)/i.test(lower) ||
       /\b(en inglés|in english|change.*(to|language).*english)\b/i.test(lower) ||
       /^(english|inglés)$/i.test(lower)) {
     return 'en';
   }
   
   // Portuguese explicit requests
-  if (/\b(habla|fala|escrib[eí]|respond[eé]|cambia)\b.*(portugu[eé]s)/i.test(lower) ||
+  if (/\b(habla|háblame|hablame|fala|escrib[eí]|respond[eé]|cambia|speak|talk)\b.*(portugu[eé]s)/i.test(lower) ||
       /\b(em português|in portuguese|change.*(to|language).*portuguese)\b/i.test(lower) ||
       /^(português|portuguese)$/i.test(lower)) {
     return 'pt';
   }
   
   // Japanese explicit requests
-  if (/\b(habla|speak|talk|respond)\b.*(japon[eé]s|japanese)/i.test(lower) ||
+  if (/\b(habla|háblame|hablame|speak|talk|respond)\b.*(japon[eé]s|japanese)/i.test(lower) ||
       /日本語で(話して|お願い|返事)/i.test(lower) ||
       /^(japonés|japanese|日本語)$/i.test(lower)) {
     return 'ja';
   }
   
   // Spanish explicit requests (user switching back)
-  if (/\b(speak|talk|falar?|respond)\b.*(spanish|español|espanhol)/i.test(lower) ||
-      /\b(en español|in spanish|change.*(to|language).*spanish)\b/i.test(lower) ||
-      /^(español|spanish)$/i.test(lower)) {
+  if (/\b(speak|talk|falar?|respond|habla|háblame|hablame)\b.*(spanish|español|espanhol|castellano)/i.test(lower) ||
+      /\b(en español|in spanish|change.*(to|language).*spanish|háblame?\s+en\s+español|hablame?\s+en\s+español)\b/i.test(lower) ||
+      /^(español|spanish|castellano)$/i.test(lower)) {
     return 'es';
   }
   

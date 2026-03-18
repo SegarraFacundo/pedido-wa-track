@@ -112,6 +112,14 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       return t('language.changed', context.language);
     }
     
+    // 🛡️ RESET DEFENSIVO: Si el idioma no es español y el usuario NO pidió otro idioma
+    // en este mensaje, resetear a español (corrige sesiones legacy pegadas en otro idioma)
+    if (context.language !== 'es' && !explicitLangRequest) {
+      console.log(`🛡️ Defensive language reset: ${context.language} → es (no explicit request in this message)`);
+      context.language = 'es';
+      // No need to save yet, will be saved later
+    }
+    
     const lang = (context.language || 'es') as Language;
 
     // 🧹 LIMPIAR CONTEXTO si hay un pedido ACTIVO del mismo vendor
@@ -380,6 +388,23 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         context.conversation_history.push({ role: "assistant", content: clarification });
         await saveContext(context, supabase);
         return clarification;
+      }
+    }
+
+    // 🏪 INTERCEPTOR: Cambio de negocio en shopping → bloquear
+    if (context.order_state === "shopping" && context.selected_vendor_id && context.available_vendors_map && context.available_vendors_map.length > 0) {
+      const msgLower = message.toLowerCase().trim();
+      const otherVendor = context.available_vendors_map.find(v => 
+        v.vendor_id !== context.selected_vendor_id && 
+        (msgLower.includes(v.name.toLowerCase()) || 
+         // Also check if user sends a number that matches another vendor's index
+         (msgLower.match(/^(\d+)$/) && parseInt(msgLower) === v.index))
+      );
+      if (otherVendor) {
+        const response = t('shopping.wrong_vendor', lang, { vendor: context.selected_vendor_name || '' });
+        context.conversation_history.push({ role: "assistant", content: response });
+        await saveContext(context, supabase);
+        return response;
       }
     }
 
@@ -879,7 +904,13 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         continue;
       }
 
-      finalResponse = assistantMessage.content || t('error.not_understood', lang);
+      // 🛡️ Si estamos en shopping y el LLM responde texto libre sin herramientas,
+      // dar una respuesta breve con opciones concretas en vez de dejar que el LLM divague
+      if (context.order_state === "shopping" && context.selected_vendor_id) {
+        finalResponse = t('shopping.not_understood', lang);
+      } else {
+        finalResponse = assistantMessage.content || t('error.not_understood', lang);
+      }
       continueLoop = false;
     }
 
