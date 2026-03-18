@@ -1495,6 +1495,20 @@ Escreva o que precisa e eu ajudo. É muito fácil! 😊`,
     pt: 'De qual loja quer ver o horário? Diga o nome ou número.',
     ja: 'どの店舗の営業時間を見たいですか？名前か番号を教えてください。',
   },
+
+  // === INTERCEPTORES DE CONTEXTO ===
+  'shopping.wrong_vendor': {
+    es: '⚠️ Estás comprando en *{vendor}*. Si querés ver otro negocio, primero decí "vaciar carrito" o "nuevo pedido".',
+    en: '⚠️ You\'re shopping at *{vendor}*. To browse another store, first say "clear cart" or "new order".',
+    pt: '⚠️ Você está comprando em *{vendor}*. Para ver outra loja, primeiro diga "esvaziar carrinho" ou "novo pedido".',
+    ja: '⚠️ *{vendor}*で買い物中です。他の店舗を見るには、まず「カートをクリア」か「新しい注文」と言ってください。',
+  },
+  'shopping.not_understood': {
+    es: 'No entendí tu mensaje 🤔\n\nPodés:\n• Enviar un *número del menú* para agregar\n• Decir *"carrito"* para ver tu pedido\n• Decir *"confirmar"* para finalizar\n• Decir *"menú"* para ver los productos',
+    en: 'I didn\'t understand your message 🤔\n\nYou can:\n• Send a *menu number* to add\n• Say *"cart"* to see your order\n• Say *"confirm"* to finalize\n• Say *"menu"* to see products',
+    pt: 'Não entendi sua mensagem 🤔\n\nVocê pode:\n• Enviar um *número do cardápio* para adicionar\n• Dizer *"carrinho"* para ver seu pedido\n• Dizer *"confirmar"* para finalizar\n• Dizer *"cardápio"* para ver os produtos',
+    ja: 'メッセージが理解できませんでした 🤔\n\n以下のことができます:\n• *メニュー番号*を送信して追加\n• *「カート」*で注文を確認\n• *「確定」*で注文を完了\n• *「メニュー」*で商品を表示',
+  },
 };
 
 /**
