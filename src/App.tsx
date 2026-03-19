@@ -58,6 +58,8 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
+          {/* Product image redirect - locale-independent */}
+          <Route path="/p/:productId" element={<ProductImage />} />
           {/* Redirect root to default locale */}
           <Route path="/" element={<RedirectToLocale />} />
           {/* All localized routes */}
