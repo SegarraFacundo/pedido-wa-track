@@ -394,7 +394,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     // 🏪 INTERCEPTOR: Shopping + quiere ver locales → si carrito vacío, resetear a idle
     if (context.order_state === "shopping") {
       const msgLower = message.toLowerCase().trim();
-      const wantsBrowseStores = /\b(ver\s+(locales|negocios|tiendas|comercios)|locales\s+abiertos|qu[eé]\s+hay\s+abierto|show\s+(stores|shops)|ver\s+opciones|otros?\s+(locales?|negocios?)|cambiar\s+de\s+(local|negocio))\b/i.test(msgLower);
+      const wantsBrowseStores = /\b((ver|mostrar)\s+(los\s+|las\s+|el\s+|la\s+)?(locales|negocios|tiendas|comercios)(\s+abiertos?)?|((locales|negocios|tiendas|comercios)\s+abiertos?)|qu[eé]\s+hay\s+abierto|show\s+(stores|shops)|ver\s+opciones|otros?\s+(locales?|negocios?)|cambiar\s+de\s+(local|negocio))\b/i.test(msgLower);
       
       if (wantsBrowseStores) {
         if (context.cart.length === 0) {
