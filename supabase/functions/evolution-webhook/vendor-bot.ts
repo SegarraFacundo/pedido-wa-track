@@ -391,6 +391,41 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
     }
 
+    // 🏪 INTERCEPTOR: Shopping + quiere ver locales → si carrito vacío, resetear a idle
+    if (context.order_state === "shopping") {
+      const msgLower = message.toLowerCase().trim();
+      const wantsBrowseStores = /\b(ver\s+(locales|negocios|tiendas|comercios)|locales\s+abiertos|qu[eé]\s+hay\s+abierto|show\s+(stores|shops)|ver\s+opciones|otros?\s+(locales?|negocios?)|cambiar\s+de\s+(local|negocio))\b/i.test(msgLower);
+      
+      if (wantsBrowseStores) {
+        if (context.cart.length === 0) {
+          // Carrito vacío → resetear a idle y mostrar locales
+          console.log('🏪 User wants to browse stores with empty cart, resetting to idle');
+          context.order_state = "idle";
+          context.selected_vendor_id = undefined;
+          context.selected_vendor_name = undefined;
+          context.payment_method = undefined;
+          context.delivery_address = undefined;
+          context.delivery_type = undefined;
+          context.payment_methods_fetched = false;
+          context.available_payment_methods = [];
+          context.resumen_mostrado = false;
+          context.conversation_history = [];
+          await saveContext(context, supabase);
+          
+          const storesResult = await ejecutarHerramienta("ver_locales_abiertos", {}, context, supabase);
+          context.conversation_history.push({ role: "assistant", content: storesResult });
+          await saveContext(context, supabase);
+          return storesResult;
+        } else {
+          // Carrito con items → advertir que perderá el carrito
+          const response = t('shopping.wrong_vendor', lang, { vendor: context.selected_vendor_name || '' });
+          context.conversation_history.push({ role: "assistant", content: response });
+          await saveContext(context, supabase);
+          return response;
+        }
+      }
+    }
+
     // 🏪 INTERCEPTOR: Cambio de negocio en shopping → bloquear
     if (context.order_state === "shopping" && context.selected_vendor_id && context.available_vendors_map && context.available_vendors_map.length > 0) {
       const msgLower = message.toLowerCase().trim();
