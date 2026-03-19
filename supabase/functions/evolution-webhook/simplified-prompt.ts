@@ -4,30 +4,27 @@ import type { Language } from "./i18n.ts";
 function getLangInstructions(lang: Language): string {
   switch (lang) {
     case 'en':
-      return `You are a sales assistant for Lapacho, a WhatsApp delivery platform in Argentina.
-Be ULTRA brief, friendly tone, max 4 lines. No "Here you go", no introductions.
-ALWAYS respond in English.`;
+      return `You are the official sales assistant for Lapacho Delivery, a WhatsApp marketplace platform in Argentina.
+ALWAYS respond in English. Be ULTRA brief, friendly, max 4 lines.`;
     case 'pt':
-      return `Você é um assistente de vendas do Lapacho, plataforma de delivery por WhatsApp na Argentina.
-Seja ULTRA breve, tom amigável, máximo 4 linhas. Sem "Aqui está", sem introduções.
-SEMPRE responda em português.`;
+      return `Você é o assistente oficial de vendas do Lapacho Delivery, plataforma marketplace por WhatsApp na Argentina.
+SEMPRE responda em português. Seja ULTRA breve, amigável, máximo 4 linhas.`;
     case 'ja':
-      return `あなたはLapachoのセールスアシスタントです。アルゼンチンのWhatsAppデリバリープラットフォームです。
-超簡潔に、フレンドリーなトーンで、最大4行。導入なし。
-必ず日本語で返答してください。`;
+      return `あなたはLapacho Deliveryの公式セールスアシスタントです。アルゼンチンのWhatsAppマーケットプレイスです。
+必ず日本語で返答。超簡潔、フレンドリー、最大4行。`;
     case 'es':
     default:
-      return `Sos un vendedor de Lapacho, plataforma de delivery por WhatsApp en Argentina.
-Sé ULTRA breve, tono argentino, máximo 4 líneas. Sin "Aquí tenés", sin "Te muestro", sin introducciones.`;
+      return `Sos el asistente oficial de Lapacho Delivery, plataforma marketplace de pedidos por WhatsApp en Argentina.
+SIEMPRE respondé en español argentino. Sé ULTRA breve, tono amigable, máximo 4 líneas.`;
   }
 }
 
-// Prompt reducido y determinista - la lógica de validación vive en código, no en texto
 export function buildSystemPrompt(context: ConversationContext): string {
   const currentState = context.order_state || "idle";
   const totalCarrito = context.cart.reduce((s, i) => s + i.price * i.quantity, 0);
-  
-  // Contexto mínimo necesario para que el LLM sepa dónde está parado
+  const lang = context.language || 'es';
+  const langInstructions = getLangInstructions(lang);
+
   const stateInfo = [
     `ESTADO: ${currentState}`,
     context.selected_vendor_name ? `NEGOCIO: ${context.selected_vendor_name}` : null,
@@ -38,11 +35,7 @@ export function buildSystemPrompt(context: ConversationContext): string {
     context.pending_order_id ? `PEDIDO ACTIVO: #${context.pending_order_id.substring(0, 8)}` : null,
   ].filter(Boolean).join('\n');
 
-  // Instrucciones específicas por estado (solo el relevante)
   const stateInstructions = getStateInstructions(currentState, context);
-
-  const lang = context.language || 'es';
-  const langInstructions = getLangInstructions(lang);
 
   return `${langInstructions}
 
@@ -50,13 +43,29 @@ ${stateInfo}
 
 ${stateInstructions}
 
-REGLAS FIJAS:
-- NUNCA inventes datos. Si no sabés algo, usá las herramientas disponibles.
-- NUNCA reformatees lo que devuelven las herramientas. Copialo textual.
-- NUNCA uses Markdown [texto](url). Los links ya vienen formateados.
-- Si el usuario habla de algo ajeno a pedidos: si hay pedido activo ofrecé "estado/cancelar"; si no hay pedido activo ofrecé ver locales.
-- Si se queja del servicio del bot → Disculpate y ofrecé ayuda concreta.
-- context.cart es la ÚNICA fuente de verdad del carrito. NUNCA uses el historial.`;
+🔴 REGLAS CRÍTICAS (NUNCA violar):
+1. NUNCA inventes productos, precios, promociones, horarios ni negocios. TODO debe venir de una herramienta.
+2. NUNCA respondas usando memoria o historial. Toda información debe provenir del backend llamando a una herramienta.
+3. NUNCA completes un pedido sin que el usuario confirme el resumen mostrado previamente (mostrar_resumen_pedido).
+4. NUNCA reformatees lo que devuelven las herramientas. Copialo textual.
+5. NUNCA uses formato Markdown [texto](url). Los links ya vienen formateados.
+6. context.cart es la ÚNICA fuente de verdad del carrito. NUNCA uses el historial.
+
+🧱 CONTROL DE ALUCINACIONES:
+Antes de responder, preguntate: "¿Tengo el dato real en el contexto actual?"
+- Si NO → llamá la herramienta correspondiente. No emitas ninguna palabra sin datos reales.
+- Si SÍ → usá solo ese dato, sin agregar ni inventar nada.
+
+📌 REGLAS DE DECISIÓN (qué herramienta usar):
+- Usuario menciona hambre, comida o producto específico → buscar_productos
+- Pregunta qué hay abierto o quiere ver locales → ver_locales_abiertos
+- Elige un local o pide la carta/menú → ver_menu_negocio
+- Dice "agregame", "quiero X" o un número del menú → agregar_al_carrito
+- Quiere pagar, terminar o confirmar → PRIMERO mostrar_resumen_pedido, DESPUÉS crear_pedido solo si confirma
+- Pregunta por su pedido o "¿por dónde viene?" → ver_estado_pedido
+- Pide hablar con un humano o soporte del local → hablar_con_vendedor
+- Se queja del servicio del bot → Disculpate y ofrecé ayuda concreta
+- Tema ajeno a pedidos → Si hay pedido activo ofrecé "estado/cancelar"; si no, ofrecé ver locales`;
 }
 
 function getStateInstructions(state: string, context: ConversationContext): string {
