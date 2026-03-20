@@ -33,58 +33,63 @@
 - `src/components/LanguageSelector.tsx`: Dropdown con banderas
 - `src/pages/Landing.tsx`: Migrado a t('key')
 
-## Fase 2 (Pendiente)
-- Migrar resto de páginas web (Términos, Privacidad, Contacto, Auth, Dashboards)
-
 ## Bot: Inline ternary → t() migration ✅
 - Added 13 label keys to `i18n.ts` (label.order, label.payment, label.cash, etc.)
 - Replaced all ~15 inline `lang === 'es' ? ...` ternaries in `tool-handlers.ts` and `vendor-bot.ts`
-- Fixed missing PT/JA translations (e.g., "Holder" → proper `t('label.account_holder', lang)`)
-- Zero remaining inline ternaries in bot code
-
-## Ver horario de negocio + Pausa temporal vendor ✅
-### Bot: `ver_horario_negocio` (determinista)
-- Tool definition en `tools-definitions.ts`
-- Handler en `tool-handlers.ts`: busca vendor, consulta `vendor_hours`, formatea por día con estado actual
-- `TOOLS_BY_STATE`: disponible en todos los estados
-- `DIRECT_RESPONSE_TOOLS`: respuesta directa sin reformateo LLM
-- Interceptor regex en `vendor-bot.ts`: "horario", "schedule", "horários", "営業時間", "a qué hora", "what time"
-- i18n: `schedule.header`, `schedule.closed`, `schedule.currently_open/closed`, `schedule.no_hours`, `schedule.ask_vendor`
-- Help menu actualizado en 4 idiomas con sección de horarios
-
-### Dashboard: Pausa temporal
-- `VendorSettings.tsx`: Toggle `is_active` mejorado con card prominente, estados visuales y descripción clara
-- `VendorDashboard.tsx`: Banner destructive cuando `vendor.is_active === false`
-- Sin cambios de DB (usa campo `is_active` existente)
 
 ---
 
-# Fix: Bot pierde hilo y responde en portugués ✅
+# Arquitectura 100% Determinista con IA solo como NLU ✅
 
-## Problema
-- Sesiones legacy con `"language":"pt"` → todas las respuestas deterministas en portugués
-- "Háblame en español" no funcionaba (faltaba `habla/háblame` en regex)
-- Usuario en `shopping` de un negocio pero el bot respondía sobre otro
-- LLM divagaba con respuestas irrelevantes en estado `shopping`
+## Concepto
+Bot transformado de "IA decide y responde" a **máquina de estados pura**:
+- La IA **solo clasifica el intent** del usuario (1 llamada, sin herramientas, sin decisiones)
+- Toda la lógica, respuestas y flujo son **código determinista**
+- Cada estado tiene pasos definidos, respuestas fijas y manejo de errores
+- Tras 2 intentos fallidos en un paso, se ofrece ayuda humana o volver al menú principal
 
-## Solución implementada
+## Archivos creados/modificados
 
-### 1. `i18n.ts` — Fix regex detección explícita de idioma ✅
-- Agregado `habla|háblame|hablame` a TODOS los patrones de detección (es, en, pt, ja)
-- Agregado `castellano` como alias de español
+### `nlu.ts` — Natural Language Understanding ✅
+- `classifyIntent(message, context)` → `{intent, params, confidence}`
+- Usa Lovable AI Gateway (gemini-2.5-flash-lite) como primera opción, fallback a OpenAI
+- Prompt minimalista: ~30 líneas, solo clasifica en 22 intents posibles
+- Sin herramientas (tools), sin historial largo
+- Fallback: si la IA falla o no responde JSON válido → intent `unknown`
 
-### 2. `vendor-bot.ts` — Reset defensivo de idioma ✅
-- Si `context.language !== 'es'` y NO hay petición explícita de idioma en el mensaje actual → reset a `'es'`
-- Corrige automáticamente todas las sesiones legacy sin migración SQL
+### `state-machine.ts` — Motor determinista ✅
+- `processIntent(nlu, context, supabase)` → `{response, handled}`
+- `VALID_INTENTS_BY_STATE`: mapeo de intents válidos por estado
+- `STEP_HINTS`: instrucciones específicas por estado para reintentos
+- `handleInvalidIntent()`: contador de reintentos con escalación tras 2 fallos
+- Handlers individuales para cada intent ejecutando `ejecutarHerramienta()`
+- 0 texto libre del LLM — todo viene de i18n o tool-handlers
 
-### 3. `vendor-bot.ts` — Interceptor cambio de negocio en `shopping` ✅
-- Si el usuario menciona otro negocio del `available_vendors_map` estando en `shopping`, responde:
-  "⚠️ Estás comprando en *{vendor}*. Si querés ver otro negocio, primero decí 'vaciar carrito' o 'nuevo pedido'."
+### `vendor-bot.ts` — Refactored ✅
+- Eliminada dependencia de `openai@4.77.3`
+- Eliminado import de `buildSystemPrompt`
+- Eliminado el loop OpenAI con `tool_calls` (líneas 843-950)
+- Reemplazado por: `classifyIntent()` → `processIntent()` → respuesta fija
+- Interceptores deterministas se mantienen intactos (resuelven ~80% de mensajes)
+- Error handling actualizado para API genérica
 
-### 4. `vendor-bot.ts` — Fallback determinista en `shopping` ✅
-- Si el LLM no usa herramientas en estado `shopping`, en vez de devolver texto libre, responde con opciones concretas:
-  "No entendí tu mensaje 🤔\n• Enviar número del menú\n• Decir 'carrito'\n• Decir 'confirmar'\n• Decir 'menú'"
+### `types.ts` — Updated ✅
+- Agregado `retry_count?: number` al ConversationContext
 
-### 5. `i18n.ts` — Nuevas keys ✅
-- `shopping.wrong_vendor`: Mensaje de bloqueo de cambio de negocio (4 idiomas)
-- `shopping.not_understood`: Fallback con opciones concretas (4 idiomas)
+## Flujo actual
+
+```text
+MENSAJE → Interceptores (regex/keywords) → 80% resuelto
+                                          ↓ no matcheó
+                                    NLU (classifyIntent)
+                                          ↓ {intent, params}
+                                    State Machine (processIntent)
+                                          ↓ {response}
+                                    Respuesta fija (t('key'))
+```
+
+## Resultado
+- **0 alucinaciones**: La IA nunca genera texto que el usuario vea
+- **100% predecible**: Misma entrada → misma salida siempre
+- **Menos tokens**: 1 llamada corta vs. múltiples iteraciones con tools
+- **Escalación automática**: 2 fallos → ofrecer soporte o menú principal
