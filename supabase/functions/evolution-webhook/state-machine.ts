@@ -465,7 +465,25 @@ async function handleCancelOrder(
   supabase: any,
   lang: Language,
 ): Promise<StateMachineResult> {
-  // Initiate cancellation flow
+  // If no pending order (e.g. shopping state), just reset to idle
+  if (!context.pending_order_id) {
+    context.order_state = "idle";
+    context.cart = [];
+    context.selected_vendor_id = undefined;
+    context.selected_vendor_name = undefined;
+    context.payment_method = undefined;
+    context.delivery_address = undefined;
+    context.delivery_type = undefined;
+    context.payment_methods_fetched = false;
+    context.available_payment_methods = [];
+    context.resumen_mostrado = false;
+    context.conversation_history = [];
+    context.available_vendors_map = [];
+    await saveContext(context, supabase);
+    return { response: t("reset.done", lang), handled: true };
+  }
+
+  // Initiate cancellation flow for active order
   context.pending_cancellation = {
     step: "awaiting_reason",
     order_id: context.pending_order_id || context.last_order_id,
