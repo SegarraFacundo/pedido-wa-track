@@ -392,6 +392,30 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
     }
 
+    // 🔴 INTERCEPTOR: Cancelar en estados pre-pedido (shopping, browsing, needs_address, checkout)
+    const preOrderStates = ['shopping', 'browsing', 'needs_address', 'checkout'];
+    if (preOrderStates.includes(context.order_state || '')) {
+      const msgLower = message.toLowerCase().trim();
+      const wantsCancel = /\b(cancelar|cancel|salir|exit|volver|back|menu\s*principal|main\s*menu|inicio|home)\b/i.test(msgLower);
+      if (wantsCancel) {
+        console.log('🔴 Cancel/exit detected in pre-order state, resetting to idle');
+        context.order_state = "idle";
+        context.cart = [];
+        context.selected_vendor_id = undefined;
+        context.selected_vendor_name = undefined;
+        context.payment_method = undefined;
+        context.delivery_address = undefined;
+        context.delivery_type = undefined;
+        context.payment_methods_fetched = false;
+        context.available_payment_methods = [];
+        context.resumen_mostrado = false;
+        context.conversation_history = [];
+        context.available_vendors_map = [];
+        await saveContext(context, supabase);
+        return t('reset.done', lang);
+      }
+    }
+
     // 🏪 INTERCEPTOR: Shopping + quiere ver locales → si carrito vacío, resetear a idle
     if (context.order_state === "shopping") {
       const msgLower = message.toLowerCase().trim();
