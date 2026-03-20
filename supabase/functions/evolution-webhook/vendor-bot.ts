@@ -841,118 +841,17 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       return helpText;
     }
 
-    // Inicializar OpenAI
-    const openai = new OpenAI({ apiKey: Deno.env.get("OPENAI_API_KEY") });
-
-    let continueLoop = true;
-    let finalResponse = "";
-    let iterationCount = 0;
-    const MAX_ITERATIONS = 8;
+    // ==================== NLU + STATE MACHINE ====================
+    // The AI only classifies intent — all logic and responses are deterministic
     
-    const toolCallTracker = new Map<string, number>();
-
-    const historyLimit = context.order_state === "idle" ? 1 
-      : context.order_state === "browsing" ? 2 : 6;
+    console.log(`🧠 NLU: Classifying message in state "${context.order_state || 'idle'}"`);
     
-    const menuPattern = /\d+\.\s+\*?.+\$[\d.,]+/;
-    const filteredHistory = context.conversation_history
-      .slice(-historyLimit)
-      .filter(msg => {
-        if (msg.role === "user") return true;
-        if (msg.role === "assistant" && msg.content && menuPattern.test(msg.content)) return false;
-        return true;
-      });
+    const nluResult = await classifyIntent(message, context);
+    console.log(`🧠 NLU Result: intent=${nluResult.intent}, confidence=${nluResult.confidence}, params=${JSON.stringify(nluResult.params)}`);
     
-    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-      { role: "system", content: buildSystemPrompt(context) },
-      ...filteredHistory,
-    ];
-
-    while (continueLoop && iterationCount < MAX_ITERATIONS) {
-      iterationCount++;
-      console.log(`🔁 Iteration ${iterationCount}/${MAX_ITERATIONS}, state: ${context.order_state || "idle"}`);
-
-      messages[0] = { role: "system", content: buildSystemPrompt(context) };
-
-      const nonCheckoutStates = ["idle", "browsing", "shopping", "needs_address"];
-      const forceTools = nonCheckoutStates.includes(context.order_state || "idle") 
-        && iterationCount === 1
-        && !context.resumen_mostrado;
-
-      const currentState = context.order_state || "idle";
-      const filteredTools = filterToolsByState(currentState, context);
-
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: messages,
-        tools: filteredTools,
-        temperature: 0,
-        max_tokens: 800,
-        tool_choice: forceTools ? "required" : "auto",
-      });
-
-      const assistantMessage = completion.choices[0].message;
-
-      if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
-        messages.push(assistantMessage);
-
-        for (const toolCall of assistantMessage.tool_calls) {
-          const toolName = toolCall.function.name;
-          const toolArgs = JSON.parse(toolCall.function.arguments);
-          
-          const callCount = toolCallTracker.get(toolName) || 0;
-          const maxCalls = toolName === 'ver_menu_negocio' ? 1 : 2;
-          
-          if (callCount >= maxCalls) {
-            if (toolName === 'ver_menu_negocio') {
-              messages.push({
-                role: "tool",
-                tool_call_id: toolCall.id,
-                content: t('menu.one_at_a_time', lang),
-              });
-              continue;
-            }
-            continueLoop = false;
-            finalResponse = t('error.reformulate', lang);
-            break;
-          }
-          toolCallTracker.set(toolName, callCount + 1);
-
-          const toolResult = await ejecutarHerramienta(toolName, toolArgs, context, supabase);
-
-          if (DIRECT_RESPONSE_TOOLS.has(toolName) && assistantMessage.tool_calls!.length === 1) {
-            finalResponse = toolResult;
-            continueLoop = false;
-            await saveContext(context, supabase);
-            break;
-          }
-
-          messages.push({
-            role: "tool",
-            tool_call_id: toolCall.id,
-            content: toolResult,
-          });
-        }
-        
-        if (!continueLoop) break;
-
-        await saveContext(context, supabase);
-        continue;
-      }
-
-      // 🛡️ Si estamos en shopping y el LLM responde texto libre sin herramientas,
-      // dar una respuesta breve con opciones concretas en vez de dejar que el LLM divague
-      if (context.order_state === "shopping" && context.selected_vendor_id) {
-        finalResponse = t('shopping.not_understood', lang);
-      } else {
-        finalResponse = assistantMessage.content || t('error.not_understood', lang);
-      }
-      continueLoop = false;
-    }
-
-    if (iterationCount >= MAX_ITERATIONS) {
-      finalResponse = t('error.max_iterations', lang);
-    }
+    const smResult = await processIntent(nluResult, context, supabase);
+    
+    let finalResponse = smResult.response;
 
     context.conversation_history.push({ role: "assistant", content: finalResponse });
     await saveContext(context, supabase);
