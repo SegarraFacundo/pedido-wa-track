@@ -862,15 +862,15 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     console.error("❌ AI Bot ERROR:", error);
     
     const errorMessage = error.message || 'Unknown error';
-    const isOpenAIError = errorMessage.includes('OpenAI') || 
+    const isAPIError = errorMessage.includes('API') || 
                           errorMessage.includes('rate limit') || 
-                          errorMessage.includes('API') ||
                           errorMessage.includes('timeout') ||
                           errorMessage.includes('insufficient_quota') ||
-                          error.name === 'APIError';
+                          errorMessage.includes('429') ||
+                          errorMessage.includes('402');
     
-    if (isOpenAIError) {
-      await logBotError(supabase, 'OPENAI_ERROR', errorMessage, normalizedPhone, undefined, { name: error.name, stack: error.stack?.substring(0, 500) });
+    if (isAPIError) {
+      await logBotError(supabase, 'API_ERROR', errorMessage, normalizedPhone, undefined, { name: error.name, stack: error.stack?.substring(0, 500) });
       const emergencyActivated = await incrementErrorCount(supabase, errorMessage);
       
       if (emergencyActivated) {
