@@ -17,7 +17,7 @@ export interface StateMachineResult {
 const VALID_INTENTS_BY_STATE: Record<string, Intent[]> = {
   idle: ["browse_stores", "search_product", "select_vendor", "view_menu", "check_status", "rate_order", "rate_platform", "view_schedule", "view_offers", "help", "reset", "change_language", "talk_to_human", "add_to_cart"],
   browsing: ["select_vendor", "view_menu", "browse_stores", "search_product", "view_schedule", "help", "reset", "change_language", "talk_to_human"],
-  shopping: ["add_to_cart", "remove_from_cart", "view_cart", "empty_cart", "confirm_order", "select_delivery", "give_address", "select_payment", "view_menu", "browse_stores", "view_schedule", "help", "reset", "change_language", "talk_to_human", "check_status"],
+  shopping: ["add_to_cart", "remove_from_cart", "view_cart", "empty_cart", "confirm_order", "select_delivery", "give_address", "select_payment", "view_menu", "browse_stores", "view_schedule", "help", "reset", "change_language", "talk_to_human", "check_status", "cancel_order"],
   needs_address: ["give_address", "view_cart", "empty_cart", "help", "reset", "cancel_order", "change_language"],
   checkout: ["select_payment", "view_cart", "empty_cart", "confirm_order", "help", "reset", "cancel_order", "change_language"],
   order_pending_cash: ["check_status", "cancel_order", "talk_to_human", "rate_order", "rate_platform", "view_schedule", "help"],
@@ -465,7 +465,25 @@ async function handleCancelOrder(
   supabase: any,
   lang: Language,
 ): Promise<StateMachineResult> {
-  // Initiate cancellation flow
+  // If no pending order (e.g. shopping state), just reset to idle
+  if (!context.pending_order_id) {
+    context.order_state = "idle";
+    context.cart = [];
+    context.selected_vendor_id = undefined;
+    context.selected_vendor_name = undefined;
+    context.payment_method = undefined;
+    context.delivery_address = undefined;
+    context.delivery_type = undefined;
+    context.payment_methods_fetched = false;
+    context.available_payment_methods = [];
+    context.resumen_mostrado = false;
+    context.conversation_history = [];
+    context.available_vendors_map = [];
+    await saveContext(context, supabase);
+    return { response: t("reset.done", lang), handled: true };
+  }
+
+  // Initiate cancellation flow for active order
   context.pending_cancellation = {
     step: "awaiting_reason",
     order_id: context.pending_order_id || context.last_order_id,
