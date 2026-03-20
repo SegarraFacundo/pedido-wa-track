@@ -1,16 +1,17 @@
 // ==================== AGENTE PRINCIPAL ====================
 // Modularized: imports from bot-helpers.ts, tool-handlers.ts, emergency.ts
+// Architecture: 100% deterministic state machine with AI only as NLU (intent classifier)
 
-import OpenAI from "https://esm.sh/openai@4.77.3";
 import { ConversationContext } from "./types.ts";
 import { normalizeArgentinePhone } from "./utils.ts";
 import { getContext, saveContext } from "./context.ts";
-import { buildSystemPrompt } from "./simplified-prompt.ts";
 import { t, detectLanguage, detectExplicitLanguageRequest, HELP_REGEX, isConfirmation, isCancellation, detectPaymentMethod, Language } from "./i18n.ts";
 
 import { DIRECT_RESPONSE_TOOLS, filterToolsByState, handleShoppingInterceptor, trackVendorChange } from "./bot-helpers.ts";
 import { ejecutarHerramienta } from "./tool-handlers.ts";
 import { checkPlatformSettings, logBotError, incrementErrorCount, handleEmergencyFallback } from "./emergency.ts";
+import { classifyIntent } from "./nlu.ts";
+import { processIntent } from "./state-machine.ts";
 
 export async function handleVendorBot(message: string, phone: string, supabase: any, imageUrl?: string): Promise<string> {
   const normalizedPhone = normalizeArgentinePhone(phone);
