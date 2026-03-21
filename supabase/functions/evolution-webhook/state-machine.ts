@@ -69,10 +69,10 @@ const VALID_INTENTS_BY_STATE: Record<string, Intent[]> = {
 // Step instructions for retry messages
 const STEP_HINTS: Record<string, Record<Language, string>> = {
   idle: {
-    es: "Podés decir \"ver negocios\" o buscar un producto (ej: \"pizza\").",
-    en: "You can say \"see stores\" or search a product (e.g. \"pizza\").",
-    pt: "Pode dizer \"ver lojas\" ou buscar um produto (ex: \"pizza\").",
-    ja: "「店舗を見る」または商品を検索できます（例：「ピザ」）。",
+    es: "Enviá un *número* del menú o escribí lo que necesitás.",
+    en: "Send a *number* from the menu or write what you need.",
+    pt: "Envie um *número* do menu ou escreva o que precisa.",
+    ja: "メニューから*番号*を送るか、必要なことを書いてください。",
   },
   browsing: {
     es: "Elegí un negocio enviando su *número* o *nombre* de la lista.",
