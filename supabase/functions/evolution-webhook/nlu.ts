@@ -108,6 +108,10 @@ REGLA CRÍTICA - UN SOLO JSON:
 CASOS ESPECIALES POR ESTADO:
 - En estado "browsing": números probablemente seleccionan un vendor → select_vendor con params {vendor_ref: "N"}
 - En estado "shopping": números probablemente agregan un producto del menú → add_to_cart con params {product_ref: "N", quantity: 1}
+- En estado "shopping": "quitar/sacar/eliminar/borrar + producto/número" → remove_from_cart con params {product_ref: "..."}
+  Ejemplos: "quitar pizza" → {"intent": "remove_from_cart", "params": {"product_ref": "pizza"}, "confidence": 0.9}
+  "sacar el 2" → {"intent": "remove_from_cart", "params": {"product_ref": "2"}, "confidence": 0.9}
+  "eliminar tiramisú" → {"intent": "remove_from_cart", "params": {"product_ref": "tiramisú"}, "confidence": 0.9}
 - En estado "needs_address": la mayoría del texto es una dirección → give_address con params {address: "..."}
 - En estado "checkout": números/texto seleccionan método de pago → select_payment con params {method: "..."}
 

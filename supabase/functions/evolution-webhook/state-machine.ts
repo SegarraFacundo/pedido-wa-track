@@ -155,7 +155,7 @@ export async function processIntent(
       return handleAddToCart(params, context, supabase, lang);
 
     case "remove_from_cart":
-      return { response: t("shopping.not_understood", lang), handled: true };
+      return handleRemoveFromCart(params, context, supabase, lang);
 
     case "view_cart":
       return handleViewCart(context, supabase, lang);
@@ -265,7 +265,10 @@ function handleInvalidIntent(
   // First retry: repeat step instruction with context header
   const hint = STEP_HINTS[state]?.[lang] || STEP_HINTS["idle"][lang];
   const header = buildContextHeader(context, lang);
-  const response = `${header}🤔 ${t("error.not_understood", lang)}\n\n${hint}`;
+  const vendorName = context.selected_vendor_name || '';
+  const response = state === "shopping" 
+    ? t("shopping.not_understood", lang, { vendor: vendorName })
+    : `${header}🤔 ${t("error.not_understood", lang)}\n\n${hint}`;
   return { response, handled: true };
 }
 
@@ -365,7 +368,63 @@ async function handleAddToCart(
   }
 
   // Fallback: show not understood with menu hint
-  return { response: t("shopping.not_understood", lang), handled: true };
+  return { response: t("shopping.not_understood", lang, { vendor: context.selected_vendor_name || '' }), handled: true };
+}
+
+async function handleRemoveFromCart(
+  params: Record<string, any>,
+  context: ConversationContext,
+  supabase: any,
+  lang: Language,
+): Promise<StateMachineResult> {
+  const productRef = params.product_ref || "";
+  
+  if (context.cart.length === 0) {
+    return { response: t("cart.empty", lang), handled: true };
+  }
+
+  const cartDetail = context.cart.map((item, idx) => 
+    `${idx + 1}. ${item.product_name} x${item.quantity} - $${item.price * item.quantity}`
+  ).join('\n');
+
+  // Try to match by number index
+  const numRef = parseInt(productRef);
+  let removedProduct: string | null = null;
+
+  if (!isNaN(numRef) && numRef >= 1 && numRef <= context.cart.length) {
+    removedProduct = context.cart[numRef - 1].product_name;
+    context.cart.splice(numRef - 1, 1);
+  } else if (productRef) {
+    // Try to match by name
+    const idx = context.cart.findIndex(item => 
+      item.product_name.toLowerCase().includes(productRef.toLowerCase()) ||
+      productRef.toLowerCase().includes(item.product_name.toLowerCase())
+    );
+    if (idx >= 0) {
+      removedProduct = context.cart[idx].product_name;
+      context.cart.splice(idx, 1);
+    }
+  }
+
+  if (!removedProduct) {
+    return { response: t("cart.remove_not_found", lang, { cart_detail: cartDetail }), handled: true };
+  }
+
+  await saveContext(context, supabase);
+
+  if (context.cart.length === 0) {
+    context.order_state = "shopping";
+    context.resumen_mostrado = false;
+    await saveContext(context, supabase);
+    return { response: `🗑️ *${removedProduct}* eliminado. Tu carrito está vacío.\n\n` + t("shopping.not_understood", lang, { vendor: context.selected_vendor_name || '' }), handled: true };
+  }
+
+  const newCartDetail = context.cart.map((item, idx) => 
+    `${idx + 1}. ${item.product_name} x${item.quantity} - $${item.price * item.quantity}`
+  ).join('\n');
+  const total = context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+  return { response: t("cart.removed", lang, { product: removedProduct, vendor: context.selected_vendor_name || '', cart_detail: newCartDetail, total: String(total) }), handled: true };
 }
 
 async function handleViewCart(
