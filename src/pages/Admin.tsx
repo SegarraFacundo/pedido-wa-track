@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Store, DollarSign, BarChart3, LogOut, Headphones, Bot, Star, 
-  TrendingUp, Users, Wrench, AlertTriangle, Menu, FileText 
+  TrendingUp, Users, Wrench, AlertTriangle, Menu, FileText, TestTube2
 } from "lucide-react";
 import {
   Sheet,
