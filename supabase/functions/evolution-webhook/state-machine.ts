@@ -237,20 +237,35 @@ function handleInvalidIntent(
     return { response: getContextualMenu(context, lang), handled: true };
   }
 
-  if (retryCount >= 2) {
-    // Offer escalation
-    const response =
-      `😔 ${t("error.not_understood", lang)}\n\n` +
-      `💡 ${lang === "es" ? "Opciones" : lang === "en" ? "Options" : lang === "pt" ? "Opções" : "オプション"}:\n` +
-      `• ${lang === "es" ? 'Escribí "soporte" para hablar con alguien' : lang === "en" ? 'Type "support" to talk to someone' : lang === "pt" ? 'Digite "suporte" para falar com alguém' : '「サポート」でスタッフに連絡'}\n` +
-      `• ${lang === "es" ? 'Escribí "menú principal" para empezar de nuevo' : lang === "en" ? 'Type "main menu" to start over' : lang === "pt" ? 'Digite "menu principal" para recomeçar' : '「メインメニュー」で最初からやり直し'}`;
-    context.retry_count = 0; // Reset after escalation offer
-    return { response, handled: true };
+  // 3rd retry: force reset to idle + show main menu
+  if (retryCount >= 3) {
+    context.retry_count = 0;
+    context.order_state = "idle";
+    context.cart = [];
+    context.selected_vendor_id = undefined;
+    context.selected_vendor_name = undefined;
+    context.payment_method = undefined;
+    context.delivery_address = undefined;
+    context.delivery_type = undefined;
+    context.payment_methods_fetched = false;
+    context.available_payment_methods = [];
+    context.resumen_mostrado = false;
+    context.conversation_history = [];
+    context.available_vendors_map = [];
+    const resetMenu = t("welcome.menu_clean", lang);
+    return { response: t("error.forced_reset", lang) + resetMenu, handled: true };
   }
 
-  // First retry: repeat step instruction
+  // 2nd retry: show escalation menu with numbered options
+  if (retryCount >= 2) {
+    const header = buildContextHeader(context, lang);
+    return { response: header + t("error.escalation_menu", lang), handled: true };
+  }
+
+  // First retry: repeat step instruction with context header
   const hint = STEP_HINTS[state]?.[lang] || STEP_HINTS["idle"][lang];
-  const response = `🤔 ${t("error.not_understood", lang)}\n\n${hint}`;
+  const header = buildContextHeader(context, lang);
+  const response = `${header}🤔 ${t("error.not_understood", lang)}\n\n${hint}`;
   return { response, handled: true };
 }
 
