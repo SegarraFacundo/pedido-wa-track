@@ -3801,8 +3801,24 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
     }
 
+    // 🎯 INTERCEPTOR: Pedido explícito de menú en estado shopping
+    // El usuario quiere VER el menú otra vez (no agregar producto)
+    if (context.order_state === "shopping" && context.selected_vendor_id) {
+      const menuRequest = /^(men[uú]|ver men[uú]|mostrame el men[uú]|menu del local|ver productos|productos|que hay|qué hay|que tienen|qué tienen|ver carta|carta|show menu|ver el men[uú])/i;
+      if (menuRequest.test(message.trim())) {
+        console.log(`📋 INTERCEPTOR: Explicit menu request in shopping state → showing menu`);
+        const result = await ejecutarHerramienta("ver_menu_negocio", {
+          vendor_id: context.selected_vendor_id,
+        }, context, supabase);
+        
+        context.conversation_history.push({ role: "assistant", content: result });
+        await saveContext(context, supabase);
+        return result;
+      }
+    }
+
     // 🎯 FASE 5: Menú de ayuda estático
-    const helpKeywords = /^(ayuda|help|menu|opciones|que puedo hacer|qué puedo hacer|como funciona|cómo funciona|\?|info)$/i;
+    const helpKeywords = /^(ayuda|help|opciones|que puedo hacer|qué puedo hacer|como funciona|cómo funciona|\?|info)$/i;
     if (helpKeywords.test(message.trim())) {
       console.log(`📋 INTERCEPTOR: Static help menu`);
       const helpText = `📋 *¿Qué puedo hacer?*\n\n` +
