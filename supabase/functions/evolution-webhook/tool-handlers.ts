@@ -594,10 +594,10 @@ export async function ejecutarHerramienta(
         
         resumen += t('summary.products', lang) + `\n`;
         context.cart.forEach((item, i) => {
-          resumen += `${i + 1}. ${item.product_name} x${item.quantity} - $${item.price * item.quantity}\n`;
+          resumen += `${i + 1}. ${item.product_name} x${item.quantity} - $${Math.round(item.price * item.quantity)}\n`;
         });
         
-        const subtotal = context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        const subtotal = Math.round(context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0));
         resumen += `\n` + t('summary.subtotal', lang, { amount: String(subtotal) }) + `\n`;
         
         if (context.delivery_type === 'pickup') {
