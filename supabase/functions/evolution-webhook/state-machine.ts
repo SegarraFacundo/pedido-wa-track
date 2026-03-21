@@ -265,7 +265,10 @@ function handleInvalidIntent(
   // First retry: repeat step instruction with context header
   const hint = STEP_HINTS[state]?.[lang] || STEP_HINTS["idle"][lang];
   const header = buildContextHeader(context, lang);
-  const response = `${header}🤔 ${t("error.not_understood", lang)}\n\n${hint}`;
+  const vendorName = context.selected_vendor_name || '';
+  const response = state === "shopping" 
+    ? t("shopping.not_understood", lang, { vendor: vendorName })
+    : `${header}🤔 ${t("error.not_understood", lang)}\n\n${hint}`;
   return { response, handled: true };
 }
 
