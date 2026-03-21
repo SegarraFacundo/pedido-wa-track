@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
   Sparkles, Play, Trash2, Save, Loader2, CheckCircle2, XCircle,
-  AlertTriangle, ChevronDown, ChevronRight, Plus, Zap, Download
+  AlertTriangle, ChevronDown, ChevronRight, Plus, Zap, Download, Copy, ClipboardCheck
 } from "lucide-react";
 
 interface QaTest {
