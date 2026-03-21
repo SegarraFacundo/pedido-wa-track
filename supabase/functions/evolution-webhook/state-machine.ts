@@ -8,6 +8,44 @@ import { t, Language, detectPaymentMethod } from "./i18n.ts";
 import { saveContext } from "./context.ts";
 import { handleShoppingInterceptor } from "./bot-helpers.ts";
 
+// ==================== CONTEXT LEVEL DETECTION ====================
+// Determines which menu to show based on user's current context
+
+export type ContextLevel = 1 | 2 | 3 | 4;
+
+export function getContextLevel(context: ConversationContext): ContextLevel {
+  // Level 4: Completed order
+  if (context.order_state === "order_completed") return 4;
+  
+  // Level 3: Active order (pending/confirmed)
+  const activeOrderStates = ["order_pending_cash", "order_pending_transfer", "order_pending_mp", "order_confirmed"];
+  if (context.pending_order_id && activeOrderStates.includes(context.order_state || "")) return 3;
+  
+  // Level 2: Vendor selected (browsing/shopping)
+  if (context.selected_vendor_id) return 2;
+  
+  // Level 1: No context
+  return 1;
+}
+
+function getContextualMenu(context: ConversationContext, lang: Language): string {
+  const level = getContextLevel(context);
+  
+  switch (level) {
+    case 4:
+      return t("welcome.menu_completed", lang);
+    case 3: {
+      const orderId = context.pending_order_id ? context.pending_order_id.substring(0, 8) : "???";
+      return t("welcome.menu_active_order", lang, { id: orderId });
+    }
+    case 2:
+      return t("welcome.menu_vendor", lang, { vendor: context.selected_vendor_name || "" });
+    case 1:
+    default:
+      return t("welcome.menu_clean", lang);
+  }
+}
+
 export interface StateMachineResult {
   response: string;
   handled: boolean;  // false means NLU couldn't help, use fallback
