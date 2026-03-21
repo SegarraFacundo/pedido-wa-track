@@ -558,10 +558,10 @@ export async function ejecutarHerramienta(
 
         let carrito = t('cart.header', lang, { vendor: context.selected_vendor_name || '' }) + `\n\n`;
         context.cart.forEach((item, i) => {
-          carrito += `${i + 1}. ${item.product_name} x${item.quantity} - $${item.price * item.quantity}\n`;
+          carrito += `${i + 1}. ${item.product_name} x${item.quantity} - $${Math.round(item.price * item.quantity)}\n`;
         });
 
-        const total = context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        const total = Math.round(context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0));
         carrito += `\n💰 ${t('cart.total', lang)}: $${total}\n\n`;
         
         if (context.delivery_type && context.payment_method) {
@@ -594,10 +594,10 @@ export async function ejecutarHerramienta(
         
         resumen += t('summary.products', lang) + `\n`;
         context.cart.forEach((item, i) => {
-          resumen += `${i + 1}. ${item.product_name} x${item.quantity} - $${item.price * item.quantity}\n`;
+          resumen += `${i + 1}. ${item.product_name} x${item.quantity} - $${Math.round(item.price * item.quantity)}\n`;
         });
         
-        const subtotal = context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        const subtotal = Math.round(context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0));
         resumen += `\n` + t('summary.subtotal', lang, { amount: String(subtotal) }) + `\n`;
         
         if (context.delivery_type === 'pickup') {
@@ -730,11 +730,11 @@ export async function ejecutarHerramienta(
         
         context.cart = newCart;
         
-        const total = context.cart.reduce((s, i) => s + i.price * i.quantity, 0);
+        const total = Math.round(context.cart.reduce((s, i) => s + i.price * i.quantity, 0));
         
         let response = t('cart.modified', lang, { vendor: context.selected_vendor_name || '' }) + `\n\n`;
         context.cart.forEach(item => {
-          response += `• ${item.product_name} x${item.quantity} - $${item.price * item.quantity}\n`;
+          response += `• ${item.product_name} x${item.quantity} - $${Math.round(item.price * item.quantity)}\n`;
         });
         response += `\n💰 ${t('cart.total', lang)}: $${total}\n\n` + t('cart.is_correct', lang);
         
@@ -944,8 +944,8 @@ export async function ejecutarHerramienta(
         context.delivery_address = args.direccion;
         context.payment_method = args.metodo_pago;
 
-        const subtotal = context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-        const total = subtotal + deliveryCost;
+        const subtotal = Math.round(context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0));
+        const total = Math.round(subtotal + deliveryCost);
 
         const { data: order, error } = await supabase
           .from("orders")

@@ -57,7 +57,7 @@ function buildContextHeader(context: ConversationContext, lang: Language): strin
   }
   
   if (context.cart.length > 0) {
-    const total = context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const total = Math.round(context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0));
     const itemCount = context.cart.reduce((sum, item) => sum + item.quantity, 0);
     parts.push(`🛒 ${lang === "es" ? "Carrito" : lang === "en" ? "Cart" : lang === "pt" ? "Carrinho" : "カート"}: ${itemCount} ${lang === "es" ? "productos" : lang === "en" ? "items" : lang === "pt" ? "produtos" : "商品"} ($${total})`);
   }
@@ -378,36 +378,52 @@ async function handleRemoveFromCart(
   lang: Language,
 ): Promise<StateMachineResult> {
   const productRef = params.product_ref || "";
+  const requestedQty = params.quantity;
   
   if (context.cart.length === 0) {
     return { response: t("cart.empty", lang), handled: true };
   }
 
   const cartDetail = context.cart.map((item, idx) => 
-    `${idx + 1}. ${item.product_name} x${item.quantity} - $${item.price * item.quantity}`
+    `${idx + 1}. ${item.product_name} x${item.quantity} - $${Math.round(item.price * item.quantity)}`
   ).join('\n');
 
   // Try to match by number index
   const numRef = parseInt(productRef);
-  let removedProduct: string | null = null;
+  let matchIdx = -1;
 
   if (!isNaN(numRef) && numRef >= 1 && numRef <= context.cart.length) {
-    removedProduct = context.cart[numRef - 1].product_name;
-    context.cart.splice(numRef - 1, 1);
+    matchIdx = numRef - 1;
   } else if (productRef) {
-    // Try to match by name
-    const idx = context.cart.findIndex(item => 
+    matchIdx = context.cart.findIndex(item => 
       item.product_name.toLowerCase().includes(productRef.toLowerCase()) ||
       productRef.toLowerCase().includes(item.product_name.toLowerCase())
     );
-    if (idx >= 0) {
-      removedProduct = context.cart[idx].product_name;
-      context.cart.splice(idx, 1);
-    }
   }
 
-  if (!removedProduct) {
+  if (matchIdx < 0) {
     return { response: t("cart.remove_not_found", lang, { cart_detail: cartDetail }), handled: true };
+  }
+
+  const item = context.cart[matchIdx];
+  const removedProduct = item.product_name;
+
+  // Determine how many to remove
+  let removeCount: number;
+  if (requestedQty === "all" || requestedQty === "todas" || requestedQty === "todos") {
+    removeCount = item.quantity;
+  } else if (typeof requestedQty === "number" && requestedQty > 0) {
+    removeCount = Math.min(requestedQty, item.quantity);
+  } else if (typeof requestedQty === "string" && !isNaN(parseInt(requestedQty))) {
+    removeCount = Math.min(parseInt(requestedQty), item.quantity);
+  } else {
+    // No quantity specified: remove 1 unit
+    removeCount = 1;
+  }
+
+  item.quantity -= removeCount;
+  if (item.quantity <= 0) {
+    context.cart.splice(matchIdx, 1);
   }
 
   await saveContext(context, supabase);
@@ -416,15 +432,15 @@ async function handleRemoveFromCart(
     context.order_state = "shopping";
     context.resumen_mostrado = false;
     await saveContext(context, supabase);
-    return { response: `🗑️ *${removedProduct}* eliminado. Tu carrito está vacío.\n\n` + t("shopping.not_understood", lang, { vendor: context.selected_vendor_name || '' }), handled: true };
+    return { response: `🗑️ *${removedProduct}* (x${removeCount}) eliminado. Tu carrito está vacío.\n\n` + t("shopping.not_understood", lang, { vendor: context.selected_vendor_name || '' }), handled: true };
   }
 
   const newCartDetail = context.cart.map((item, idx) => 
-    `${idx + 1}. ${item.product_name} x${item.quantity} - $${item.price * item.quantity}`
+    `${idx + 1}. ${item.product_name} x${item.quantity} - $${Math.round(item.price * item.quantity)}`
   ).join('\n');
-  const total = context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const total = Math.round(context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0));
 
-  return { response: t("cart.removed", lang, { product: removedProduct, vendor: context.selected_vendor_name || '', cart_detail: newCartDetail, total: String(total) }), handled: true };
+  return { response: t("cart.removed", lang, { product: `${removedProduct} (x${removeCount})`, vendor: context.selected_vendor_name || '', cart_detail: newCartDetail, total: String(total) }), handled: true };
 }
 
 async function handleViewCart(

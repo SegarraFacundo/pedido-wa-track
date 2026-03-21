@@ -202,9 +202,9 @@ export async function handleShoppingInterceptor(
     }
   }
 
-  const total = context.cart.reduce((s: number, i: CartItem) => s + i.price * i.quantity, 0);
+  const total = Math.round(context.cart.reduce((s: number, i: CartItem) => s + i.price * i.quantity, 0));
   const cartDetail = context.cart.map((item: CartItem, idx: number) => 
-    `${idx + 1}. ${item.product_name} x${item.quantity} - $${item.price * item.quantity}`
+    `${idx + 1}. ${item.product_name} x${item.quantity} - $${Math.round(item.price * item.quantity)}`
   ).join('\n');
 
   await saveContext(context, supabase);
