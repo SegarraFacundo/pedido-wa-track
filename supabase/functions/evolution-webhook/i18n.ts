@@ -1504,10 +1504,22 @@ Escreva o que precisa e eu ajudo. É muito fácil! 😊`,
     ja: '⚠️ *{vendor}*で買い物中です。他の店舗を見るには、まず「カートをクリア」か「新しい注文」と言ってください。',
   },
   'shopping.not_understood': {
-    es: 'No entendí tu mensaje 🤔\n\nPodés:\n• Enviar un *número del menú* para agregar\n• Decir *"carrito"* para ver tu pedido\n• Decir *"confirmar"* para finalizar\n• Decir *"menú"* para ver los productos',
-    en: 'I didn\'t understand your message 🤔\n\nYou can:\n• Send a *menu number* to add\n• Say *"cart"* to see your order\n• Say *"confirm"* to finalize\n• Say *"menu"* to see products',
-    pt: 'Não entendi sua mensagem 🤔\n\nVocê pode:\n• Enviar um *número do cardápio* para adicionar\n• Dizer *"carrinho"* para ver seu pedido\n• Dizer *"confirmar"* para finalizar\n• Dizer *"cardápio"* para ver os produtos',
-    ja: 'メッセージが理解できませんでした 🤔\n\n以下のことができます:\n• *メニュー番号*を送信して追加\n• *「カート」*で注文を確認\n• *「確定」*で注文を完了\n• *「メニュー」*で商品を表示',
+    es: '🤔 No entendí. Estás en *{vendor}*.\n\n📌 *Podés hacer:*\n• Enviá un *número del menú* (ej: *3*) para agregar un producto\n• Enviá *cantidad + número* (ej: *2x3*) para agregar varios\n• Escribí *"carrito"* para ver tu pedido\n• Escribí *"confirmar"* para finalizar\n• Escribí *"menú"* para ver los productos\n• Escribí *"cancelar"* para empezar de nuevo',
+    en: 'I didn\'t understand 🤔 You\'re at *{vendor}*.\n\n📌 *You can:*\n• Send a *menu number* (e.g. *3*) to add a product\n• Send *quantity + number* (e.g. *2x3*) to add multiple\n• Type *"cart"* to see your order\n• Type *"confirm"* to finalize\n• Type *"menu"* to see products\n• Type *"cancel"* to start over',
+    pt: 'Não entendi 🤔 Você está em *{vendor}*.\n\n📌 *Você pode:*\n• Envie um *número do cardápio* (ex: *3*) para adicionar\n• Envie *quantidade + número* (ex: *2x3*) para adicionar vários\n• Escreva *"carrinho"* para ver seu pedido\n• Escreva *"confirmar"* para finalizar\n• Escreva *"cardápio"* para ver produtos\n• Escreva *"cancelar"* para recomeçar',
+    ja: '理解できませんでした 🤔 *{vendor}*にいます。\n\n📌 *できること:*\n• *メニュー番号*を送信（例: *3*）して追加\n• *数量+番号*を送信（例: *2x3*）して複数追加\n• *「カート」*で注文を確認\n• *「確定」*で注文を完了\n• *「メニュー」*で商品を表示\n• *「キャンセル」*でやり直す',
+  },
+  'cart.removed': {
+    es: '🗑️ *{product}* eliminado del carrito.\n\n🛒 *Tu carrito de {vendor}:*\n{cart_detail}\n\n💰 *Total: ${total}*',
+    en: '🗑️ *{product}* removed from cart.\n\n🛒 *Your cart from {vendor}:*\n{cart_detail}\n\n💰 *Total: ${total}*',
+    pt: '🗑️ *{product}* removido do carrinho.\n\n🛒 *Seu carrinho de {vendor}:*\n{cart_detail}\n\n💰 *Total: ${total}*',
+    ja: '🗑️ *{product}* をカートから削除しました。\n\n🛒 *{vendor}のカート:*\n{cart_detail}\n\n💰 *合計: ${total}*',
+  },
+  'cart.remove_not_found': {
+    es: '❌ No encontré ese producto en tu carrito.\n\n🛒 *Tu carrito:*\n{cart_detail}\n\nDecí *"quitar 1"* con el número del producto para eliminarlo.',
+    en: '❌ Product not found in your cart.\n\n🛒 *Your cart:*\n{cart_detail}\n\nSay *"remove 1"* with the product number to remove it.',
+    pt: '❌ Produto não encontrado no carrinho.\n\n🛒 *Seu carrinho:*\n{cart_detail}\n\nDiga *"remover 1"* com o número do produto.',
+    ja: '❌ その商品はカートにありません。\n\n🛒 *カート:*\n{cart_detail}\n\n*「削除 1」*と商品番号で削除。',
   },
 
   // === WELCOME MENUS (Contextual) ===
