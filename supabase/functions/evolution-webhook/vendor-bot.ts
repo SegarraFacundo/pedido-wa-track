@@ -11,7 +11,7 @@ import { DIRECT_RESPONSE_TOOLS, filterToolsByState, handleShoppingInterceptor, t
 import { ejecutarHerramienta } from "./tool-handlers.ts";
 import { checkPlatformSettings, logBotError, incrementErrorCount, handleEmergencyFallback } from "./emergency.ts";
 import { classifyIntent } from "./nlu.ts";
-import { processIntent } from "./state-machine.ts";
+import { processIntent, getContextLevel } from "./state-machine.ts";
 
 export async function handleVendorBot(message: string, phone: string, supabase: any, imageUrl?: string): Promise<string> {
   const normalizedPhone = normalizeArgentinePhone(phone);
