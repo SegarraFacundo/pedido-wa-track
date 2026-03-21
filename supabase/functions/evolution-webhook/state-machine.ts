@@ -46,6 +46,26 @@ function getContextualMenu(context: ConversationContext, lang: Language): string
   }
 }
 
+// ==================== CONTEXT HEADER ====================
+// Shows the user where they are (vendor, cart) to reduce confusion
+
+function buildContextHeader(context: ConversationContext, lang: Language): string {
+  const parts: string[] = [];
+  
+  if (context.selected_vendor_name) {
+    parts.push(`📍 ${lang === "es" ? "Negocio" : lang === "en" ? "Store" : lang === "pt" ? "Loja" : "店舗"}: *${context.selected_vendor_name}*`);
+  }
+  
+  if (context.cart.length > 0) {
+    const total = context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const itemCount = context.cart.reduce((sum, item) => sum + item.quantity, 0);
+    parts.push(`🛒 ${lang === "es" ? "Carrito" : lang === "en" ? "Cart" : lang === "pt" ? "Carrinho" : "カート"}: ${itemCount} ${lang === "es" ? "productos" : lang === "en" ? "items" : lang === "pt" ? "produtos" : "商品"} ($${total})`);
+  }
+  
+  if (parts.length === 0) return "";
+  return parts.join(" | ") + "\n\n";
+}
+
 export interface StateMachineResult {
   response: string;
   handled: boolean;  // false means NLU couldn't help, use fallback
