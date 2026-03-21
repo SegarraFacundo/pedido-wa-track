@@ -982,7 +982,8 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     // ==================== NLU + STATE MACHINE ====================
     // The AI only classifies intent — all logic and responses are deterministic
     
-    console.log(`🧠 NLU: Classifying message in state "${context.order_state || 'idle'}"`);
+    const stateBefore = context.order_state || "idle";
+    console.log(`🧠 NLU: Classifying message in state "${stateBefore}"`);
     
     const nluResult = await classifyIntent(message, context);
     console.log(`🧠 NLU Result: intent=${nluResult.intent}, confidence=${nluResult.confidence}, params=${JSON.stringify(nluResult.params)}`);
@@ -990,9 +991,13 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     const smResult = await processIntent(nluResult, context, supabase);
     
     let finalResponse = smResult.response;
+    const stateAfter = context.order_state || "idle";
 
     context.conversation_history.push({ role: "assistant", content: finalResponse });
     await saveContext(context, supabase);
+
+    // 📊 LOG: Structured interaction log
+    logBotInteraction(supabase, normalizedPhone, message, nluResult.intent, stateBefore, stateAfter, nluResult.confidence, finalResponse);
 
     console.log("🤖 AI Bot END");
     return finalResponse;
