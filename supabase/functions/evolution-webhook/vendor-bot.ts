@@ -258,7 +258,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
           switch (num) {
             case 1: result = t('rating.prompt_order', lang); break;
             case 2: result = await ejecutarHerramienta("ver_locales_abiertos", {}, context, supabase); break;
-            case 3: result = t('welcome.search_prompt', lang); break;
+            case 3: result = t('welcome.search_prompt', lang); context.order_state = 'awaiting_search'; break;
             case 4: result = t('help.full', lang); break;
             default: intercepted = false;
           }
