@@ -3958,16 +3958,6 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
 
           // 🎯 FASE 4: Si es una herramienta de respuesta directa Y es el único tool call,
           // retornar resultado directamente sin pasar por el LLM para reformateo
-          // ⚠️ EXCEPCIÓN: En estado shopping, bloquear ver_menu_negocio redundante
-          if (toolName === "ver_menu_negocio" && (context.order_state === "shopping")) {
-            console.log(`🚫 BLOCKED: ver_menu_negocio in shopping state - user likely wants to add products`);
-            messages.push({
-              role: "tool",
-              tool_call_id: toolCall.id,
-              content: "⚠️ El usuario ya está viendo este menú. Interpretá su mensaje como un pedido de producto y usá agregar_al_carrito. Si dice un número, es el producto #N del menú.",
-            });
-            continue;
-          }
           
           if (DIRECT_RESPONSE_TOOLS.has(toolName) && assistantMessage.tool_calls!.length === 1) {
             console.log(`⚡ DIRECT RESPONSE: Returning ${toolName} result directly (no LLM reformatting)`);
