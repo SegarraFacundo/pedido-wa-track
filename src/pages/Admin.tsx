@@ -29,6 +29,7 @@ import { VendorChangeAnalytics } from "@/components/admin/VendorChangeAnalytics"
 import PharmacyProductLoader from "@/components/admin/PharmacyProductLoader";
 import EmergencyControl from "@/components/admin/EmergencyControl";
 import BotInteractionReview from "@/components/admin/BotInteractionReview";
+import BotQATester from "@/components/admin/BotQATester";
 import lapachoLogo from "@/assets/lapacho-logo.png";
 import lapachoIcon from "@/assets/lapacho-icon.png";
 import { cn } from "@/lib/utils";
