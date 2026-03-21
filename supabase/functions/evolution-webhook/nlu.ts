@@ -27,6 +27,7 @@ export type Intent =
   | "help"
   | "reset"
   | "change_language"
+  | "greeting"
   | "unknown";
 
 export interface NLUResult {
