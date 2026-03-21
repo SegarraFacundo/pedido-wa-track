@@ -10,7 +10,7 @@ import { buildSystemPrompt } from "./simplified-prompt.ts";
 
 const TOOLS_BY_STATE: Record<string, string[]> = {
   idle: ["buscar_productos", "ver_locales_abiertos", "mostrar_menu_ayuda", "ver_estado_pedido"],
-  browsing: ["ver_menu_negocio", "buscar_productos", "ver_locales_abiertos", "mostrar_menu_ayuda"],
+  browsing: ["ver_menu_negocio", "buscar_productos", "ver_locales_abiertos", "mostrar_menu_ayuda", "ver_estado_pedido", "registrar_calificacion", "calificar_plataforma"],
   shopping: [
     "agregar_al_carrito", "quitar_producto_carrito", "ver_carrito",
     "modificar_carrito_completo", "ver_menu_negocio", "ver_ofertas",
@@ -120,9 +120,13 @@ async function handleShoppingInterceptor(
     .eq("is_available", true)
     .order("name");
 
-  if (error || !products || products.length === 0) {
-    console.error("❌ Shopping interceptor: Error fetching products or no products found");
+  if (error) {
+    console.error("❌ Shopping interceptor: Error fetching products:", error);
     return null;
+  }
+  if (!products || products.length === 0) {
+    console.warn("⚠️ Shopping interceptor: No products found for vendor", vendorId);
+    return `⚠️ *${context.selected_vendor_name}* no tiene productos disponibles en este momento.\n\n¿Querés ver otros negocios? Escribí "ver negocios" 😊`;
   }
 
   // Parse each segment into { quantity, searchTerm, menuIndex }
@@ -235,6 +239,29 @@ function splitProductSegments(text: string): string[] {
   return parts.filter(p => p.trim().length > 0);
 }
 
+// ==================== HELPER: Spanish number words to integer ====================
+function spanishNumberToInt(word: string): number | null {
+  const map: Record<string, number> = {
+    'un': 1, 'una': 1, 'uno': 1,
+    'dos': 2,
+    'tres': 3,
+    'cuatro': 4,
+    'cinco': 5,
+    'seis': 6,
+    'siete': 7,
+    'ocho': 8,
+    'nueve': 9,
+    'diez': 10,
+    'once': 11,
+    'doce': 12,
+    'media': 6, // "media docena"
+    'docena': 12,
+    'quince': 15,
+    'veinte': 20,
+  };
+  return map[word.toLowerCase()] ?? null;
+}
+
 // ==================== HELPER: Parse a single product segment ====================
 function parseProductSegment(segment: string): { quantity: number; searchTerm: string | null; menuIndex: number | null } | null {
   // Solo número → menu index
@@ -252,14 +279,26 @@ function parseProductSegment(segment: string): { quantity: number; searchTerm: s
     }
   }
 
+  // "media docena de X" → 6
+  const mediaDocena = segment.match(/^media\s+docena\s+(?:de\s+)?(.+)/i);
+  if (mediaDocena) {
+    return { quantity: 6, searchTerm: mediaDocena[1].trim(), menuIndex: null };
+  }
+
+  // "una docena de X" → 12
+  const docena = segment.match(/^(?:una?\s+)?docena\s+(?:de\s+)?(.+)/i);
+  if (docena) {
+    return { quantity: 12, searchTerm: docena[1].trim(), menuIndex: null };
+  }
+
   // "una/uno producto"
   const unaPattern = segment.match(/^(?:una?|uno)\s+(.+)/i);
   if (unaPattern) {
     return { quantity: 1, searchTerm: unaPattern[1].trim(), menuIndex: null };
   }
 
-  // "quiero/dame N producto"
-  const quieroPattern = segment.match(/^(?:quiero|dame|poneme|agregame|mandame)\s+(\d+)\s+(.+)/i);
+  // "quiero/dame N producto" (digit)
+  const quieroPattern = segment.match(/^(?:quiero|dame|poneme|agregame|mandame|traeme)\s+(\d+)\s+(.+)/i);
   if (quieroPattern) {
     const qty = parseInt(quieroPattern[1]);
     if (qty >= 1 && qty <= 50) {
@@ -267,10 +306,28 @@ function parseProductSegment(segment: string): { quantity: number; searchTerm: s
     }
   }
 
+  // "quiero/dame SPANISH_NUMBER producto" ("dame cuatro tiramisú", "traeme dos empanadas")
+  const quieroSpanishNum = segment.match(/^(?:quiero|dame|poneme|agregame|mandame|traeme)\s+(\w+)\s+(.+)/i);
+  if (quieroSpanishNum) {
+    const qty = spanishNumberToInt(quieroSpanishNum[1]);
+    if (qty !== null && qty >= 1 && qty <= 50) {
+      return { quantity: qty, searchTerm: quieroSpanishNum[2].trim(), menuIndex: null };
+    }
+  }
+
   // "quiero/dame producto" (qty 1)
-  const quieroSimple = segment.match(/^(?:quiero|dame|poneme|agregame|mandame)\s+(.+)/i);
+  const quieroSimple = segment.match(/^(?:quiero|dame|poneme|agregame|mandame|traeme)\s+(.+)/i);
   if (quieroSimple) {
     return { quantity: 1, searchTerm: quieroSimple[1].trim(), menuIndex: null };
+  }
+
+  // "SPANISH_NUMBER producto" sin verbo ("cuatro tiramisú", "dos cocas")
+  const spanishNumProduct = segment.match(/^(\w+)\s+(.+)/i);
+  if (spanishNumProduct) {
+    const qty = spanishNumberToInt(spanishNumProduct[1]);
+    if (qty !== null && qty >= 1 && qty <= 50) {
+      return { quantity: qty, searchTerm: spanishNumProduct[2].trim(), menuIndex: null };
+    }
   }
 
   // Just a product name (e.g. "helado de vainilla")
@@ -283,18 +340,24 @@ function parseProductSegment(segment: string): { quantity: number; searchTerm: s
 
 // ==================== HELPER: Find product by name ====================
 function findProductByName(searchTerm: string, products: any[]): any {
-  const searchLower = searchTerm.toLowerCase().replace(/s$/, '');
+  // Normalize accents for comparison
+  const normalize = (s: string) => s.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/s$/, '');
   
-  let matched = products.find((p: any) => 
-    p.name.toLowerCase().includes(searchLower) ||
-    searchLower.includes(p.name.toLowerCase().replace(/s$/, ''))
-  );
+  const searchNorm = normalize(searchTerm);
+  
+  let matched = products.find((p: any) => {
+    const nameNorm = normalize(p.name);
+    return nameNorm.includes(searchNorm) || searchNorm.includes(nameNorm);
+  });
 
   if (!matched) {
-    const words = searchLower.split(/\s+/);
-    matched = products.find((p: any) => 
-      words.some((w: string) => w.length > 2 && p.name.toLowerCase().includes(w))
-    );
+    const words = searchNorm.split(/\s+/);
+    matched = products.find((p: any) => {
+      const nameNorm = normalize(p.name);
+      return words.some((w: string) => w.length > 2 && nameNorm.includes(w));
+    });
   }
 
   return matched;
@@ -4021,11 +4084,17 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
     }
 
-    // INTERCEPTOR: Estado idle/browsing + palabras de comida → buscar_productos directo
+    // INTERCEPTOR: Estado idle/browsing + palabras de comida O producto genérico → buscar_productos directo
     if ((context.order_state === "idle" || context.order_state === "browsing" || !context.order_state) && !context.selected_vendor_id) {
       const foodKeywords = /\b(pizza|hamburguesa|empanada|milanesa|sushi|helado|cerveza|coca|fanta|sprite|agua|café|cafe|pollo|asado|lomito|sandwich|tarta|torta|postre|ensalada|papas|sándwich|medialunas?|facturas?|alfajor|ravioles?|ñoquis?|pastas?)\b/i;
-      if (foodKeywords.test(message)) {
-        console.log(`🍕 INTERCEPTOR: Food keyword detected in idle/browsing, calling buscar_productos`);
+      // Detectar queries de producto: no es un saludo, no es un comando, tiene 2+ caracteres
+      const isGreeting = /^(hola|buenas?|buen[ao]s?\s+(dias?|tardes?|noches?)|hey|hi|hello|que\s+tal)\b/i.test(message.trim());
+      const isCommand = /^(ayuda|help|opciones|estado|cancelar|carrito|menu|volver|salir|calificar)\b/i.test(message.trim());
+      const isGibberish = /^[^a-záéíóúñü]*$/i.test(message.trim()); // Only symbols/numbers
+      const isProductQuery = !isGreeting && !isCommand && !isGibberish && message.trim().length >= 3 && message.trim().length <= 80;
+      
+      if (foodKeywords.test(message) || isProductQuery) {
+        console.log(`🍕 INTERCEPTOR: Product query detected in idle/browsing: "${message.trim()}", calling buscar_productos`);
         const result = await ejecutarHerramienta("buscar_productos", {
           consulta: message.trim(),
         }, context, supabase);
