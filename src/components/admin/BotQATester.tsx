@@ -204,11 +204,11 @@ export default function BotQATester() {
       }
 
       const allPassed = stepsResults.every(s => s.success);
-      await supabase.from("bot_qa_results").insert({
-        test_id: test.id,
+      await supabase.from("bot_qa_results").insert([{
+        test_id: test.id!,
         status: allPassed ? "passed" : "failed",
-        steps_results: stepsResults as unknown as Record<string, unknown>,
-      });
+        steps_results: JSON.parse(JSON.stringify(stepsResults)),
+      }]);
 
       toast({
         title: allPassed ? "✅ Test pasó" : "⚠️ Test con problemas",
