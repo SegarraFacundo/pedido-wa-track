@@ -193,6 +193,9 @@ export async function processIntent(
       // This is handled earlier in vendor-bot.ts interceptors
       return { response: t("language.changed", lang), handled: true };
 
+    case "greeting":
+      return { response: getContextualMenu(context, lang), handled: true };
+
     default:
       return handleInvalidIntent(context, state, lang);
   }
