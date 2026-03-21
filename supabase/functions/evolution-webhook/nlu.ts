@@ -106,6 +106,7 @@ REGLA CRÍTICA - UN SOLO JSON:
   El sistema procesará los demás productos en turnos siguientes.
 
 CASOS ESPECIALES POR ESTADO:
+- En estado "idle": si el usuario escribe un nombre de producto o comida sin contexto (ej: "pizza", "remera", "hamburguesa", "coca cola"), es search_product con params {query: "..."}.
 - En estado "browsing": números probablemente seleccionan un vendor → select_vendor con params {vendor_ref: "N"}
 - En estado "shopping": números probablemente agregan un producto del menú → add_to_cart con params {product_ref: "N", quantity: 1}
 - En estado "shopping": "quitar/sacar/eliminar/borrar + producto/número" → remove_from_cart con params {product_ref: "...", quantity: N}
