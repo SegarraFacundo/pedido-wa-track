@@ -730,11 +730,11 @@ export async function ejecutarHerramienta(
         
         context.cart = newCart;
         
-        const total = context.cart.reduce((s, i) => s + i.price * i.quantity, 0);
+        const total = Math.round(context.cart.reduce((s, i) => s + i.price * i.quantity, 0));
         
         let response = t('cart.modified', lang, { vendor: context.selected_vendor_name || '' }) + `\n\n`;
         context.cart.forEach(item => {
-          response += `• ${item.product_name} x${item.quantity} - $${item.price * item.quantity}\n`;
+          response += `• ${item.product_name} x${item.quantity} - $${Math.round(item.price * item.quantity)}\n`;
         });
         response += `\n💰 ${t('cart.total', lang)}: $${total}\n\n` + t('cart.is_correct', lang);
         
