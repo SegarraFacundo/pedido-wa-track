@@ -178,7 +178,7 @@ export default function Admin() {
       <main className="container mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           {/* TabsList solo visible en desktop */}
-          <TabsList className="hidden lg:grid w-full grid-cols-14 mb-8">
+          <TabsList className="hidden lg:grid w-full mb-8" style={{ gridTemplateColumns: `repeat(${menuItems.length}, minmax(0, 1fr))` }}>
             {menuItems.map((item) => (
               <TabsTrigger
                 key={item.value}
