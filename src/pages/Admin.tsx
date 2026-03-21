@@ -253,6 +253,12 @@ export default function Admin() {
             <EmergencyControl />
           </TabsContent>
 
+          <TabsContent value="qa-bot">
+            <BotQATester />
+          </TabsContent>
+            <EmergencyControl />
+          </TabsContent>
+
           <TabsContent value="tools">
             <div className="space-y-6">
               <h2 className="text-2xl font-bold">Herramientas de Administración</h2>
