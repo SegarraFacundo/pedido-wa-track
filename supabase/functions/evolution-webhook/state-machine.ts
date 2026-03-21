@@ -365,7 +365,7 @@ async function handleAddToCart(
   }
 
   // Fallback: show not understood with menu hint
-  return { response: t("shopping.not_understood", lang), handled: true };
+  return { response: t("shopping.not_understood", lang, { vendor: context.selected_vendor_name || '' }), handled: true };
 }
 
 async function handleViewCart(
