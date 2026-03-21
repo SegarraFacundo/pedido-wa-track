@@ -160,13 +160,38 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       return menuResponse;
     }
 
-    // 🔢 INTERCEPTOR: Number in idle/completed → execute menu action
+    // 🔢 INTERCEPTOR: Number from contextual menu → execute menu action deterministically
     const idleMenuStates = ['idle', 'order_completed', 'order_cancelled'];
-    if (idleMenuStates.includes(context.order_state || 'idle')) {
-      const numMatch = message.trim().match(/^(\d)$/);
-      if (numMatch) {
-        const num = parseInt(numMatch[1]);
-        const level = getContextLevel(context);
+    const numMatch = message.trim().match(/^(\d)$/);
+    if (numMatch) {
+      const num = parseInt(numMatch[1]);
+      const level = getContextLevel(context);
+
+      const lastAssistant = context.conversation_history
+        .filter(m => m.role === 'assistant')
+        .slice(-1)[0]?.content?.trim();
+
+      const expectedMenuForLevel = (() => {
+        switch (level) {
+          case 4:
+            return t('welcome.menu_completed', lang).trim();
+          case 3: {
+            const orderId = context.pending_order_id ? context.pending_order_id.substring(0, 8) : '???';
+            return t('welcome.menu_active_order', lang, { id: orderId }).trim();
+          }
+          case 2:
+            return t('welcome.menu_vendor', lang, { vendor: context.selected_vendor_name || '' }).trim();
+          case 1:
+          default:
+            return t('welcome.menu_clean', lang).trim();
+        }
+      })();
+
+      const shouldHandleMenuNumber =
+        idleMenuStates.includes(context.order_state || 'idle') ||
+        (!!lastAssistant && lastAssistant === expectedMenuForLevel);
+
+      if (shouldHandleMenuNumber) {
         let intercepted = true;
         let result: string | null = null;
 
