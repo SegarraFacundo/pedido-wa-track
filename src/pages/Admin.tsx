@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Store, DollarSign, BarChart3, LogOut, Headphones, Bot, Star, 
-  TrendingUp, Users, Wrench, AlertTriangle, Menu, FileText 
+  TrendingUp, Users, Wrench, AlertTriangle, Menu, FileText, TestTube2
 } from "lucide-react";
 import {
   Sheet,
@@ -29,6 +29,7 @@ import { VendorChangeAnalytics } from "@/components/admin/VendorChangeAnalytics"
 import PharmacyProductLoader from "@/components/admin/PharmacyProductLoader";
 import EmergencyControl from "@/components/admin/EmergencyControl";
 import BotInteractionReview from "@/components/admin/BotInteractionReview";
+import BotQATester from "@/components/admin/BotQATester";
 import lapachoLogo from "@/assets/lapacho-logo.png";
 import lapachoIcon from "@/assets/lapacho-icon.png";
 import { cn } from "@/lib/utils";
@@ -45,7 +46,9 @@ const menuItems = [
   { value: "soporte-users", label: "Usuarios Soporte", icon: Users },
   { value: "evolution", label: "Agente IA", icon: Bot },
   { value: "bot-review", label: "Errores Bot", icon: AlertTriangle },
+  { value: "qa-bot", label: "QA Bot", icon: TestTube2 },
   { value: "emergency", label: "Emergencia", icon: AlertTriangle, danger: true },
+  { value: "tools", label: "Herramientas", icon: Wrench },
   { value: "tools", label: "Herramientas", icon: Wrench },
 ];
 
@@ -176,7 +179,7 @@ export default function Admin() {
       <main className="container mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           {/* TabsList solo visible en desktop */}
-          <TabsList className="hidden lg:grid w-full grid-cols-13 mb-8">
+          <TabsList className="hidden lg:grid w-full grid-cols-14 mb-8">
             {menuItems.map((item) => (
               <TabsTrigger
                 key={item.value}
@@ -248,6 +251,10 @@ export default function Admin() {
 
           <TabsContent value="emergency">
             <EmergencyControl />
+          </TabsContent>
+
+          <TabsContent value="qa-bot">
+            <BotQATester />
           </TabsContent>
 
           <TabsContent value="tools">

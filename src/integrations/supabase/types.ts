@@ -144,6 +144,68 @@ export type Database = {
         }
         Relationships: []
       }
+      bot_qa_results: {
+        Row: {
+          id: string
+          notes: string | null
+          run_at: string
+          status: string
+          steps_results: Json
+          test_id: string
+        }
+        Insert: {
+          id?: string
+          notes?: string | null
+          run_at?: string
+          status?: string
+          steps_results?: Json
+          test_id: string
+        }
+        Update: {
+          id?: string
+          notes?: string | null
+          run_at?: string
+          status?: string
+          steps_results?: Json
+          test_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bot_qa_results_test_id_fkey"
+            columns: ["test_id"]
+            isOneToOne: false
+            referencedRelation: "bot_qa_tests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bot_qa_tests: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          name: string
+          source: string
+          steps: Json
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          id?: string
+          name: string
+          source?: string
+          steps?: Json
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          name?: string
+          source?: string
+          steps?: Json
+        }
+        Relationships: []
+      }
       chat_messages: {
         Row: {
           chat_id: string
