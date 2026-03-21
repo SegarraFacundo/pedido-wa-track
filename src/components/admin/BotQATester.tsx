@@ -457,6 +457,29 @@ export default function BotQATester() {
 
         {/* Results Tab */}
         <TabsContent value="results" className="space-y-4">
+          {results.filter(r => r.status === "failed").length > 0 && (
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const failed = results.filter(r => r.status === "failed");
+                  const text = failed.map(r => {
+                    const steps = (r.steps_results || []).map((sr, i) =>
+                      `  Paso ${i + 1}:\n    👤 Usuario: "${sr.step}"\n    🤖 Bot: "${sr.response}"\n    ${sr.success ? "✅ OK" : "❌ FALLO"}`
+                    ).join("\n");
+                    return `### ${r.test_name}\nFecha: ${new Date(r.run_at).toLocaleString("es-AR")}\n${steps}`;
+                  }).join("\n\n---\n\n");
+                  const header = `Tengo ${failed.length} tests QA que fallaron en mi bot de pedidos. Necesito que analices las respuestas del bot y me ayudes a corregir los errores en el flujo conversacional.\n\n`;
+                  navigator.clipboard.writeText(header + text);
+                  toast({ title: "Copiado al portapapeles", description: "Pegalo en el chat de Lovable para analizar los errores" });
+                }}
+              >
+                <Copy className="mr-2 h-4 w-4" />
+                Copiar fallos para Lovable ({results.filter(r => r.status === "failed").length})
+              </Button>
+            </div>
+          )}
           <ScrollArea className="h-[500px]">
             <div className="space-y-2">
               {results.map((result) => (
