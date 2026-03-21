@@ -1509,6 +1509,38 @@ Escreva o que precisa e eu ajudo. É muito fácil! 😊`,
     pt: 'Não entendi sua mensagem 🤔\n\nVocê pode:\n• Enviar um *número do cardápio* para adicionar\n• Dizer *"carrinho"* para ver seu pedido\n• Dizer *"confirmar"* para finalizar\n• Dizer *"cardápio"* para ver os produtos',
     ja: 'メッセージが理解できませんでした 🤔\n\n以下のことができます:\n• *メニュー番号*を送信して追加\n• *「カート」*で注文を確認\n• *「確定」*で注文を完了\n• *「メニュー」*で商品を表示',
   },
+
+  // === WELCOME MENUS (Contextual) ===
+  'welcome.menu_clean': {
+    es: '👋 *¡Hola! Soy el bot de Lapacho Delivery*\n\n¿Qué querés hacer?\n\n1️⃣ 🏪 Ver negocios abiertos\n2️⃣ 🔍 Buscar un producto\n3️⃣ 🕐 Ver horarios\n4️⃣ ❓ Ayuda\n\nEnviá el *número* o escribí lo que necesitás',
+    en: '👋 *Hi! I\'m the Lapacho Delivery bot*\n\nWhat would you like to do?\n\n1️⃣ 🏪 See open stores\n2️⃣ 🔍 Search a product\n3️⃣ 🕐 View schedules\n4️⃣ ❓ Help\n\nSend the *number* or write what you need',
+    pt: '👋 *Olá! Sou o bot do Lapacho Delivery*\n\nO que você quer fazer?\n\n1️⃣ 🏪 Ver lojas abertas\n2️⃣ 🔍 Buscar um produto\n3️⃣ 🕐 Ver horários\n4️⃣ ❓ Ajuda\n\nEnvie o *número* ou escreva o que precisa',
+    ja: '👋 *こんにちは！Lapacho Deliveryのボットです*\n\n何をしますか？\n\n1️⃣ 🏪 営業中の店舗を見る\n2️⃣ 🔍 商品を検索\n3️⃣ 🕐 営業時間を見る\n4️⃣ ❓ ヘルプ\n\n*番号*を送るか、必要なことを書いてください',
+  },
+  'welcome.menu_vendor': {
+    es: '👋 *¡Hola! Estás en {vendor}*\n\n1️⃣ 📋 Ver menú de {vendor}\n2️⃣ 🛒 Ver carrito\n3️⃣ ✅ Confirmar pedido\n4️⃣ 💬 Hablar con {vendor}\n5️⃣ 🏪 Ver otros negocios\n6️⃣ ❓ Ayuda\n\nEnviá el *número* de lo que necesitás',
+    en: '👋 *Hi! You\'re at {vendor}*\n\n1️⃣ 📋 View {vendor} menu\n2️⃣ 🛒 View cart\n3️⃣ ✅ Confirm order\n4️⃣ 💬 Talk to {vendor}\n5️⃣ 🏪 See other stores\n6️⃣ ❓ Help\n\nSend the *number* of what you need',
+    pt: '👋 *Olá! Você está em {vendor}*\n\n1️⃣ 📋 Ver cardápio de {vendor}\n2️⃣ 🛒 Ver carrinho\n3️⃣ ✅ Confirmar pedido\n4️⃣ 💬 Falar com {vendor}\n5️⃣ 🏪 Ver outras lojas\n6️⃣ ❓ Ajuda\n\nEnvie o *número* do que precisa',
+    ja: '👋 *こんにちは！{vendor}にいます*\n\n1️⃣ 📋 {vendor}のメニューを見る\n2️⃣ 🛒 カートを見る\n3️⃣ ✅ 注文を確定\n4️⃣ 💬 {vendor}に連絡\n5️⃣ 🏪 他の店舗を見る\n6️⃣ ❓ ヘルプ\n\n必要なものの*番号*を送ってください',
+  },
+  'welcome.menu_active_order': {
+    es: '👋 *¡Hola! Tenés un pedido activo (#{id})*\n\n1️⃣ 📦 Ver estado del pedido\n2️⃣ ❌ Cancelar pedido\n3️⃣ 💬 Hablar con el vendedor\n4️⃣ ⭐ Calificar pedido\n5️⃣ 🕐 Ver horarios\n6️⃣ ❓ Ayuda\n\nEnviá el *número* de lo que necesitás',
+    en: '👋 *Hi! You have an active order (#{id})*\n\n1️⃣ 📦 Check order status\n2️⃣ ❌ Cancel order\n3️⃣ 💬 Talk to vendor\n4️⃣ ⭐ Rate order\n5️⃣ 🕐 View schedules\n6️⃣ ❓ Help\n\nSend the *number* of what you need',
+    pt: '👋 *Olá! Você tem um pedido ativo (#{id})*\n\n1️⃣ 📦 Ver status do pedido\n2️⃣ ❌ Cancelar pedido\n3️⃣ 💬 Falar com o vendedor\n4️⃣ ⭐ Avaliar pedido\n5️⃣ 🕐 Ver horários\n6️⃣ ❓ Ajuda\n\nEnvie o *número* do que precisa',
+    ja: '👋 *こんにちは！アクティブな注文があります (#{id})*\n\n1️⃣ 📦 注文状況を確認\n2️⃣ ❌ 注文をキャンセル\n3️⃣ 💬 販売者に連絡\n4️⃣ ⭐ 注文を評価\n5️⃣ 🕐 営業時間を見る\n6️⃣ ❓ ヘルプ\n\n必要なものの*番号*を送ってください',
+  },
+  'welcome.menu_completed': {
+    es: '👋 *¡Hola! Tu último pedido fue completado*\n\n1️⃣ ⭐ Calificar pedido\n2️⃣ 🏪 Ver negocios abiertos\n3️⃣ 🔍 Buscar un producto\n4️⃣ ❓ Ayuda\n\nEnviá el *número* o escribí lo que necesitás',
+    en: '👋 *Hi! Your last order was completed*\n\n1️⃣ ⭐ Rate order\n2️⃣ 🏪 See open stores\n3️⃣ 🔍 Search a product\n4️⃣ ❓ Help\n\nSend the *number* or write what you need',
+    pt: '👋 *Olá! Seu último pedido foi concluído*\n\n1️⃣ ⭐ Avaliar pedido\n2️⃣ 🏪 Ver lojas abertas\n3️⃣ 🔍 Buscar um produto\n4️⃣ ❓ Ajuda\n\nEnvie o *número* ou escreva o que precisa',
+    ja: '👋 *こんにちは！最後の注文が完了しました*\n\n1️⃣ ⭐ 注文を評価\n2️⃣ 🏪 営業中の店舗を見る\n3️⃣ 🔍 商品を検索\n4️⃣ ❓ ヘルプ\n\n*番号*を送るか、必要なことを書いてください',
+  },
+  'welcome.search_prompt': {
+    es: '🔍 ¿Qué producto buscás?',
+    en: '🔍 What product are you looking for?',
+    pt: '🔍 Que produto você procura?',
+    ja: '🔍 何の商品をお探しですか？',
+  },
 };
 
 /**

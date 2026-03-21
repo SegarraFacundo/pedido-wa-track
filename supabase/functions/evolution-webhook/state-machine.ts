@@ -8,6 +8,44 @@ import { t, Language, detectPaymentMethod } from "./i18n.ts";
 import { saveContext } from "./context.ts";
 import { handleShoppingInterceptor } from "./bot-helpers.ts";
 
+// ==================== CONTEXT LEVEL DETECTION ====================
+// Determines which menu to show based on user's current context
+
+export type ContextLevel = 1 | 2 | 3 | 4;
+
+export function getContextLevel(context: ConversationContext): ContextLevel {
+  // Level 4: Completed order
+  if (context.order_state === "order_completed") return 4;
+  
+  // Level 3: Active order (pending/confirmed)
+  const activeOrderStates = ["order_pending_cash", "order_pending_transfer", "order_pending_mp", "order_confirmed"];
+  if (context.pending_order_id && activeOrderStates.includes(context.order_state || "")) return 3;
+  
+  // Level 2: Vendor selected (browsing/shopping)
+  if (context.selected_vendor_id) return 2;
+  
+  // Level 1: No context
+  return 1;
+}
+
+function getContextualMenu(context: ConversationContext, lang: Language): string {
+  const level = getContextLevel(context);
+  
+  switch (level) {
+    case 4:
+      return t("welcome.menu_completed", lang);
+    case 3: {
+      const orderId = context.pending_order_id ? context.pending_order_id.substring(0, 8) : "???";
+      return t("welcome.menu_active_order", lang, { id: orderId });
+    }
+    case 2:
+      return t("welcome.menu_vendor", lang, { vendor: context.selected_vendor_name || "" });
+    case 1:
+    default:
+      return t("welcome.menu_clean", lang);
+  }
+}
+
 export interface StateMachineResult {
   response: string;
   handled: boolean;  // false means NLU couldn't help, use fallback
@@ -15,26 +53,26 @@ export interface StateMachineResult {
 
 // Valid intents per state
 const VALID_INTENTS_BY_STATE: Record<string, Intent[]> = {
-  idle: ["browse_stores", "search_product", "select_vendor", "view_menu", "check_status", "rate_order", "rate_platform", "view_schedule", "view_offers", "help", "reset", "change_language", "talk_to_human", "add_to_cart"],
-  browsing: ["select_vendor", "view_menu", "browse_stores", "search_product", "view_schedule", "help", "reset", "change_language", "talk_to_human"],
-  shopping: ["add_to_cart", "remove_from_cart", "view_cart", "empty_cart", "confirm_order", "select_delivery", "give_address", "select_payment", "view_menu", "browse_stores", "view_schedule", "help", "reset", "change_language", "talk_to_human", "check_status", "cancel_order"],
-  needs_address: ["give_address", "view_cart", "empty_cart", "help", "reset", "cancel_order", "change_language"],
-  checkout: ["select_payment", "view_cart", "empty_cart", "confirm_order", "help", "reset", "cancel_order", "change_language"],
-  order_pending_cash: ["check_status", "cancel_order", "talk_to_human", "rate_order", "rate_platform", "view_schedule", "help"],
-  order_pending_transfer: ["check_status", "cancel_order", "talk_to_human", "rate_order", "rate_platform", "view_schedule", "help", "confirm_order"],
-  order_pending_mp: ["check_status", "cancel_order", "talk_to_human", "rate_order", "rate_platform", "view_schedule", "help"],
-  order_confirmed: ["check_status", "cancel_order", "talk_to_human", "rate_order", "rate_platform", "view_schedule", "help"],
-  order_completed: ["check_status", "rate_order", "rate_platform", "browse_stores", "search_product", "view_schedule", "help", "reset"],
-  order_cancelled: ["browse_stores", "search_product", "check_status", "view_schedule", "help", "reset"],
+  idle: ["browse_stores", "search_product", "select_vendor", "view_menu", "check_status", "rate_order", "rate_platform", "view_schedule", "view_offers", "help", "reset", "change_language", "talk_to_human", "add_to_cart", "greeting"],
+  browsing: ["select_vendor", "view_menu", "browse_stores", "search_product", "view_schedule", "help", "reset", "change_language", "talk_to_human", "greeting"],
+  shopping: ["add_to_cart", "remove_from_cart", "view_cart", "empty_cart", "confirm_order", "select_delivery", "give_address", "select_payment", "view_menu", "browse_stores", "view_schedule", "help", "reset", "change_language", "talk_to_human", "check_status", "cancel_order", "greeting"],
+  needs_address: ["give_address", "view_cart", "empty_cart", "help", "reset", "cancel_order", "change_language", "greeting"],
+  checkout: ["select_payment", "view_cart", "empty_cart", "confirm_order", "help", "reset", "cancel_order", "change_language", "greeting"],
+  order_pending_cash: ["check_status", "cancel_order", "talk_to_human", "rate_order", "rate_platform", "view_schedule", "help", "greeting"],
+  order_pending_transfer: ["check_status", "cancel_order", "talk_to_human", "rate_order", "rate_platform", "view_schedule", "help", "confirm_order", "greeting"],
+  order_pending_mp: ["check_status", "cancel_order", "talk_to_human", "rate_order", "rate_platform", "view_schedule", "help", "greeting"],
+  order_confirmed: ["check_status", "cancel_order", "talk_to_human", "rate_order", "rate_platform", "view_schedule", "help", "greeting"],
+  order_completed: ["check_status", "rate_order", "rate_platform", "browse_stores", "search_product", "view_schedule", "help", "reset", "greeting"],
+  order_cancelled: ["browse_stores", "search_product", "check_status", "view_schedule", "help", "reset", "greeting"],
 };
 
 // Step instructions for retry messages
 const STEP_HINTS: Record<string, Record<Language, string>> = {
   idle: {
-    es: "Podés decir \"ver negocios\" o buscar un producto (ej: \"pizza\").",
-    en: "You can say \"see stores\" or search a product (e.g. \"pizza\").",
-    pt: "Pode dizer \"ver lojas\" ou buscar um produto (ex: \"pizza\").",
-    ja: "「店舗を見る」または商品を検索できます（例：「ピザ」）。",
+    es: "Enviá un *número* del menú o escribí lo que necesitás.",
+    en: "Send a *number* from the menu or write what you need.",
+    pt: "Envie um *número* do menu ou escreva o que precisa.",
+    ja: "メニューから*番号*を送るか、必要なことを書いてください。",
   },
   browsing: {
     es: "Elegí un negocio enviando su *número* o *nombre* de la lista.",
@@ -155,6 +193,9 @@ export async function processIntent(
       // This is handled earlier in vendor-bot.ts interceptors
       return { response: t("language.changed", lang), handled: true };
 
+    case "greeting":
+      return { response: getContextualMenu(context, lang), handled: true };
+
     default:
       return handleInvalidIntent(context, state, lang);
   }
@@ -169,6 +210,12 @@ function handleInvalidIntent(
 ): StateMachineResult {
   const retryCount = (context.retry_count || 0) + 1;
   context.retry_count = retryCount;
+
+  // In idle state, show contextual menu instead of error
+  if (state === "idle" || state === "order_completed" || state === "order_cancelled") {
+    context.retry_count = 0;
+    return { response: getContextualMenu(context, lang), handled: true };
+  }
 
   if (retryCount >= 2) {
     // Offer escalation

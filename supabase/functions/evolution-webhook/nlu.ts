@@ -27,6 +27,7 @@ export type Intent =
   | "help"
   | "reset"
   | "change_language"
+  | "greeting"
   | "unknown";
 
 export interface NLUResult {
@@ -35,7 +36,7 @@ export interface NLUResult {
   confidence: number;
 }
 
-const INTENT_LIST = `browse_stores, search_product, select_vendor, view_menu, add_to_cart, remove_from_cart, view_cart, empty_cart, confirm_order, select_delivery, give_address, select_payment, check_status, cancel_order, rate_order, rate_platform, talk_to_human, view_schedule, view_offers, help, reset, change_language, unknown`;
+const INTENT_LIST = `browse_stores, search_product, select_vendor, view_menu, add_to_cart, remove_from_cart, view_cart, empty_cart, confirm_order, select_delivery, give_address, select_payment, check_status, cancel_order, rate_order, rate_platform, talk_to_human, view_schedule, view_offers, help, reset, change_language, greeting, unknown`;
 
 function buildNLUPrompt(state: string, context: ConversationContext): string {
   const contextHints: string[] = [];
@@ -77,6 +78,7 @@ Intent guide:
 - help: asking for help/menu
 - reset: restart/clear everything
 - change_language: wants to switch language (params: {lang: "es"|"en"|"pt"|"ja"})
+- greeting: saying hello, hi, good morning/afternoon/evening, or general greeting
 - unknown: can't determine intent
 
 IMPORTANT: In state "browsing", numbers likely mean selecting a vendor. In state "shopping", numbers mean adding a product from the menu.
@@ -157,7 +159,7 @@ export async function classifyIntent(
       "confirm_order", "select_delivery", "give_address", "select_payment",
       "check_status", "cancel_order", "rate_order", "rate_platform",
       "talk_to_human", "view_schedule", "view_offers", "help", "reset",
-      "change_language", "unknown",
+      "change_language", "greeting", "unknown",
     ];
 
     const intent: Intent = validIntents.includes(parsed.intent) ? parsed.intent : "unknown";
