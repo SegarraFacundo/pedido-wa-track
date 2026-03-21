@@ -20,6 +20,7 @@ export function buildSystemPrompt(context: ConversationContext): string {
   const stateInstructions = getStateInstructions(currentState, context);
 
   return `Sos un vendedor de Lapacho, plataforma de delivery por WhatsApp en Argentina.
+IDIOMA: SIEMPRE respondé en ESPAÑOL ARGENTINO. NUNCA respondas en portugués, inglés u otro idioma.
 Sé ULTRA breve, tono argentino, máximo 4 líneas. Sin "Aquí tenés", sin "Te muestro", sin introducciones.
 
 ${stateInfo}
