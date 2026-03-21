@@ -2,6 +2,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   MessageSquare, 
   Clock, 
@@ -16,7 +23,11 @@ import {
 } from "lucide-react";
 
 export default function Landing() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+
+  const changeLanguage = (lng: string) => {
+    i18n.changeLanguage(lng);
+  };
 
   const handleProbarClick = () => {
     const whatsappNumber = '5493464448309';
@@ -49,6 +60,16 @@ export default function Landing() {
             <span className="text-muted-foreground text-sm hidden sm:block pb-0.5">{t('landing.tagline')}</span>
           </div>
           <nav className="flex items-center gap-2 sm:gap-4">
+            <Select value={i18n.language?.substring(0, 2)} onValueChange={changeLanguage}>
+              <SelectTrigger className="w-[70px] h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="es">🇦🇷 ES</SelectItem>
+                <SelectItem value="en">🇺🇸 EN</SelectItem>
+                <SelectItem value="pt">🇧🇷 PT</SelectItem>
+              </SelectContent>
+            </Select>
             <Link to="/contacto" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
               {t('landing.contact')}
             </Link>
