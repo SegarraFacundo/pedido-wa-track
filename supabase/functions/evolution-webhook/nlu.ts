@@ -36,7 +36,7 @@ export interface NLUResult {
   confidence: number;
 }
 
-const INTENT_LIST = `browse_stores, search_product, select_vendor, view_menu, add_to_cart, remove_from_cart, view_cart, empty_cart, confirm_order, select_delivery, give_address, select_payment, check_status, cancel_order, rate_order, rate_platform, talk_to_human, view_schedule, view_offers, help, reset, change_language, unknown`;
+const INTENT_LIST = `browse_stores, search_product, select_vendor, view_menu, add_to_cart, remove_from_cart, view_cart, empty_cart, confirm_order, select_delivery, give_address, select_payment, check_status, cancel_order, rate_order, rate_platform, talk_to_human, view_schedule, view_offers, help, reset, change_language, greeting, unknown`;
 
 function buildNLUPrompt(state: string, context: ConversationContext): string {
   const contextHints: string[] = [];
