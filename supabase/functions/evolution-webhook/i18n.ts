@@ -12,10 +12,10 @@ const translations: Record<string, Record<Language, string>> = {
     ja: 'カートは空です。何を注文しますか？',
   },
   'cart.added': {
-    es: '✅ Productos agregados al carrito de *{vendor}*.\n\n💰 Total actual: ${total}\n\n¿Querés agregar algo más o confirmás el pedido? 📦',
-    en: '✅ Products added to *{vendor}* cart.\n\n💰 Current total: ${total}\n\nWant to add more or confirm the order? 📦',
-    pt: '✅ Produtos adicionados ao carrinho de *{vendor}*.\n\n💰 Total atual: ${total}\n\nQuer adicionar mais ou confirmar o pedido? 📦',
-    ja: '✅ *{vendor}*のカートに商品を追加しました。\n\n💰 合計: ${total}\n\n他に追加しますか？それとも注文を確定しますか？📦',
+    es: '✅ *{product}* x{qty} agregado\n\n🛒 *Tu carrito de {vendor}:*\n{cart_detail}\n\n💰 *Total: ${total}*\n\n📌 *¿Qué hacés ahora?*\n• Enviá otro *número del menú* para agregar más\n• Escribí *"confirmar"* para hacer el pedido\n• Escribí *"carrito"* para ver/modificar\n• Escribí *"menú"* para ver productos',
+    en: '✅ *{product}* x{qty} added\n\n🛒 *Your cart from {vendor}:*\n{cart_detail}\n\n💰 *Total: ${total}*\n\n📌 *What now?*\n• Send another *menu number* to add more\n• Type *"confirm"* to place the order\n• Type *"cart"* to view/modify\n• Type *"menu"* to see products',
+    pt: '✅ *{product}* x{qty} adicionado\n\n🛒 *Seu carrinho de {vendor}:*\n{cart_detail}\n\n💰 *Total: ${total}*\n\n📌 *O que fazer agora?*\n• Envie outro *número do cardápio* para adicionar mais\n• Escreva *"confirmar"* para fazer o pedido\n• Escreva *"carrinho"* para ver/modificar\n• Escreva *"cardápio"* para ver produtos',
+    ja: '✅ *{product}* x{qty} 追加しました\n\n🛒 *{vendor}のカート:*\n{cart_detail}\n\n💰 *合計: ${total}*\n\n📌 *次は？*\n• 他の*メニュー番号*を送信して追加\n• *「確定」*と入力して注文\n• *「カート」*と入力して確認/変更\n• *「メニュー」*と入力して商品を見る',
   },
   'cart.header': {
     es: '🛒 *Tu carrito de {vendor}:*',
