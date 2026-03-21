@@ -53,17 +53,17 @@ export interface StateMachineResult {
 
 // Valid intents per state
 const VALID_INTENTS_BY_STATE: Record<string, Intent[]> = {
-  idle: ["browse_stores", "search_product", "select_vendor", "view_menu", "check_status", "rate_order", "rate_platform", "view_schedule", "view_offers", "help", "reset", "change_language", "talk_to_human", "add_to_cart"],
-  browsing: ["select_vendor", "view_menu", "browse_stores", "search_product", "view_schedule", "help", "reset", "change_language", "talk_to_human"],
-  shopping: ["add_to_cart", "remove_from_cart", "view_cart", "empty_cart", "confirm_order", "select_delivery", "give_address", "select_payment", "view_menu", "browse_stores", "view_schedule", "help", "reset", "change_language", "talk_to_human", "check_status", "cancel_order"],
-  needs_address: ["give_address", "view_cart", "empty_cart", "help", "reset", "cancel_order", "change_language"],
-  checkout: ["select_payment", "view_cart", "empty_cart", "confirm_order", "help", "reset", "cancel_order", "change_language"],
-  order_pending_cash: ["check_status", "cancel_order", "talk_to_human", "rate_order", "rate_platform", "view_schedule", "help"],
-  order_pending_transfer: ["check_status", "cancel_order", "talk_to_human", "rate_order", "rate_platform", "view_schedule", "help", "confirm_order"],
-  order_pending_mp: ["check_status", "cancel_order", "talk_to_human", "rate_order", "rate_platform", "view_schedule", "help"],
-  order_confirmed: ["check_status", "cancel_order", "talk_to_human", "rate_order", "rate_platform", "view_schedule", "help"],
-  order_completed: ["check_status", "rate_order", "rate_platform", "browse_stores", "search_product", "view_schedule", "help", "reset"],
-  order_cancelled: ["browse_stores", "search_product", "check_status", "view_schedule", "help", "reset"],
+  idle: ["browse_stores", "search_product", "select_vendor", "view_menu", "check_status", "rate_order", "rate_platform", "view_schedule", "view_offers", "help", "reset", "change_language", "talk_to_human", "add_to_cart", "greeting"],
+  browsing: ["select_vendor", "view_menu", "browse_stores", "search_product", "view_schedule", "help", "reset", "change_language", "talk_to_human", "greeting"],
+  shopping: ["add_to_cart", "remove_from_cart", "view_cart", "empty_cart", "confirm_order", "select_delivery", "give_address", "select_payment", "view_menu", "browse_stores", "view_schedule", "help", "reset", "change_language", "talk_to_human", "check_status", "cancel_order", "greeting"],
+  needs_address: ["give_address", "view_cart", "empty_cart", "help", "reset", "cancel_order", "change_language", "greeting"],
+  checkout: ["select_payment", "view_cart", "empty_cart", "confirm_order", "help", "reset", "cancel_order", "change_language", "greeting"],
+  order_pending_cash: ["check_status", "cancel_order", "talk_to_human", "rate_order", "rate_platform", "view_schedule", "help", "greeting"],
+  order_pending_transfer: ["check_status", "cancel_order", "talk_to_human", "rate_order", "rate_platform", "view_schedule", "help", "confirm_order", "greeting"],
+  order_pending_mp: ["check_status", "cancel_order", "talk_to_human", "rate_order", "rate_platform", "view_schedule", "help", "greeting"],
+  order_confirmed: ["check_status", "cancel_order", "talk_to_human", "rate_order", "rate_platform", "view_schedule", "help", "greeting"],
+  order_completed: ["check_status", "rate_order", "rate_platform", "browse_stores", "search_product", "view_schedule", "help", "reset", "greeting"],
+  order_cancelled: ["browse_stores", "search_product", "check_status", "view_schedule", "help", "reset", "greeting"],
 };
 
 // Step instructions for retry messages
