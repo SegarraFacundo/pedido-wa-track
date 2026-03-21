@@ -1029,3 +1029,31 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     return t('error.generic', 'es');
   }
 }
+
+// 📊 Structured interaction logging (fire-and-forget)
+function logBotInteraction(
+  supabase: any,
+  phone: string,
+  message: string,
+  intent: string,
+  stateBefore: string,
+  stateAfter: string,
+  confidence: number,
+  response: string,
+  error?: string,
+): void {
+  // Fire-and-forget — don't await, don't block the response
+  supabase.from("bot_interaction_logs").insert({
+    phone,
+    message_preview: message.substring(0, 200),
+    intent_detected: intent,
+    state_before: stateBefore,
+    state_after: stateAfter,
+    action_taken: intent,
+    response_preview: response.substring(0, 300),
+    confidence,
+    error: error || null,
+  }).then(({ error: insertErr }: any) => {
+    if (insertErr) console.warn("⚠️ Failed to log interaction:", insertErr.message);
+  });
+}
