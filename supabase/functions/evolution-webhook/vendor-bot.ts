@@ -123,7 +123,111 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     
     const lang = (context.language || 'es') as Language;
 
-    // 🧹 LIMPIAR CONTEXTO si hay un pedido ACTIVO del mismo vendor
+    // 👋 INTERCEPTOR: Greeting → contextual menu
+    const greetingRegex = /^(hola|buenas|hey|hi|hello|oi|olá|buen\s*d[ií]a|buenos?\s*d[ií]as|buenas?\s*tardes?|buenas?\s*noches?|que\s*tal|qué\s*tal|saludos)\s*[!.?]*$/i;
+    if (greetingRegex.test(message.trim())) {
+      console.log('👋 Greeting interceptor triggered');
+      const level = getContextLevel(context);
+      let menuResponse: string;
+      switch (level) {
+        case 4:
+          menuResponse = t('welcome.menu_completed', lang);
+          break;
+        case 3: {
+          const orderId = context.pending_order_id ? context.pending_order_id.substring(0, 8) : '???';
+          menuResponse = t('welcome.menu_active_order', lang, { id: orderId });
+          break;
+        }
+        case 2:
+          menuResponse = t('welcome.menu_vendor', lang, { vendor: context.selected_vendor_name || '' });
+          break;
+        default:
+          menuResponse = t('welcome.menu_clean', lang);
+      }
+      context.conversation_history.push({ role: "user", content: message });
+      context.conversation_history.push({ role: "assistant", content: menuResponse });
+      await saveContext(context, supabase);
+      return menuResponse;
+    }
+
+    // 🔢 INTERCEPTOR: Number in idle/completed → execute menu action
+    const idleMenuStates = ['idle', 'order_completed', 'order_cancelled'];
+    if (idleMenuStates.includes(context.order_state || 'idle')) {
+      const numMatch = message.trim().match(/^(\d)$/);
+      if (numMatch) {
+        const num = parseInt(numMatch[1]);
+        const level = getContextLevel(context);
+        let intercepted = true;
+        let result: string | null = null;
+
+        if (level === 1) {
+          switch (num) {
+            case 1: result = await ejecutarHerramienta("ver_locales_abiertos", {}, context, supabase); break;
+            case 2: result = t('welcome.search_prompt', lang); break;
+            case 3: {
+              if (context.selected_vendor_id) {
+                result = await ejecutarHerramienta("ver_horario_negocio", { vendor_id: context.selected_vendor_id }, context, supabase);
+              } else {
+                const stores = await ejecutarHerramienta("ver_locales_abiertos", {}, context, supabase);
+                result = stores + "\n\n" + t('schedule.ask_vendor', lang);
+              }
+              break;
+            }
+            case 4: result = t('help.full', lang); break;
+            default: intercepted = false;
+          }
+        } else if (level === 2) {
+          switch (num) {
+            case 1: result = await ejecutarHerramienta("ver_menu_negocio", { vendor_id: context.selected_vendor_id! }, context, supabase); break;
+            case 2: result = await ejecutarHerramienta("ver_carrito", {}, context, supabase); break;
+            case 3: intercepted = false; break; // Delegate to confirm flow
+            case 4: result = await ejecutarHerramienta("hablar_con_vendedor", {}, context, supabase); break;
+            case 5: result = await ejecutarHerramienta("ver_locales_abiertos", {}, context, supabase); break;
+            case 6: result = t('help.full', lang); break;
+            default: intercepted = false;
+          }
+        } else if (level === 3) {
+          switch (num) {
+            case 1: result = await ejecutarHerramienta("ver_estado_pedido", {}, context, supabase); break;
+            case 2: {
+              context.pending_cancellation = { step: "awaiting_reason", order_id: context.pending_order_id };
+              await saveContext(context, supabase);
+              result = t('cancel.ask_reason', lang);
+              break;
+            }
+            case 3: result = await ejecutarHerramienta("hablar_con_vendedor", {}, context, supabase); break;
+            case 4: result = t('rating.prompt_order', lang); break;
+            case 5: {
+              if (context.selected_vendor_id) {
+                result = await ejecutarHerramienta("ver_horario_negocio", { vendor_id: context.selected_vendor_id }, context, supabase);
+              } else {
+                result = t('help.full', lang);
+              }
+              break;
+            }
+            case 6: result = t('help.full', lang); break;
+            default: intercepted = false;
+          }
+        } else if (level === 4) {
+          switch (num) {
+            case 1: result = t('rating.prompt_order', lang); break;
+            case 2: result = await ejecutarHerramienta("ver_locales_abiertos", {}, context, supabase); break;
+            case 3: result = t('welcome.search_prompt', lang); break;
+            case 4: result = t('help.full', lang); break;
+            default: intercepted = false;
+          }
+        }
+
+        if (intercepted && result) {
+          context.conversation_history.push({ role: "user", content: message });
+          context.conversation_history.push({ role: "assistant", content: result });
+          await saveContext(context, supabase);
+          return result;
+        }
+      }
+    }
+
+
     if (context.selected_vendor_id || context.cart.length > 0) {
       let shouldClearContext = false;
       
