@@ -46,7 +46,9 @@ const menuItems = [
   { value: "soporte-users", label: "Usuarios Soporte", icon: Users },
   { value: "evolution", label: "Agente IA", icon: Bot },
   { value: "bot-review", label: "Errores Bot", icon: AlertTriangle },
+  { value: "qa-bot", label: "QA Bot", icon: TestTube2 },
   { value: "emergency", label: "Emergencia", icon: AlertTriangle, danger: true },
+  { value: "tools", label: "Herramientas", icon: Wrench },
   { value: "tools", label: "Herramientas", icon: Wrench },
 ];
 
