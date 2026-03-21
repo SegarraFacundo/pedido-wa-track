@@ -3801,8 +3801,24 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
     }
 
+    // 🎯 INTERCEPTOR: Pedido explícito de menú en estado shopping
+    // El usuario quiere VER el menú otra vez (no agregar producto)
+    if (context.order_state === "shopping" && context.selected_vendor_id) {
+      const menuRequest = /^(men[uú]|ver men[uú]|mostrame el men[uú]|menu del local|ver productos|productos|que hay|qué hay|que tienen|qué tienen|ver carta|carta|show menu|ver el men[uú])/i;
+      if (menuRequest.test(message.trim())) {
+        console.log(`📋 INTERCEPTOR: Explicit menu request in shopping state → showing menu`);
+        const result = await ejecutarHerramienta("ver_menu_negocio", {
+          vendor_id: context.selected_vendor_id,
+        }, context, supabase);
+        
+        context.conversation_history.push({ role: "assistant", content: result });
+        await saveContext(context, supabase);
+        return result;
+      }
+    }
+
     // 🎯 FASE 5: Menú de ayuda estático
-    const helpKeywords = /^(ayuda|help|menu|opciones|que puedo hacer|qué puedo hacer|como funciona|cómo funciona|\?|info)$/i;
+    const helpKeywords = /^(ayuda|help|opciones|que puedo hacer|qué puedo hacer|como funciona|cómo funciona|\?|info)$/i;
     if (helpKeywords.test(message.trim())) {
       console.log(`📋 INTERCEPTOR: Static help menu`);
       const helpText = `📋 *¿Qué puedo hacer?*\n\n` +
@@ -3942,16 +3958,6 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
 
           // 🎯 FASE 4: Si es una herramienta de respuesta directa Y es el único tool call,
           // retornar resultado directamente sin pasar por el LLM para reformateo
-          // ⚠️ EXCEPCIÓN: En estado shopping, bloquear ver_menu_negocio redundante
-          if (toolName === "ver_menu_negocio" && (context.order_state === "shopping")) {
-            console.log(`🚫 BLOCKED: ver_menu_negocio in shopping state - user likely wants to add products`);
-            messages.push({
-              role: "tool",
-              tool_call_id: toolCall.id,
-              content: "⚠️ El usuario ya está viendo este menú. Interpretá su mensaje como un pedido de producto y usá agregar_al_carrito. Si dice un número, es el producto #N del menú.",
-            });
-            continue;
-          }
           
           if (DIRECT_RESPONSE_TOOLS.has(toolName) && assistantMessage.tool_calls!.length === 1) {
             console.log(`⚡ DIRECT RESPONSE: Returning ${toolName} result directly (no LLM reformatting)`);
