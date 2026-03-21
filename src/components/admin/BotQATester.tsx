@@ -135,7 +135,7 @@ export default function BotQATester() {
     const inserts = generatedTests.map(t => ({
       name: t.name,
       category: t.category,
-      steps: t.steps as unknown as Record<string, unknown>,
+      steps: JSON.parse(JSON.stringify(t.steps)),
       source: t.source,
     }));
     const { error } = await supabase.from("bot_qa_tests").insert(inserts);
