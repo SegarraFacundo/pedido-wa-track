@@ -155,7 +155,7 @@ export async function processIntent(
       return handleAddToCart(params, context, supabase, lang);
 
     case "remove_from_cart":
-      return { response: t("shopping.not_understood", lang), handled: true };
+      return handleRemoveFromCart(params, context, supabase, lang);
 
     case "view_cart":
       return handleViewCart(context, supabase, lang);
