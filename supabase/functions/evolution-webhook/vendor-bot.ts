@@ -3566,6 +3566,41 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
     }
 
+    // 🔍 INTERCEPTOR: "buscar X" or "ver locales/negocios" in shopping state with empty cart
+    if (context.order_state === "shopping" && context.cart.length === 0) {
+      const msgLower = message.toLowerCase().trim();
+      
+      // "buscar hamburguesa", "donde puedo pedir hamburguesa"
+      const searchMatch = msgLower.match(/^(?:buscar|busco|donde puedo pedir|dónde puedo pedir|quiero buscar)\s+(.+)/i);
+      const wantsList = /^(ver locales|ver negocios|locales abiertos|negocios abiertos|ver la lista|lista de locales|quiero la lista)/i.test(msgLower);
+      const wantsOrder = /^(quiero (?:hacer )?(?:un )?pedido|hacer (?:un )?pedido|me gustaria pedir|me gustaría pedir comida)/i.test(msgLower);
+      
+      if (searchMatch || wantsList || wantsOrder) {
+        // Reset to idle first since cart is empty
+        context.order_state = "idle";
+        context.selected_vendor_id = undefined;
+        context.selected_vendor_name = undefined;
+        context.conversation_history = [];
+        await saveContext(context, supabase);
+        
+        if (searchMatch) {
+          const result = await ejecutarHerramienta("buscar_productos", {
+            consulta: searchMatch[1].trim(),
+          }, context, supabase);
+          context.conversation_history.push({ role: "assistant", content: result });
+          await saveContext(context, supabase);
+          return result;
+        }
+        
+        if (wantsList || wantsOrder) {
+          const result = await ejecutarHerramienta("ver_locales_abiertos", {}, context, supabase);
+          context.conversation_history.push({ role: "assistant", content: result });
+          await saveContext(context, supabase);
+          return result;
+        }
+      }
+    }
+
     // 🛒 INTERCEPTOR: Estado shopping + número/producto → agregar al carrito directamente
     if (context.order_state === "shopping" && context.selected_vendor_id) {
       const shoppingResult = await handleShoppingInterceptor(message, context, supabase);
