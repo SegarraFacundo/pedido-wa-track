@@ -211,6 +211,12 @@ function handleInvalidIntent(
   const retryCount = (context.retry_count || 0) + 1;
   context.retry_count = retryCount;
 
+  // In idle state, show contextual menu instead of error
+  if (state === "idle" || state === "order_completed" || state === "order_cancelled") {
+    context.retry_count = 0;
+    return { response: getContextualMenu(context, lang), handled: true };
+  }
+
   if (retryCount >= 2) {
     // Offer escalation
     const response =
