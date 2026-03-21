@@ -235,6 +235,29 @@ function splitProductSegments(text: string): string[] {
   return parts.filter(p => p.trim().length > 0);
 }
 
+// ==================== HELPER: Spanish number words to integer ====================
+function spanishNumberToInt(word: string): number | null {
+  const map: Record<string, number> = {
+    'un': 1, 'una': 1, 'uno': 1,
+    'dos': 2,
+    'tres': 3,
+    'cuatro': 4,
+    'cinco': 5,
+    'seis': 6,
+    'siete': 7,
+    'ocho': 8,
+    'nueve': 9,
+    'diez': 10,
+    'once': 11,
+    'doce': 12,
+    'media': 6, // "media docena"
+    'docena': 12,
+    'quince': 15,
+    'veinte': 20,
+  };
+  return map[word.toLowerCase()] ?? null;
+}
+
 // ==================== HELPER: Parse a single product segment ====================
 function parseProductSegment(segment: string): { quantity: number; searchTerm: string | null; menuIndex: number | null } | null {
   // Solo número → menu index
@@ -252,14 +275,26 @@ function parseProductSegment(segment: string): { quantity: number; searchTerm: s
     }
   }
 
+  // "media docena de X" → 6
+  const mediaDocena = segment.match(/^media\s+docena\s+(?:de\s+)?(.+)/i);
+  if (mediaDocena) {
+    return { quantity: 6, searchTerm: mediaDocena[1].trim(), menuIndex: null };
+  }
+
+  // "una docena de X" → 12
+  const docena = segment.match(/^(?:una?\s+)?docena\s+(?:de\s+)?(.+)/i);
+  if (docena) {
+    return { quantity: 12, searchTerm: docena[1].trim(), menuIndex: null };
+  }
+
   // "una/uno producto"
   const unaPattern = segment.match(/^(?:una?|uno)\s+(.+)/i);
   if (unaPattern) {
     return { quantity: 1, searchTerm: unaPattern[1].trim(), menuIndex: null };
   }
 
-  // "quiero/dame N producto"
-  const quieroPattern = segment.match(/^(?:quiero|dame|poneme|agregame|mandame)\s+(\d+)\s+(.+)/i);
+  // "quiero/dame N producto" (digit)
+  const quieroPattern = segment.match(/^(?:quiero|dame|poneme|agregame|mandame|traeme)\s+(\d+)\s+(.+)/i);
   if (quieroPattern) {
     const qty = parseInt(quieroPattern[1]);
     if (qty >= 1 && qty <= 50) {
@@ -267,10 +302,28 @@ function parseProductSegment(segment: string): { quantity: number; searchTerm: s
     }
   }
 
+  // "quiero/dame SPANISH_NUMBER producto" ("dame cuatro tiramisú", "traeme dos empanadas")
+  const quieroSpanishNum = segment.match(/^(?:quiero|dame|poneme|agregame|mandame|traeme)\s+(\w+)\s+(.+)/i);
+  if (quieroSpanishNum) {
+    const qty = spanishNumberToInt(quieroSpanishNum[1]);
+    if (qty !== null && qty >= 1 && qty <= 50) {
+      return { quantity: qty, searchTerm: quieroSpanishNum[2].trim(), menuIndex: null };
+    }
+  }
+
   // "quiero/dame producto" (qty 1)
-  const quieroSimple = segment.match(/^(?:quiero|dame|poneme|agregame|mandame)\s+(.+)/i);
+  const quieroSimple = segment.match(/^(?:quiero|dame|poneme|agregame|mandame|traeme)\s+(.+)/i);
   if (quieroSimple) {
     return { quantity: 1, searchTerm: quieroSimple[1].trim(), menuIndex: null };
+  }
+
+  // "SPANISH_NUMBER producto" sin verbo ("cuatro tiramisú", "dos cocas")
+  const spanishNumProduct = segment.match(/^(\w+)\s+(.+)/i);
+  if (spanishNumProduct) {
+    const qty = spanishNumberToInt(spanishNumProduct[1]);
+    if (qty !== null && qty >= 1 && qty <= 50) {
+      return { quantity: qty, searchTerm: spanishNumProduct[2].trim(), menuIndex: null };
+    }
   }
 
   // Just a product name (e.g. "helado de vainilla")
