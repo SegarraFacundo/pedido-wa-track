@@ -53,15 +53,17 @@ Bot transformado de "IA decide y responde" a **máquina de estados pura**:
 ### `nlu.ts` — Natural Language Understanding ✅
 - `classifyIntent(message, context)` → `{intent, params, confidence}`
 - Usa Lovable AI Gateway (gemini-2.5-flash-lite) como primera opción, fallback a OpenAI
-- Prompt minimalista: ~30 líneas, solo clasifica en 22 intents posibles
+- Prompt minimalista: ~30 líneas, solo clasifica en 23 intents posibles (incluye `greeting`)
 - Sin herramientas (tools), sin historial largo
 - Fallback: si la IA falla o no responde JSON válido → intent `unknown`
 
 ### `state-machine.ts` — Motor determinista ✅
 - `processIntent(nlu, context, supabase)` → `{response, handled}`
-- `VALID_INTENTS_BY_STATE`: mapeo de intents válidos por estado
+- `VALID_INTENTS_BY_STATE`: mapeo de intents válidos por estado (incluye `greeting` en todos)
 - `STEP_HINTS`: instrucciones específicas por estado para reintentos
-- `handleInvalidIntent()`: contador de reintentos con escalación tras 2 fallos
+- `handleInvalidIntent()`: en idle/completed/cancelled → muestra menú contextual; en otros estados → contador de reintentos con escalación tras 2 fallos
+- `getContextLevel()`: determina nivel 1-4 según contexto actual
+- `getContextualMenu()`: devuelve el menú apropiado según nivel
 - Handlers individuales para cada intent ejecutando `ejecutarHerramienta()`
 - 0 texto libre del LLM — todo viene de i18n o tool-handlers
 
@@ -93,3 +95,61 @@ MENSAJE → Interceptores (regex/keywords) → 80% resuelto
 - **100% predecible**: Misma entrada → misma salida siempre
 - **Menos tokens**: 1 llamada corta vs. múltiples iteraciones con tools
 - **Escalación automática**: 2 fallos → ofrecer soporte o menú principal
+
+---
+
+# Menú Principal Contextual con 4 Niveles ✅
+
+## Problema
+Las opciones del menú deben reflejar lo que el usuario **realmente puede hacer** según su contexto actual.
+
+## Diseño: 4 niveles de contexto
+
+### Nivel 1: Sin contexto (idle, sin nada previo)
+1️⃣ 🏪 Ver negocios abiertos
+2️⃣ 🔍 Buscar un producto
+3️⃣ 🕐 Ver horarios
+4️⃣ ❓ Ayuda
+
+### Nivel 2: Con negocio seleccionado (browsing/shopping)
+1️⃣ 📋 Ver menú de {vendor}
+2️⃣ 🛒 Ver carrito
+3️⃣ ✅ Confirmar pedido
+4️⃣ 💬 Hablar con {vendor}
+5️⃣ 🏪 Ver otros negocios
+6️⃣ ❓ Ayuda
+
+### Nivel 3: Con pedido activo (pending/confirmed)
+1️⃣ 📦 Ver estado del pedido
+2️⃣ ❌ Cancelar pedido
+3️⃣ 💬 Hablar con el vendedor
+4️⃣ ⭐ Calificar pedido
+5️⃣ 🕐 Ver horarios
+6️⃣ ❓ Ayuda
+
+### Nivel 4: Pedido completado (order_completed)
+1️⃣ ⭐ Calificar pedido
+2️⃣ 🏪 Ver negocios abiertos
+3️⃣ 🔍 Buscar un producto
+4️⃣ ❓ Ayuda
+
+## Implementación ✅
+
+### `i18n.ts`
+- 5 nuevas keys: `welcome.menu_clean`, `welcome.menu_vendor`, `welcome.menu_active_order`, `welcome.menu_completed`, `welcome.search_prompt`
+- En 4 idiomas (es, en, pt, ja)
+
+### `vendor-bot.ts`
+- **Interceptor de saludos**: Regex para "hola", "buenas", "hey", etc. → devuelve menú contextual según nivel
+- **Interceptor numérico**: Números 1-6 en estados idle/completed/cancelled → ejecuta acción directa según nivel
+
+### `nlu.ts`
+- Agregado intent `greeting` al tipo, INTENT_LIST, prompt de clasificación e intents válidos
+
+### `state-machine.ts`
+- `getContextLevel(context)`: Determina nivel 1-4 según pending_order_id, order_state, selected_vendor_id
+- `getContextualMenu(context, lang)`: Devuelve menú i18n según nivel
+- Handler `greeting` en switch → devuelve menú contextual
+- `handleInvalidIntent`: En estados idle/completed/cancelled → devuelve menú contextual en vez de error
+- `greeting` agregado a VALID_INTENTS_BY_STATE en todos los estados
+- `STEP_HINTS.idle` actualizado para referenciar menú numerado
