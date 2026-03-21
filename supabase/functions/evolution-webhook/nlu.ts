@@ -159,7 +159,7 @@ export async function classifyIntent(
       "confirm_order", "select_delivery", "give_address", "select_payment",
       "check_status", "cancel_order", "rate_order", "rate_platform",
       "talk_to_human", "view_schedule", "view_offers", "help", "reset",
-      "change_language", "unknown",
+      "change_language", "greeting", "unknown",
     ];
 
     const intent: Intent = validIntents.includes(parsed.intent) ? parsed.intent : "unknown";
