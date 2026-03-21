@@ -57,7 +57,7 @@ function buildContextHeader(context: ConversationContext, lang: Language): strin
   }
   
   if (context.cart.length > 0) {
-    const total = context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const total = Math.round(context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0));
     const itemCount = context.cart.reduce((sum, item) => sum + item.quantity, 0);
     parts.push(`🛒 ${lang === "es" ? "Carrito" : lang === "en" ? "Cart" : lang === "pt" ? "Carrinho" : "カート"}: ${itemCount} ${lang === "es" ? "productos" : lang === "en" ? "items" : lang === "pt" ? "produtos" : "商品"} ($${total})`);
   }

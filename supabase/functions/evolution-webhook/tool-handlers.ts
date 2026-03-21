@@ -944,8 +944,8 @@ export async function ejecutarHerramienta(
         context.delivery_address = args.direccion;
         context.payment_method = args.metodo_pago;
 
-        const subtotal = context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-        const total = subtotal + deliveryCost;
+        const subtotal = Math.round(context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0));
+        const total = Math.round(subtotal + deliveryCost);
 
         const { data: order, error } = await supabase
           .from("orders")
