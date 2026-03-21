@@ -97,5 +97,6 @@ export interface ConversationContext {
   last_menu_fetch?: string;                // ISO timestamp del último menú obtenido
   last_vendors_fetch?: string;             // ISO timestamp de la última lista de locales
   retry_count?: number;                    // Contador de reintentos en el paso actual (para escalación)
+  was_inactive?: boolean;                  // Flag: session was reset due to 10min inactivity
   conversation_history: Array<{ role: "user" | "assistant" | "system"; content: string }>;
 }
