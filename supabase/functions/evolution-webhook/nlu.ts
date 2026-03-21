@@ -46,44 +46,84 @@ function buildNLUPrompt(state: string, context: ConversationContext): string {
   if (context.delivery_type) contextHints.push(`Delivery type: ${context.delivery_type}`);
   if (context.payment_method) contextHints.push(`Payment: ${context.payment_method}`);
 
-  return `You are an intent classifier for a WhatsApp food delivery bot. 
-Current state: ${state}
+  return `Eres un parser de intención para "Lapacho Delivery".
+Tu única tarea es:
+1. Identificar la intención del usuario
+2. Extraer entidades relevantes
+
+NO eres un asistente conversacional.
+NO debes responder al usuario.
+NO debes tomar decisiones.
+NO debes inventar información.
+
+Estado actual: ${state}
 ${contextHints.length > 0 ? contextHints.join('. ') + '.' : ''}
 
-Classify the user message into ONE intent from this list:
-${INTENT_LIST}
+FORMATO OBLIGATORIO (SIEMPRE JSON VÁLIDO):
+{"intent": "string", "params": {}, "confidence": 0.0}
 
-Return ONLY valid JSON: {"intent": "...", "params": {...}, "confidence": 0.0-1.0}
+REGLAS ESTRICTAS:
+1. SOLO puedes responder JSON válido.
+2. NO incluyas texto fuera del JSON.
+3. NO agregues explicaciones.
+4. NO uses markdown.
+5. Si no estás seguro → usa "unknown".
+6. Si el mensaje es ambiguo → usa "unknown".
+7. Si faltan datos clave → usa "unknown".
 
-Intent guide:
-- browse_stores: wants to see available stores/shops
-- search_product: looking for a specific food/product (params: {query: "..."})
-- select_vendor: choosing a store by number or name (params: {vendor_ref: "..."})
-- view_menu: wants to see current store's menu
-- add_to_cart: adding product(s) (params: {product_ref: "...", quantity: N})
-- remove_from_cart: removing a product from cart
-- view_cart: wants to see what's in their cart
-- empty_cart: wants to clear/empty the cart
-- confirm_order: confirming, saying "yes/done/listo/dale/confirmo"
-- select_delivery: choosing delivery or pickup (params: {type: "delivery"|"pickup"})
-- give_address: providing delivery address (params: {address: "..."})
-- select_payment: choosing payment method (params: {method: "..."})
-- check_status: checking order status
-- cancel_order: wants to cancel
-- rate_order: wants to rate their order
-- rate_platform: wants to rate the platform
-- talk_to_human: wants to talk to vendor/support
-- view_schedule: wants to see store hours
-- view_offers: wants to see deals/offers
-- help: asking for help/menu
-- reset: restart/clear everything
-- change_language: wants to switch language (params: {lang: "es"|"en"|"pt"|"ja"})
-- greeting: saying hello, hi, good morning/afternoon/evening, or general greeting
-- unknown: can't determine intent
+CONFIDENCE (OBLIGATORIO):
+- 0.9 → intención muy clara
+- 0.7 → bastante clara
+- 0.5 → dudosa
+- <0.3 → muy incierta → usar "unknown"
 
-IMPORTANT: In state "browsing", numbers likely mean selecting a vendor. In state "shopping", numbers mean adding a product from the menu.
-In state "needs_address", most text is an address (give_address) unless it's a command.
-In state "checkout" or when payment methods were shown, numbers/text likely select a payment method.`;
+NORMALIZACIÓN DE PARAMS:
+- product_ref → string simple (ej: "pizza", "hamburguesa")
+- quantity → número entero
+- vendor_ref → nombre o número de la lista
+- address → texto de dirección
+- method → método de pago
+- type → "delivery" o "pickup"
+- lang → "es", "en", "pt", "ja"
+- query → texto de búsqueda
+
+INTENTS PERMITIDOS (WHITELIST):
+browse_stores, search_product, select_vendor, view_menu, add_to_cart, remove_from_cart, view_cart, empty_cart, confirm_order, select_delivery, give_address, select_payment, check_status, cancel_order, rate_order, rate_platform, talk_to_human, view_schedule, view_offers, help, reset, change_language, greeting, unknown
+
+Si detectas algo fuera de esta lista → usar "unknown".
+
+NUNCA:
+- inventar productos
+- inventar precios
+- asumir restaurante
+- completar pedidos
+- inferir datos faltantes
+
+CASOS ESPECIALES POR ESTADO:
+- En estado "browsing": números probablemente seleccionan un vendor → select_vendor con params {vendor_ref: "N"}
+- En estado "shopping": números probablemente agregan un producto del menú → add_to_cart con params {product_ref: "N", quantity: 1}
+- En estado "needs_address": la mayoría del texto es una dirección → give_address con params {address: "..."}
+- En estado "checkout": números/texto seleccionan método de pago → select_payment con params {method: "..."}
+
+EJEMPLOS:
+
+Usuario: "hola"
+{"intent": "greeting", "params": {}, "confidence": 0.95}
+
+Usuario: "quiero pizza"
+{"intent": "search_product", "params": {"query": "pizza"}, "confidence": 0.9}
+
+Usuario: "agregar 2 hamburguesas"
+{"intent": "add_to_cart", "params": {"product_ref": "hamburguesa", "quantity": 2}, "confidence": 0.95}
+
+Usuario: "lo mismo de siempre"
+{"intent": "unknown", "params": {}, "confidence": 0.2}
+
+Usuario: "..."
+{"intent": "unknown", "params": {}, "confidence": 0.1}
+
+REGLA FINAL:
+Es mejor devolver "unknown" que equivocarse. Nunca adivines. Nunca completes información faltante.`;
 }
 
 export async function classifyIntent(
