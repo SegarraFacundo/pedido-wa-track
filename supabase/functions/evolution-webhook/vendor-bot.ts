@@ -133,6 +133,17 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     
     const lang = (context.language || 'es') as Language;
 
+    // 🔍 INTERCEPTOR: awaiting_search → treat any text as search query
+    if (context.order_state === 'awaiting_search') {
+      console.log('🔍 Awaiting search interceptor: treating message as search query');
+      context.order_state = 'idle';
+      const searchResult = await ejecutarHerramienta("buscar_productos", { consulta: message.trim() }, context, supabase);
+      context.conversation_history.push({ role: "user", content: message });
+      context.conversation_history.push({ role: "assistant", content: searchResult });
+      await saveContext(context, supabase);
+      return searchResult;
+    }
+
     // 👋 INTERCEPTOR: Greeting → contextual menu
     const greetingRegex = /^(hola|buenas|hey|hi|hello|oi|olá|buen\s*d[ií]a|buenos?\s*d[ií]as|buenas?\s*tardes?|buenas?\s*noches?|que\s*tal|qué\s*tal|saludos)\s*[!.?]*$/i;
     if (greetingRegex.test(message.trim())) {
@@ -198,7 +209,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         if (level === 1) {
           switch (num) {
             case 1: result = await ejecutarHerramienta("ver_locales_abiertos", {}, context, supabase); break;
-            case 2: result = t('welcome.search_prompt', lang); break;
+            case 2: result = t('welcome.search_prompt', lang); context.order_state = 'awaiting_search'; break;
             case 3: {
               if (context.selected_vendor_id) {
                 result = await ejecutarHerramienta("ver_horario_negocio", { vendor_id: context.selected_vendor_id }, context, supabase);
@@ -247,7 +258,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
           switch (num) {
             case 1: result = t('rating.prompt_order', lang); break;
             case 2: result = await ejecutarHerramienta("ver_locales_abiertos", {}, context, supabase); break;
-            case 3: result = t('welcome.search_prompt', lang); break;
+            case 3: result = t('welcome.search_prompt', lang); context.order_state = 'awaiting_search'; break;
             case 4: result = t('help.full', lang); break;
             default: intercepted = false;
           }
