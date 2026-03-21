@@ -242,6 +242,10 @@ export default function Admin() {
             <EvolutionConfig />
           </TabsContent>
 
+          <TabsContent value="bot-review">
+            <BotInteractionReview />
+          </TabsContent>
+
           <TabsContent value="emergency">
             <EmergencyControl />
           </TabsContent>
