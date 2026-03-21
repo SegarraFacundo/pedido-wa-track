@@ -52,13 +52,11 @@ export function useRealtimeMessages(orderId: string, customerPhone?: string) {
     
     setIsBotPaused(false);
     
-    // Notify customer (translated)
-    const { getTranslatedNotification } = await import('@/lib/notificationTranslation');
-    const translatedMsg = await getTranslatedNotification(customerPhone, 'bot_active');
+    // Notify customer
     await supabase.functions.invoke('send-whatsapp-notification', {
       body: {
         phoneNumber: customerPhone,
-        message: translatedMsg || '✅ El asistente virtual está activo nuevamente.'
+        message: '✅ El asistente virtual está activo nuevamente.'
       }
     });
     
@@ -193,35 +191,22 @@ export function useRealtimeMessages(orderId: string, customerPhone?: string) {
           // Si el bot NO estaba pausado, primero notificar que el vendedor va a responder
           if (!wasBotPaused) {
             console.log('Sending bot paused notification to:', orderData.customer_phone);
-            const { getTranslatedNotification } = await import('@/lib/notificationTranslation');
-            const pausedMsg = await getTranslatedNotification(
-              orderData.customer_phone,
-              'bot_paused',
-              { vendorName }
-            );
             await supabase.functions.invoke('send-whatsapp-notification', {
               body: {
                 phoneNumber: orderData.customer_phone,
-                message: pausedMsg || `⚠️ *${vendorName}* va a responderte personalmente.\n\n🤖 El bot está pausado.\n\n_Escribí *"menu"* para volver al bot._`
+                message: `⚠️ *${vendorName}* va a responderte personalmente.\n\n🤖 El bot está pausado.\n\n_Escribí *"menu"* para volver al bot._`
               }
             });
           }
           
-          // Send WhatsApp notification with vendor message (translated)
+          // Send WhatsApp notification with vendor message
           console.log('Sending WhatsApp notification to:', orderData.customer_phone);
-          
-          const { getTranslatedNotification: getTranslation } = await import('@/lib/notificationTranslation');
-          const vendorMsg = await getTranslation(
-            orderData.customer_phone,
-            'vendor_message',
-            { vendorName, message: content }
-          );
           
           const { data: whatsappResponse, error: whatsappError } = await supabase.functions.invoke('send-whatsapp-notification', {
             body: {
               orderId,
               phoneNumber: orderData.customer_phone,
-              message: vendorMsg || `📩 Mensaje de *${vendorName}*: ${content}`
+              message: `📩 Mensaje de *${vendorName}*: ${content}`
             }
           });
 

@@ -5,15 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { User } from '@supabase/supabase-js';
 import { MessageSquare } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
-import { useLocalePath } from '@/hooks/useLocalePath';
 import lapachoIcon from '@/assets/lapacho-icon.png';
 
 export default function VendorAuth() {
-  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [vendorName, setVendorName] = useState('');
@@ -21,17 +19,19 @@ export default function VendorAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [hasVendorProfile, setHasVendorProfile] = useState<boolean | null>(null);
   const navigate = useNavigate();
-  const localePath = useLocalePath();
   const { toast } = useToast();
 
   useEffect(() => {
+    // Check if user is already logged in
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user);
+        // Check if vendor profile exists
         checkVendorProfile(session.user.id);
       }
     });
 
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         setUser(session.user);
@@ -55,7 +55,7 @@ export default function VendorAuth() {
 
     if (vendor) {
       setHasVendorProfile(true);
-      navigate(localePath('/vendor-dashboard'));
+      navigate('/vendor-dashboard');
     } else {
       setHasVendorProfile(false);
     }
@@ -66,7 +66,7 @@ export default function VendorAuth() {
     setLoading(true);
 
     try {
-      if (!user) throw new Error(t('vendorAuth.noAuthUser'));
+      if (!user) throw new Error('No hay usuario autenticado');
 
       const { error: vendorError } = await supabase
         .from('vendors')
@@ -82,14 +82,14 @@ export default function VendorAuth() {
       if (vendorError) throw vendorError;
 
       toast({
-        title: t('vendorAuth.profileCreated'),
-        description: t('vendorAuth.profileCreatedDesc'),
+        title: '✅ Perfil creado',
+        description: 'Tu perfil de vendedor ha sido creado exitosamente',
       });
 
-      navigate(localePath('/vendor-dashboard'));
+      navigate('/vendor-dashboard');
     } catch (error: any) {
       toast({
-        title: t('common.error'),
+        title: 'Error',
         description: error.message,
         variant: 'destructive'
       });
@@ -103,11 +103,14 @@ export default function VendorAuth() {
     setLoading(true);
 
     try {
+      // Sign up with vendor role
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: { role: 'vendor' },
+          data: {
+            role: 'vendor'
+          },
           emailRedirectTo: `${window.location.origin}/vendor-auth`
         }
       });
@@ -115,6 +118,7 @@ export default function VendorAuth() {
       if (error) throw error;
 
       if (data.user) {
+        // Create vendor profile
         const { error: vendorError } = await supabase
           .from('vendors')
           .insert({
@@ -129,13 +133,13 @@ export default function VendorAuth() {
         if (vendorError) throw vendorError;
 
         toast({
-          title: t('vendorAuth.accountCreated'),
-          description: t('vendorAuth.accountCreatedDesc'),
+          title: '✅ Cuenta creada',
+          description: 'Por favor verifica tu email antes de iniciar sesión',
         });
       }
     } catch (error: any) {
       toast({
-        title: t('common.error'),
+        title: 'Error',
         description: error.message,
         variant: 'destructive'
       });
@@ -149,24 +153,29 @@ export default function VendorAuth() {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
       if (error) throw error;
 
       toast({
-        title: t('vendorAuth.welcome'),
-        description: t('vendorAuth.welcomeDesc'),
+        title: '✅ Bienvenido',
+        description: 'Iniciando sesión...',
       });
     } catch (error: any) {
       let errorMessage = error.message;
       
+      // Handle network errors
       if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
-        errorMessage = t('vendorAuth.networkError');
+        errorMessage = 'Error de conexión. Verifica tu internet y vuelve a intentarlo.';
       } else if (error.message?.includes('Invalid login credentials')) {
-        errorMessage = t('vendorAuth.invalidCredentials');
+        errorMessage = 'Email o contraseña incorrectos.';
       }
       
       toast({
-        title: t('common.error'),
+        title: 'Error',
         description: errorMessage,
         variant: 'destructive'
       });
@@ -177,10 +186,11 @@ export default function VendorAuth() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    navigate(localePath('/'));
+    navigate('/');
   };
 
   if (user) {
+    // Si el usuario no tiene perfil de vendedor, mostrar formulario para crearlo
     if (hasVendorProfile === false) {
       return (
         <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -189,29 +199,34 @@ export default function VendorAuth() {
               <div className="flex justify-center mb-6">
                 <img src={lapachoIcon} alt="Lapacho" className="h-20 w-auto" />
               </div>
-              <CardTitle>{t('vendorAuth.createProfileTitle')}</CardTitle>
+              <CardTitle>Crear Perfil de Vendedor</CardTitle>
               <CardDescription>
-                {t('vendorAuth.createProfileDesc', { email: user.email })}
+                Tu cuenta ({user.email}) no tiene un perfil de vendedor. Completa el formulario para crear uno.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleCreateProfile} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="vendor-name">{t('vendorAuth.businessName')}</Label>
+                  <Label htmlFor="vendor-name">Nombre del Negocio</Label>
                   <Input
                     id="vendor-name"
                     type="text"
-                    placeholder={t('vendorAuth.businessPlaceholder')}
+                    placeholder="Mi Restaurante"
                     value={vendorName}
                     onChange={(e) => setVendorName(e.target.value)}
                     required
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? t('vendorAuth.creatingProfile') : t('vendorAuth.createProfile')}
+                  {loading ? 'Creando perfil...' : 'Crear Perfil de Vendedor'}
                 </Button>
-                <Button type="button" onClick={handleSignOut} variant="outline" className="w-full">
-                  {t('common.signOut')}
+                <Button 
+                  type="button"
+                  onClick={handleSignOut}
+                  variant="outline"
+                  className="w-full"
+                >
+                  Cerrar Sesión
                 </Button>
               </form>
             </CardContent>
@@ -220,19 +235,29 @@ export default function VendorAuth() {
       );
     }
 
+    // Si tiene perfil, mostrar opciones normales
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle>{t('vendorAuth.alreadyLoggedIn')}</CardTitle>
-            <CardDescription>{user.email}</CardDescription>
+            <CardTitle>Ya has iniciado sesión</CardTitle>
+            <CardDescription>
+              {user.email}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button onClick={() => navigate(localePath('/vendor-dashboard'))} className="w-full">
-              {t('vendorAuth.goToDashboard')}
+            <Button 
+              onClick={() => navigate('/vendor-dashboard')}
+              className="w-full"
+            >
+              Ir al Panel de Vendedor
             </Button>
-            <Button onClick={handleSignOut} variant="outline" className="w-full">
-              {t('common.signOut')}
+            <Button 
+              onClick={handleSignOut}
+              variant="outline"
+              className="w-full"
+            >
+              Cerrar Sesión
             </Button>
           </CardContent>
         </Card>
@@ -247,35 +272,35 @@ export default function VendorAuth() {
           <div className="flex justify-center mb-6">
             <img src={lapachoIcon} alt="Lapacho" className="h-20 w-auto" />
           </div>
-          <CardTitle>{t('vendorAuth.panelTitle')}</CardTitle>
-          <CardDescription>{t('vendorAuth.panelDesc')}</CardDescription>
+          <CardTitle>Panel de Vendedor</CardTitle>
+          <CardDescription>Accede a tu panel para gestionar pedidos y tu negocio</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSignIn} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">{t('vendorAuth.emailLabel')}</Label>
-              <Input id="email" type="email" placeholder={t('vendorAuth.emailPlaceholder')} value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" type="email" placeholder="vendedor@ejemplo.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">{t('vendorAuth.passwordLabel')}</Label>
+              <Label htmlFor="password">Contraseña</Label>
               <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? t('vendorAuth.signingIn') : t('common.signIn')}
+              {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </Button>
           </form>
           <div className="mt-6 pt-6 border-t">
-            <p className="text-sm text-center text-muted-foreground mb-4">{t('vendorAuth.noAccount')}</p>
+            <p className="text-sm text-center text-muted-foreground mb-4">¿No tienes una cuenta de vendedor?</p>
             <Button variant="outline" className="w-full" onClick={() => {
               const whatsappNumber = '5493464448309';
               const message = encodeURIComponent('Hola, quiero registrar mi negocio en Lapacho');
               window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');
             }}>
               <MessageSquare className="mr-2 h-4 w-4" />
-              {t('vendorAuth.contactToRegister')}
+              Contactar para Registrarse
             </Button>
           </div>
-          <Button variant="ghost" className="w-full mt-4" onClick={() => navigate(localePath('/'))}>{t('common.backHome')}</Button>
+          <Button variant="ghost" className="w-full mt-4" onClick={() => navigate('/')}>Volver al Inicio</Button>
         </CardContent>
       </Card>
     </div>

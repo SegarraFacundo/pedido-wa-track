@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,64 +45,9 @@ export default function SupportPanel() {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const selectedTicketRef = useRef<Ticket | null>(null);
-
-  useEffect(() => {
-    selectedTicketRef.current = selectedTicket;
-  }, [selectedTicket]);
-
   useEffect(() => {
     fetchTickets();
-
-    const channel = supabase
-      .channel('support-changes')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'support_tickets' },
-        (payload: any) => {
-          const newTicket = payload.new as Ticket;
-          setTickets(prev => [newTicket, ...prev.filter(t => t.id !== newTicket.id)]);
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'support_tickets' },
-        (payload: any) => {
-          const updatedTicket = payload.new as Ticket;
-          setTickets(prev => prev.map(t => (t.id === updatedTicket.id ? updatedTicket : t)));
-
-          const current = selectedTicketRef.current;
-          if (current && current.id === updatedTicket.id) {
-            setSelectedTicket(updatedTicket);
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'support_messages' },
-        (payload: any) => {
-          const incomingMessage = payload.new as Message;
-          const current = selectedTicketRef.current;
-
-          if (current && incomingMessage.ticket_id === current.id) {
-            setMessages(prev =>
-              prev.some(msg => msg.id === incomingMessage.id)
-                ? prev
-                : [...prev, incomingMessage]
-            );
-          }
-        }
-      )
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR') {
-          console.error('Support realtime channel error');
-          fetchTickets();
-        }
-      });
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    setupRealtimeSubscription();
   }, []);
 
   useEffect(() => {
@@ -111,20 +56,34 @@ export default function SupportPanel() {
     }
   }, [selectedTicket]);
 
-  useEffect(() => {
-    if (!selectedTicket) return;
+  const setupRealtimeSubscription = () => {
+    const channel = supabase
+      .channel('support-changes')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'support_tickets' },
+        () => fetchTickets()
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'support_tickets' },
+        () => fetchTickets()
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'support_messages' },
+        (payload: any) => {
+          if (selectedTicket && payload.new.ticket_id === selectedTicket.id) {
+            fetchMessages(selectedTicket.id);
+          }
+        }
+      )
+      .subscribe();
 
-    const refreshedTicket = tickets.find(t => t.id === selectedTicket.id);
-    if (!refreshedTicket) return;
-
-    if (
-      refreshedTicket.status !== selectedTicket.status ||
-      refreshedTicket.updated_at !== selectedTicket.updated_at ||
-      refreshedTicket.subject !== selectedTicket.subject
-    ) {
-      setSelectedTicket(refreshedTicket);
-    }
-  }, [tickets, selectedTicket]);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  };
 
   const fetchTickets = async () => {
     try {
@@ -222,8 +181,6 @@ export default function SupportPanel() {
   const updateTicketStatus = async (status: string) => {
     if (!selectedTicket) return;
 
-    const currentTicket = selectedTicket;
-
     try {
       const { error } = await supabase
         .from('support_tickets')
@@ -231,29 +188,12 @@ export default function SupportPanel() {
           status,
           resolved_at: status === 'resolved' ? new Date().toISOString() : null
         })
-        .eq('id', currentTicket.id);
+        .eq('id', selectedTicket.id);
 
       if (error) throw error;
 
-      setSelectedTicket(prev => (prev ? { ...prev, status } : prev));
-      setTickets(prev => prev.map(t => (t.id === currentTicket.id ? { ...t, status } : t)));
-
-      if (status === 'resolved') {
-        try {
-          const { data: whatsappData, error: whatsappError } = await supabase.functions.invoke('send-whatsapp-notification', {
-            body: {
-              phoneNumber: currentTicket.customer_phone,
-              message: `✅ Tu ticket de soporte "${currentTicket.subject}" fue marcado como resuelto.\n\nSi necesitás algo más, escribinos cuando quieras.`
-            }
-          });
-
-          if (whatsappError || whatsappData?.success === false) {
-            console.error('Error sending resolved notification:', whatsappError || whatsappData);
-          }
-        } catch (notifyError) {
-          console.error('Resolved notification failed:', notifyError);
-        }
-      }
+      setSelectedTicket({ ...selectedTicket, status });
+      fetchTickets();
 
       toast({
         title: "Estado actualizado",

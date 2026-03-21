@@ -5,17 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Headphones } from "lucide-react";
-import { useTranslation } from "react-i18next";
-import { useLocalePath } from "@/hooks/useLocalePath";
 import lapachoLogo from "@/assets/lapacho-logo.png";
 
 export default function SoporteAuth() {
-  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const lp = useLocalePath();
   const { toast } = useToast();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -31,9 +27,10 @@ export default function SoporteAuth() {
       if (authError) throw authError;
 
       if (!authData.user) {
-        throw new Error(t('vendorAuth.noAuthUser'));
+        throw new Error("No se pudo obtener la información del usuario");
       }
 
+      // Verificar que el usuario tiene rol de soporte o admin
       const { data: roles, error: rolesError } = await supabase
         .from('user_roles')
         .select('role')
@@ -42,14 +39,14 @@ export default function SoporteAuth() {
 
       if (rolesError) {
         console.error('Error checking roles:', rolesError);
-        throw new Error(t('common.error'));
+        throw new Error("Error al verificar permisos");
       }
 
       if (!roles || roles.length === 0) {
         await supabase.auth.signOut();
         toast({
-          title: t('soporteAuth.accessDenied'),
-          description: t('soporteAuth.accessDeniedDesc'),
+          title: "Acceso denegado",
+          description: "No tienes permisos para acceder al panel de soporte",
           variant: "destructive",
         });
         setLoading(false);
@@ -57,16 +54,16 @@ export default function SoporteAuth() {
       }
 
       toast({
-        title: t('soporteAuth.loginSuccess'),
-        description: t('soporteAuth.loginSuccessDesc'),
+        title: "Inicio de sesión exitoso",
+        description: "Bienvenido al panel de soporte",
       });
 
-      navigate(lp("/soporte"));
+      navigate("/soporte");
     } catch (error: any) {
       console.error('Login error:', error);
       toast({
-        title: t('soporteAuth.loginError'),
-        description: error.message || t('soporteAuth.loginErrorDesc'),
+        title: "Error al iniciar sesión",
+        description: error.message || "Verifica tus credenciales e intenta nuevamente",
         variant: "destructive",
       });
     } finally {
@@ -80,14 +77,18 @@ export default function SoporteAuth() {
         <div className="text-center mb-8">
           <img src={lapachoLogo} alt="Lapacho Logo" className="h-16 mx-auto mb-4" />
           <Headphones className="h-12 w-12 text-primary mx-auto mb-4" />
-          <h1 className="text-3xl font-bold mb-2">{t('soporteAuth.panelTitle')}</h1>
-          <p className="text-muted-foreground">{t('soporteAuth.panelDesc')}</p>
+          <h1 className="text-3xl font-bold mb-2">Panel de Soporte</h1>
+          <p className="text-muted-foreground">
+            Ingresa con tu cuenta de soporte
+          </p>
         </div>
 
         <div className="bg-card border rounded-lg p-6 shadow-sm">
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium">{t('soporteAuth.emailLabel')}</label>
+              <label htmlFor="email" className="text-sm font-medium">
+                Correo electrónico
+              </label>
               <Input
                 id="email"
                 type="email"
@@ -100,7 +101,9 @@ export default function SoporteAuth() {
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">{t('soporteAuth.passwordLabel')}</label>
+              <label htmlFor="password" className="text-sm font-medium">
+                Contraseña
+              </label>
               <Input
                 id="password"
                 type="password"
@@ -113,14 +116,14 @@ export default function SoporteAuth() {
             </div>
 
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? t('soporteAuth.signingIn') : t('common.signIn')}
+              {loading ? "Iniciando sesión..." : "Iniciar sesión"}
             </Button>
           </form>
         </div>
 
         <div className="mt-4 text-center">
-          <Button variant="ghost" onClick={() => navigate(lp('/'))}>
-            {t('common.backHome')}
+          <Button variant="ghost" onClick={() => navigate('/')}>
+            Volver al Inicio
           </Button>
         </div>
       </div>

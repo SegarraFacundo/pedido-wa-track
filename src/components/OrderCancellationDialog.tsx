@@ -67,15 +67,9 @@ export function OrderCancellationDialog({
 
       if (historyError) throw historyError;
 
-      // Send WhatsApp notification to customer (translated)
+      // Send WhatsApp notification to customer
       if (order?.customer_phone) {
-        const { getTranslatedNotification } = await import('@/lib/notificationTranslation');
-        const translatedMsg = await getTranslatedNotification(
-          order.customer_phone,
-          'cancellation',
-          { orderId: orderId.slice(0, 8), reason: reason.trim() }
-        );
-        const notificationMessage = translatedMsg || `Tu pedido #${orderId.slice(0, 8)} ha sido cancelado. Motivo: ${reason.trim()}. Si tienes alguna duda, contacta al vendedor.`;
+        const notificationMessage = `Tu pedido #${orderId.slice(0, 8)} ha sido cancelado. Motivo: ${reason.trim()}. Si tienes alguna duda, contacta al vendedor.`;
         
         await supabase.functions.invoke('send-whatsapp-notification', {
           body: {

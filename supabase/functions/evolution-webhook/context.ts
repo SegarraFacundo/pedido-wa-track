@@ -86,37 +86,6 @@ export async function getContext(phone: string, supabase: any): Promise<Conversa
       console.log("🚚 Delivery type:", saved.delivery_type);
       console.log("💳 Payment methods:", saved.available_payment_methods?.length || 0);
       
-      let wasInactive = false;
-      
-      // ⏱️ INACTIVITY TIMEOUT: 10min without activity → soft reset (if no active order)
-      const activeOrderStates = ["order_pending_cash", "order_pending_transfer", "order_pending_mp", "order_confirmed"];
-      const hasActiveOrder = saved.pending_order_id && activeOrderStates.includes(saved.order_state || "");
-      
-      if (data.updated_at && !hasActiveOrder) {
-        const lastActivity = new Date(data.updated_at).getTime();
-        const tenMinutesMs = 10 * 60 * 1000;
-        const timeSinceActivity = Date.now() - lastActivity;
-        
-        if (timeSinceActivity > tenMinutesMs) {
-          console.log(`⏱️ Inactivity detected: ${Math.round(timeSinceActivity / 60000)}min since last activity. Soft reset.`);
-          wasInactive = true;
-          // Return a clean context with inactive flag
-          const cleanContext: ConversationContext = {
-            phone,
-            cart: [],
-            order_state: "idle",
-            user_latitude: userLatitude,
-            user_longitude: userLongitude,
-            pending_location_decision: false,
-            conversation_history: [],
-            language: saved.language,
-            was_inactive: true,
-          };
-          await saveContext(cleanContext, supabase);
-          return cleanContext;
-        }
-      }
-      
       const context: ConversationContext = {
         phone,
         cart: saved.cart || [],
@@ -133,7 +102,6 @@ export async function getContext(phone: string, supabase: any): Promise<Conversa
         pending_location_decision: saved.pending_location_decision || false,
         pending_vendor_change: saved.pending_vendor_change,
         conversation_history: saved.conversation_history || [],
-        language: saved.language,
         
         // ⭐ CAMPOS CRÍTICOS QUE FALTABAN:
         resumen_mostrado: saved.resumen_mostrado || false,
@@ -147,7 +115,6 @@ export async function getContext(phone: string, supabase: any): Promise<Conversa
         last_menu_fetch: saved.last_menu_fetch,
         last_vendors_fetch: saved.last_vendors_fetch,
         pending_cancellation: saved.pending_cancellation,
-        was_inactive: wasInactive,
       };
       
       // ✅ SINCRONIZAR CON LA DB - verificar si el pedido sigue activo

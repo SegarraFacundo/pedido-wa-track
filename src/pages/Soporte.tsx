@@ -4,20 +4,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { LogOut, Headphones } from "lucide-react";
-import { useTranslation } from "react-i18next";
-import { useLocalePath } from "@/hooks/useLocalePath";
 import SupportPanel from "@/components/admin/SupportPanel";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import lapachoLogo from "@/assets/lapacho-logo.png";
 import lapachoIcon from "@/assets/lapacho-icon.png";
 
 export default function Soporte() {
-  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   const navigate = useNavigate();
-  const lp = useLocalePath();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -29,7 +25,7 @@ export default function Soporte() {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
-        navigate(lp('/soporte-auth'));
+        navigate('/soporte-auth');
         return;
       }
 
@@ -41,8 +37,8 @@ export default function Soporte() {
 
       if (error || !roles || roles.length === 0) {
         toast({
-          title: t('soporte.accessDenied'),
-          description: t('soporte.accessDeniedDesc'),
+          title: "Acceso denegado",
+          description: "No tienes permisos para acceder al panel de soporte",
           variant: "destructive",
         });
         setHasAccess(false);
@@ -64,22 +60,22 @@ export default function Soporte() {
       const { error } = await supabase.auth.signOut();
       if (error) {
         toast({
-          title: t('soporte.signOutError'),
+          title: "Error al cerrar sesión",
           description: error.message,
           variant: "destructive",
         });
         return;
       }
       toast({
-        title: t('soporte.signOutSuccess'),
-        description: t('soporte.signOutSuccessDesc'),
+        title: "Sesión cerrada",
+        description: "Has cerrado sesión correctamente",
       });
       navigate('/');
     } catch (error) {
       console.error('Error signing out:', error);
       toast({
-        title: t('common.error'),
-        description: t('soporte.signOutFailure'),
+        title: "Error",
+        description: "No se pudo cerrar la sesión. Por favor, intenta de nuevo.",
         variant: "destructive",
       });
     }
@@ -90,7 +86,7 @@ export default function Soporte() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">{t('soporte.verifyingAccess')}</p>
+          <p className="mt-4 text-muted-foreground">Verificando acceso...</p>
         </div>
       </div>
     );
@@ -108,7 +104,7 @@ export default function Soporte() {
                 <span className="text-xl font-bold md:hidden">Lapacho</span>
               </div>
               <Button variant="ghost" onClick={() => navigate('/')}>
-                {t('common.home')}
+                Inicio
               </Button>
             </div>
           </div>
@@ -117,23 +113,25 @@ export default function Soporte() {
         <main className="container mx-auto px-4 py-8">
           <div className="max-w-md mx-auto text-center">
             <Headphones className="h-16 w-16 text-primary mx-auto mb-6" />
-            <h2 className="text-2xl font-bold mb-4">{t('soporte.panelTitle')}</h2>
-            <p className="text-muted-foreground mb-6">{t('soporte.noAccess')}</p>
+            <h2 className="text-2xl font-bold mb-4">Panel de Soporte</h2>
+            <p className="text-muted-foreground mb-6">
+              No tienes permisos para acceder al panel de soporte.
+            </p>
             <div className="space-y-3">
               <Button 
-                onClick={() => navigate(lp('/soporte-auth'))} 
+                onClick={() => navigate('/soporte-auth')} 
                 variant="default"
                 className="w-full"
                 size="lg"
               >
-                {t('common.signIn')}
+                Iniciar Sesión
               </Button>
               <Button 
-                onClick={() => navigate(lp('/'))} 
+                onClick={() => navigate('/')} 
                 variant="ghost"
                 className="w-full"
               >
-                {t('common.backHome')}
+                Volver al Inicio
               </Button>
             </div>
           </div>
@@ -153,21 +151,21 @@ export default function Soporte() {
               <img src={lapachoLogo} alt="Lapacho Logo" className="h-10 hidden md:block" />
               <div>
                 <h1 className="text-xl md:text-2xl font-bold md:hidden">Lapacho</h1>
-                <p className="text-xs text-muted-foreground capitalize hidden md:block">{t('soporte.role')}: {userRole}</p>
+                <p className="text-xs text-muted-foreground capitalize hidden md:block">Rol: {userRole}</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <Button variant="ghost" onClick={() => navigate(lp('/'))}>
-                {t('common.home')}
+              <Button variant="ghost" onClick={() => navigate('/')}>
+                Inicio
               </Button>
               {userRole === 'admin' && (
-                <Button variant="ghost" onClick={() => navigate(lp('/admin'))}>
-                  {t('soporte.adminPanel')}
+                <Button variant="ghost" onClick={() => navigate('/admin')}>
+                  Panel Admin
                 </Button>
               )}
               <Button onClick={handleSignOut} variant="outline">
                 <LogOut className="mr-2 h-4 w-4" />
-                {t('common.signOut')}
+                Cerrar Sesión
               </Button>
             </div>
           </div>
@@ -177,8 +175,10 @@ export default function Soporte() {
       <main className="container mx-auto px-4 py-8">
         <div className="mb-6 text-center">
           <Headphones className="h-12 w-12 text-primary mx-auto mb-4" />
-          <h2 className="text-2xl font-semibold mb-2">{t('soporte.ticketsTitle')}</h2>
-          <p className="text-muted-foreground">{t('soporte.ticketsDesc')}</p>
+          <h2 className="text-2xl font-semibold mb-2">Sistema de Tickets de Soporte</h2>
+          <p className="text-muted-foreground">
+            Gestiona las consultas y problemas reportados por clientes y vendedores
+          </p>
         </div>
         
         <SupportPanel />

@@ -305,14 +305,12 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
             console.error('❌ Error updating user_sessions:', sessionError);
           }
 
-          // Notificar al cliente que el bot está activo (traducido)
-          const { getTranslatedNotification } = await import('@/lib/notificationTranslation');
-          const translatedMsg = await getTranslatedNotification(phone, 'bot_active');
+          // Notificar al cliente que el bot está activo
           
           const { error: notifyError } = await supabase.functions.invoke('send-whatsapp-notification', {
             body: {
               phoneNumber: phone,
-              message: translatedMsg || `✅ El bot está activo nuevamente.`
+              message: `✅ El bot está activo nuevamente.`
             }
           });
 
@@ -386,17 +384,11 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
           updated_at: new Date().toISOString()
         }, { onConflict: 'phone' });
 
-      // Enviar mensaje por WhatsApp al cliente con el nombre del negocio (traducido)
-      const { getTranslatedNotification: getTranslation } = await import('@/lib/notificationTranslation');
-      const translatedVendorMsg = await getTranslation(
-        selectedChat.customer_phone,
-        'vendor_message',
-        { vendorName, message: newMessage }
-      );
+      // Enviar mensaje por WhatsApp al cliente con el nombre del negocio
       await supabase.functions.invoke('send-whatsapp-notification', {
         body: {
           phoneNumber: selectedChat.customer_phone,
-          message: translatedVendorMsg || `📩 Mensaje de *${vendorName}*:\n${newMessage}`,
+          message: `📩 Mensaje de *${vendorName}*:\n${newMessage}`,
           orderId: selectedChat.id
         }
       });
@@ -454,13 +446,11 @@ export function VendorDirectChat({ vendorId }: VendorDirectChatProps) {
           })
           .eq('phone', chat.customer_phone);
 
-        // Notificar al cliente que el bot está activo nuevamente (traducido)
-        const { getTranslatedNotification: getEndTranslation } = await import('@/lib/notificationTranslation');
-        const endMsg = await getEndTranslation(chat.customer_phone, 'bot_active_full');
+        // Notificar al cliente que el bot está activo nuevamente
         await supabase.functions.invoke('send-whatsapp-notification', {
           body: {
             phoneNumber: chat.customer_phone,
-            message: endMsg || `✅ El bot está activo nuevamente. Puedes seguir haciendo consultas o pedidos.`
+            message: `✅ El bot está activo nuevamente. Puedes seguir haciendo consultas o pedidos.`
           }
         });
       }

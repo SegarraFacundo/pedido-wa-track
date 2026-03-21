@@ -8,29 +8,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// ==================== MESSAGE DEDUPLICATION ====================
-// Prevents duplicate webhook processing from Evolution API
-const recentMessageIds = new Map<string, number>(); // messageId → timestamp
-const DEDUP_WINDOW_MS = 30_000; // 30 seconds
-
-function isDuplicateMessage(messageId: string): boolean {
-  if (!messageId) return false;
-  
-  // Cleanup old entries every check
-  const now = Date.now();
-  for (const [id, ts] of recentMessageIds) {
-    if (now - ts > DEDUP_WINDOW_MS) recentMessageIds.delete(id);
-  }
-  
-  if (recentMessageIds.has(messageId)) {
-    console.log(`🔁 DUPLICATE message detected: ${messageId}, ignoring`);
-    return true;
-  }
-  
-  recentMessageIds.set(messageId, now);
-  return false;
-}
-
 // ✅ Normaliza números argentinos: siempre 549XXXXXXXXX
 function normalizeArgentinePhone(phone: string): string {
   let cleaned = phone.replace(/@s\.whatsapp\.net$/i, '').replace(/@c\.us$/i, '');
@@ -145,15 +122,6 @@ serve(async (req) => {
     if (data.key?.fromMe) {
       console.log('Ignoring message from bot itself');
       return new Response(JSON.stringify({ status: 'own_message_ignored' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
-      });
-    }
-
-    // 🔁 DEDUPLICATION: Prevent processing the same message twice
-    const messageId = data.key?.id;
-    if (messageId && isDuplicateMessage(messageId)) {
-      return new Response(JSON.stringify({ status: 'duplicate_ignored' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200
       });
@@ -690,29 +658,6 @@ serve(async (req) => {
       }, 8000);
     }
 
-    const stopTypingIndicator = () => {
-      if (typingInterval) {
-        clearInterval(typingInterval);
-        typingInterval = undefined;
-        console.log('🛑 Typing indicator stopped');
-      }
-    };
-
-    // 🤖 Comandos del cliente para reactivar el bot
-    const clientBotCommands = [
-      'menu', 'bot', 'ayuda', 'salir', 'inicio', 'volver', 'estado', 'mi pedido', 'cancelar', 'nuevo pedido',
-      'horario', 'schedule', 'horário', '営業時間', 'what time', 'a qué hora', 'a que hora'
-    ];
-
-    // Check if ANY line in the combined text is a reactivation command
-    const messageLines = finalMessageText.toLowerCase().trim().split('\n').map(l => l.trim());
-    const isReactivateCommand = messageLines.some(line => clientBotCommands.includes(line));
-
-    // Also check for rating intents (these should bypass support tickets)
-    const ratePlatformPattern = /\b(calificar\s+(a\s+)?lapacho|calificar\s+(la\s+)?plataforma|rate\s+lapacho|rate\s+(the\s+)?platform|avaliar\s+(o\s+)?lapacho)\b/i;
-    const rateOrderPattern = /\b(calificar\s+(mi\s+)?(orden|pedido)|rate\s+(my\s+)?(order)|avaliar\s+(meu\s+)?pedido)\b/i;
-    const isRatingIntent = ratePlatformPattern.test(finalMessageText) || rateOrderPattern.test(finalMessageText);
-
     // 🎫 Verificar si hay un ticket de soporte abierto RECIENTE (últimas 48 horas)
     let openTicket = await supabase
       .from('support_tickets')
@@ -775,74 +720,26 @@ serve(async (req) => {
 
     if (openTicket) {
       console.log('🎫 User has open support ticket:', openTicket.id);
-
-      // Permitir volver al bot con comandos explícitos (menu, bot, horario, etc.)
-      if (isReactivateCommand || isRatingIntent) {
-        await supabase
-          .from('support_tickets')
-          .update({
-            status: 'resolved',
-            resolved_at: new Date().toISOString(),
-          })
-          .eq('id', openTicket.id);
-
-        console.log('🔄 Support ticket auto-resolved by customer reactivation command:', finalMessageText);
-
-        // Notificar al cliente que el ticket fue cerrado
-        try {
-          const evolutionApiUrlTicket = Deno.env.get('EVOLUTION_API_URL');
-          const evolutionApiKeyTicket = Deno.env.get('EVOLUTION_API_KEY');
-          const instanceNameTicket = Deno.env.get('EVOLUTION_INSTANCE_NAME');
-          const chatIdTicket = rawJid?.includes('@lid') ? rawJid : `${normalizedPhone}@s.whatsapp.net`;
-          
-          const notifyResp = await fetch(`${evolutionApiUrlTicket}/message/sendText/${instanceNameTicket}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': evolutionApiKeyTicket!,
-              'ngrok-skip-browser-warning': 'true',
-              'User-Agent': 'SupabaseFunction/1.0'
-            },
-            body: JSON.stringify({
-              number: chatIdTicket,
-              text: `✅ Tu ticket de soporte *"${openTicket.subject}"* fue cerrado.\n\n_Ahora estás de vuelta con el bot. ¡Procesando tu solicitud!_ 🤖`
-            })
-          });
-
-          const notifyData = await notifyResp.json();
-          if (!notifyResp.ok) {
-            console.error('Error notifying ticket closure (Evolution):', notifyData);
-          } else {
-            console.log('✅ Ticket closure notification sent:', notifyData);
-          }
-        } catch (e) {
-          console.error('Error notifying ticket closure:', e);
-        }
-
-        openTicket = null;
-      } else {
-        // Guardar el mensaje del usuario en support_messages
-        await supabase
-          .from('support_messages')
-          .insert({
-            ticket_id: openTicket.id,
-            sender_type: 'customer',
-            message: finalMessageText
-          });
-
-        console.log('📝 Message saved to support ticket, bot will not respond');
-
-        stopTypingIndicator();
-
-        // Liberar lock antes de salir
-        await releaseLock(supabase, normalizedPhone);
-
-        // NO procesamos con el bot si hay un ticket abierto
-        return new Response(JSON.stringify({ status: 'support_mode', ticket_id: openTicket.id }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200
+      
+      // Guardar el mensaje del usuario en support_messages
+      await supabase
+        .from('support_messages')
+        .insert({
+          ticket_id: openTicket.id,
+          sender_type: 'customer',
+          message: finalMessageText
         });
-      }
+      
+      console.log('📝 Message saved to support ticket, bot will not respond');
+      
+      // Liberar lock antes de salir
+      await releaseLock(supabase, normalizedPhone);
+      
+      // NO procesamos con el bot si hay un ticket abierto
+      return new Response(JSON.stringify({ status: 'support_mode', ticket_id: openTicket.id }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
+      });
     }
 
     // 💬 Verificar si el usuario está en modo chat directo con vendedor
@@ -892,7 +789,11 @@ serve(async (req) => {
       }
     }
 
-    // isReactivateCommand se calcula arriba para cubrir también support_mode
+    // 🤖 Comandos del cliente para reactivar el bot
+    const clientBotCommands = ['menu', 'bot', 'ayuda', 'salir', 'inicio', 'volver', 'estado', 'mi pedido', 'cancelar', 'nuevo pedido'];
+    // Check if ANY line in the combined text is a reactivation command
+    const messageLines = finalMessageText.toLowerCase().trim().split('\n').map(l => l.trim());
+    const isReactivateCommand = messageLines.some(line => clientBotCommands.includes(line));
     
     if (vendorSession?.in_vendor_chat && !vendorChatExpired && isReactivateCommand) {
       console.log('🔄 Client requested to reactivate bot with command:', finalMessageText);
@@ -936,8 +837,6 @@ serve(async (req) => {
           }),
         });
         
-        stopTypingIndicator();
-
         // Liberar lock y salir
         await releaseLock(supabase, normalizedPhone);
         return new Response(JSON.stringify({ status: 'bot_reactivated_with_active_order' }), {
@@ -977,8 +876,6 @@ serve(async (req) => {
         console.log('✅ Message saved to order chat, bot will not respond');
         console.log('💡 Tip: Customer can write "menu" or "bot" to reactivate the bot');
 
-        stopTypingIndicator();
-
         // Liberar lock antes de salir
         await releaseLock(supabase, normalizedPhone);
 
@@ -1011,8 +908,6 @@ serve(async (req) => {
 
         console.log('✅ Message saved to vendor chat, bot will not respond');
 
-        stopTypingIndicator();
-
         // Liberar lock antes de salir
         await releaseLock(supabase, normalizedPhone);
 
@@ -1037,7 +932,10 @@ serve(async (req) => {
     let responseMessage = await processWithVendorBot(normalizedPhone, finalMessageText, finalImageUrl || undefined);
     
     // 🛑 Detener el typing indicator después del procesamiento
-    stopTypingIndicator();
+    if (typingInterval) {
+      clearInterval(typingInterval);
+      console.log('🛑 Typing indicator stopped');
+    }
 
     // --- ENVÍO FINAL ---
     if (responseMessage) {

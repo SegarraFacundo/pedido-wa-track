@@ -5,13 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { useTranslation } from "react-i18next";
-import { useLocalePath } from "@/hooks/useLocalePath";
+import { Lock } from "lucide-react";
 import lapachoIcon from "@/assets/lapacho-icon.png";
 
 export default function AdminAuth() {
-  const { t } = useTranslation();
-  const lp = useLocalePath();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -26,6 +23,7 @@ export default function AdminAuth() {
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
+      // Check if user is admin
       const { data: roles } = await supabase
         .from('user_roles')
         .select('role')
@@ -34,7 +32,7 @@ export default function AdminAuth() {
         .single();
       
       if (roles) {
-        navigate(lp('/admin'));
+        navigate('/admin');
       }
     }
   };
@@ -53,14 +51,14 @@ export default function AdminAuth() {
 
       if (user) {
         toast({
-          title: t('adminAuth.accountCreated'),
+          title: "Cuenta creada",
           description: "Ahora ve al SQL Editor de Supabase y ejecuta: SELECT public.make_user_admin('" + email + "');",
           duration: 10000,
         });
       }
     } catch (error: any) {
       toast({
-        title: t('common.error'),
+        title: "Error",
         description: error.message,
         variant: "destructive",
       });
@@ -82,6 +80,7 @@ export default function AdminAuth() {
       if (signInError) throw signInError;
 
       if (user) {
+        // Check if user has admin role
         const { data: roles, error: roleError } = await supabase
           .from('user_roles')
           .select('role')
@@ -91,19 +90,19 @@ export default function AdminAuth() {
 
         if (roleError || !roles) {
           await supabase.auth.signOut();
-          throw new Error(t('adminAuth.noAdminPermission') + " Ejecuta: SELECT public.make_user_admin('" + email + "'); en el SQL Editor");
+          throw new Error('No tienes permisos de administrador. Ejecuta: SELECT public.make_user_admin(\'' + email + '\'); en el SQL Editor');
         }
 
         toast({
-          title: t('adminAuth.loginSuccess'),
-          description: t('adminAuth.loginSuccessDesc'),
+          title: "Inicio de sesión exitoso",
+          description: "Bienvenido al panel de administración",
         });
         
-        navigate(lp('/admin'));
+        navigate('/admin');
       }
     } catch (error: any) {
       toast({
-        title: t('common.error'),
+        title: "Error",
         description: error.message,
         variant: "destructive",
       });
@@ -119,15 +118,17 @@ export default function AdminAuth() {
           <div className="flex items-center justify-center mb-6">
             <img src={lapachoIcon} alt="Lapacho" className="h-20 w-auto" />
           </div>
-          <CardTitle className="text-2xl text-center">{t('adminAuth.panelTitle')}</CardTitle>
-          <CardDescription className="text-center">{t('adminAuth.panelDesc')}</CardDescription>
+          <CardTitle className="text-2xl text-center">Panel de Administración</CardTitle>
+          <CardDescription className="text-center">
+            Acceso exclusivo para administradores
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={isSignUp ? handleSignUp : handleSignIn} className="space-y-4">
             <div className="space-y-2">
               <Input
                 type="email"
-                placeholder={t('adminAuth.emailPlaceholder')}
+                placeholder="Email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -136,7 +137,7 @@ export default function AdminAuth() {
             <div className="space-y-2">
               <Input
                 type="password"
-                placeholder={t('adminAuth.passwordPlaceholder')}
+                placeholder="Contraseña"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -144,7 +145,7 @@ export default function AdminAuth() {
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? t('common.processing') : (isSignUp ? t('adminAuth.createAdminAccount') : t('common.signIn'))}
+              {loading ? "Procesando..." : (isSignUp ? "Crear Cuenta Admin" : "Iniciar Sesión")}
             </Button>
             <div className="text-center">
               <Button
@@ -153,18 +154,18 @@ export default function AdminAuth() {
                 onClick={() => setIsSignUp(!isSignUp)}
                 className="text-sm"
               >
-                {isSignUp ? t('adminAuth.hasAccount') : t('adminAuth.firstTime')}
+                {isSignUp ? "¿Ya tienes cuenta? Inicia sesión" : "¿Primera vez? Crea tu cuenta admin"}
               </Button>
             </div>
           </form>
           
           {isSignUp && (
             <div className="mt-4 p-4 bg-muted rounded-lg text-sm">
-              <p className="font-medium mb-2">{t('adminAuth.afterCreate')}</p>
+              <p className="font-medium mb-2">Después de crear tu cuenta:</p>
               <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-                <li>{(t('adminAuth.afterCreateSteps', { returnObjects: true }) as string[])[0]}</li>
-                <li>{(t('adminAuth.afterCreateSteps', { returnObjects: true }) as string[])[1]} <code className="bg-background px-1 py-0.5 rounded">SELECT public.make_user_admin('tu-email@ejemplo.com');</code></li>
-                <li>{(t('adminAuth.afterCreateSteps', { returnObjects: true }) as string[])[2]}</li>
+                <li>Ve al SQL Editor de Supabase</li>
+                <li>Ejecuta: <code className="bg-background px-1 py-0.5 rounded">SELECT public.make_user_admin('tu-email@ejemplo.com');</code></li>
+                <li>Regresa aquí e inicia sesión</li>
               </ol>
             </div>
           )}

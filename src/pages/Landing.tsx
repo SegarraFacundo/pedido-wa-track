@@ -1,8 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Link } from "react-router-dom";
-import { useTranslation } from "react-i18next";
-import { useLocalePath } from "@/hooks/useLocalePath";
 import { 
   MessageSquare, 
   Clock, 
@@ -15,11 +13,8 @@ import {
   Leaf,
   Instagram
 } from "lucide-react";
-import LanguageSelector from "@/components/LanguageSelector";
 
 export default function Landing() {
-  const { t } = useTranslation();
-  const lp = useLocalePath();
   const handleProbarClick = () => {
     const whatsappNumber = '5493464448309';
     const message = encodeURIComponent('Hola, quiero probar Lapacho');
@@ -32,37 +27,12 @@ export default function Landing() {
     window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');
   };
 
+  // ⭐ NUEVO: Botón para clientes que quieren hacer pedidos
   const handlePedirClick = () => {
-    const whatsappNumber = '5493464515971';
+    const whatsappNumber = '5493464515971'; // Número del bot Lapacho
     const message = encodeURIComponent('Hola! Quiero hacer un pedido');
     window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');
   };
-
-  const businessCards = [
-    {
-      icon: MessageSquare,
-      titleKey: 'business.simplicity.title',
-      itemsKey: 'business.simplicity.items',
-    },
-    {
-      icon: Clock,
-      titleKey: 'business.time.title',
-      itemsKey: 'business.time.items',
-    },
-    {
-      icon: ShieldCheck,
-      titleKey: 'business.errors.title',
-      itemsKey: 'business.errors.items',
-    },
-  ];
-
-  const clientCards = [
-    { icon: Smartphone, titleKey: 'clients.single.title', descKey: 'clients.single.desc' },
-    { icon: Zap, titleKey: 'clients.fast.title', descKey: 'clients.fast.desc' },
-    { icon: Bell, titleKey: 'clients.tracking.title', descKey: 'clients.tracking.desc' },
-  ];
-
-  const steps = t('how.steps', { returnObjects: true }) as string[];
 
   return (
     <div className="min-h-screen bg-background">
@@ -74,15 +44,14 @@ export default function Landing() {
               <Leaf className="h-6 w-6 text-primary transition-transform origin-bottom group-hover:animate-leaf-sway" />
               <span className="text-xl font-semibold text-primary">Lapacho</span>
             </div>
-            <span className="text-muted-foreground text-sm hidden sm:block pb-0.5">{t('header.tagline')}</span>
+            <span className="text-muted-foreground text-sm hidden sm:block pb-0.5">Simple por naturaleza.</span>
           </div>
           <nav className="flex items-center gap-2 sm:gap-4">
-            <LanguageSelector />
-            <Link to={lp("/contacto")} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              {t('header.contact')}
+            <Link to="/contacto" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Contacto
             </Link>
             <Button variant="outline" size="sm" onClick={handleProbarClick}>
-              {t('header.try')}
+              Probar Lapacho
             </Button>
           </nav>
         </div>
@@ -90,6 +59,7 @@ export default function Landing() {
 
       {/* Hero Section */}
       <section className="relative overflow-hidden py-20 md:py-32 min-h-[80vh] flex items-center">
+        {/* Video de fondo */}
         <div className="absolute inset-0 z-0">
           <video 
             autoPlay 
@@ -101,6 +71,7 @@ export default function Landing() {
           >
             <source src="/videos/hero-lapacho.mp4" type="video/mp4" />
           </video>
+          {/* Overlay para legibilidad */}
           <div className="absolute inset-0 bg-gradient-to-b from-background/70 via-background/60 to-background/80" />
         </div>
         
@@ -108,21 +79,21 @@ export default function Landing() {
           <div className="max-w-3xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 bg-primary/20 text-primary-foreground backdrop-blur-sm px-4 py-2 rounded-full text-sm mb-8 border border-primary/30">
               <Leaf className="h-4 w-4" />
-              {t('hero.badge')}
+              Simple por naturaleza.
             </div>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-6 leading-tight drop-shadow-sm">
-              {t('hero.title')}
+              Lapacho – Simple por naturaleza.
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto">
-              {t('hero.subtitle')}
+              Pedidos claros, rápidos y sin errores. Todo por WhatsApp.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button size="lg" className="text-base px-8" onClick={handlePedirClick}>
-                {t('hero.cta_order')}
+                Hacer un pedido
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
               <Button size="lg" variant="outline" className="text-base px-8 bg-background/50 backdrop-blur-sm" onClick={handleProbarClick}>
-                {t('hero.cta_business')}
+                Soy un negocio
               </Button>
             </div>
           </div>
@@ -133,10 +104,16 @@ export default function Landing() {
       <section className="py-20 md:py-24">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-3xl md:text-4xl font-bold mb-6">{t('what.title')}</h2>
-            <p className="text-lg text-muted-foreground leading-relaxed">{t('what.p1')}</p>
-            <p className="text-lg text-muted-foreground leading-relaxed mt-4">{t('what.p2')}</p>
-            <p className="text-lg text-foreground font-medium mt-4">{t('what.p3')}</p>
+            <h2 className="text-3xl md:text-4xl font-bold mb-6">¿Qué es Lapacho?</h2>
+            <p className="text-lg text-muted-foreground leading-relaxed">
+              Lapacho es un asistente automatizado que toma pedidos por WhatsApp, los organiza y te los envía listos para preparar.
+            </p>
+            <p className="text-lg text-muted-foreground leading-relaxed mt-4">
+              No necesitás instalar nada ni aprender nuevas herramientas.
+            </p>
+            <p className="text-lg text-foreground font-medium mt-4">
+              Tu negocio trabaja igual, pero sin caos.
+            </p>
           </div>
         </div>
       </section>
@@ -144,30 +121,91 @@ export default function Landing() {
       {/* Beneficios para Negocios */}
       <section className="py-20 md:py-24 bg-muted/50">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">{t('business.title')}</h2>
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">Beneficios para negocios</h2>
           <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            {businessCards.map((card) => {
-              const Icon = card.icon;
-              const items = t(card.itemsKey, { returnObjects: true }) as string[];
-              return (
-                <Card key={card.titleKey} className="border-0 shadow-md hover:shadow-lg transition-shadow">
-                  <CardContent className="p-8">
-                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-6">
-                      <Icon className="h-6 w-6 text-primary" />
-                    </div>
-                    <h3 className="text-xl font-semibold mb-4">{t(card.titleKey)}</h3>
-                    <ul className="space-y-2 text-muted-foreground">
-                      {items.map((item, i) => (
-                        <li key={i} className="flex items-start gap-2">
-                          <CheckCircle2 className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                          <span>{item}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                </Card>
-              );
-            })}
+            {/* Simplicidad total */}
+            <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+              <CardContent className="p-8">
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-6">
+                  <MessageSquare className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="text-xl font-semibold mb-4">Simplicidad total</h3>
+                <ul className="space-y-2 text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                    <span>Pedidos claros por WhatsApp</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                    <span>Sin audios eternos</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                    <span>Sin errores de interpretación</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                    <span>Sin cambiar tu forma de trabajar</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Ahorro de tiempo real */}
+            <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+              <CardContent className="p-8">
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-6">
+                  <Clock className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="text-xl font-semibold mb-4">Ahorro de tiempo real</h3>
+                <ul className="space-y-2 text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                    <span>El sistema arma el pedido completo</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                    <span>Atiende a muchos clientes a la vez</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                    <span>Menos chat, más productividad</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                    <span>Vos solo preparás el pedido</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Cero errores */}
+            <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+              <CardContent className="p-8">
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-6">
+                  <ShieldCheck className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="text-xl font-semibold mb-4">Cero errores</h3>
+                <ul className="space-y-2 text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                    <span>Productos correctos</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                    <span>Cantidades exactas</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                    <span>Dirección y pago confirmados</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                    <span>Menos reclamos y pérdida de plata</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>
@@ -175,20 +213,37 @@ export default function Landing() {
       {/* Beneficios para Clientes */}
       <section className="py-20 md:py-24">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">{t('clients.title')}</h2>
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">Beneficios para clientes</h2>
           <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-            {clientCards.map((card) => {
-              const Icon = card.icon;
-              return (
-                <div key={card.titleKey} className="text-center">
-                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                    <Icon className="h-8 w-8 text-primary" />
-                  </div>
-                  <h3 className="text-lg font-semibold mb-2">{t(card.titleKey)}</h3>
-                  <p className="text-muted-foreground">{t(card.descKey)}</p>
-                </div>
-              );
-            })}
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                <Smartphone className="h-8 w-8 text-primary" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">Un solo número de WhatsApp</h3>
+              <p className="text-muted-foreground">
+                Todos los negocios en un mismo lugar, sin buscar teléfonos.
+              </p>
+            </div>
+
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                <Zap className="h-8 w-8 text-primary" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">Pedido rápido y simple</h3>
+              <p className="text-muted-foreground">
+                El bot arma el pedido en segundos, sin complicaciones.
+              </p>
+            </div>
+
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                <Bell className="h-8 w-8 text-primary" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">Seguimiento automático</h3>
+              <p className="text-muted-foreground">
+                Notificaciones: recibido, preparando, listo, en camino.
+              </p>
+            </div>
           </div>
         </div>
       </section>
@@ -196,21 +251,28 @@ export default function Landing() {
       {/* Cómo funciona */}
       <section className="py-20 md:py-24 bg-muted/50">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">{t('how.title')}</h2>
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">Cómo funciona</h2>
           <div className="max-w-3xl mx-auto">
             <div className="space-y-0">
-              {steps.map((text, index) => (
-                <div key={index} className="flex items-start gap-4">
+              {[
+                { step: 1, text: "El cliente escribe al número de Lapacho" },
+                { step: 2, text: "Selecciona negocio y productos" },
+                { step: 3, text: "Lapacho arma el pedido completo" },
+                { step: 4, text: "El negocio recibe el pedido en WhatsApp" },
+                { step: 5, text: "Cambia el estado con un clic" },
+                { step: 6, text: "El cliente recibe la notificación automática" },
+              ].map((item, index, arr) => (
+                <div key={item.step} className="flex items-start gap-4">
                   <div className="flex flex-col items-center">
                     <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-semibold shrink-0">
-                      {index + 1}
+                      {item.step}
                     </div>
-                    {index < steps.length - 1 && (
+                    {index < arr.length - 1 && (
                       <div className="w-0.5 h-12 bg-primary/30" />
                     )}
                   </div>
                   <div className="pt-2 pb-12">
-                    <p className="text-lg">{text}</p>
+                    <p className="text-lg">{item.text}</p>
                   </div>
                 </div>
               ))}
@@ -222,15 +284,19 @@ export default function Landing() {
       {/* CTA Final */}
       <section className="py-20 md:py-24 bg-primary text-primary-foreground">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">{t('cta.title')}</h2>
-          <p className="text-lg opacity-90 mb-8 max-w-xl mx-auto">{t('cta.subtitle')}</p>
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">
+            Simplificá tu negocio desde hoy.
+          </h2>
+          <p className="text-lg opacity-90 mb-8 max-w-xl mx-auto">
+            Menos chat. Menos errores. Más tiempo para crecer.
+          </p>
           <Button 
             size="lg" 
             variant="secondary" 
             className="text-base px-8"
             onClick={handleProbarClick}
           >
-            {t('cta.button')}
+            Probar Lapacho
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </div>
@@ -245,15 +311,15 @@ export default function Landing() {
                 <Leaf className="h-6 w-6 text-primary transition-transform origin-bottom group-hover:animate-leaf-sway" />
                 <span className="text-xl font-semibold text-primary">Lapacho</span>
               </div>
-              <p className="text-sm opacity-70">{t('footer.tagline')}</p>
+              <p className="text-sm opacity-70">Simple por naturaleza.</p>
             </div>
             
             <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8 text-sm">
-              <Link to={lp("/terminos")} className="opacity-70 hover:opacity-100 transition-opacity">
-                {t('footer.terms')}
+              <Link to="/terminos" className="opacity-70 hover:opacity-100 transition-opacity">
+                Términos y Condiciones
               </Link>
-              <Link to={lp("/privacidad")} className="opacity-70 hover:opacity-100 transition-opacity">
-                {t('footer.privacy')}
+              <Link to="/privacidad" className="opacity-70 hover:opacity-100 transition-opacity">
+                Política de Privacidad
               </Link>
               <a href="mailto:contacto@lapacho.ar" className="opacity-70 hover:opacity-100 transition-opacity">
                 contacto@lapacho.ar
@@ -271,7 +337,7 @@ export default function Landing() {
           </div>
           
           <div className="mt-8 pt-8 border-t border-background/20 text-center text-sm opacity-60">
-            <p>{t('footer.rights')}</p>
+            <p>© 2025 Lapacho. Todos los derechos reservados.</p>
           </div>
         </div>
       </footer>

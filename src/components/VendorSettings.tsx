@@ -8,8 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Building2, Save, Upload, X, PauseCircle, PlayCircle } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Building2, Save, Upload, X } from 'lucide-react';
 import { VendorNotificationSettings } from '@/components/VendorNotificationSettings';
 
 interface VendorData {
@@ -468,42 +467,15 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
           </p>
         </div>
 
-        {/* ⏸️ SECCIÓN: Pausa temporal del negocio */}
-        <div className="border-t pt-4 mt-4">
-          <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
-            {vendorData.is_active ? <PlayCircle className="h-5 w-5 text-primary" /> : <PauseCircle className="h-5 w-5 text-destructive" />}
-            Estado del Negocio
-          </h3>
-          
-          {!vendorData.is_active && (
-            <Alert variant="destructive" className="mb-4">
-              <PauseCircle className="h-4 w-4" />
-              <AlertTitle>Negocio pausado</AlertTitle>
-              <AlertDescription>
-                Tu negocio no aparece en el listado de WhatsApp y no recibirás nuevos pedidos. Activalo cuando estés listo para volver a operar.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          <div className="p-4 border rounded-lg">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <Label htmlFor="active" className="font-medium text-base">
-                  {vendorData.is_active ? '🟢 Negocio activo' : '⏸️ Negocio pausado'}
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  {vendorData.is_active 
-                    ? 'Tu negocio es visible para clientes y recibís pedidos normalmente.'
-                    : 'Tu negocio está oculto. No aparece en la lista de negocios ni recibe pedidos.'}
-                </p>
-              </div>
-              <Switch
-                id="active"
-                checked={vendorData.is_active}
-                onCheckedChange={(checked) => setVendorData({ ...vendorData, is_active: checked })}
-              />
-            </div>
-          </div>
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="active"
+            checked={vendorData.is_active}
+            onCheckedChange={(checked) => setVendorData({ ...vendorData, is_active: checked })}
+          />
+          <Label htmlFor="active">
+            Negocio activo (visible para clientes)
+          </Label>
         </div>
 
         {/* ⭐ SECCIÓN: Opciones de Entrega */}
