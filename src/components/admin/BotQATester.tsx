@@ -158,10 +158,15 @@ export default function BotQATester() {
     setIsRunning(true);
     setRunningTestId(test.id);
     const testPhone = `qa_test_${Date.now()}`;
+    // normalizeArgentinePhone strips the qa_test_ prefix and keeps only digits
+    const normalizedPhone = testPhone.replace(/^qa_test_/, "");
     const stepsResults: StepResult[] = [];
 
     try {
       for (const step of test.steps) {
+        // Record timestamp before sending to filter logs accurately
+        const beforeSend = new Date().toISOString();
+
         // Send message to bot
         await supabase.functions.invoke("evolution-webhook", {
           body: {
@@ -173,33 +178,30 @@ export default function BotQATester() {
           },
         });
 
-        // Wait for processing
-        await new Promise(r => setTimeout(r, 2000));
+        // Wait for debounce (2s) + AI processing (~3s)
+        await new Promise(r => setTimeout(r, 5000));
 
-        // Get bot response
-        const { data: sessionData } = await supabase
-          .from("user_sessions")
-          .select("last_bot_message")
-          .eq("phone", testPhone)
+        // Read response from bot_interaction_logs (admin has RLS SELECT access)
+        const { data: logData } = await supabase
+          .from("bot_interaction_logs")
+          .select("response_preview, intent_detected, confidence, error")
+          .eq("phone", normalizedPhone)
+          .gt("created_at", beforeSend)
+          .order("created_at", { ascending: false })
+          .limit(1)
           .maybeSingle();
 
         let botResponse = "(sin respuesta)";
-        if (sessionData?.last_bot_message) {
-          try {
-            const ctx = JSON.parse(sessionData.last_bot_message);
-            if (ctx.conversation_history?.length > 0) {
-              const last = [...ctx.conversation_history].reverse().find((m: { role: string }) => m.role === "assistant");
-              if (last) botResponse = (last as { content: string }).content;
-            }
-          } catch {
-            botResponse = sessionData.last_bot_message;
-          }
+        if (logData?.response_preview) {
+          botResponse = logData.response_preview;
+        } else if (logData?.error) {
+          botResponse = `(error: ${logData.error})`;
         }
 
         stepsResults.push({
           step,
           response: botResponse,
-          success: botResponse !== "(sin respuesta)" && !botResponse.includes("error"),
+          success: botResponse !== "(sin respuesta)" && !botResponse.startsWith("(error"),
         });
       }
 
@@ -215,10 +217,6 @@ export default function BotQATester() {
         description: test.name,
         variant: allPassed ? "default" : "destructive",
       });
-
-      // Cleanup test session
-      await supabase.from("user_sessions").delete().eq("phone", testPhone);
-      await supabase.from("chat_sessions").delete().eq("phone", testPhone);
 
       fetchResults();
     } catch (e: unknown) {
