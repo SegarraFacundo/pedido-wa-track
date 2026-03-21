@@ -83,77 +83,36 @@ async function handleShoppingInterceptor(
   if (!vendorId) return null;
 
   // 🔍 Pre-process: extract multi-intent parts
-  // Split by "y" / "," to separate product from address/payment
-  // "2 remeras quiero y enviamelo a Av. Villada 1582 y pago en efectivo"
   let productPart = text;
   let addressPart: string | null = null;
   let paymentPart: string | null = null;
 
-  // Extract address: "enviamelo a ...", "a la dirección ...", "enviar a ..."
+  // Extract address
   const addressMatch = text.match(/(?:enviam?elo?\s+a|enviar\s+a|direcci[oó]n\s+|a\s+la\s+direcci[oó]n\s+)([\w\s.,]+?)(?:\s+y\s+pago|\s+pago\s+|$)/i);
   if (addressMatch) {
     addressPart = addressMatch[1].trim();
     productPart = text.substring(0, text.indexOf(addressMatch[0])).trim();
   }
 
-  // Extract payment: "pago en efectivo", "pago con transferencia", "efectivo"
+  // Extract payment
   const paymentMatch = text.match(/pago\s+(?:en\s+|con\s+)?(efectivo|transferencia|mercadopago|mp)/i);
   if (paymentMatch) {
     paymentPart = paymentMatch[1].trim();
     if (!addressPart) {
-      // If no address was extracted, trim the payment part from productPart
       productPart = text.substring(0, text.indexOf(paymentMatch[0])).trim();
     }
   }
 
-  // Clean productPart: remove trailing "y", "quiero", connectors
   productPart = productPart.replace(/\s+y\s*$/i, '').replace(/\s+quiero\s*$/i, '').trim();
 
   console.log(`🛒 SHOPPING INTERCEPTOR: productPart="${productPart}", addressPart="${addressPart}", paymentPart="${paymentPart}"`);
 
-  let quantity = 1;
-  let searchTerm: string | null = null;
-  let menuIndex: number | null = null;
+  // ==================== MULTI-PRODUCT PARSING ====================
+  // Split by " y " or "," to handle "1 helado de chocolate y 1 helado de vainilla"
+  const productSegments = splitProductSegments(productPart);
+  console.log(`🛒 MULTI-PRODUCT: ${productSegments.length} segment(s): ${JSON.stringify(productSegments)}`);
 
-  // Pattern: solo número → producto #N del menú
-  const soloNumero = productPart.match(/^(\d+)$/);
-  if (soloNumero) {
-    menuIndex = parseInt(soloNumero[1]);
-  }
-  
-  // Pattern: "N producto" ("2 remeras")
-  if (!menuIndex) {
-    const cantidadProducto = productPart.match(/^(\d+)\s+(.+)/i);
-    if (cantidadProducto) {
-      quantity = parseInt(cantidadProducto[1]);
-      searchTerm = cantidadProducto[2].trim();
-    }
-  }
-  
-  // Pattern: "quiero/dame N producto"
-  if (!menuIndex && !searchTerm) {
-    const quieroPattern = productPart.match(/^(?:quiero|dame|poneme|agregame|mandame)\s+(\d+)\s+(.+)/i);
-    if (quieroPattern) {
-      quantity = parseInt(quieroPattern[1]);
-      searchTerm = quieroPattern[2].trim();
-    }
-  }
-
-  // Pattern: "quiero/dame producto" (cantidad 1)
-  if (!menuIndex && !searchTerm) {
-    const quieroSimple = productPart.match(/^(?:quiero|dame|poneme|agregame|mandame)\s+(.+)/i);
-    if (quieroSimple) {
-      searchTerm = quieroSimple[1].trim();
-    }
-  }
-
-  // Si no matcheó ningún patrón, dejar pasar al LLM
-  if (!menuIndex && !searchTerm) return null;
-  if (quantity < 1 || quantity > 50) return null;
-
-  console.log(`🛒 SHOPPING INTERCEPTOR: menuIndex=${menuIndex}, searchTerm="${searchTerm}", quantity=${quantity}`);
-
-  // Buscar productos del vendor en la DB
+  // Fetch products from DB once
   const { data: products, error } = await supabase
     .from("products")
     .select("id, name, price, is_available, stock_enabled, stock_quantity")
@@ -166,54 +125,73 @@ async function handleShoppingInterceptor(
     return null;
   }
 
-  let matchedProduct: any = null;
-
-  if (menuIndex !== null) {
-    if (menuIndex >= 1 && menuIndex <= products.length) {
-      matchedProduct = products[menuIndex - 1];
-      console.log(`✅ Product resolved by menu index #${menuIndex}: ${matchedProduct.name}`);
-    } else {
-      return `⚠️ No existe el producto #${menuIndex}. El menú tiene ${products.length} productos. Decime el número del 1 al ${products.length}.`;
+  // Parse each segment into { quantity, searchTerm, menuIndex }
+  const parsedItems: { quantity: number; searchTerm: string | null; menuIndex: number | null }[] = [];
+  
+  for (const segment of productSegments) {
+    const parsed = parseProductSegment(segment.trim());
+    if (parsed) {
+      parsedItems.push(parsed);
     }
-  } else if (searchTerm) {
-    const searchLower = searchTerm.toLowerCase().replace(/s$/, '');
-    
-    matchedProduct = products.find((p: any) => 
-      p.name.toLowerCase().includes(searchLower) ||
-      searchLower.includes(p.name.toLowerCase().replace(/s$/, ''))
-    );
-
-    if (!matchedProduct) {
-      const words = searchLower.split(/\s+/);
-      matchedProduct = products.find((p: any) => 
-        words.some((w: string) => w.length > 2 && p.name.toLowerCase().includes(w))
-      );
-    }
-
-    if (!matchedProduct) {
-      console.log(`❌ No product matched for "${searchTerm}" in vendor ${vendorId}`);
-      return `No encontré "${searchTerm}" en el menú de ${context.selected_vendor_name}.\n\nProductos disponibles:\n${products.map((p: any, i: number) => `${i + 1}. ${p.name} - $${p.price}`).join('\n')}\n\nDecime el número o nombre del producto.`;
-    }
-    console.log(`✅ Product resolved by name "${searchTerm}": ${matchedProduct.name}`);
   }
 
-  if (!matchedProduct) return null;
+  if (parsedItems.length === 0) return null;
 
-  // 1. Agregar al carrito
+  // Resolve each parsed item to a product
+  const itemsToAdd: { product_id: string; product_name: string; quantity: number; price: number }[] = [];
+  const errors: string[] = [];
+
+  for (const item of parsedItems) {
+    let matchedProduct: any = null;
+
+    if (item.menuIndex !== null) {
+      if (item.menuIndex >= 1 && item.menuIndex <= products.length) {
+        matchedProduct = products[item.menuIndex - 1];
+        console.log(`✅ Product resolved by menu index #${item.menuIndex}: ${matchedProduct.name}`);
+      } else {
+        errors.push(`⚠️ No existe el producto #${item.menuIndex}. El menú tiene ${products.length} productos.`);
+        continue;
+      }
+    } else if (item.searchTerm) {
+      matchedProduct = findProductByName(item.searchTerm, products);
+      if (!matchedProduct) {
+        errors.push(`No encontré "${item.searchTerm}" en el menú.`);
+        continue;
+      }
+      console.log(`✅ Product resolved by name "${item.searchTerm}": ${matchedProduct.name}`);
+    }
+
+    if (matchedProduct) {
+      itemsToAdd.push({
+        product_id: matchedProduct.id,
+        product_name: matchedProduct.name,
+        quantity: item.quantity,
+        price: matchedProduct.price,
+      });
+    }
+  }
+
+  if (itemsToAdd.length === 0 && errors.length > 0) {
+    return errors.join('\n') + `\n\nProductos disponibles:\n${products.map((p: any, i: number) => `${i + 1}. ${p.name} - $${p.price}`).join('\n')}\n\nDecime el número o nombre del producto.`;
+  }
+
+  if (itemsToAdd.length === 0) return null;
+
+  // Add all items to cart
   const result = await ejecutarHerramienta("agregar_al_carrito", {
-    items: [{
-      product_id: matchedProduct.id,
-      product_name: matchedProduct.name,
-      quantity: quantity,
-      price: matchedProduct.price,
-    }],
+    items: itemsToAdd,
   }, context, supabase);
 
-  // 2. Multi-intent: si hay dirección, procesarla
   let multiResult = result;
+  
+  // Append any partial errors
+  if (errors.length > 0) {
+    multiResult += `\n\n⚠️ ${errors.join('\n')}`;
+  }
+
+  // Multi-intent: address
   if (addressPart && addressPart.length > 3) {
     console.log(`📍 MULTI-INTENT: Processing address "${addressPart}"`);
-    // Set delivery type to delivery
     context.delivery_type = "delivery";
     const addressResult = await ejecutarHerramienta("confirmar_direccion_entrega", {
       direccion: addressPart,
@@ -221,7 +199,7 @@ async function handleShoppingInterceptor(
     multiResult += `\n\n${addressResult}`;
   }
 
-  // 3. Multi-intent: si hay método de pago, guardarlo
+  // Multi-intent: payment
   if (paymentPart) {
     console.log(`💳 MULTI-INTENT: Setting payment method "${paymentPart}"`);
     const methodMap: Record<string, string> = {
@@ -236,6 +214,90 @@ async function handleShoppingInterceptor(
   }
 
   return multiResult;
+}
+
+// ==================== HELPER: Split product segments ====================
+function splitProductSegments(text: string): string[] {
+  // Handle "1 helado de chocolate y 1 helado de vainilla" or "pizza, coca"
+  // But don't split on "y" inside product names like "sal y pimienta"
+  // Strategy: split on " y " only if what follows looks like a product request (number or verb prefix)
+  
+  const parts: string[] = [];
+  // Split by comma first
+  const commaParts = text.split(/,\s*/);
+  
+  for (const commaPart of commaParts) {
+    // Now split by " y " only when followed by a number or verb prefix
+    const yParts = commaPart.split(/\s+y\s+(?=\d|un[ao]?\s|quiero|dame|poneme|agregame)/i);
+    parts.push(...yParts);
+  }
+  
+  return parts.filter(p => p.trim().length > 0);
+}
+
+// ==================== HELPER: Parse a single product segment ====================
+function parseProductSegment(segment: string): { quantity: number; searchTerm: string | null; menuIndex: number | null } | null {
+  // Solo número → menu index
+  const soloNumero = segment.match(/^(\d+)$/);
+  if (soloNumero) {
+    return { quantity: 1, searchTerm: null, menuIndex: parseInt(soloNumero[1]) };
+  }
+
+  // "N producto" ("2 remeras", "1 helado de chocolate")
+  const cantidadProducto = segment.match(/^(\d+)\s+(.+)/i);
+  if (cantidadProducto) {
+    const qty = parseInt(cantidadProducto[1]);
+    if (qty >= 1 && qty <= 50) {
+      return { quantity: qty, searchTerm: cantidadProducto[2].trim(), menuIndex: null };
+    }
+  }
+
+  // "una/uno producto"
+  const unaPattern = segment.match(/^(?:una?|uno)\s+(.+)/i);
+  if (unaPattern) {
+    return { quantity: 1, searchTerm: unaPattern[1].trim(), menuIndex: null };
+  }
+
+  // "quiero/dame N producto"
+  const quieroPattern = segment.match(/^(?:quiero|dame|poneme|agregame|mandame)\s+(\d+)\s+(.+)/i);
+  if (quieroPattern) {
+    const qty = parseInt(quieroPattern[1]);
+    if (qty >= 1 && qty <= 50) {
+      return { quantity: qty, searchTerm: quieroPattern[2].trim(), menuIndex: null };
+    }
+  }
+
+  // "quiero/dame producto" (qty 1)
+  const quieroSimple = segment.match(/^(?:quiero|dame|poneme|agregame|mandame)\s+(.+)/i);
+  if (quieroSimple) {
+    return { quantity: 1, searchTerm: quieroSimple[1].trim(), menuIndex: null };
+  }
+
+  // Just a product name (e.g. "helado de vainilla")
+  if (segment.length > 2 && !/^\d+$/.test(segment)) {
+    return { quantity: 1, searchTerm: segment, menuIndex: null };
+  }
+
+  return null;
+}
+
+// ==================== HELPER: Find product by name ====================
+function findProductByName(searchTerm: string, products: any[]): any {
+  const searchLower = searchTerm.toLowerCase().replace(/s$/, '');
+  
+  let matched = products.find((p: any) => 
+    p.name.toLowerCase().includes(searchLower) ||
+    searchLower.includes(p.name.toLowerCase().replace(/s$/, ''))
+  );
+
+  if (!matched) {
+    const words = searchLower.split(/\s+/);
+    matched = products.find((p: any) => 
+      words.some((w: string) => w.length > 2 && p.name.toLowerCase().includes(w))
+    );
+  }
+
+  return matched;
 }
 
 // ==================== EJECUTORES DE HERRAMIENTAS ====================

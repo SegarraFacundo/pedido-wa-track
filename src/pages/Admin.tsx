@@ -28,6 +28,7 @@ import CommissionInvoiceGenerator from "@/components/admin/CommissionInvoiceGene
 import { VendorChangeAnalytics } from "@/components/admin/VendorChangeAnalytics";
 import PharmacyProductLoader from "@/components/admin/PharmacyProductLoader";
 import EmergencyControl from "@/components/admin/EmergencyControl";
+import BotInteractionReview from "@/components/admin/BotInteractionReview";
 import lapachoLogo from "@/assets/lapacho-logo.png";
 import lapachoIcon from "@/assets/lapacho-icon.png";
 import { cn } from "@/lib/utils";
@@ -43,6 +44,7 @@ const menuItems = [
   { value: "support", label: "Tickets Soporte", icon: Headphones },
   { value: "soporte-users", label: "Usuarios Soporte", icon: Users },
   { value: "evolution", label: "Agente IA", icon: Bot },
+  { value: "bot-review", label: "Errores Bot", icon: AlertTriangle },
   { value: "emergency", label: "Emergencia", icon: AlertTriangle, danger: true },
   { value: "tools", label: "Herramientas", icon: Wrench },
 ];
@@ -174,7 +176,7 @@ export default function Admin() {
       <main className="container mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           {/* TabsList solo visible en desktop */}
-          <TabsList className="hidden lg:grid w-full grid-cols-12 mb-8">
+          <TabsList className="hidden lg:grid w-full grid-cols-13 mb-8">
             {menuItems.map((item) => (
               <TabsTrigger
                 key={item.value}
@@ -238,6 +240,10 @@ export default function Admin() {
 
           <TabsContent value="evolution">
             <EvolutionConfig />
+          </TabsContent>
+
+          <TabsContent value="bot-review">
+            <BotInteractionReview />
           </TabsContent>
 
           <TabsContent value="emergency">
