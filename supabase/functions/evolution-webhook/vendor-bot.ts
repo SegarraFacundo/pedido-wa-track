@@ -65,6 +65,16 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     // Cargar contexto
     const context = await getContext(normalizedPhone, supabase);
     
+    // ⏱️ INACTIVITY: If session was soft-reset, show welcome back + menu
+    if (context.was_inactive) {
+      console.log('⏱️ User returned after inactivity, showing welcome back');
+      context.was_inactive = false;  // Clear flag
+      const lang = (context.language || 'es') as Language;
+      const welcomeBack = t('welcome.inactive_return', lang) + t('welcome.menu_clean', lang);
+      context.conversation_history.push({ role: "assistant", content: welcomeBack });
+      await saveContext(context, supabase);
+      return welcomeBack;
+    }
     // 🔄 VALIDACIÓN DE SINCRONIZACIÓN
     if (context.pending_order_id) {
       const { data: orderCheck } = await supabase
