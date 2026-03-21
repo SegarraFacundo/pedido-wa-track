@@ -256,8 +256,6 @@ export default function Admin() {
           <TabsContent value="qa-bot">
             <BotQATester />
           </TabsContent>
-            <EmergencyControl />
-          </TabsContent>
 
           <TabsContent value="tools">
             <div className="space-y-6">
