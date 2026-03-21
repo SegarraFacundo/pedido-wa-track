@@ -203,10 +203,19 @@ export async function handleShoppingInterceptor(
   }
 
   const total = context.cart.reduce((s: number, i: CartItem) => s + i.price * i.quantity, 0);
+  const cartDetail = context.cart.map((item: CartItem, idx: number) => 
+    `${idx + 1}. ${item.product_name} x${item.quantity} - $${item.price * item.quantity}`
+  ).join('\n');
 
   await saveContext(context, supabase);
 
-  return t('cart.added', lang, { vendor: context.selected_vendor_name || '', total: String(total) });
+  return t('cart.added', lang, { 
+    product: selectedProduct.name, 
+    qty: String(quantity), 
+    vendor: context.selected_vendor_name || '', 
+    total: String(total),
+    cart_detail: cartDetail,
+  });
 }
 
 // ==================== HELPER: TRACK VENDOR CHANGE ====================
