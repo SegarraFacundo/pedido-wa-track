@@ -74,7 +74,7 @@ export interface StateMachineResult {
 // Valid intents per state
 const VALID_INTENTS_BY_STATE: Record<string, Intent[]> = {
   idle: ["browse_stores", "search_product", "select_vendor", "view_menu", "check_status", "rate_order", "rate_platform", "view_schedule", "view_offers", "help", "reset", "change_language", "talk_to_human", "add_to_cart", "greeting"],
-  browsing: ["select_vendor", "view_menu", "browse_stores", "search_product", "view_schedule", "help", "reset", "change_language", "talk_to_human", "greeting"],
+  browsing: ["select_vendor", "view_menu", "browse_stores", "search_product", "check_status", "rate_order", "rate_platform", "view_offers", "view_schedule", "help", "reset", "change_language", "talk_to_human", "greeting"],
   shopping: ["add_to_cart", "remove_from_cart", "view_cart", "empty_cart", "confirm_order", "select_delivery", "give_address", "select_payment", "view_menu", "browse_stores", "view_schedule", "help", "reset", "change_language", "talk_to_human", "check_status", "cancel_order", "greeting"],
   needs_address: ["give_address", "view_cart", "empty_cart", "help", "reset", "cancel_order", "change_language", "greeting"],
   checkout: ["select_payment", "view_cart", "empty_cart", "confirm_order", "help", "reset", "cancel_order", "change_language", "greeting"],
