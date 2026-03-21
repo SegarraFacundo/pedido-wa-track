@@ -133,6 +133,17 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     
     const lang = (context.language || 'es') as Language;
 
+    // 🔍 INTERCEPTOR: awaiting_search → treat any text as search query
+    if (context.order_state === 'awaiting_search') {
+      console.log('🔍 Awaiting search interceptor: treating message as search query');
+      context.order_state = 'idle';
+      const searchResult = await ejecutarHerramienta("buscar_productos", { consulta: message.trim() }, context, supabase);
+      context.conversation_history.push({ role: "user", content: message });
+      context.conversation_history.push({ role: "assistant", content: searchResult });
+      await saveContext(context, supabase);
+      return searchResult;
+    }
+
     // 👋 INTERCEPTOR: Greeting → contextual menu
     const greetingRegex = /^(hola|buenas|hey|hi|hello|oi|olá|buen\s*d[ií]a|buenos?\s*d[ií]as|buenas?\s*tardes?|buenas?\s*noches?|que\s*tal|qué\s*tal|saludos)\s*[!.?]*$/i;
     if (greetingRegex.test(message.trim())) {
