@@ -120,9 +120,13 @@ async function handleShoppingInterceptor(
     .eq("is_available", true)
     .order("name");
 
-  if (error || !products || products.length === 0) {
-    console.error("❌ Shopping interceptor: Error fetching products or no products found");
+  if (error) {
+    console.error("❌ Shopping interceptor: Error fetching products:", error);
     return null;
+  }
+  if (!products || products.length === 0) {
+    console.warn("⚠️ Shopping interceptor: No products found for vendor", vendorId);
+    return `⚠️ *${context.selected_vendor_name}* no tiene productos disponibles en este momento.\n\n¿Querés ver otros negocios? Escribí "ver negocios" 😊`;
   }
 
   // Parse each segment into { quantity, searchTerm, menuIndex }
