@@ -8,6 +8,29 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// ==================== MESSAGE DEDUPLICATION ====================
+// Prevents duplicate webhook processing from Evolution API
+const recentMessageIds = new Map<string, number>(); // messageId → timestamp
+const DEDUP_WINDOW_MS = 30_000; // 30 seconds
+
+function isDuplicateMessage(messageId: string): boolean {
+  if (!messageId) return false;
+  
+  // Cleanup old entries every check
+  const now = Date.now();
+  for (const [id, ts] of recentMessageIds) {
+    if (now - ts > DEDUP_WINDOW_MS) recentMessageIds.delete(id);
+  }
+  
+  if (recentMessageIds.has(messageId)) {
+    console.log(`🔁 DUPLICATE message detected: ${messageId}, ignoring`);
+    return true;
+  }
+  
+  recentMessageIds.set(messageId, now);
+  return false;
+}
+
 // ✅ Normaliza números argentinos: siempre 549XXXXXXXXX
 function normalizeArgentinePhone(phone: string): string {
   let cleaned = phone.replace(/@s\.whatsapp\.net$/i, '').replace(/@c\.us$/i, '');
