@@ -150,6 +150,15 @@ serve(async (req) => {
       });
     }
 
+    // 🔁 DEDUPLICATION: Prevent processing the same message twice
+    const messageId = data.key?.id;
+    if (messageId && isDuplicateMessage(messageId)) {
+      return new Response(JSON.stringify({ status: 'duplicate_ignored' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
+      });
+    }
+
     const rawJid = data.key?.remoteJid;
     if (!rawJid) {
       console.log('❌ Missing remoteJid');
