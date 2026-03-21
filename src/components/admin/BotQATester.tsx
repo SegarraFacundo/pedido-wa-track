@@ -116,12 +116,12 @@ export default function BotQATester() {
   };
 
   const saveTest = async (test: QaTest) => {
-    const { error } = await supabase.from("bot_qa_tests").insert({
+    const { error } = await supabase.from("bot_qa_tests").insert([{
       name: test.name,
       category: test.category,
-      steps: test.steps as unknown as Record<string, unknown>,
+      steps: JSON.parse(JSON.stringify(test.steps)),
       source: test.source,
-    });
+    }]);
     if (error) {
       toast({ title: "Error guardando", description: error.message, variant: "destructive" });
     } else {
