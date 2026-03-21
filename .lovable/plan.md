@@ -1,16 +1,24 @@
 
-# Bot Anti-Alucinaciones: 5 Fases + Fix Shopping Loop ✅
 
-## Fases 1-5: Implementadas ✅
-- Filtrado de herramientas por estado (TOOLS_BY_STATE)
-- Interceptores deterministas pre-LLM
-- Prompt reducido ~70 líneas
-- Respuestas directas sin reformateo (DIRECT_RESPONSE_TOOLS)
-- Menú de ayuda estático
+# Plan: Redesplegar la versión del repositorio (amigable) al edge function
 
-## Fix: Shopping Loop (menú en loop) ✅
-### Problema: En estado `shopping`, el LLM llamaba `ver_menu_negocio` en vez de `agregar_al_carrito`
-### Solución:
-1. **Interceptor determinista shopping**: Detecta números ("2"), "N producto" ("2 remeras"), "quiero N producto" antes del LLM → busca en DB → `agregar_al_carrito` directo
-2. **Bloqueo ver_menu_negocio en shopping**: Si el LLM llama `ver_menu_negocio` estando en shopping, retorna error forzando `agregar_al_carrito`
-3. **Función `handleShoppingInterceptor`**: Busca productos del vendor en DB por índice o nombre fuzzy
+## Problema
+
+La versión desplegada en producción tiene un sistema NLU diferente al código del repositorio. Los logs muestran:
+- `🧠 NLU Result: intent=add_to_cart, confidence=0.9` — este NLU no existe en el código actual del repo
+- El NLU clasifica correctamente ("add_to_cart") pero luego la lógica no lo maneja bien y cae en "Perdón, no entendí"
+
+El código del repositorio usa OpenAI function-calling con interceptores deterministas, que es la versión "amigable" que el usuario quiere restaurar.
+
+## Solución
+
+**Redesplegar la edge function `evolution-webhook`** desde el código actual del repositorio. No se necesitan cambios de código — solo un redespliegue.
+
+## Resultado esperado
+
+- El bot vuelve a usar el sistema de function-calling con interceptores deterministas
+- Respuestas amigables con emojis y opciones numeradas
+- Shopping interceptor funcional (agregar productos con "2", "2 remeras", etc.)
+- Multi-intent parsing ("2 remeras a Av. Villada 1582 pago en efectivo")
+- Sin fallbacks genéricos tipo "Perdón, no entendí"
+
