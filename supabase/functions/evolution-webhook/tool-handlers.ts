@@ -558,10 +558,10 @@ export async function ejecutarHerramienta(
 
         let carrito = t('cart.header', lang, { vendor: context.selected_vendor_name || '' }) + `\n\n`;
         context.cart.forEach((item, i) => {
-          carrito += `${i + 1}. ${item.product_name} x${item.quantity} - $${item.price * item.quantity}\n`;
+          carrito += `${i + 1}. ${item.product_name} x${item.quantity} - $${Math.round(item.price * item.quantity)}\n`;
         });
 
-        const total = context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        const total = Math.round(context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0));
         carrito += `\n💰 ${t('cart.total', lang)}: $${total}\n\n`;
         
         if (context.delivery_type && context.payment_method) {
