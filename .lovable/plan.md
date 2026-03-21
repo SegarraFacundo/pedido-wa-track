@@ -153,3 +153,42 @@ Las opciones del menú deben reflejar lo que el usuario **realmente puede hacer*
 - `handleInvalidIntent`: En estados idle/completed/cancelled → devuelve menú contextual en vez de error
 - `greeting` agregado a VALID_INTENTS_BY_STATE en todos los estados
 - `STEP_HINTS.idle` actualizado para referenciar menú numerado
+
+---
+
+# Hardening Determinista del Bot ✅
+
+## Cambios implementados (basado en 12 recomendaciones)
+
+### 1. NLU: Validación robusta ✅ (`nlu.ts`)
+- Extracción JSON más resiliente: busca `{}` si no hay code block
+- Validación estricta: `typeof intent === "string"` + `typeof params === "object"`
+- Umbral de confianza: `confidence < 0.3` → intent `unknown`
+- Log warnings cuando la IA devuelve formato inválido
+- Try/catch separado para JSON.parse
+
+### 2. Reintentos: 3 niveles ✅ (`state-machine.ts`)
+- 1er retry: hint del paso actual + context header
+- 2do retry: menú de escalación numerado (menú / soporte / reset)
+- 3er retry: **forzar reset a idle** + mostrar menú principal limpio
+
+### 3. Context header ✅ (`state-machine.ts`)
+- `buildContextHeader()`: muestra "📍 Negocio: X | 🛒 Carrito: N productos ($total)"
+- Se usa en `handleInvalidIntent` para que el usuario siempre sepa dónde está
+
+### 4. Timeout de inactividad 10min ✅ (`context.ts` + `vendor-bot.ts`)
+- En `getContext()`: si `updated_at > 10min` y sin pedido activo → soft reset
+- Flag `was_inactive` en el contexto
+- En `vendor-bot.ts`: si `was_inactive` → "¡Hola de nuevo!" + menú principal
+- No resetea si hay pedido activo
+
+### 5. Fallback con opciones numeradas ✅ (`i18n.ts`)
+- `error.escalation_menu`: 3 opciones numeradas (menú / soporte / reset)
+- `error.forced_reset`: mensaje + menú principal
+- `welcome.inactive_return`: bienvenida tras inactividad
+
+### 6. Log estructurado en DB ✅ (`vendor-bot.ts` + migración)
+- Tabla `bot_interaction_logs`: phone, message, intent, state_before/after, confidence, response
+- `logBotInteraction()`: fire-and-forget, no bloquea la respuesta
+- Índices en phone, created_at, intent_detected
+- RLS: service_role puede escribir, admins pueden leer
