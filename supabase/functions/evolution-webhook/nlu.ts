@@ -131,6 +131,12 @@ Usuario: "quiero pizza"
 Usuario: "agregar 2 hamburguesas"
 {"intent": "add_to_cart", "params": {"product_ref": "hamburguesa", "quantity": 2}, "confidence": 0.95}
 
+Usuario: "remera"
+{"intent": "search_product", "params": {"query": "remera"}, "confidence": 0.85}
+
+Usuario: "coca cola"
+{"intent": "search_product", "params": {"query": "coca cola"}, "confidence": 0.85}
+
 Usuario: "lo mismo de siempre"
 {"intent": "unknown", "params": {}, "confidence": 0.2}
 
