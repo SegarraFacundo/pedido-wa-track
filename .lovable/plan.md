@@ -1,37 +1,35 @@
 
 
-# Fix: Remoción parcial del carrito y formato de precios
+# Revertir bot a versión pre-traducción (mantener frontend i18n)
 
-## Problemas detectados
+## Problema
 
-1. **"sacame 2 cocas" elimina TODAS las cocas**: `handleRemoveFromCart` hace `splice()` que borra el ítem completo, sin importar la cantidad pedida
-2. **NLU no extrae cantidad para remoción**: "sacame 2 cocas" solo pasa `{product_ref: "cocas"}`, pierde el "2"
-3. **Precios con decimales rotos**: `$7499.460000000001` por error de punto flotante
+El bot (`evolution-webhook`) fue modificado extensivamente el 15 de marzo para soportar i18n (4 idiomas). Esto tocó **todos** los archivos del bot: `vendor-bot.ts`, `state-machine.ts`, `bot-helpers.ts`, `tool-handlers.ts`, `nlu.ts`, y se creó `i18n.ts`. Querés volver al bot estable anterior (solo español, sin sistema i18n).
 
-## Cambios
+## Enfoque recomendado (2 pasos)
 
-### 1. NLU (`nlu.ts`) — Extraer `quantity` en `remove_from_cart`
+### Paso 1: Revertir todo vía History
 
-Agregar `quantity` como parámetro en los ejemplos de remoción:
-```
-"sacame 2 cocas" → {"intent": "remove_from_cart", "params": {"product_ref": "cocas", "quantity": 2}}
-"sacar el 2" → sigue siendo por índice sin quantity (quita 1 unidad)
-"sacame todas las cocas" → {"intent": "remove_from_cart", "params": {"product_ref": "cocas", "quantity": "all"}}
-```
+Usar el **History** de Lovable para volver a la versión del **15 de marzo antes de las 13:14** (antes del mensaje "Quisiera soportar multiple lenguajes").
 
-### 2. State Machine (`state-machine.ts`) — Remoción parcial por cantidad
+Esto revierte TODO el proyecto (bot + frontend) a ese punto estable.
 
-Reescribir `handleRemoveFromCart` para:
-- Si `quantity` viene, reducir esa cantidad del ítem (no eliminar todo)
-- Si no viene `quantity`, reducir 1 unidad
-- Solo hacer `splice` si la cantidad resultante llega a 0
-- Ejemplo: tengo 3 cocas, "sacame 2" → queda 1 coca
+### Paso 2: Re-agregar solo el frontend i18n
 
-### 3. Formato de precios (`bot-helpers.ts` + `state-machine.ts`)
+Después del revert, re-implementar únicamente el i18n del frontend web (que es mucho más simple que el bot). Esto incluye:
 
-Usar `Math.round()` o `.toFixed(0)` en todos los cálculos de total para evitar `$7499.460000000001` → `$7499`
+- `src/i18n/index.ts` y los archivos de locales (`es.json`, `en.json`, `pt.json`, `ja.json`)
+- `src/components/LanguageSelector.tsx`
+- `src/components/LocaleRouter.tsx`
+- Integración de `react-i18next` en los componentes de páginas
 
-### 4. Redespliegue
+Estos archivos del frontend son relativamente pocos y se pueden re-crear rápidamente.
 
-Redesplegar `evolution-webhook` con los 3 fixes.
+## ¿Por qué no revertir manualmente solo el bot?
+
+El bot tiene **8+ archivos** con cientos de cambios entrelazados con el sistema `i18n.ts`. No tengo acceso a las versiones anteriores de esos archivos. Intentar revertir manualmente sería propenso a errores y llevaría mucho más tiempo.
+
+## Acción inmediata
+
+Usá el botón de History para encontrar la versión correcta:
 
