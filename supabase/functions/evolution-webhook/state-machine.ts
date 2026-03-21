@@ -427,6 +427,7 @@ async function handleRemoveFromCart(
   return { response: t("cart.removed", lang, { product: removedProduct, vendor: context.selected_vendor_name || '', cart_detail: newCartDetail, total: String(total) }), handled: true };
 }
 
+async function handleViewCart(
   context: ConversationContext,
   supabase: any,
   lang: Language,
