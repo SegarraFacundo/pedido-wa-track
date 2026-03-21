@@ -501,7 +501,27 @@ export default function BotQATester() {
                         {new Date(result.run_at).toLocaleString("es-AR")}
                       </span>
                     </div>
-                    {expandedResult === result.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    <div className="flex items-center gap-2">
+                      {expandedResult === result.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      {result.status === "failed" && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const steps = (result.steps_results || []).map((sr, i) =>
+                              `Paso ${i + 1}:\n  👤 "${sr.step}"\n  🤖 "${sr.response}"\n  ${sr.success ? "✅" : "❌"}`
+                            ).join("\n");
+                            const text = `Este test QA falló en mi bot. Analizá las respuestas y ayudame a corregir:\n\n### ${result.test_name}\n${steps}`;
+                            navigator.clipboard.writeText(text);
+                            toast({ title: "Copiado" });
+                          }}
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
                   {expandedResult === result.id && (
