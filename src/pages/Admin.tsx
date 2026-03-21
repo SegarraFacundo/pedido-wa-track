@@ -49,7 +49,6 @@ const menuItems = [
   { value: "qa-bot", label: "QA Bot", icon: TestTube2 },
   { value: "emergency", label: "Emergencia", icon: AlertTriangle, danger: true },
   { value: "tools", label: "Herramientas", icon: Wrench },
-  { value: "tools", label: "Herramientas", icon: Wrench },
 ];
 
 export default function Admin() {
