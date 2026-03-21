@@ -60,6 +60,16 @@ export default function Landing() {
             <span className="text-muted-foreground text-sm hidden sm:block pb-0.5">{t('landing.tagline')}</span>
           </div>
           <nav className="flex items-center gap-2 sm:gap-4">
+            <Select value={i18n.language?.substring(0, 2)} onValueChange={changeLanguage}>
+              <SelectTrigger className="w-[70px] h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="es">🇦🇷 ES</SelectItem>
+                <SelectItem value="en">🇺🇸 EN</SelectItem>
+                <SelectItem value="pt">🇧🇷 PT</SelectItem>
+              </SelectContent>
+            </Select>
             <Link to="/contacto" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
               {t('landing.contact')}
             </Link>
