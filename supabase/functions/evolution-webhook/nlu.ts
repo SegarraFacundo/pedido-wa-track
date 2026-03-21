@@ -78,6 +78,7 @@ Intent guide:
 - help: asking for help/menu
 - reset: restart/clear everything
 - change_language: wants to switch language (params: {lang: "es"|"en"|"pt"|"ja"})
+- greeting: saying hello, hi, good morning/afternoon/evening, or general greeting
 - unknown: can't determine intent
 
 IMPORTANT: In state "browsing", numbers likely mean selecting a vendor. In state "shopping", numbers mean adding a product from the menu.
