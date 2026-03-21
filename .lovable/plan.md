@@ -1,29 +1,37 @@
 
 
-# Plan: Mejorar el System Prompt del NLU
+# Fix: Remoción parcial del carrito y formato de precios
 
-## Objetivo
-Reemplazar el prompt actual de `buildNLUPrompt()` en `nlu.ts` con el prompt mejorado que el usuario proporcionó, adaptado a nuestros intent names y estructura (`params` en vez de `entities`).
+## Problemas detectados
 
-## Cambio único: `nlu.ts` → `buildNLUPrompt()`
+1. **"sacame 2 cocas" elimina TODAS las cocas**: `handleRemoveFromCart` hace `splice()` que borra el ítem completo, sin importar la cantidad pedida
+2. **NLU no extrae cantidad para remoción**: "sacame 2 cocas" solo pasa `{product_ref: "cocas"}`, pierde el "2"
+3. **Precios con decimales rotos**: `$7499.460000000001` por error de punto flotante
 
-Reescribir la función para usar el nuevo prompt estricto con estas adaptaciones:
+## Cambios
 
-- **Nombre del bot**: "Lapacho Delivery" (como indica el prompt)
-- **Campo `entities` → `params`**: Nuestro sistema usa `params`, no `entities`. El prompt se adapta para pedir `params`
-- **Whitelist de intents**: Usar nuestra lista existente (24 intents) en vez de la del prompt (17 intents). Incluye los que no están en su lista: `empty_cart`, `select_delivery`, `give_address`, `select_payment`, `rate_order`, `rate_platform`, `view_offers`, `view_schedule`, `reset`, `change_language`
-- **Reglas de confianza**: Adoptar tal cual (0.9/0.7/0.5/<0.3)
-- **Reglas estrictas**: Adoptar todas (solo JSON, no markdown, no explicaciones, no inventar datos)
-- **Casos especiales**: Adoptar + agregar los context hints por estado que ya tenemos (browsing→números=vendor, shopping→números=producto, needs_address→texto=dirección)
-- **Ejemplos**: Adaptar a nuestro formato con `params` en vez de `entities`
+### 1. NLU (`nlu.ts`) — Extraer `quantity` en `remove_from_cart`
 
-### Lo que NO cambia
-- La función `classifyIntent()` y toda la lógica de validación/parsing posterior se mantiene idéntica
-- Los tipos `Intent`, `NLUResult` no cambian
-- La constante `INTENT_LIST` no cambia
+Agregar `quantity` como parámetro en los ejemplos de remoción:
+```
+"sacame 2 cocas" → {"intent": "remove_from_cart", "params": {"product_ref": "cocas", "quantity": 2}}
+"sacar el 2" → sigue siendo por índice sin quantity (quita 1 unidad)
+"sacame todas las cocas" → {"intent": "remove_from_cart", "params": {"product_ref": "cocas", "quantity": "all"}}
+```
 
-### Archivo
-| Archivo | Cambio |
-|---------|--------|
-| `nlu.ts` | Reescribir `buildNLUPrompt()` (~lines 41-87) |
+### 2. State Machine (`state-machine.ts`) — Remoción parcial por cantidad
+
+Reescribir `handleRemoveFromCart` para:
+- Si `quantity` viene, reducir esa cantidad del ítem (no eliminar todo)
+- Si no viene `quantity`, reducir 1 unidad
+- Solo hacer `splice` si la cantidad resultante llega a 0
+- Ejemplo: tengo 3 cocas, "sacame 2" → queda 1 coca
+
+### 3. Formato de precios (`bot-helpers.ts` + `state-machine.ts`)
+
+Usar `Math.round()` o `.toFixed(0)` en todos los cálculos de total para evitar `$7499.460000000001` → `$7499`
+
+### 4. Redespliegue
+
+Redesplegar `evolution-webhook` con los 3 fixes.
 
