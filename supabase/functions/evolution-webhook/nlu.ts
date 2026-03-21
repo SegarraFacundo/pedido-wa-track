@@ -99,6 +99,12 @@ NUNCA:
 - completar pedidos
 - inferir datos faltantes
 
+REGLA CRÍTICA - UN SOLO JSON:
+- SIEMPRE devuelve UN SOLO objeto JSON, nunca dos.
+- Si el usuario pide varios productos (ej: "dame 4 tiramisú y una coca"), usa add_to_cart con el PRIMER producto mencionado.
+  Ejemplo: {"intent": "add_to_cart", "params": {"product_ref": "tiramisú", "quantity": 4}, "confidence": 0.9}
+  El sistema procesará los demás productos en turnos siguientes.
+
 CASOS ESPECIALES POR ESTADO:
 - En estado "browsing": números probablemente seleccionan un vendor → select_vendor con params {vendor_ref: "N"}
 - En estado "shopping": números probablemente agregan un producto del menú → add_to_cart con params {product_ref: "N", quantity: 1}
@@ -192,8 +198,8 @@ export async function classifyIntent(
     if (jsonMatch) {
       jsonStr = jsonMatch[1].trim();
     } else {
-      // Try to extract first JSON object from text (AI may have added text around it)
-      const braceMatch = content.match(/\{[\s\S]*\}/);
+      // Try to extract first JSON object (non-greedy to avoid grabbing multiple objects)
+      const braceMatch = content.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/);
       if (braceMatch) {
         jsonStr = braceMatch[0];
       } else {
