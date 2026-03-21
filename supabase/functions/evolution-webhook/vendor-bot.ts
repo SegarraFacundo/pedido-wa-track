@@ -336,18 +336,24 @@ function parseProductSegment(segment: string): { quantity: number; searchTerm: s
 
 // ==================== HELPER: Find product by name ====================
 function findProductByName(searchTerm: string, products: any[]): any {
-  const searchLower = searchTerm.toLowerCase().replace(/s$/, '');
+  // Normalize accents for comparison
+  const normalize = (s: string) => s.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/s$/, '');
   
-  let matched = products.find((p: any) => 
-    p.name.toLowerCase().includes(searchLower) ||
-    searchLower.includes(p.name.toLowerCase().replace(/s$/, ''))
-  );
+  const searchNorm = normalize(searchTerm);
+  
+  let matched = products.find((p: any) => {
+    const nameNorm = normalize(p.name);
+    return nameNorm.includes(searchNorm) || searchNorm.includes(nameNorm);
+  });
 
   if (!matched) {
-    const words = searchLower.split(/\s+/);
-    matched = products.find((p: any) => 
-      words.some((w: string) => w.length > 2 && p.name.toLowerCase().includes(w))
-    );
+    const words = searchNorm.split(/\s+/);
+    matched = products.find((p: any) => {
+      const nameNorm = normalize(p.name);
+      return words.some((w: string) => w.length > 2 && nameNorm.includes(w));
+    });
   }
 
   return matched;
