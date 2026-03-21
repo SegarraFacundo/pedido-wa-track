@@ -102,6 +102,48 @@ export type Database = {
           },
         ]
       }
+      bot_interaction_logs: {
+        Row: {
+          action_taken: string | null
+          confidence: number | null
+          created_at: string
+          error: string | null
+          id: string
+          intent_detected: string | null
+          message_preview: string | null
+          phone: string
+          response_preview: string | null
+          state_after: string | null
+          state_before: string | null
+        }
+        Insert: {
+          action_taken?: string | null
+          confidence?: number | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          intent_detected?: string | null
+          message_preview?: string | null
+          phone: string
+          response_preview?: string | null
+          state_after?: string | null
+          state_before?: string | null
+        }
+        Update: {
+          action_taken?: string | null
+          confidence?: number | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          intent_detected?: string | null
+          message_preview?: string | null
+          phone?: string
+          response_preview?: string | null
+          state_after?: string | null
+          state_before?: string | null
+        }
+        Relationships: []
+      }
       chat_messages: {
         Row: {
           chat_id: string

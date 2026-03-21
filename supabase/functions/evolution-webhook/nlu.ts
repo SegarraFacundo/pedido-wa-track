@@ -140,19 +140,43 @@ export async function classifyIntent(
     const content = data.choices?.[0]?.message?.content?.trim();
 
     if (!content) {
+      console.warn("⚠️ NLU: Empty response from AI");
       return { intent: "unknown", params: {}, confidence: 0 };
     }
 
-    // Extract JSON from response (handle markdown code blocks)
+    // Extract JSON from response (handle markdown code blocks, text around JSON, etc.)
     let jsonStr = content;
+    
+    // Try markdown code block first
     const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (jsonMatch) {
       jsonStr = jsonMatch[1].trim();
+    } else {
+      // Try to extract first JSON object from text (AI may have added text around it)
+      const braceMatch = content.match(/\{[\s\S]*\}/);
+      if (braceMatch) {
+        jsonStr = braceMatch[0];
+      } else {
+        console.warn("⚠️ NLU: No JSON found in response:", content.substring(0, 200));
+        return { intent: "unknown", params: {}, confidence: 0 };
+      }
     }
 
-    const parsed = JSON.parse(jsonStr);
+    let parsed: any;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch (parseErr) {
+      console.warn("⚠️ NLU: Invalid JSON from AI:", jsonStr.substring(0, 200));
+      return { intent: "unknown", params: {}, confidence: 0 };
+    }
 
-    // Validate intent
+    // Strict validation: must have intent as string and params as object
+    if (!parsed || typeof parsed.intent !== "string" || typeof parsed.params !== "object") {
+      console.warn("⚠️ NLU: Invalid structure from AI:", JSON.stringify(parsed).substring(0, 200));
+      return { intent: "unknown", params: {}, confidence: 0 };
+    }
+
+    // Validate intent is in allowed list
     const validIntents: Intent[] = [
       "browse_stores", "search_product", "select_vendor", "view_menu",
       "add_to_cart", "remove_from_cart", "view_cart", "empty_cart",
@@ -165,6 +189,12 @@ export async function classifyIntent(
     const intent: Intent = validIntents.includes(parsed.intent) ? parsed.intent : "unknown";
     const params = parsed.params || {};
     const confidence = typeof parsed.confidence === "number" ? parsed.confidence : 0.5;
+
+    // Confidence threshold: too low = unknown
+    if (confidence < 0.3) {
+      console.warn(`⚠️ NLU: Low confidence ${confidence} for intent "${intent}", treating as unknown`);
+      return { intent: "unknown", params, confidence };
+    }
 
     console.log(`🧠 NLU: "${message}" → ${intent} (${confidence}) params:`, JSON.stringify(params));
     return { intent, params, confidence };

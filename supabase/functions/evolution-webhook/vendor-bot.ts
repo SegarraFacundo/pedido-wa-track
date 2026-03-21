@@ -65,6 +65,16 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     // Cargar contexto
     const context = await getContext(normalizedPhone, supabase);
     
+    // ⏱️ INACTIVITY: If session was soft-reset, show welcome back + menu
+    if (context.was_inactive) {
+      console.log('⏱️ User returned after inactivity, showing welcome back');
+      context.was_inactive = false;  // Clear flag
+      const lang = (context.language || 'es') as Language;
+      const welcomeBack = t('welcome.inactive_return', lang) + t('welcome.menu_clean', lang);
+      context.conversation_history.push({ role: "assistant", content: welcomeBack });
+      await saveContext(context, supabase);
+      return welcomeBack;
+    }
     // 🔄 VALIDACIÓN DE SINCRONIZACIÓN
     if (context.pending_order_id) {
       const { data: orderCheck } = await supabase
@@ -972,7 +982,8 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     // ==================== NLU + STATE MACHINE ====================
     // The AI only classifies intent — all logic and responses are deterministic
     
-    console.log(`🧠 NLU: Classifying message in state "${context.order_state || 'idle'}"`);
+    const stateBefore = context.order_state || "idle";
+    console.log(`🧠 NLU: Classifying message in state "${stateBefore}"`);
     
     const nluResult = await classifyIntent(message, context);
     console.log(`🧠 NLU Result: intent=${nluResult.intent}, confidence=${nluResult.confidence}, params=${JSON.stringify(nluResult.params)}`);
@@ -980,9 +991,13 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     const smResult = await processIntent(nluResult, context, supabase);
     
     let finalResponse = smResult.response;
+    const stateAfter = context.order_state || "idle";
 
     context.conversation_history.push({ role: "assistant", content: finalResponse });
     await saveContext(context, supabase);
+
+    // 📊 LOG: Structured interaction log
+    logBotInteraction(supabase, normalizedPhone, message, nluResult.intent, stateBefore, stateAfter, nluResult.confidence, finalResponse);
 
     console.log("🤖 AI Bot END");
     return finalResponse;
@@ -1013,4 +1028,32 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     
     return t('error.generic', 'es');
   }
+}
+
+// 📊 Structured interaction logging (fire-and-forget)
+function logBotInteraction(
+  supabase: any,
+  phone: string,
+  message: string,
+  intent: string,
+  stateBefore: string,
+  stateAfter: string,
+  confidence: number,
+  response: string,
+  error?: string,
+): void {
+  // Fire-and-forget — don't await, don't block the response
+  supabase.from("bot_interaction_logs").insert({
+    phone,
+    message_preview: message.substring(0, 200),
+    intent_detected: intent,
+    state_before: stateBefore,
+    state_after: stateAfter,
+    action_taken: intent,
+    response_preview: response.substring(0, 300),
+    confidence,
+    error: error || null,
+  }).then(({ error: insertErr }: any) => {
+    if (insertErr) console.warn("⚠️ Failed to log interaction:", insertErr.message);
+  });
 }

@@ -1541,6 +1541,26 @@ Escreva o que precisa e eu ajudo. É muito fácil! 😊`,
     pt: '🔍 Que produto você procura?',
     ja: '🔍 何の商品をお探しですか？',
   },
+
+  // === ERROR HANDLING (Hardening) ===
+  'error.forced_reset': {
+    es: '😔 No pude ayudarte con eso. Volvemos al menú principal:\n\n',
+    en: '😔 I couldn\'t help with that. Back to the main menu:\n\n',
+    pt: '😔 Não consegui ajudar com isso. Voltamos ao menu principal:\n\n',
+    ja: '😔 お手伝いできませんでした。メインメニューに戻ります:\n\n',
+  },
+  'error.escalation_menu': {
+    es: '😔 No pude entender tu mensaje.\n\n1️⃣ 🏪 Ver menú principal\n2️⃣ 💬 Hablar con soporte\n3️⃣ ❌ Cancelar y empezar de nuevo',
+    en: '😔 I couldn\'t understand your message.\n\n1️⃣ 🏪 Main menu\n2️⃣ 💬 Talk to support\n3️⃣ ❌ Cancel and start over',
+    pt: '😔 Não consegui entender sua mensagem.\n\n1️⃣ 🏪 Menu principal\n2️⃣ 💬 Falar com suporte\n3️⃣ ❌ Cancelar e recomeçar',
+    ja: '😔 メッセージが理解できませんでした。\n\n1️⃣ 🏪 メインメニュー\n2️⃣ 💬 サポートに連絡\n3️⃣ ❌ キャンセルしてやり直す',
+  },
+  'welcome.inactive_return': {
+    es: '👋 *¡Hola de nuevo!* Pasó un rato sin actividad, así que empezamos de cero.\n\n',
+    en: '👋 *Welcome back!* It\'s been a while, so we\'re starting fresh.\n\n',
+    pt: '👋 *Olá de novo!* Faz um tempo sem atividade, então recomeçamos.\n\n',
+    ja: '👋 *おかえりなさい！* しばらく操作がなかったので、最初からやり直します。\n\n',
+  },
 };
 
 /**
