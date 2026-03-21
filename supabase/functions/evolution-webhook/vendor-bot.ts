@@ -3409,6 +3409,163 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
     }
 
+    // 🔴 INTERCEPTOR: Cancelar carrito/vaciar en shopping state (no order_pending)
+    if (context.order_state === "shopping") {
+      const msgLower = message.toLowerCase().trim();
+      const wantsCancelShopping = /cancelar|vaciar carrito|no quiero|quiero cancelar/.test(msgLower);
+      if (wantsCancelShopping) {
+        console.log(`🔴 CANCEL SHOPPING: User wants to cancel/empty cart in shopping state`);
+        context.cart = [];
+        context.selected_vendor_id = undefined;
+        context.selected_vendor_name = undefined;
+        context.order_state = "idle";
+        context.delivery_type = undefined;
+        context.delivery_address = undefined;
+        context.payment_method = undefined;
+        context.conversation_history = [];
+        await saveContext(context, supabase);
+        return `✅ Carrito vaciado.\n\n¿Qué querés hacer?\n\n1️⃣ 🏪 Ver negocios abiertos\n2️⃣ 🔍 Buscar un producto\n\nEscribí lo que necesitás 😊`;
+      }
+    }
+
+    // 🏪 INTERCEPTOR: "Quiero pedir de [negocio]" o "cambiar de negocio" en shopping state
+    if (context.order_state === "shopping" && context.selected_vendor_id) {
+      const msgLower = message.toLowerCase().trim();
+      
+      // Detect "quiero pedir de X", "cambiar de negocio", "pedir de X"
+      const vendorSwitchMatch = msgLower.match(/(?:quiero pedir de|pedir de|cambiar (?:a|de) negocio|cambiar de local|ir a)\s+(.+)/i);
+      const wantsSwitch = /cambiar de negocio|cambiar de local|otro negocio|otro local/.test(msgLower);
+      
+      if (vendorSwitchMatch || wantsSwitch) {
+        console.log(`🏪 VENDOR SWITCH INTERCEPTOR in shopping state`);
+        
+        if (context.cart.length > 0) {
+          // Has items - need to confirm
+          const vendorName = vendorSwitchMatch ? vendorSwitchMatch[1].trim() : null;
+          
+          if (vendorName) {
+            // Try to find the vendor
+            const { data: foundVendor } = await supabase
+              .from("vendors")
+              .select("id, name")
+              .ilike("name", `%${vendorName}%`)
+              .eq("is_active", true)
+              .maybeSingle();
+            
+            if (foundVendor) {
+              context.pending_vendor_change = {
+                new_vendor_id: foundVendor.id,
+                new_vendor_name: foundVendor.name
+              };
+              await saveContext(context, supabase);
+              
+              return `⚠️ Tenés productos en el carrito de *${context.selected_vendor_name}*.\n\n` +
+                     `Si cambias a *${foundVendor.name}*, se vaciará el carrito.\n\n` +
+                     `¿Querés cambiar? (sí/no)`;
+            }
+          }
+          
+          // Generic switch request with cart
+          return `⚠️ Tenés productos en el carrito de *${context.selected_vendor_name}*.\n\n` +
+                 `Si querés cambiar de negocio, primero vaciá el carrito diciendo "vaciar carrito".\n\n` +
+                 `O decime "cancelar" para empezar de nuevo.`;
+        } else {
+          // Empty cart - switch directly
+          context.order_state = "idle";
+          context.selected_vendor_id = undefined;
+          context.selected_vendor_name = undefined;
+          context.conversation_history = [];
+          await saveContext(context, supabase);
+          
+          const vendorName = vendorSwitchMatch ? vendorSwitchMatch[1].trim() : null;
+          if (vendorName) {
+            // Search for the vendor
+            const result = await ejecutarHerramienta("buscar_productos", {
+              consulta: vendorName,
+            }, context, supabase);
+            context.conversation_history.push({ role: "assistant", content: result });
+            await saveContext(context, supabase);
+            return result;
+          }
+          
+          return `✅ ¡Dale! ¿De qué negocio querés pedir?\n\nDecí "ver negocios" o buscá un producto. 😊`;
+        }
+      }
+    }
+
+    // 🍕 INTERCEPTOR: Product request in shopping state that doesn't match current vendor
+    // E.g., user is in "Heladería Italiana" but says "quiero una hamburguesa"
+    if (context.order_state === "shopping" && context.selected_vendor_id) {
+      const msgLower = message.toLowerCase().trim();
+      const productRequest = msgLower.match(/^(?:quiero|dame|me gusta[rí]a|quisiera|necesito)\s+(?:un[ao]?\s+)?(.+)/i);
+      
+      if (productRequest) {
+        const requestedProduct = productRequest[1].trim();
+        
+        // Check if this product exists in the current vendor's menu
+        const { data: matchingProducts } = await supabase
+          .from("products")
+          .select("id, name")
+          .eq("vendor_id", context.selected_vendor_id)
+          .eq("is_available", true)
+          .ilike("name", `%${requestedProduct.split(/\s+/).filter(w => w.length > 2)[0] || requestedProduct}%`);
+        
+        if (!matchingProducts || matchingProducts.length === 0) {
+          // Product NOT in current vendor - check if it mentions another vendor
+          const mentionsVendor = msgLower.match(/(?:de|del)\s+(.+?)$/i);
+          
+          if (mentionsVendor) {
+            const vendorSearch = mentionsVendor[1].trim();
+            const { data: foundVendor } = await supabase
+              .from("vendors")
+              .select("id, name")
+              .ilike("name", `%${vendorSearch}%`)
+              .eq("is_active", true)
+              .maybeSingle();
+            
+            if (foundVendor && foundVendor.id !== context.selected_vendor_id) {
+              // User wants product from a different vendor
+              if (context.cart.length > 0) {
+                context.pending_vendor_change = {
+                  new_vendor_id: foundVendor.id,
+                  new_vendor_name: foundVendor.name
+                };
+                await saveContext(context, supabase);
+                return `⚠️ Estás en *${context.selected_vendor_name}* y tenés ${context.cart.length} producto(s) en el carrito.\n\n` +
+                       `¿Querés cambiar a *${foundVendor.name}*? Se vaciará tu carrito actual. (sí/no)`;
+              } else {
+                // Empty cart, switch directly
+                context.order_state = "browsing";
+                context.selected_vendor_id = undefined;
+                context.selected_vendor_name = undefined;
+                context.conversation_history = [];
+                await saveContext(context, supabase);
+                
+                const result = await ejecutarHerramienta("ver_menu_negocio", {
+                  vendor_id: foundVendor.id,
+                }, context, supabase);
+                context.conversation_history.push({ role: "assistant", content: result });
+                await saveContext(context, supabase);
+                return result;
+              }
+            }
+          }
+          
+          // Product not found in current vendor and no vendor mention
+          // Don't intercept - let it fall through to shopping interceptor / LLM
+          // But if it's clearly a food item not in the menu, suggest searching
+          const foodKeywords = /\b(pizza|hamburguesa|empanada|milanesa|sushi|cerveza|pollo|asado|lomito|sandwich|tarta|torta|ensalada|papas|medialunas?|facturas?|ravioles?|ñoquis?|pastas?)\b/i;
+          if (foodKeywords.test(requestedProduct)) {
+            console.log(`🍕 Product "${requestedProduct}" not found in ${context.selected_vendor_name}, suggesting search`);
+            return `No encontré "${requestedProduct}" en el menú de *${context.selected_vendor_name}*.\n\n` +
+                   `¿Querés que busque negocios que tengan "${requestedProduct}"? Decí *"buscar ${requestedProduct}"*\n` +
+                   `O decí *"menú"* para ver los productos disponibles acá.`;
+          }
+        }
+        // If product IS in current vendor, let shopping interceptor handle it
+      }
+    }
+
     // 🛒 INTERCEPTOR: Estado shopping + número/producto → agregar al carrito directamente
     if (context.order_state === "shopping" && context.selected_vendor_id) {
       const shoppingResult = await handleShoppingInterceptor(message, context, supabase);
