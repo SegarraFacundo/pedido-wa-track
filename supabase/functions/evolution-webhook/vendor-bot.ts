@@ -209,7 +209,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         if (level === 1) {
           switch (num) {
             case 1: result = await ejecutarHerramienta("ver_locales_abiertos", {}, context, supabase); break;
-            case 2: result = t('welcome.search_prompt', lang); break;
+            case 2: result = t('welcome.search_prompt', lang); context.order_state = 'awaiting_search'; break;
             case 3: {
               if (context.selected_vendor_id) {
                 result = await ejecutarHerramienta("ver_horario_negocio", { vendor_id: context.selected_vendor_id }, context, supabase);
