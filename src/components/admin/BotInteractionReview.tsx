@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,9 +19,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { AlertTriangle, CheckCircle2, Search, RefreshCw, MessageSquare, Bot } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Search, RefreshCw, MessageSquare, Bot, Copy, ClipboardCheck, EyeOff } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { useToast } from "@/hooks/use-toast";
 
 interface BotInteraction {
   id: string;
@@ -43,6 +44,9 @@ export default function BotInteractionReview() {
   const [filter, setFilter] = useState<"all" | "errors" | "low_confidence" | "fallback">("errors");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [copied, setCopied] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchInteractions();
@@ -73,7 +77,9 @@ export default function BotInteractionReview() {
     setLoading(false);
   };
 
-  const filteredInteractions = interactions.filter((i) => {
+  const visibleInteractions = interactions.filter(i => !dismissed.has(i.id));
+
+  const filteredInteractions = visibleInteractions.filter((i) => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -101,14 +107,45 @@ export default function BotInteractionReview() {
     );
   };
 
-  const errorCount = interactions.filter(isErrorInteraction).length;
+  const errorCount = visibleInteractions.filter(isErrorInteraction).length;
 
   const stats = {
-    total: interactions.length,
+    total: visibleInteractions.length,
     errors: errorCount,
-    avgConfidence: interactions.length > 0
-      ? (interactions.reduce((sum, i) => sum + (i.confidence || 0), 0) / interactions.length * 100).toFixed(0)
+    avgConfidence: visibleInteractions.length > 0
+      ? (visibleInteractions.reduce((sum, i) => sum + (i.confidence || 0), 0) / visibleInteractions.length * 100).toFixed(0)
       : 0,
+  };
+
+  const copyErrorsForLovable = () => {
+    const errors = filteredInteractions.filter(isErrorInteraction);
+    if (errors.length === 0) {
+      toast({ title: "Sin errores para copiar" });
+      return;
+    }
+
+    const text = errors.map(i => {
+      const date = format(new Date(i.created_at), "dd/MM HH:mm", { locale: es });
+      return [
+        `### ${date} | Intención: ${i.intent_detected || "N/A"} | Confianza: ${i.confidence ? (i.confidence * 100).toFixed(0) + "%" : "N/A"}`,
+        `  👤 Usuario: "${i.message_preview || "(vacío)"}"`,
+        `  🤖 Bot: "${i.response_preview || "(sin respuesta)"}"`,
+        `  Estado: ${i.state_before} → ${i.state_after}`,
+        i.error ? `  ❌ Error: ${i.error}` : null,
+      ].filter(Boolean).join("\n");
+    }).join("\n\n---\n\n");
+
+    const header = `Tengo ${errors.length} interacciones con errores en el bot. Necesito que analices las respuestas y me ayudes a corregir los flujos:\n\n`;
+    navigator.clipboard.writeText(header + text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    toast({ title: `${errors.length} errores copiados al portapapeles` });
+  };
+
+  const dismissInteraction = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDismissed(prev => new Set(prev).add(id));
+    toast({ title: "Interacción desestimada" });
   };
 
   return (
@@ -123,10 +160,21 @@ export default function BotInteractionReview() {
             Revisá las interacciones problemáticas para mejorar el bot
           </p>
         </div>
-        <Button onClick={fetchInteractions} variant="outline" size="sm">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Actualizar
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={copyErrorsForLovable}
+            variant="outline"
+            size="sm"
+            disabled={filteredInteractions.filter(isErrorInteraction).length === 0}
+          >
+            {copied ? <ClipboardCheck className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
+            {copied ? "Copiado" : "Copiar para Lovable"}
+          </Button>
+          <Button onClick={fetchInteractions} variant="outline" size="sm">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Actualizar
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -150,6 +198,16 @@ export default function BotInteractionReview() {
           </CardContent>
         </Card>
       </div>
+
+      {dismissed.size > 0 && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <EyeOff className="h-4 w-4" />
+          {dismissed.size} desestimada{dismissed.size > 1 ? "s" : ""}
+          <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => setDismissed(new Set())}>
+            Restaurar todas
+          </Button>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -196,7 +254,7 @@ export default function BotInteractionReview() {
                     <TableHead className="w-[130px]">Intención</TableHead>
                     <TableHead className="w-[80px]">Confianza</TableHead>
                     <TableHead className="w-[120px]">Estado</TableHead>
-                    <TableHead className="w-[50px]"></TableHead>
+                    <TableHead className="w-[80px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -230,7 +288,18 @@ export default function BotInteractionReview() {
                           </span>
                         </TableCell>
                         <TableCell>
-                          <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                          <div className="flex gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7"
+                              title="Desestimar"
+                              onClick={(e) => dismissInteraction(interaction.id, e)}
+                            >
+                              <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
+                            </Button>
+                            <MessageSquare className="h-4 w-4 text-muted-foreground mt-1.5" />
+                          </div>
                         </TableCell>
                       </TableRow>
                       {expandedId === interaction.id && (
