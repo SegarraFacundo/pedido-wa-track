@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
   Sparkles, Play, Trash2, Save, Loader2, CheckCircle2, XCircle,
-  AlertTriangle, ChevronDown, ChevronRight, Plus, Zap, Download
+  AlertTriangle, ChevronDown, ChevronRight, Plus, Zap, Download, Copy, ClipboardCheck
 } from "lucide-react";
 
 interface QaTest {
@@ -457,6 +457,29 @@ export default function BotQATester() {
 
         {/* Results Tab */}
         <TabsContent value="results" className="space-y-4">
+          {results.filter(r => r.status === "failed").length > 0 && (
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const failed = results.filter(r => r.status === "failed");
+                  const text = failed.map(r => {
+                    const steps = (r.steps_results || []).map((sr, i) =>
+                      `  Paso ${i + 1}:\n    👤 Usuario: "${sr.step}"\n    🤖 Bot: "${sr.response}"\n    ${sr.success ? "✅ OK" : "❌ FALLO"}`
+                    ).join("\n");
+                    return `### ${r.test_name}\nFecha: ${new Date(r.run_at).toLocaleString("es-AR")}\n${steps}`;
+                  }).join("\n\n---\n\n");
+                  const header = `Tengo ${failed.length} tests QA que fallaron en mi bot de pedidos. Necesito que analices las respuestas del bot y me ayudes a corregir los errores en el flujo conversacional.\n\n`;
+                  navigator.clipboard.writeText(header + text);
+                  toast({ title: "Copiado al portapapeles", description: "Pegalo en el chat de Lovable para analizar los errores" });
+                }}
+              >
+                <Copy className="mr-2 h-4 w-4" />
+                Copiar fallos para Lovable ({results.filter(r => r.status === "failed").length})
+              </Button>
+            </div>
+          )}
           <ScrollArea className="h-[500px]">
             <div className="space-y-2">
               {results.map((result) => (
@@ -478,7 +501,27 @@ export default function BotQATester() {
                         {new Date(result.run_at).toLocaleString("es-AR")}
                       </span>
                     </div>
-                    {expandedResult === result.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    <div className="flex items-center gap-2">
+                      {expandedResult === result.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      {result.status === "failed" && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const steps = (result.steps_results || []).map((sr, i) =>
+                              `Paso ${i + 1}:\n  👤 "${sr.step}"\n  🤖 "${sr.response}"\n  ${sr.success ? "✅" : "❌"}`
+                            ).join("\n");
+                            const text = `Este test QA falló en mi bot. Analizá las respuestas y ayudame a corregir:\n\n### ${result.test_name}\n${steps}`;
+                            navigator.clipboard.writeText(text);
+                            toast({ title: "Copiado" });
+                          }}
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
                   {expandedResult === result.id && (
