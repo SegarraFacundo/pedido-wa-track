@@ -4080,11 +4080,17 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
     }
 
-    // INTERCEPTOR: Estado idle/browsing + palabras de comida → buscar_productos directo
+    // INTERCEPTOR: Estado idle/browsing + palabras de comida O producto genérico → buscar_productos directo
     if ((context.order_state === "idle" || context.order_state === "browsing" || !context.order_state) && !context.selected_vendor_id) {
       const foodKeywords = /\b(pizza|hamburguesa|empanada|milanesa|sushi|helado|cerveza|coca|fanta|sprite|agua|café|cafe|pollo|asado|lomito|sandwich|tarta|torta|postre|ensalada|papas|sándwich|medialunas?|facturas?|alfajor|ravioles?|ñoquis?|pastas?)\b/i;
-      if (foodKeywords.test(message)) {
-        console.log(`🍕 INTERCEPTOR: Food keyword detected in idle/browsing, calling buscar_productos`);
+      // Detectar queries de producto: no es un saludo, no es un comando, tiene 2+ caracteres
+      const isGreeting = /^(hola|buenas?|buen[ao]s?\s+(dias?|tardes?|noches?)|hey|hi|hello|que\s+tal)\b/i.test(message.trim());
+      const isCommand = /^(ayuda|help|opciones|estado|cancelar|carrito|menu|volver|salir|calificar)\b/i.test(message.trim());
+      const isGibberish = /^[^a-záéíóúñü]*$/i.test(message.trim()); // Only symbols/numbers
+      const isProductQuery = !isGreeting && !isCommand && !isGibberish && message.trim().length >= 3 && message.trim().length <= 80;
+      
+      if (foodKeywords.test(message) || isProductQuery) {
+        console.log(`🍕 INTERCEPTOR: Product query detected in idle/browsing: "${message.trim()}", calling buscar_productos`);
         const result = await ejecutarHerramienta("buscar_productos", {
           consulta: message.trim(),
         }, context, supabase);
