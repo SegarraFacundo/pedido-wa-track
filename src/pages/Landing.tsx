@@ -23,7 +23,11 @@ import {
 } from "lucide-react";
 
 export default function Landing() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+
+  const changeLanguage = (lng: string) => {
+    i18n.changeLanguage(lng);
+  };
 
   const handleProbarClick = () => {
     const whatsappNumber = '5493464448309';
