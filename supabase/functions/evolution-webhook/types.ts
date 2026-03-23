@@ -96,5 +96,6 @@ export interface ConversationContext {
   last_menu_fetch?: string;                // ISO timestamp del último menú obtenido
   last_vendors_fetch?: string;             // ISO timestamp de la última lista de locales
   confusion_count?: number;                // Contador de mensajes no reconocidos consecutivos
+  last_interaction_at?: string;             // ISO timestamp de la última interacción real (para inactividad)
   conversation_history: Array<{ role: "user" | "assistant" | "system"; content: string }>;
 }
