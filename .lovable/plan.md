@@ -1,62 +1,47 @@
 
+Objetivo: cortar el bucle donde el usuario intenta seguir comprando y el bot vuelve a buscar negocios en vez de avanzar al pedido.
 
-# Plan: Rewrite System Prompt and Bot Behavior for Human-like UX
+Diagnóstico (confirmado con logs/DB):
+- Do I know what the issue is? Sí.
+- En `vendor-bot.ts` se ejecutó: `⏱️ Inactivity reset: 2695 min` justo antes del mensaje “BUeno dame 3 palos...”.
+- Ese reset dejó `order_state=browsing`, `selected_vendor_id=null` y carrito vacío.
+- Luego el interceptor genérico de `idle/browsing` tomó la frase completa como búsqueda y llamó `buscar_productos`, generando el bucle.
 
-## Problem
-The current bot has a rigid, menu-driven approach with overly technical prompts. The user wants a friendlier, simpler bot that adapts to the user instead of forcing the user to adapt to the bot.
+Plan de implementación
 
-## What Changes
+1) Corregir reset por inactividad (causa raíz)
+- Archivo: `supabase/functions/evolution-webhook/vendor-bot.ts`, `context.ts`, `types.ts`.
+- Dejar de usar `bot_interaction_logs` como fuente principal de “última actividad” (está desfasada para este flujo).
+- Agregar/usar `context.last_interaction_at` (persistido en `last_bot_message`) y calcular actividad con el timestamp más reciente real del contexto (`last_interaction_at`, `last_menu_fetch`, `last_vendors_fetch`).
+- Ejecutar reset solo si realmente hay inactividad prolongada y sin pedido activo.
+- Subir el umbral de reset (hoy 10 min) a una ventana más segura para checkout (ej. 2h/4h configurable).
 
-### 1. Rewrite `simplified-prompt.ts` — New system prompt philosophy
-The current prompt is terse and mechanical ("ESTADO: idle", "Sé ULTRA breve"). Replace with a warm, conversational tone that follows the user's guidelines:
+2) Blindar continuidad de compra antes de la búsqueda global
+- Archivo: `vendor-bot.ts`.
+- Insertar un interceptor “continuar pedido” antes del bloque genérico `isProductQuery`.
+- Si el mensaje es tipo carrito (“dame X”, “quiero X”, cantidades) y hay contexto de vendor/compra reciente, enrutar a `handleShoppingInterceptor` en vez de `buscar_productos`.
+- Si no hay vendor seleccionado, responder guiando a elegir local (o auto-seleccionar cuando haya un único vendor en `available_vendors_map`).
 
-- Replace "Sos un vendedor" → "Sos un asistente amable de Lapacho"
-- Replace rigid rules like "máximo 4 líneas" → "Frases cortas, amable pero directo"
-- Add explicit guidance for ambiguous inputs: guide with simple questions instead of "no entendí"
-- Add guidance for gibberish/unclear messages: offer clear options instead of fallback
-- Add "never blame the user" and "always offer a way out" rules
-- Remove the mechanical state labels from the prompt (keep them internally)
-- Make state instructions more conversational and less robotic
+3) Ajustar el detector genérico de búsqueda
+- Archivo: `vendor-bot.ts`.
+- Evitar que frases imperativas largas de compra se envíen literal a `buscar_productos`.
+- Mantener `buscar_productos` para intención de descubrimiento (“buscar…”, “qué hay…”, “categorías…”) y no para “agregar al carrito”.
 
-Key changes to `getStateInstructions`:
-- **idle**: Instead of "Usá buscar_productos" → "Preguntale qué busca, sugerí categorías"
-- **browsing**: Remove "NUNCA inventes resultados" (already a global rule) → "Ayudalo a elegir con preguntas simples"
-- **shopping**: Remove menu-speak like "Enviá un número del menú" → "Guialo para elegir productos"
-- **needs_address**: Instead of "Todo se trata como dirección" → "Pedile la dirección de forma amable"
-- All states: Replace "🤔 Perdón, no entendí" with helpful contextual suggestions
+4) Pruebas de regresión del flujo end-to-end
+- Archivo: `supabase/functions/evolution-webhook/conversation.test.ts` (o tests nuevos del webhook).
+- Casos mínimos:
+  - “qué hay en el vivero” → menú → “dame 3 palos…” agrega al carrito (no búsqueda de negocios).
+  - Con log histórico viejo no debe resetear una sesión activa reciente.
+  - Mensaje de compra en browsing sin vendor: guía a elegir local (sin loop).
 
-### 2. Update `vendor-bot.ts` — Improve fallback responses and interceptors
+5) Verificación operativa post-fix
+- Desplegar `evolution-webhook`.
+- Validar en logs que:
+  - no aparezca reset falso al minuto,
+  - no haya `idle → browsing (buscar_productos)` para frases de “dame X” cuando venía de menú,
+  - el flujo complete pedido hasta dirección/pago/creación sin desvíos.
 
-**Fallback message improvements** (~6 locations):
-- Replace all instances of `"🤔 Perdón, no entendí. ¿Podés repetir?"` with contextual, helpful messages
-- In idle: "Te ayudo 🙂 ¿Qué te gustaría? Puedo mostrarte negocios o buscar algo"
-- In browsing: "Decime el número o nombre del negocio que te interesa, o buscá otro producto"
-- In shopping: Show available products as numbered list instead of generic error
-
-**Interceptor improvements**:
-- In the idle/browsing product interceptor (line ~4088): Don't call `buscar_productos` for gibberish or very short ambiguous messages. Instead, offer guidance
-- Add a "confused user" interceptor: if user sends >2 unrecognized messages in a row, simplify options to 2-3 clear choices
-- In shopping state: when user says something unrecognized, show cart status + "¿Querés agregar algo más o confirmar?"
-
-**Remove rigid menu formatting**:
-- The welcome/help menu (line ~3090 reset command, ~4147 help interceptor) currently shows numbered emoji lists. Simplify to conversational text
-- Don't show "1️⃣ 🏪 Ver negocios abiertos" style — instead say "¿Qué querés hacer? Puedo mostrarte negocios, buscar un producto..."
-
-### 3. Track "confusion count" in context
-Add a `confusion_count` field to track consecutive unrecognized messages. After 2+ failures, auto-simplify to basic options. Reset on any successful action.
-
-## Files to modify
-
-| File | Changes |
-|------|---------|
-| `supabase/functions/evolution-webhook/simplified-prompt.ts` | Rewrite system prompt and state instructions for warm, human-like tone |
-| `supabase/functions/evolution-webhook/vendor-bot.ts` | Update fallback messages, add confusion tracking, simplify menus |
-| `supabase/functions/evolution-webhook/types.ts` | Add `confusion_count` to ConversationContext |
-
-## What stays the same
-- All tool definitions (tools-definitions.ts) — unchanged
-- All tool execution logic (ejecutarHerramienta) — unchanged  
-- State machine transitions — unchanged
-- Interceptors for shopping/address/payment — logic unchanged, only messages improved
-- TOOLS_BY_STATE restrictions — unchanged
-
+Detalles técnicos
+- Archivos foco: `vendor-bot.ts` (routing/interceptores), `context.ts` + `types.ts` (nuevo timestamp confiable), tests de conversación.
+- No cambiaremos herramientas ni schema de pedidos; el ajuste es de enrutamiento y coherencia de estado.
+- Resultado esperado: el bot prioriza continuidad de compra y solo vuelve a búsqueda cuando realmente el usuario quiere explorar.
