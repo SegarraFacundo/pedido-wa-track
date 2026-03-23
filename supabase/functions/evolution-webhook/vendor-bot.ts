@@ -3156,20 +3156,21 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     const context = await getContext(normalizedPhone, supabase);
 
     // ⏱️ RESET AUTOMÁTICO POR INACTIVIDAD (sin pedido activo)
-    // Usamos el último log de interacción del bot para evitar falsos positivos:
-    // user_sessions.last_message_at se actualiza al recibir ESTE mensaje.
-    const { data: lastBotInteraction } = await supabase
-      .from('bot_interaction_logs')
-      .select('created_at')
-      .eq('phone', normalizedPhone)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const lastActivityRaw = lastBotInteraction?.created_at || context.last_menu_fetch || context.last_vendors_fetch;
-    const inactivityLimitMs = 10 * 60 * 1000; // 10 minutos
+    // Usamos timestamps del propio contexto (last_interaction_at, last_menu_fetch, last_vendors_fetch)
+    // para evitar consultas extra a bot_interaction_logs que daban timestamps desfasados.
+    const lastActivityCandidates = [
+      context.last_interaction_at,
+      context.last_menu_fetch,
+      context.last_vendors_fetch,
+    ].filter(Boolean) as string[];
+    
+    const lastActivityRaw = lastActivityCandidates.length > 0
+      ? lastActivityCandidates.reduce((a, b) => (a > b ? a : b))
+      : null;
+    
+    const inactivityLimitMs = 2 * 60 * 60 * 1000; // 2 horas (antes era 10 min, causaba resets falsos)
     const hasLastActivity = !!lastActivityRaw;
-    const inactiveMs = hasLastActivity ? Date.now() - new Date(lastActivityRaw).getTime() : 0;
+    const inactiveMs = hasLastActivity ? Date.now() - new Date(lastActivityRaw!).getTime() : 0;
     const hasActiveOrder = ['order_pending_cash', 'order_pending_transfer', 'order_pending_mp', 'order_confirmed'].includes(context.order_state || '') && !!context.pending_order_id;
     const hasStaleSessionData = context.order_state !== 'idle' || context.cart.length > 0 || !!context.selected_vendor_id || context.conversation_history.length > 0;
 
@@ -3199,6 +3200,9 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         return '¡Hola! Retomamos desde cero 😊\n\n¿Qué te gustaría pedir hoy?';
       }
     }
+    
+    // ✅ Actualizar timestamp de última interacción
+    context.last_interaction_at = new Date().toISOString();
 
     // 🔄 VALIDACIÓN DE SINCRONIZACIÓN: Verificar si pending_order_id ya fue cancelado/entregado
     if (context.pending_order_id) {
