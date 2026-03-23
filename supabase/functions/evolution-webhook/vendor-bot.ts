@@ -4115,6 +4115,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
           direccion: message.trim(),
         }, context, supabase);
         
+        context.confusion_count = 0;
         context.conversation_history.push({ role: "assistant", content: result });
         await saveContext(context, supabase);
         return result;
