@@ -438,7 +438,8 @@ async function ejecutarHerramienta(
         console.log("Search products result:", JSON.stringify(data, null, 2));
 
         if (error || !data?.found) {
-          return `No encontré negocios abiertos con "${args.consulta}".`;
+          const query = String(args.consulta || "").trim();
+          return `No encontré productos relacionados con "${query}".\n\nPodés decir "ver categorías" para explorar locales o escribir el nombre de un negocio (ej: "¿qué hay en el vivero?").`;
         }
 
         // Formatear resultados SIN exponer UUIDs
@@ -4196,7 +4197,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       const msgLower = message.toLowerCase().trim();
 
       // Frases que significan "mostrame qué hay" → ver_locales_abiertos
-      const wantsVendorList = /^(ver opciones|quiero ver opciones|opciones|ver locales|ver negocios|mostrame los? locales?|que hay|qué hay|que tenés|qué tenés|ver tiendas|negocios abiertos|locales abiertos|ver categorías|categorías|quiero ver|que puedo pedir|qué puedo pedir|donde puedo pedir|dónde puedo pedir|mostrame|ver todo|ver menu|ver menú)\s*\??$/i.test(msgLower);
+      const wantsVendorList = /(?:\bver\s+(?:opciones|locales|negocios|tiendas|categor[ií]as?|todo|men[uú])\b|\bopciones\b|\b(?:que|qué)\s+hay\b|\b(?:que|qué)\s+ten[eé]s\b|\b(?:que|qué)\s+puedo\s+pedir\b|\bd[oó]nde\s+puedo\s+pedir\b|\bmostrame\b|\bnegocios\s+abiertos\b|\blocales\s+abiertos\b)/i.test(msgLower);
 
       if (wantsVendorList) {
         console.log(`🏪 INTERCEPTOR: User wants to see options/vendors: "${message.trim()}", calling ver_locales_abiertos`);
@@ -4205,6 +4206,39 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         context.conversation_history.push({ role: "assistant", content: result });
         await saveContext(context, supabase);
         return result;
+      }
+
+      // INTERCEPTOR: Preguntas tipo "¿qué hay en el vivero?" → abrir menú de negocio (sin buscar literal producto)
+      const vendorIntentMatch = msgLower.match(
+        /(?:que|qué)\s+(?:tenemos|hay|tienen|ofrecen)\s+(?:en|del?|de la)\s+(.+)$|(?:ver|mostrar|mostrame)\s+(?:el\s+)?men[uú]\s+(?:de|del|de la)\s+(.+)$|(?:productos?|cat[aá]logo)\s+(?:de|del|de la)\s+(.+)$/i,
+      );
+      const rawVendorCandidate = vendorIntentMatch?.slice(1).find(Boolean)?.trim();
+      if (rawVendorCandidate) {
+        const vendorCandidate = rawVendorCandidate
+          .replace(/[?!.,;:]+$/g, "")
+          .replace(/^(el|la|los|las)\s+/i, "")
+          .trim();
+
+        if (vendorCandidate.length >= 3) {
+          console.log(`🏪 INTERCEPTOR: Vendor intent detected "${message.trim()}" → "${vendorCandidate}"`);
+          const result = await ejecutarHerramienta("ver_menu_negocio", {
+            vendor_id: vendorCandidate,
+          }, context, supabase);
+
+          if (/^No encontré ese negocio/i.test(result)) {
+            const fallbackList = await ejecutarHerramienta("ver_locales_abiertos", {}, context, supabase);
+            const response = `No identifiqué el negocio "${vendorCandidate}".\n\n${fallbackList}`;
+            context.confusion_count = 0;
+            context.conversation_history.push({ role: "assistant", content: response });
+            await saveContext(context, supabase);
+            return response;
+          }
+
+          context.confusion_count = 0;
+          context.conversation_history.push({ role: "assistant", content: result });
+          await saveContext(context, supabase);
+          return result;
+        }
       }
 
       // INTERCEPTOR: Detectar referencia a un negocio de la lista por nombre parcial
