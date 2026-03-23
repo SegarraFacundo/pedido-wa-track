@@ -4342,6 +4342,8 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         }
 
         // 💾 CRÍTICO: Guardar contexto después de ejecutar todas las herramientas
+        // Reset confusion count on successful tool execution
+        context.confusion_count = 0;
         console.log(`💾 Saving context after tool execution - vendor_id: ${context.selected_vendor_id}`);
         await saveContext(context, supabase);
 
