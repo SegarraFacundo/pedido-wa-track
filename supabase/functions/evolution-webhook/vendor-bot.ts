@@ -3155,13 +3155,17 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     const context = await getContext(normalizedPhone, supabase);
 
     // ⏱️ RESET AUTOMÁTICO POR INACTIVIDAD (sin pedido activo)
-    const { data: sessionMeta } = await supabase
-      .from('user_sessions')
-      .select('last_message_at, updated_at')
+    // Usamos el último log de interacción del bot para evitar falsos positivos:
+    // user_sessions.last_message_at se actualiza al recibir ESTE mensaje.
+    const { data: lastBotInteraction } = await supabase
+      .from('bot_interaction_logs')
+      .select('created_at')
       .eq('phone', normalizedPhone)
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
-    const lastActivityRaw = sessionMeta?.last_message_at || sessionMeta?.updated_at;
+    const lastActivityRaw = lastBotInteraction?.created_at;
     const inactivityLimitMs = 10 * 60 * 1000; // 10 minutos
     const hasLastActivity = !!lastActivityRaw;
     const inactiveMs = hasLastActivity ? Date.now() - new Date(lastActivityRaw).getTime() : 0;
