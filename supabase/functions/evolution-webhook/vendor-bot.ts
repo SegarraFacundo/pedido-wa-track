@@ -3165,7 +3165,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       .limit(1)
       .maybeSingle();
 
-    const lastActivityRaw = lastBotInteraction?.created_at;
+    const lastActivityRaw = lastBotInteraction?.created_at || context.last_menu_fetch || context.last_vendors_fetch;
     const inactivityLimitMs = 10 * 60 * 1000; // 10 minutos
     const hasLastActivity = !!lastActivityRaw;
     const inactiveMs = hasLastActivity ? Date.now() - new Date(lastActivityRaw).getTime() : 0;
