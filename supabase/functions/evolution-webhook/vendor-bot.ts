@@ -4191,8 +4191,22 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
     }
 
-    // INTERCEPTOR: Estado idle/browsing + palabras de comida O producto genérico → buscar_productos directo
+    // INTERCEPTOR: Estado idle/browsing → detectar intención de ver negocios/opciones antes de buscar productos
     if ((context.order_state === "idle" || context.order_state === "browsing" || !context.order_state) && !context.selected_vendor_id) {
+      const msgLower = message.toLowerCase().trim();
+
+      // Frases que significan "mostrame qué hay" → ver_locales_abiertos
+      const wantsVendorList = /^(ver opciones|quiero ver opciones|opciones|ver locales|ver negocios|mostrame los? locales?|que hay|qué hay|que tenés|qué tenés|ver tiendas|negocios abiertos|locales abiertos|ver categorías|categorías|quiero ver|que puedo pedir|qué puedo pedir|donde puedo pedir|dónde puedo pedir|mostrame|ver todo|ver menu|ver menú)\s*\??$/i.test(msgLower);
+
+      if (wantsVendorList) {
+        console.log(`🏪 INTERCEPTOR: User wants to see options/vendors: "${message.trim()}", calling ver_locales_abiertos`);
+        const result = await ejecutarHerramienta("ver_locales_abiertos", {}, context, supabase);
+        context.confusion_count = 0;
+        context.conversation_history.push({ role: "assistant", content: result });
+        await saveContext(context, supabase);
+        return result;
+      }
+
       const foodKeywords = /\b(pizza|hamburguesa|empanada|milanesa|sushi|helado|cerveza|coca|fanta|sprite|agua|café|cafe|pollo|asado|lomito|sandwich|tarta|torta|postre|ensalada|papas|sándwich|medialunas?|facturas?|alfajor|ravioles?|ñoquis?|pastas?)\b/i;
       // Detectar queries de producto: no es un saludo, no es un comando, tiene 2+ caracteres
       const isGreeting = /^(hola|buenas?|buen[ao]s?\s+(dias?|tardes?|noches?)|hey|hi|hello|que\s+tal)\b/i.test(message.trim());
