@@ -4144,15 +4144,14 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     const helpKeywords = /^(ayuda|help|opciones|que puedo hacer|qué puedo hacer|como funciona|cómo funciona|\?|info)$/i;
     if (helpKeywords.test(message.trim())) {
       console.log(`📋 INTERCEPTOR: Static help menu`);
-      const helpText = `📋 *¿Qué puedo hacer?*\n\n` +
-        `🔍 *Ver negocios* - "mostrame los locales"\n` +
-        `🍕 *Buscar productos* - "quiero pizza", "busco helado"\n` +
-        `🛒 *Ver carrito* - "ver carrito", "qué tengo"\n` +
-        `📦 *Estado de pedido* - "estado de mi pedido"\n` +
-        `❌ *Cancelar pedido* - "cancelar pedido"\n` +
-        `🗣️ *Hablar con negocio* - "hablar con vendedor"\n` +
-        `⭐ *Calificar* - "quiero calificar"\n\n` +
-        `Escribí lo que necesitás y te ayudo 😊`;
+      const helpText = `📋 *¿En qué te puedo ayudar?*\n\n` +
+        `🔍 *Ver negocios* → "mostrame los locales"\n` +
+        `🍕 *Buscar algo* → "quiero pizza", "busco helado"\n` +
+        `🛒 *Tu carrito* → "ver carrito"\n` +
+        `📦 *Tu pedido* → "estado de mi pedido"\n` +
+        `❌ *Cancelar* → "cancelar pedido"\n` +
+        `⭐ *Calificar* → "quiero calificar"\n\n` +
+        `Decime qué necesitás y te ayudo 😊`;
       
       context.conversation_history.push({ role: "assistant", content: helpText });
       await saveContext(context, supabase);
