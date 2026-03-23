@@ -3109,37 +3109,92 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
     }
     // 🔄 COMANDO DE REINICIO: Detectar palabras clave para limpiar memoria
-    const resetCommands = ['reiniciar', 'empezar de nuevo', 'borrar todo', 'limpiar memoria', 'reset', 'comenzar de nuevo', 'nuevo pedido', 'empezar'];
+    const resetCommands = ['reiniciar', 'empezar de nuevo', 'borrar todo', 'limpiar memoria', 'reset', 'comenzar de nuevo', 'nuevo pedido', 'empezar', 'de cero'];
     const normalizedMessage = message.toLowerCase().trim();
-    
+    const nowIso = new Date().toISOString();
+
     if (resetCommands.some(cmd => normalizedMessage.includes(cmd))) {
       console.log('🔄 Reset command detected, clearing user memory...');
-      
-      // Limpiar toda la memoria del usuario
+
       const { error } = await supabase
         .from('user_sessions')
         .update({
           last_bot_message: JSON.stringify({
             phone: normalizedPhone,
             cart: [],
+            order_state: 'idle',
             conversation_history: [],
+            selected_vendor_id: undefined,
+            selected_vendor_name: undefined,
+            delivery_address: undefined,
+            payment_method: undefined,
+            pending_order_id: undefined,
+            delivery_type: undefined,
+            payment_methods_fetched: false,
+            available_payment_methods: [],
+            available_vendors_map: [],
+            pending_cancellation: undefined,
+            confusion_count: 0,
             user_latitude: undefined,
             user_longitude: undefined,
             pending_location_decision: false,
           }),
+          last_message_at: nowIso,
+          updated_at: nowIso,
         })
         .eq('phone', normalizedPhone);
-      
+
       if (error) {
         console.error('Error clearing memory:', error);
       }
-      
-      return '🔄 ¡Listo! Borré toda tu memoria de conversación.\n\n¡Empecemos de nuevo! ¿Qué estás buscando hoy? 😊';
+
+      return '🔄 Listo, arrancamos desde cero.\n\n¿Qué te gustaría pedir hoy? 😊';
     }
-    
+
     // Cargar contexto
     const context = await getContext(normalizedPhone, supabase);
-    
+
+    // ⏱️ RESET AUTOMÁTICO POR INACTIVIDAD (sin pedido activo)
+    const { data: sessionMeta } = await supabase
+      .from('user_sessions')
+      .select('last_message_at, updated_at')
+      .eq('phone', normalizedPhone)
+      .maybeSingle();
+
+    const lastActivityRaw = sessionMeta?.last_message_at || sessionMeta?.updated_at;
+    const inactivityLimitMs = 10 * 60 * 1000; // 10 minutos
+    const hasLastActivity = !!lastActivityRaw;
+    const inactiveMs = hasLastActivity ? Date.now() - new Date(lastActivityRaw).getTime() : 0;
+    const hasActiveOrder = ['order_pending_cash', 'order_pending_transfer', 'order_pending_mp', 'order_confirmed'].includes(context.order_state || '') && !!context.pending_order_id;
+    const hasStaleSessionData = context.order_state !== 'idle' || context.cart.length > 0 || !!context.selected_vendor_id || context.conversation_history.length > 0;
+
+    if (hasLastActivity && inactiveMs > inactivityLimitMs && !hasActiveOrder && hasStaleSessionData) {
+      console.log(`⏱️ Inactivity reset: ${Math.round(inactiveMs / 60000)} min without active order`);
+
+      context.order_state = 'idle';
+      context.pending_order_id = undefined;
+      context.cart = [];
+      context.selected_vendor_id = undefined;
+      context.selected_vendor_name = undefined;
+      context.payment_method = undefined;
+      context.delivery_address = undefined;
+      context.delivery_type = undefined;
+      context.resumen_mostrado = false;
+      context.payment_methods_fetched = false;
+      context.available_payment_methods = [];
+      context.available_vendors_map = [];
+      context.pending_cancellation = undefined;
+      context.pending_vendor_change = undefined;
+      context.confusion_count = 0;
+      context.conversation_history = [];
+      await saveContext(context, supabase);
+
+      const isSimpleGreeting = /^(hola|holi|buenas?|buen\s*d[ií]a|buen[oa]s?\s+(d[ií]as|tardes|noches)|hey)$/i.test(normalizedMessage);
+      if (isSimpleGreeting) {
+        return '¡Hola! Retomamos desde cero 😊\n\n¿Qué te gustaría pedir hoy?';
+      }
+    }
+
     // 🔄 VALIDACIÓN DE SINCRONIZACIÓN: Verificar si pending_order_id ya fue cancelado/entregado
     if (context.pending_order_id) {
       console.log(`🔄 Checking sync status for pending_order_id: ${context.pending_order_id}`);
