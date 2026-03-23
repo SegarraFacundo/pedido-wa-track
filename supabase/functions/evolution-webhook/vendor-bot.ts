@@ -3487,7 +3487,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         context.payment_method = undefined;
         context.conversation_history = [];
         await saveContext(context, supabase);
-        return `✅ Carrito vaciado.\n\n¿Qué querés hacer?\n\n1️⃣ 🏪 Ver negocios abiertos\n2️⃣ 🔍 Buscar un producto\n\nEscribí lo que necesitás 😊`;
+        return `✅ Carrito vaciado.\n\n¿Qué querés hacer? Puedo mostrarte negocios abiertos o buscar algo puntual 😊`;
       }
     }
 
