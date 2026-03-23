@@ -119,6 +119,16 @@ async function handleShoppingInterceptor(
   const vendorId = context.selected_vendor_id;
   if (!vendorId) return null;
 
+  // Evitar interpretar saludos como productos (ej: "hola")
+  const isGreetingOnly = /^(hola|holi|buenas?|buen\s*d[ií]a|buen[oa]s?\s+(d[ií]as|tardes|noches)|hey)$/i.test(text);
+  if (isGreetingOnly) {
+    const cartSummary = context.cart.length > 0
+      ? `Tenés ${context.cart.length} producto${context.cart.length === 1 ? '' : 's'} en el carrito.`
+      : "Todavía no agregaste productos al carrito.";
+
+    return `${cartSummary}\n¿Querés que te muestre el menú de ${context.selected_vendor_name || "este negocio"} o preferís ver otros locales?`;
+  }
+
   // 🔍 Pre-process: extract multi-intent parts
   let productPart = text;
   let addressPart: string | null = null;
