@@ -4207,6 +4207,31 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         return result;
       }
 
+      // INTERCEPTOR: Detectar referencia a un negocio de la lista por nombre parcial
+      // Ej: "que tenemos en el vivero?", "vivero", "burger", "pizzeria don luigi"
+      if (context.available_vendors_map && context.available_vendors_map.length > 0) {
+        const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, "").trim();
+        const msgNorm = normalize(msgLower);
+        
+        const matchedVendor = context.available_vendors_map.find(v => {
+          const vendorNorm = normalize(v.name);
+          // Check if any word from the vendor name appears in the message (min 4 chars to avoid false positives)
+          const vendorWords = vendorNorm.split(/\s+/).filter(w => w.length >= 4);
+          return vendorWords.some(word => msgNorm.includes(word));
+        });
+        
+        if (matchedVendor) {
+          console.log(`🏪 INTERCEPTOR: Vendor name reference detected: "${message.trim()}" → "${matchedVendor.name}" (#${matchedVendor.index})`);
+          const result = await ejecutarHerramienta("ver_menu_negocio", {
+            vendor_id: String(matchedVendor.index),
+          }, context, supabase);
+          context.confusion_count = 0;
+          context.conversation_history.push({ role: "assistant", content: result });
+          await saveContext(context, supabase);
+          return result;
+        }
+      }
+
       const foodKeywords = /\b(pizza|hamburguesa|empanada|milanesa|sushi|helado|cerveza|coca|fanta|sprite|agua|café|cafe|pollo|asado|lomito|sandwich|tarta|torta|postre|ensalada|papas|sándwich|medialunas?|facturas?|alfajor|ravioles?|ñoquis?|pastas?)\b/i;
       // Detectar queries de producto: no es un saludo, no es un comando, tiene 2+ caracteres
       const isGreeting = /^(hola|buenas?|buen[ao]s?\s+(dias?|tardes?|noches?)|hey|hi|hello|que\s+tal)\b/i.test(message.trim());
