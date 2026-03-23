@@ -4321,7 +4321,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
 
     if (iterationCount >= MAX_ITERATIONS) {
       console.warn("⚠️ Max iterations reached, forcing response");
-      finalResponse = "Disculpá, tuve un problema procesando tu mensaje. ¿Podés intentar de nuevo?";
+      finalResponse = "Disculpá, me trabé un poco. ¿Podés decirme de nuevo qué necesitás?";
     }
 
     // Agregar respuesta del asistente al historial
