@@ -3156,20 +3156,21 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     const context = await getContext(normalizedPhone, supabase);
 
     // ⏱️ RESET AUTOMÁTICO POR INACTIVIDAD (sin pedido activo)
-    // Usamos el último log de interacción del bot para evitar falsos positivos:
-    // user_sessions.last_message_at se actualiza al recibir ESTE mensaje.
-    const { data: lastBotInteraction } = await supabase
-      .from('bot_interaction_logs')
-      .select('created_at')
-      .eq('phone', normalizedPhone)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const lastActivityRaw = lastBotInteraction?.created_at || context.last_menu_fetch || context.last_vendors_fetch;
-    const inactivityLimitMs = 10 * 60 * 1000; // 10 minutos
+    // Usamos timestamps del propio contexto (last_interaction_at, last_menu_fetch, last_vendors_fetch)
+    // para evitar consultas extra a bot_interaction_logs que daban timestamps desfasados.
+    const lastActivityCandidates = [
+      context.last_interaction_at,
+      context.last_menu_fetch,
+      context.last_vendors_fetch,
+    ].filter(Boolean) as string[];
+    
+    const lastActivityRaw = lastActivityCandidates.length > 0
+      ? lastActivityCandidates.reduce((a, b) => (a > b ? a : b))
+      : null;
+    
+    const inactivityLimitMs = 2 * 60 * 60 * 1000; // 2 horas (antes era 10 min, causaba resets falsos)
     const hasLastActivity = !!lastActivityRaw;
-    const inactiveMs = hasLastActivity ? Date.now() - new Date(lastActivityRaw).getTime() : 0;
+    const inactiveMs = hasLastActivity ? Date.now() - new Date(lastActivityRaw!).getTime() : 0;
     const hasActiveOrder = ['order_pending_cash', 'order_pending_transfer', 'order_pending_mp', 'order_confirmed'].includes(context.order_state || '') && !!context.pending_order_id;
     const hasStaleSessionData = context.order_state !== 'idle' || context.cart.length > 0 || !!context.selected_vendor_id || context.conversation_history.length > 0;
 
@@ -3199,6 +3200,9 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         return '¡Hola! Retomamos desde cero 😊\n\n¿Qué te gustaría pedir hoy?';
       }
     }
+    
+    // ✅ Actualizar timestamp de última interacción
+    context.last_interaction_at = new Date().toISOString();
 
     // 🔄 VALIDACIÓN DE SINCRONIZACIÓN: Verificar si pending_order_id ya fue cancelado/entregado
     if (context.pending_order_id) {
@@ -4266,12 +4270,53 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         }
       }
 
+      // 🛒 INTERCEPTOR: Intención de compra ("dame X", "quiero X", "X unidades de Y")
+      // Si el usuario tiene un vendor reciente en contexto, enrutar a shopping en vez de buscar_productos
+      const purchaseIntent = /\b(dame|deme|quer[ée]s?|quiero|poneme|agrega|agreg[aá]me|mand[aá]me|trae(?:me)?|ped[ií](?:me)?|necesito|llevo|meti?|pone)\b/i.test(msgLower)
+        || /^\d+\s+\w/i.test(message.trim()); // "3 palos de agua" starts with number + word
+      
+      if (purchaseIntent) {
+        // Si hay vendor seleccionado reciente, ir directo a shopping
+        if (context.selected_vendor_id && context.selected_vendor_name) {
+          console.log(`🛒 INTERCEPTOR: Purchase intent with active vendor "${context.selected_vendor_name}": "${message.trim()}"`);
+          // Transicionar a shopping y dejar que la IA procese el agregado al carrito
+          if (context.order_state === "idle" || context.order_state === "browsing") {
+            context.order_state = "shopping";
+            console.log(`🔄 STATE: → shopping (purchase intent with vendor)`);
+          }
+          // No interceptar, dejar que fluya al LLM con herramientas de shopping
+        } 
+        // Si hay un solo vendor en el mapa, auto-seleccionarlo
+        else if (context.available_vendors_map && context.available_vendors_map.length === 1) {
+          const singleVendor = context.available_vendors_map[0];
+          console.log(`🛒 INTERCEPTOR: Purchase intent with single vendor available "${singleVendor.name}": "${message.trim()}"`);
+          const menuResult = await ejecutarHerramienta("ver_menu_negocio", {
+            vendor_id: String(singleVendor.index),
+          }, context, supabase);
+          context.confusion_count = 0;
+          context.conversation_history.push({ role: "assistant", content: menuResult });
+          await saveContext(context, supabase);
+          return menuResult;
+        }
+        // Si hay vendors pero no uno seleccionado, guiar a elegir
+        else if (context.available_vendors_map && context.available_vendors_map.length > 1) {
+          console.log(`🛒 INTERCEPTOR: Purchase intent without vendor selected, guiding user`);
+          const vendorNames = context.available_vendors_map.map(v => `${v.index}️⃣ ${v.name}`).join('\n');
+          const response = `Para hacer tu pedido, primero elegí un negocio 🙂\n\n${vendorNames}\n\nDecime el número o nombre.`;
+          context.confusion_count = 0;
+          context.conversation_history.push({ role: "assistant", content: response });
+          await saveContext(context, supabase);
+          return response;
+        }
+        // Sin vendors disponibles, hacer búsqueda normal (caerá al bloque de abajo)
+      }
+
       const foodKeywords = /\b(pizza|hamburguesa|empanada|milanesa|sushi|helado|cerveza|coca|fanta|sprite|agua|café|cafe|pollo|asado|lomito|sandwich|tarta|torta|postre|ensalada|papas|sándwich|medialunas?|facturas?|alfajor|ravioles?|ñoquis?|pastas?)\b/i;
       // Detectar queries de producto: no es un saludo, no es un comando, tiene 2+ caracteres
       const isGreeting = /^(hola|buenas?|buen[ao]s?\s+(dias?|tardes?|noches?)|hey|hi|hello|que\s+tal)\b/i.test(message.trim());
       const isCommand = /^(ayuda|help|opciones|estado|cancelar|carrito|menu|volver|salir|calificar)\b/i.test(message.trim());
       const isGibberish = /^[^a-záéíóúñü]*$/i.test(message.trim()); // Only symbols/numbers
-      const isProductQuery = !isGreeting && !isCommand && !isGibberish && message.trim().length >= 3 && message.trim().length <= 80;
+      const isProductQuery = !isGreeting && !isCommand && !isGibberish && !purchaseIntent && message.trim().length >= 3 && message.trim().length <= 80;
       
       if (foodKeywords.test(message) || isProductQuery) {
         console.log(`🍕 INTERCEPTOR: Product query detected in idle/browsing: "${message.trim()}", calling buscar_productos`);
