@@ -4354,6 +4354,8 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       // Si no hay tool calls, es la respuesta final
       console.log("✅ No tool calls - AI responding with text");
       console.log("   Content preview:", assistantMessage.content?.slice(0, 200));
+      // Incrementar confusion count cuando la IA no usa herramientas (posible mensaje no reconocido)
+      context.confusion_count = (context.confusion_count || 0) + 1;
       finalResponse = assistantMessage.content || getContextualFallback(context);
       continueLoop = false;
     }
