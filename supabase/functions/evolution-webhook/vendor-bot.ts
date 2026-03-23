@@ -6,6 +6,43 @@ import { getContext, saveContext } from "./context.ts";
 import { tools } from "./tools-definitions.ts";
 import { buildSystemPrompt } from "./simplified-prompt.ts";
 
+// ==================== HELPER: CONTEXTUAL FALLBACK ====================
+
+function getContextualFallback(context: ConversationContext): string {
+  const state = context.order_state || "idle";
+  const confusionCount = context.confusion_count || 0;
+
+  // Si el usuario lleva 2+ mensajes sin reconocer, simplificar al máximo
+  if (confusionCount >= 2) {
+    if (state === "shopping" && context.selected_vendor_name) {
+      return `Te ayudo 🙂 Estás en *${context.selected_vendor_name}*.\n\n` +
+        `1️⃣ Ver el menú\n2️⃣ Ver tu carrito\n3️⃣ Confirmar pedido\n\n¿Qué preferís?`;
+    }
+    return `Te ayudo 🙂 ¿Qué querés hacer?\n\n` +
+      `1️⃣ Ver negocios abiertos\n2️⃣ Buscar un producto\n\n` +
+      `Escribí lo que necesitás.`;
+  }
+
+  switch (state) {
+    case "idle":
+      return "¿Qué te gustaría? Puedo mostrarte negocios abiertos o buscar algo puntual 😊";
+    case "browsing":
+      return "Decime el número o nombre del negocio que te interesa, o decime qué querés buscar 🙂";
+    case "shopping": {
+      const cartInfo = context.cart.length > 0
+        ? `Tenés ${context.cart.length} producto${context.cart.length > 1 ? 's' : ''} en el carrito. `
+        : "";
+      return `${cartInfo}¿Querés agregar algo más o confirmar tu pedido?`;
+    }
+    case "needs_address":
+      return "¿A qué dirección te lo mando? 📍";
+    case "checkout":
+      return "¿Cómo querés pagar? " + (context.available_payment_methods?.join(', ') || "");
+    default:
+      return "¿En qué te puedo ayudar? 😊";
+  }
+}
+
 // ==================== FASE 1: FILTRADO DE HERRAMIENTAS POR ESTADO ====================
 
 const TOOLS_BY_STATE: Record<string, string[]> = {
