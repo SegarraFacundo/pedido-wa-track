@@ -6,6 +6,43 @@ import { getContext, saveContext } from "./context.ts";
 import { tools } from "./tools-definitions.ts";
 import { buildSystemPrompt } from "./simplified-prompt.ts";
 
+// ==================== HELPER: CONTEXTUAL FALLBACK ====================
+
+function getContextualFallback(context: ConversationContext): string {
+  const state = context.order_state || "idle";
+  const confusionCount = context.confusion_count || 0;
+
+  // Si el usuario lleva 2+ mensajes sin reconocer, simplificar al máximo
+  if (confusionCount >= 2) {
+    if (state === "shopping" && context.selected_vendor_name) {
+      return `Te ayudo 🙂 Estás en *${context.selected_vendor_name}*.\n\n` +
+        `1️⃣ Ver el menú\n2️⃣ Ver tu carrito\n3️⃣ Confirmar pedido\n\n¿Qué preferís?`;
+    }
+    return `Te ayudo 🙂 ¿Qué querés hacer?\n\n` +
+      `1️⃣ Ver negocios abiertos\n2️⃣ Buscar un producto\n\n` +
+      `Escribí lo que necesitás.`;
+  }
+
+  switch (state) {
+    case "idle":
+      return "¿Qué te gustaría? Puedo mostrarte negocios abiertos o buscar algo puntual 😊";
+    case "browsing":
+      return "Decime el número o nombre del negocio que te interesa, o decime qué querés buscar 🙂";
+    case "shopping": {
+      const cartInfo = context.cart.length > 0
+        ? `Tenés ${context.cart.length} producto${context.cart.length > 1 ? 's' : ''} en el carrito. `
+        : "";
+      return `${cartInfo}¿Querés agregar algo más o confirmar tu pedido?`;
+    }
+    case "needs_address":
+      return "¿A qué dirección te lo mando? 📍";
+    case "checkout":
+      return "¿Cómo querés pagar? " + (context.available_payment_methods?.join(', ') || "");
+    default:
+      return "¿En qué te puedo ayudar? 😊";
+  }
+}
+
 // ==================== FASE 1: FILTRADO DE HERRAMIENTAS POR ESTADO ====================
 
 const TOOLS_BY_STATE: Record<string, string[]> = {
@@ -3487,7 +3524,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         context.payment_method = undefined;
         context.conversation_history = [];
         await saveContext(context, supabase);
-        return `✅ Carrito vaciado.\n\n¿Qué querés hacer?\n\n1️⃣ 🏪 Ver negocios abiertos\n2️⃣ 🔍 Buscar un producto\n\nEscribí lo que necesitás 😊`;
+        return `✅ Carrito vaciado.\n\n¿Qué querés hacer? Puedo mostrarte negocios abiertos o buscar algo puntual 😊`;
       }
     }
 
@@ -4078,6 +4115,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
           direccion: message.trim(),
         }, context, supabase);
         
+        context.confusion_count = 0;
         context.conversation_history.push({ role: "assistant", content: result });
         await saveContext(context, supabase);
         return result;
@@ -4099,6 +4137,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
           consulta: message.trim(),
         }, context, supabase);
         
+        context.confusion_count = 0;
         context.conversation_history.push({ role: "assistant", content: result });
         await saveContext(context, supabase);
         return result;
@@ -4144,15 +4183,14 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     const helpKeywords = /^(ayuda|help|opciones|que puedo hacer|qué puedo hacer|como funciona|cómo funciona|\?|info)$/i;
     if (helpKeywords.test(message.trim())) {
       console.log(`📋 INTERCEPTOR: Static help menu`);
-      const helpText = `📋 *¿Qué puedo hacer?*\n\n` +
-        `🔍 *Ver negocios* - "mostrame los locales"\n` +
-        `🍕 *Buscar productos* - "quiero pizza", "busco helado"\n` +
-        `🛒 *Ver carrito* - "ver carrito", "qué tengo"\n` +
-        `📦 *Estado de pedido* - "estado de mi pedido"\n` +
-        `❌ *Cancelar pedido* - "cancelar pedido"\n` +
-        `🗣️ *Hablar con negocio* - "hablar con vendedor"\n` +
-        `⭐ *Calificar* - "quiero calificar"\n\n` +
-        `Escribí lo que necesitás y te ayudo 😊`;
+      const helpText = `📋 *¿En qué te puedo ayudar?*\n\n` +
+        `🔍 *Ver negocios* → "mostrame los locales"\n` +
+        `🍕 *Buscar algo* → "quiero pizza", "busco helado"\n` +
+        `🛒 *Tu carrito* → "ver carrito"\n` +
+        `📦 *Tu pedido* → "estado de mi pedido"\n` +
+        `❌ *Cancelar* → "cancelar pedido"\n` +
+        `⭐ *Calificar* → "quiero calificar"\n\n` +
+        `Decime qué necesitás y te ayudo 😊`;
       
       context.conversation_history.push({ role: "assistant", content: helpText });
       await saveContext(context, supabase);
@@ -4306,6 +4344,8 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         }
 
         // 💾 CRÍTICO: Guardar contexto después de ejecutar todas las herramientas
+        // Reset confusion count on successful tool execution
+        context.confusion_count = 0;
         console.log(`💾 Saving context after tool execution - vendor_id: ${context.selected_vendor_id}`);
         await saveContext(context, supabase);
 
@@ -4316,13 +4356,15 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       // Si no hay tool calls, es la respuesta final
       console.log("✅ No tool calls - AI responding with text");
       console.log("   Content preview:", assistantMessage.content?.slice(0, 200));
-      finalResponse = assistantMessage.content || "Perdón, no entendí. ¿Podés repetir?";
+      // Incrementar confusion count cuando la IA no usa herramientas (posible mensaje no reconocido)
+      context.confusion_count = (context.confusion_count || 0) + 1;
+      finalResponse = assistantMessage.content || getContextualFallback(context);
       continueLoop = false;
     }
 
     if (iterationCount >= MAX_ITERATIONS) {
       console.warn("⚠️ Max iterations reached, forcing response");
-      finalResponse = "Disculpá, tuve un problema procesando tu mensaje. ¿Podés intentar de nuevo?";
+      finalResponse = "Disculpá, me trabé un poco. ¿Podés decirme de nuevo qué necesitás?";
     }
 
     // Agregar respuesta del asistente al historial
