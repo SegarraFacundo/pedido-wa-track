@@ -1,58 +1,62 @@
 
 
-# Plan: Fix QA Test Runner - "(sin respuesta)" Bug
+# Plan: Rewrite System Prompt and Bot Behavior for Human-like UX
 
-## Root Cause
+## Problem
+The current bot has a rigid, menu-driven approach with overly technical prompts. The user wants a friendlier, simpler bot that adapts to the user instead of forcing the user to adapt to the bot.
 
-All 24 tests fail with "(sin respuesta)" due to **two bugs in the QA test runner**, not in the bot itself. The edge function logs confirm the bot IS processing messages and generating responses correctly.
+## What Changes
 
-### Bug 1: Phone normalization mismatch
-The QA tester sends messages with `remoteJid: "qa_test_1774113038309"`, but `normalizeArgentinePhone()` strips the `qa_test_` prefix, storing the session under phone `"1774113038309"`. The tester then queries `user_sessions` with `phone = "qa_test_1774113038309"` -- which doesn't match.
+### 1. Rewrite `simplified-prompt.ts` — New system prompt philosophy
+The current prompt is terse and mechanical ("ESTADO: idle", "Sé ULTRA breve"). Replace with a warm, conversational tone that follows the user's guidelines:
 
-### Bug 2: RLS blocks admin reads
-The `user_sessions` table only allows reads by `service_role` or vendors with active orders. The admin's authenticated client can't read the bot's response from this table.
+- Replace "Sos un vendedor" → "Sos un asistente amable de Lapacho"
+- Replace rigid rules like "máximo 4 líneas" → "Frases cortas, amable pero directo"
+- Add explicit guidance for ambiguous inputs: guide with simple questions instead of "no entendí"
+- Add guidance for gibberish/unclear messages: offer clear options instead of fallback
+- Add "never blame the user" and "always offer a way out" rules
+- Remove the mechanical state labels from the prompt (keep them internally)
+- Make state instructions more conversational and less robotic
 
-## Fix
+Key changes to `getStateInstructions`:
+- **idle**: Instead of "Usá buscar_productos" → "Preguntale qué busca, sugerí categorías"
+- **browsing**: Remove "NUNCA inventes resultados" (already a global rule) → "Ayudalo a elegir con preguntas simples"
+- **shopping**: Remove menu-speak like "Enviá un número del menú" → "Guialo para elegir productos"
+- **needs_address**: Instead of "Todo se trata como dirección" → "Pedile la dirección de forma amable"
+- All states: Replace "🤔 Perdón, no entendí" with helpful contextual suggestions
 
-Modify `BotQATester.tsx` `runTest()` to:
+### 2. Update `vendor-bot.ts` — Improve fallback responses and interceptors
 
-1. **Extract the normalized phone** by applying the same normalization logic (strip `qa_test_` prefix, keep only digits) so the session lookup matches
-2. **Use `bot_interaction_logs` instead of `user_sessions`** to read bot responses -- this table has admin SELECT RLS already enabled, and stores `response_preview` for every bot interaction
-3. **Increase wait time** from 2s to 4s to account for debounce (2s) + AI processing time
-4. **Fix cleanup** to use the normalized phone for deletion
+**Fallback message improvements** (~6 locations):
+- Replace all instances of `"🤔 Perdón, no entendí. ¿Podés repetir?"` with contextual, helpful messages
+- In idle: "Te ayudo 🙂 ¿Qué te gustaría? Puedo mostrarte negocios o buscar algo"
+- In browsing: "Decime el número o nombre del negocio que te interesa, o buscá otro producto"
+- In shopping: Show available products as numbered list instead of generic error
+
+**Interceptor improvements**:
+- In the idle/browsing product interceptor (line ~4088): Don't call `buscar_productos` for gibberish or very short ambiguous messages. Instead, offer guidance
+- Add a "confused user" interceptor: if user sends >2 unrecognized messages in a row, simplify options to 2-3 clear choices
+- In shopping state: when user says something unrecognized, show cart status + "¿Querés agregar algo más o confirmar?"
+
+**Remove rigid menu formatting**:
+- The welcome/help menu (line ~3090 reset command, ~4147 help interceptor) currently shows numbered emoji lists. Simplify to conversational text
+- Don't show "1️⃣ 🏪 Ver negocios abiertos" style — instead say "¿Qué querés hacer? Puedo mostrarte negocios, buscar un producto..."
+
+### 3. Track "confusion count" in context
+Add a `confusion_count` field to track consecutive unrecognized messages. After 2+ failures, auto-simplify to basic options. Reset on any successful action.
 
 ## Files to modify
 
-| File | Change |
-|------|--------|
-| `src/components/admin/BotQATester.tsx` | Fix `runTest()` response retrieval logic |
+| File | Changes |
+|------|---------|
+| `supabase/functions/evolution-webhook/simplified-prompt.ts` | Rewrite system prompt and state instructions for warm, human-like tone |
+| `supabase/functions/evolution-webhook/vendor-bot.ts` | Update fallback messages, add confusion tracking, simplify menus |
+| `supabase/functions/evolution-webhook/types.ts` | Add `confusion_count` to ConversationContext |
 
-## Technical Detail
-
-Replace the `user_sessions` lookup with a query to `bot_interaction_logs`:
-
-```typescript
-// After sending message, wait longer for debounce + processing
-await new Promise(r => setTimeout(r, 5000));
-
-// Read response from bot_interaction_logs (admin has RLS access)
-const { data: logData } = await supabase
-  .from("bot_interaction_logs")
-  .select("response_preview, intent_detected, confidence, error")
-  .eq("phone", normalizedPhone)
-  .order("created_at", { ascending: false })
-  .limit(1)
-  .maybeSingle();
-
-if (logData?.response_preview) {
-  botResponse = logData.response_preview;
-}
-```
-
-The normalized phone is derived by stripping the `qa_test_` prefix:
-```typescript
-const normalizedPhone = testPhone.replace(/^qa_test_/, "");
-```
-
-Cleanup also uses the normalized phone for both tables.
+## What stays the same
+- All tool definitions (tools-definitions.ts) — unchanged
+- All tool execution logic (ejecutarHerramienta) — unchanged  
+- State machine transitions — unchanged
+- Interceptors for shopping/address/payment — logic unchanged, only messages improved
+- TOOLS_BY_STATE restrictions — unchanged
 
