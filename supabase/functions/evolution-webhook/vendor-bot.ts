@@ -6,6 +6,17 @@ import { getContext, saveContext } from "./context.ts";
 import { tools } from "./tools-definitions.ts";
 import { buildSystemPrompt } from "./simplified-prompt.ts";
 
+const PURCHASE_VERB_REGEX = /\b(dame|deme|quer[ée]s?|quiero|quer(?:ia|ía)|quisiera|poneme|agrega|agreg[aá]me|mand[aá]me|trae(?:me|r)?|ped[ií](?:me)?|necesito|llevo|meti?|pone)\b/i;
+const NUMERIC_PURCHASE_REGEX = /^(?:(?:los|las|unos?|unas?)\s+)?\d+\s+\w/i;
+const WORD_QTY_PURCHASE_REGEX = /^(?:un[oa]?|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|media|docena|quince|veinte)\s+\w/i;
+
+function looksLikePurchaseIntent(message: string): boolean {
+  const trimmed = message.trim();
+  return PURCHASE_VERB_REGEX.test(trimmed)
+    || NUMERIC_PURCHASE_REGEX.test(trimmed)
+    || WORD_QTY_PURCHASE_REGEX.test(trimmed);
+}
+
 // ==================== HELPER: CONTEXTUAL FALLBACK ====================
 
 function getContextualFallback(context: ConversationContext): string {
@@ -116,6 +127,7 @@ async function handleShoppingInterceptor(
   supabase: any
 ): Promise<string | null> {
   const text = message.trim();
+  const textLower = text.toLowerCase();
   const vendorId = context.selected_vendor_id;
   if (!vendorId) return null;
 
@@ -127,6 +139,13 @@ async function handleShoppingInterceptor(
       : "Todavía no agregaste productos al carrito.";
 
     return `${cartSummary}\n¿Querés que te muestre el menú de ${context.selected_vendor_name || "este negocio"} o preferís ver otros locales?`;
+  }
+
+  // Evitar tratar comandos de flujo (carrito/confirmar/menú) como nombre de producto
+  const wantsCartView = /(?:\bcarrito\b|ver\s+productos?\s+en\s+el\s+carrito|mostrar\s+carrito|ver\s+carrito)/i.test(textLower);
+  const wantsFlowCommand = /^(?:confirmar(?:\s+pedido)?|listo|finalizar|terminar(?:\s+pedido)?|pagar|vaciar\s+carrito|ver\s+men[uú]|men[uú])\b/i.test(textLower);
+  if ((wantsCartView || wantsFlowCommand) && !looksLikePurchaseIntent(text)) {
+    return null;
   }
 
   // 🔍 Pre-process: extract multi-intent parts
@@ -268,6 +287,17 @@ async function handleShoppingInterceptor(
 }
 
 // ==================== HELPER: Split product segments ====================
+function isClarificationOnlySegment(segment: string): boolean {
+  const normalized = segment
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[.,;:!?]/g, "")
+    .trim();
+
+  return /^(?:no\s+solo\s+(?:uno|una|1)|(?:solo|solamente)\s+(?:uno|una|1)|no\s+(?:uno|una|1)|nada\s+mas|eso(?:\s+solo)?|nomas)$/.test(normalized);
+}
+
 function splitProductSegments(text: string): string[] {
   // Handle "1 helado de chocolate y 1 helado de vainilla" or "pizza, coca"
   // But don't split on "y" inside product names like "sal y pimienta"
@@ -279,11 +309,20 @@ function splitProductSegments(text: string): string[] {
   
   for (const commaPart of commaParts) {
     // Now split by " y " only when followed by a number or verb prefix
-    const yParts = commaPart.split(/\s+y\s+(?=\d|un[ao]?\s|quiero|dame|poneme|agregame)/i);
+    const yParts = commaPart.split(/\s+y\s+(?=\d|un[ao]?\s|quiero|quer(?:ia|ía)|quisiera|dame|poneme|agregame|mandame|traeme|trae|traer|necesito)/i);
     parts.push(...yParts);
   }
   
-  return parts.filter(p => p.trim().length > 0);
+  return parts
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0)
+    .filter((segment) => {
+      const isClarification = isClarificationOnlySegment(segment);
+      if (isClarification) {
+        console.log(`🧹 MULTI-PRODUCT: Ignoring clarification segment "${segment}"`);
+      }
+      return !isClarification;
+    });
 }
 
 // ==================== HELPER: Spanish number words to integer ====================
@@ -311,14 +350,27 @@ function spanishNumberToInt(word: string): number | null {
 
 // ==================== HELPER: Parse a single product segment ====================
 function parseProductSegment(segment: string): { quantity: number; searchTerm: string | null; menuIndex: number | null } | null {
+  const cleanSegment = segment
+    .trim()
+    .replace(/^[,.;:!?]+|[,.;:!?]+$/g, "")
+    .replace(/^(?:bueno|ok(?:ay)?|dale|che)\s+/i, "")
+    .trim();
+
+  if (!cleanSegment) return null;
+  if (isClarificationOnlySegment(cleanSegment)) return null;
+
+  const commandOnlySegment = /^(?:ver|mostrar|mirar|revisar|confirmar|finalizar|terminar|pagar|vaciar)\b/i.test(cleanSegment)
+    && !looksLikePurchaseIntent(cleanSegment);
+  if (commandOnlySegment) return null;
+
   // Solo número → menu index
-  const soloNumero = segment.match(/^(\d+)$/);
+  const soloNumero = cleanSegment.match(/^(\d+)$/);
   if (soloNumero) {
     return { quantity: 1, searchTerm: null, menuIndex: parseInt(soloNumero[1]) };
   }
 
   // "N producto" ("2 remeras", "1 helado de chocolate")
-  const cantidadProducto = segment.match(/^(\d+)\s+(.+)/i);
+  const cantidadProducto = cleanSegment.match(/^(\d+)\s+(.+)/i);
   if (cantidadProducto) {
     const qty = parseInt(cantidadProducto[1]);
     if (qty >= 1 && qty <= 50) {
@@ -327,49 +379,49 @@ function parseProductSegment(segment: string): { quantity: number; searchTerm: s
   }
 
   // "media docena de X" → 6
-  const mediaDocena = segment.match(/^media\s+docena\s+(?:de\s+)?(.+)/i);
+  const mediaDocena = cleanSegment.match(/^media\s+docena\s+(?:de\s+)?(.+)/i);
   if (mediaDocena) {
     return { quantity: 6, searchTerm: mediaDocena[1].trim(), menuIndex: null };
   }
 
   // "una docena de X" → 12
-  const docena = segment.match(/^(?:una?\s+)?docena\s+(?:de\s+)?(.+)/i);
+  const docena = cleanSegment.match(/^(?:una?\s+)?docena\s+(?:de\s+)?(.+)/i);
   if (docena) {
     return { quantity: 12, searchTerm: docena[1].trim(), menuIndex: null };
   }
 
   // "una/uno producto"
-  const unaPattern = segment.match(/^(?:una?|uno)\s+(.+)/i);
+  const unaPattern = cleanSegment.match(/^(?:una?|uno)\s+(.+)/i);
   if (unaPattern) {
     return { quantity: 1, searchTerm: unaPattern[1].trim(), menuIndex: null };
   }
 
-  // "quiero/dame N producto" (digit)
-  const quieroPattern = segment.match(/^(?:quiero|dame|poneme|agregame|mandame|traeme)\s+(\d+)\s+(.+)/i);
-  if (quieroPattern) {
-    const qty = parseInt(quieroPattern[1]);
+  // "quiero/quería/traer N producto" (digit)
+  const verbWithDigitQty = cleanSegment.match(/^(?:quiero|quer(?:ia|ía)|quisiera|dame|deme|poneme|agregame|mandame|traeme|trae|traer|necesito|llevo)\s+(?:(?:los|las|unos?|unas?)\s+)?(\d+)\s+(.+)/i);
+  if (verbWithDigitQty) {
+    const qty = parseInt(verbWithDigitQty[1]);
     if (qty >= 1 && qty <= 50) {
-      return { quantity: qty, searchTerm: quieroPattern[2].trim(), menuIndex: null };
+      return { quantity: qty, searchTerm: verbWithDigitQty[2].trim(), menuIndex: null };
     }
   }
 
-  // "quiero/dame SPANISH_NUMBER producto" ("dame cuatro tiramisú", "traeme dos empanadas")
-  const quieroSpanishNum = segment.match(/^(?:quiero|dame|poneme|agregame|mandame|traeme)\s+(\w+)\s+(.+)/i);
-  if (quieroSpanishNum) {
-    const qty = spanishNumberToInt(quieroSpanishNum[1]);
+  // "quiero/quería/traer SPANISH_NUMBER producto" ("dame cuatro tiramisú", "traeme dos empanadas")
+  const verbWithWordQty = cleanSegment.match(/^(?:quiero|quer(?:ia|ía)|quisiera|dame|deme|poneme|agregame|mandame|traeme|trae|traer|necesito|llevo)\s+(?:(?:los|las|unos?|unas?)\s+)?(\w+)\s+(.+)/i);
+  if (verbWithWordQty) {
+    const qty = spanishNumberToInt(verbWithWordQty[1]);
     if (qty !== null && qty >= 1 && qty <= 50) {
-      return { quantity: qty, searchTerm: quieroSpanishNum[2].trim(), menuIndex: null };
+      return { quantity: qty, searchTerm: verbWithWordQty[2].trim(), menuIndex: null };
     }
   }
 
-  // "quiero/dame producto" (qty 1)
-  const quieroSimple = segment.match(/^(?:quiero|dame|poneme|agregame|mandame|traeme)\s+(.+)/i);
-  if (quieroSimple) {
-    return { quantity: 1, searchTerm: quieroSimple[1].trim(), menuIndex: null };
+  // "quiero/quería/traer producto" (qty 1)
+  const verbSimple = cleanSegment.match(/^(?:quiero|quer(?:ia|ía)|quisiera|dame|deme|poneme|agregame|mandame|traeme|trae|traer|necesito|llevo)\s+(.+)/i);
+  if (verbSimple) {
+    return { quantity: 1, searchTerm: verbSimple[1].trim(), menuIndex: null };
   }
 
   // "SPANISH_NUMBER producto" sin verbo ("cuatro tiramisú", "dos cocas")
-  const spanishNumProduct = segment.match(/^(\w+)\s+(.+)/i);
+  const spanishNumProduct = cleanSegment.match(/^(\w+)\s+(.+)/i);
   if (spanishNumProduct) {
     const qty = spanishNumberToInt(spanishNumProduct[1]);
     if (qty !== null && qty >= 1 && qty <= 50) {
@@ -378,8 +430,8 @@ function parseProductSegment(segment: string): { quantity: number; searchTerm: s
   }
 
   // Just a product name (e.g. "helado de vainilla")
-  if (segment.length > 2 && !/^\d+$/.test(segment)) {
-    return { quantity: 1, searchTerm: segment, menuIndex: null };
+  if (cleanSegment.length > 2 && !/^\d+$/.test(cleanSegment)) {
+    return { quantity: 1, searchTerm: cleanSegment, menuIndex: null };
   }
 
   return null;
@@ -4272,8 +4324,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
 
       // 🛒 INTERCEPTOR: Intención de compra ("dame X", "quiero X", "X unidades de Y")
       // Si el usuario tiene un vendor reciente en contexto, enrutar a shopping en vez de buscar_productos
-      const purchaseIntent = /\b(dame|deme|quer[ée]s?|quiero|poneme|agrega|agreg[aá]me|mand[aá]me|trae(?:me)?|ped[ií](?:me)?|necesito|llevo|meti?|pone)\b/i.test(msgLower)
-        || /^\d+\s+\w/i.test(message.trim()); // "3 palos de agua" starts with number + word
+      const purchaseIntent = looksLikePurchaseIntent(message);
       
       if (purchaseIntent) {
         // Si hay vendor seleccionado reciente, ir directo a shopping
@@ -4314,7 +4365,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       const foodKeywords = /\b(pizza|hamburguesa|empanada|milanesa|sushi|helado|cerveza|coca|fanta|sprite|agua|café|cafe|pollo|asado|lomito|sandwich|tarta|torta|postre|ensalada|papas|sándwich|medialunas?|facturas?|alfajor|ravioles?|ñoquis?|pastas?)\b/i;
       // Detectar queries de producto: no es un saludo, no es un comando, tiene 2+ caracteres
       const isGreeting = /^(hola|buenas?|buen[ao]s?\s+(dias?|tardes?|noches?)|hey|hi|hello|que\s+tal)\b/i.test(message.trim());
-      const isCommand = /^(ayuda|help|opciones|estado|cancelar|carrito|menu|volver|salir|calificar)\b/i.test(message.trim());
+      const isCommand = /^(ayuda|help|opciones|estado|cancelar|carrito|ver\s+(?:productos?\s+en\s+)?(?:el\s+)?carrito|menu|men[uú]|volver|salir|calificar)\b/i.test(message.trim());
       const isGibberish = /^[^a-záéíóúñü]*$/i.test(message.trim()); // Only symbols/numbers
       const isProductQuery = !isGreeting && !isCommand && !isGibberish && !purchaseIntent && message.trim().length >= 3 && message.trim().length <= 80;
       
