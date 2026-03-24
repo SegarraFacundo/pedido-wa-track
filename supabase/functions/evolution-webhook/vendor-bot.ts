@@ -4298,6 +4298,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         context.selected_vendor_id = undefined;
         context.selected_vendor_name = undefined;
         context.payment_method = undefined;
+        context.awaiting_delivery_mode_confirmation = undefined;
         context.delivery_address = undefined;
         context.payment_methods_fetched = false;
         context.available_payment_methods = [];
