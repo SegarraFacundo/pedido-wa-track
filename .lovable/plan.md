@@ -1,47 +1,50 @@
 
-Objetivo: cortar el bucle donde el usuario intenta seguir comprando y el bot vuelve a buscar negocios en vez de avanzar al pedido.
 
-Diagnóstico (confirmado con logs/DB):
-- Do I know what the issue is? Sí.
-- En `vendor-bot.ts` se ejecutó: `⏱️ Inactivity reset: 2695 min` justo antes del mensaje “BUeno dame 3 palos...”.
-- Ese reset dejó `order_state=browsing`, `selected_vendor_id=null` y carrito vacío.
-- Luego el interceptor genérico de `idle/browsing` tomó la frase completa como búsqueda y llamó `buscar_productos`, generando el bucle.
+# Plan: Dejar que la IA interprete el contexto en vez de interceptores rígidos
 
-Plan de implementación
+## Problema
+El bloque `isProductQuery` (línea 4375-4387) es un catch-all que envía **cualquier mensaje** que no sea saludo, comando o gibberish directamente a `buscar_productos`. Esto significa que la IA nunca tiene oportunidad de interpretar el contexto — el interceptor determinista decide antes. Cada vez que aparece una palabra nueva ("confirmado", "genial", "remera", etc.) hay que agregarla manualmente a una lista de exclusión. Es un juego infinito de whack-a-mole.
 
-1) Corregir reset por inactividad (causa raíz)
-- Archivo: `supabase/functions/evolution-webhook/vendor-bot.ts`, `context.ts`, `types.ts`.
-- Dejar de usar `bot_interaction_logs` como fuente principal de “última actividad” (está desfasada para este flujo).
-- Agregar/usar `context.last_interaction_at` (persistido en `last_bot_message`) y calcular actividad con el timestamp más reciente real del contexto (`last_interaction_at`, `last_menu_fetch`, `last_vendors_fetch`).
-- Ejecutar reset solo si realmente hay inactividad prolongada y sin pedido activo.
-- Subir el umbral de reset (hoy 10 min) a una ventana más segura para checkout (ej. 2h/4h configurable).
+## Solución
+Reducir los interceptores deterministas a lo **mínimo necesario** (selección de vendor por número, dirección, pago) y dejar que el resto fluya al LLM, que ya tiene el system prompt con contexto completo y herramientas filtradas por estado.
 
-2) Blindar continuidad de compra antes de la búsqueda global
-- Archivo: `vendor-bot.ts`.
-- Insertar un interceptor “continuar pedido” antes del bloque genérico `isProductQuery`.
-- Si el mensaje es tipo carrito (“dame X”, “quiero X”, cantidades) y hay contexto de vendor/compra reciente, enrutar a `handleShoppingInterceptor` en vez de `buscar_productos`.
-- Si no hay vendor seleccionado, responder guiando a elegir local (o auto-seleccionar cuando haya un único vendor en `available_vendors_map`).
+## Cambios en `vendor-bot.ts`
 
-3) Ajustar el detector genérico de búsqueda
-- Archivo: `vendor-bot.ts`.
-- Evitar que frases imperativas largas de compra se envíen literal a `buscar_productos`.
-- Mantener `buscar_productos` para intención de descubrimiento (“buscar…”, “qué hay…”, “categorías…”) y no para “agregar al carrito”.
+### 1. Eliminar el catch-all `isProductQuery` → `buscar_productos`
+El bloque de líneas ~4370-4387 que envía todo a `buscar_productos` se elimina. En su lugar, solo se mantiene el interceptor de `foodKeywords` **cuando el usuario explícitamente dice "buscar X"** o usa palabras de descubrimiento ("busco", "hay", "dónde encuentro").
 
-4) Pruebas de regresión del flujo end-to-end
-- Archivo: `supabase/functions/evolution-webhook/conversation.test.ts` (o tests nuevos del webhook).
-- Casos mínimos:
-  - “qué hay en el vivero” → menú → “dame 3 palos…” agrega al carrito (no búsqueda de negocios).
-  - Con log histórico viejo no debe resetear una sesión activa reciente.
-  - Mensaje de compra en browsing sin vendor: guía a elegir local (sin loop).
+### 2. Restringir `foodKeywords` a intención de búsqueda explícita
+En vez de disparar `buscar_productos` por cualquier mención de comida, solo hacerlo cuando hay un verbo de búsqueda: "busco pizza", "hay helado?", "dónde encuentro cerveza". Si dice "pizza" a secas en idle, dejar que la IA decida (puede preguntar "¿Querés que busque pizza?" o mostrar negocios).
 
-5) Verificación operativa post-fix
-- Desplegar `evolution-webhook`.
-- Validar en logs que:
-  - no aparezca reset falso al minuto,
-  - no haya `idle → browsing (buscar_productos)` para frases de “dame X” cuando venía de menú,
-  - el flujo complete pedido hasta dirección/pago/creación sin desvíos.
+### 3. Dejar que la IA use las herramientas disponibles
+Cuando no hay interceptor que atrape el mensaje, el flujo llega al LLM (línea 4508). La IA ya tiene:
+- `buscar_productos` en sus herramientas (para idle/browsing)
+- `agregar_al_carrito` (para shopping)
+- El system prompt con el contexto completo
 
-Detalles técnicos
-- Archivos foco: `vendor-bot.ts` (routing/interceptores), `context.ts` + `types.ts` (nuevo timestamp confiable), tests de conversación.
-- No cambiaremos herramientas ni schema de pedidos; el ajuste es de enrutamiento y coherencia de estado.
-- Resultado esperado: el bot prioriza continuidad de compra y solo vuelve a búsqueda cuando realmente el usuario quiere explorar.
+La IA puede interpretar "remera" como búsqueda de producto, "confirmado" como confirmación, "genial, dame dos más" como agregado al carrito — sin necesidad de regex.
+
+### 4. Quitar `tool_choice: "required"` en primera iteración
+Línea 4514: actualmente se fuerza `tool_choice: "required"` en estados pre-checkout. Esto obliga a la IA a llamar una herramienta incluso cuando debería solo responder con texto (ej. "¿Qué querés hacer?"). Cambiar a `"auto"` siempre para que la IA decida.
+
+### 5. Mantener interceptores esenciales (no se tocan)
+- Selección de vendor por número en browsing (línea 4391)
+- Dirección en needs_address (línea 4234)
+- Pago en checkout (línea 4045)
+- Confirmación de pedido (línea 4936)
+- Shopping interceptor para parsing multi-producto (línea 124) — solo cuando ya está en shopping con vendor
+
+## Archivos a modificar
+
+| Archivo | Cambio |
+|---------|--------|
+| `vendor-bot.ts` | Eliminar catch-all `isProductQuery`, restringir `foodKeywords`, cambiar `tool_choice` a `auto` |
+
+## Resultado esperado
+- La IA interpreta el contexto y decide qué herramienta usar (o si responder con texto)
+- No hay más listas de palabras ignoradas que mantener
+- Los interceptores solo quedan para flujos mecánicos (números, direcciones, pagos)
+- "Remera" en idle → la IA llama `buscar_productos` por su cuenta
+- "Confirmado" en shopping → la IA entiende la intención sin regex
+- "Genial, dame dos onion rings" → la IA no se confunde con "genial"
+
