@@ -302,6 +302,11 @@ export default function BotInteractionReview() {
                             {interaction.intent_detected || "N/A"}
                           </Badge>
                         </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="text-xs font-mono">
+                            {interaction.action_taken || "N/A"}
+                          </Badge>
+                        </TableCell>
                         <TableCell>{getConfidenceBadge(interaction.confidence)}</TableCell>
                         <TableCell>
                           <span className="text-xs text-muted-foreground">
