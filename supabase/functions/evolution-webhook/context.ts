@@ -50,6 +50,8 @@ async function syncOrderStateWithDB(context: ConversationContext, supabase: any)
     context.resumen_mostrado = false;
     context.payment_methods_fetched = false;
     context.pending_cancellation = undefined;
+    context.checkout_step = undefined;
+    context.checkout_retry_count = 0;
     // 🧹 CRÍTICO: Limpiar historial de conversación al resetear
     // El historial viejo contiene datos de menús/vendors que causan alucinaciones
     context.conversation_history = [];
@@ -119,6 +121,8 @@ export async function getContext(phone: string, supabase: any): Promise<Conversa
         pending_cancellation: saved.pending_cancellation,
         confusion_count: saved.confusion_count || 0,
         last_interaction_at: saved.last_interaction_at,
+        checkout_step: saved.checkout_step,
+        checkout_retry_count: saved.checkout_retry_count || 0,
       };
       
       // ✅ SINCRONIZAR CON LA DB - verificar si el pedido sigue activo

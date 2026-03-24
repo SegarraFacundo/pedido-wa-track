@@ -98,5 +98,7 @@ export interface ConversationContext {
   last_vendors_fetch?: string;             // ISO timestamp de la última lista de locales
   confusion_count?: number;                // Contador de mensajes no reconocidos consecutivos
   last_interaction_at?: string;             // ISO timestamp de la última interacción real (para inactividad)
+  checkout_step?: 'delivery_type' | 'address' | 'payment' | 'review';  // Paso actual del checkout
+  checkout_retry_count?: number;           // Contador de reintentos en checkout (3 → ofrecer salir)
   conversation_history: Array<{ role: "user" | "assistant" | "system"; content: string }>;
 }

@@ -40,7 +40,13 @@ REGLAS (nunca romper):
 - Nunca culpes al usuario. Siempre ofrecé una salida.
 - context.cart es la ÚNICA fuente de verdad del carrito. NUNCA uses el historial.
 - Si se queja del bot, disculpate y ofrecé ayuda concreta.
-- Es mejor preguntar de más que equivocarse.`;
+- Es mejor preguntar de más que equivocarse.
+
+REGLA DE TOOLS:
+- Ejecutá UNA SOLA herramienta por turno. Si hay múltiples acciones, dividí en pasos.
+- Prioridad: CORE (avanzan el flujo) > AUX (informativas) > GLOBAL (escape).
+- Nunca uses una herramienta AUX si hay una acción CORE pendiente.
+- Nunca avances si faltan datos obligatorios del paso actual.`;
 }
 
 function getStateInstructions(state: string, context: ConversationContext): string {

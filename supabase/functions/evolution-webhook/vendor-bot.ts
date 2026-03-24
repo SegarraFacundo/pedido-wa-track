@@ -6,9 +6,33 @@ import { getContext, saveContext } from "./context.ts";
 import { tools } from "./tools-definitions.ts";
 import { buildSystemPrompt } from "./simplified-prompt.ts";
 
-const PURCHASE_VERB_REGEX = /\b(dame|deme|quer[ée]s?|quiero|quer(?:ia|ía)|quisiera|poneme|agrega|agreg[aá]me|mand[aá]me|trae(?:me|r)?|ped[ií](?:me)?|necesito|llevo|meti?|pone)\b/i;
+const PURCHASE_VERB_REGEX = /\b(dame|deme|quer[ée]s?|quiero|quer(?:ia|ía)|quisiera|poneme|agrega|agreg[aá]me|mand[aá]me|trae(?:me|r)?|ped[ií](?:me)?|necesito|llevo|meti?|pone|sum[aá](?:me)?|pon[eé](?:me)?)\b/i;
 const NUMERIC_PURCHASE_REGEX = /^(?:(?:los|las|unos?|unas?)\s+)?\d+\s+\w/i;
 const WORD_QTY_PURCHASE_REGEX = /^(?:un[oa]?|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|media|docena|quince|veinte)\s+\w/i;
+const CART_MODIFICATION_REGEX = /\b(sum[aá](?:me|le)?|sac[aá](?:me|le)?|pon[eé](?:me|le)?|m[aá]s|otro|otra|agreg[aá]|quit[aá]|cambi[aá]|modific[aá])\b/i;
+
+// ==================== NORMALIZACIÓN DE PAGO ====================
+function normalizePaymentInput(input: string): string | null {
+  const normalized = input.toLowerCase().trim()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  
+  // Frases coloquiales → método
+  if (/\b(efectivo|cash|plata en mano|pago al recibir|contra\s*entrega|en mano)\b/.test(normalized)) return 'efectivo';
+  if (/\b(transferencia|transfer|transfiero|te transfiero|cbu|alias|deposito|banco|bancaria)\b/.test(normalized)) return 'transferencia';
+  if (/\b(mercado\s*pago|mercadopago|mp)\b/.test(normalized)) return 'mercadopago';
+  
+  return null;
+}
+
+// ==================== VALIDACIÓN DE DIRECCIÓN ====================
+function isValidAddress(address: string): boolean {
+  const trimmed = address.trim();
+  if (trimmed.length < 5) return false;
+  // Debe tener texto Y número (calle + altura/número)
+  const hasText = /[a-záéíóúñ]{2,}/i.test(trimmed);
+  const hasNumber = /\d+/.test(trimmed);
+  return hasText && hasNumber;
+}
 
 function normalizeIntentText(message: string): string {
   return message
@@ -1506,6 +1530,23 @@ async function ejecutarHerramienta(
         if (context.delivery_type === 'pickup') {
           context.delivery_address = undefined;
         }
+        
+        // 🛡️ v5: Idempotencia — si ya hay un pending_order_id, reutilizar
+        if (context.pending_order_id) {
+          console.log(`🛡️ IDEMPOTENCY: Order already exists: ${context.pending_order_id}`);
+          const { data: existingOrder } = await supabase
+            .from("orders")
+            .select("id, status")
+            .eq("id", context.pending_order_id)
+            .maybeSingle();
+          
+          if (existingOrder && !['cancelled', 'delivered'].includes(existingOrder.status)) {
+            return `✅ Ya tenés un pedido activo (#${context.pending_order_id.substring(0, 8)}).\n\n` +
+                   `📊 Decí "estado del pedido" para ver cómo va. 😊`;
+          }
+          // Si el pedido ya terminó, limpiar y permitir crear nuevo
+          context.pending_order_id = undefined;
+        }
         // 🆕 CRÍTICO: Guardar el método de pago de los args ANTES de cualquier verificación
         // Esto asegura que mostrar_resumen_pedido tenga el payment_method disponible
         if (args.metodo_pago && !context.payment_method) {
@@ -2746,7 +2787,12 @@ Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
         const direccion = args.direccion?.trim();
         
         if (!direccion || direccion.length < 3) {
-          return "⚠️ Por favor proporcioná una dirección más completa (calle y número).";
+          return "⚠️ Por favor proporcioná una dirección más completa (calle y número).\nEjemplo: Av. San Martín 1234";
+        }
+        
+        // v3: Validar que tenga texto + número
+        if (!isValidAddress(direccion)) {
+          return "⚠️ La dirección debe incluir calle y número.\nEjemplo: *Belgrano 450* o *Av. San Martín 1234*";
         }
         
         // Guardar la dirección en el contexto
@@ -3945,6 +3991,17 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       const normalizedMsg = message.toLowerCase().trim();
       let selectedMethod: string | null = null;
       
+      // 🔴 v5: Detectar negaciones puras ("no efectivo", "no transferencia") → NO seleccionar
+      const negationOnly = /^\s*no\s+(efectivo|transferencia|mercado\s*pago|mp|cash)\s*[.!?]*$/i.test(normalizedMsg);
+      if (negationOnly) {
+        console.log(`🔴 Negation detected: "${normalizedMsg}" — NOT selecting any method`);
+        const availableList = context.available_payment_methods?.map((m, i) => `${i+1}️⃣ ${m.charAt(0).toUpperCase() + m.slice(1)}`).join('\n') || '';
+        const negResponse = `Entendido 👍 Entonces, ¿con cuál preferís pagar?\n\n${availableList}`;
+        context.conversation_history.push({ role: "assistant", content: negResponse });
+        await saveContext(context, supabase);
+        return negResponse;
+      }
+      
       // Detectar números "1", "2", "3"
       if (/^[123]$/.test(normalizedMsg) && context.available_payment_methods && context.available_payment_methods.length > 0) {
         const index = parseInt(normalizedMsg) - 1;
@@ -3954,15 +4011,17 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         }
       }
       
-      // Detectar método por texto — SOLO si el vendor lo soporta
+      // Detectar método por texto — usando normalizePaymentInput + cruzar con available
       if (!selectedMethod) {
-        const available = context.available_payment_methods || [];
-        if ((normalizedMsg.includes('efectivo') || normalizedMsg.includes('cash')) && available.some(m => m.toLowerCase().includes('efectivo'))) {
-          selectedMethod = 'efectivo';
-        } else if ((normalizedMsg.includes('transferencia') || normalizedMsg.includes('transfer') || normalizedMsg.includes('transfiero') || normalizedMsg.includes('cbu') || normalizedMsg.includes('alias')) && available.some(m => m.toLowerCase().includes('transferencia'))) {
-          selectedMethod = 'transferencia';
-        } else if ((normalizedMsg.includes('mercado') || /\bmp\b/.test(normalizedMsg) || normalizedMsg.includes('mercadopago')) && available.some(m => m.toLowerCase().includes('mercadopago') || m.toLowerCase().includes('mercado'))) {
-          selectedMethod = 'mercadopago';
+        const detected = normalizePaymentInput(normalizedMsg);
+        if (detected) {
+          const available = context.available_payment_methods || [];
+          if (available.some(m => m.toLowerCase().includes(detected))) {
+            selectedMethod = detected;
+            console.log(`✅ Text detection: "${normalizedMsg}" → "${selectedMethod}" (validated vs available)`);
+          } else {
+            console.log(`⚠️ Detected "${detected}" but NOT in available methods: [${available.join(', ')}]`);
+          }
         }
       }
       
@@ -4025,7 +4084,37 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       const isConfirmation = /^(s[ií]|si|yes|dale|ok|confirmo|listo|confirmar|vamos|va|claro|obvio|seguro|por supuesto|manda|dale que si)\b/i.test(userResponse);
       const isCancellation = /^(no\b|nop|cancel|cancela|cambiar)/i.test(userResponse);
       
-      if (isConfirmation) {
+      // v3/v4: Detectar doble intención — usuario modifica el pedido en review → volver a cart
+      const wantsModification = CART_MODIFICATION_REGEX.test(userResponse) || 
+        /\b(mejor|prefiero|cambi[aá]r?|reemplaz[aá]r?)\b/i.test(userResponse);
+      
+      if (wantsModification) {
+        console.log(`🔄 MODIFICATION in review detected: "${userResponse}" → back to shopping`);
+        context.resumen_mostrado = false;
+        context.order_state = 'shopping';
+        await saveContext(context, supabase);
+        // Let LLM handle the modification request with shopping tools
+      } else if (isConfirmation) {
+        // v5: Block confirmation if missing structural data
+        if (!context.delivery_type) {
+          const retryResponse = "⚠️ Falta elegir el tipo de entrega (delivery o retiro). ¿Cómo lo querés?";
+          context.conversation_history.push({ role: "assistant", content: retryResponse });
+          await saveContext(context, supabase);
+          return retryResponse;
+        }
+        if (context.delivery_type === 'delivery' && !context.delivery_address) {
+          const retryResponse = "⚠️ Falta tu dirección de entrega. ¿A dónde te lo mando? 📍";
+          context.conversation_history.push({ role: "assistant", content: retryResponse });
+          await saveContext(context, supabase);
+          return retryResponse;
+        }
+        if (!context.payment_method) {
+          const retryResponse = "⚠️ Falta elegir el método de pago. ¿Cómo querés pagar?";
+          context.conversation_history.push({ role: "assistant", content: retryResponse });
+          await saveContext(context, supabase);
+          return retryResponse;
+        }
+        
         console.log(`✅ PROGRAMMATIC: User confirmed order post-summary, calling crear_pedido directly`);
         const result = await ejecutarHerramienta("crear_pedido", {
           direccion: context.delivery_address,
