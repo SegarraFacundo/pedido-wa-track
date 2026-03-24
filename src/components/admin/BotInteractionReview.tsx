@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { AlertTriangle, CheckCircle2, Search, RefreshCw, MessageSquare, Bot, Copy, ClipboardCheck, EyeOff } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Search, RefreshCw, MessageSquare, Bot, Copy, ClipboardCheck, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -44,7 +44,7 @@ export default function BotInteractionReview() {
   const [filter, setFilter] = useState<"all" | "errors" | "low_confidence" | "fallback">("errors");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
@@ -61,11 +61,11 @@ export default function BotInteractionReview() {
       .limit(100);
 
     if (filter === "errors") {
-      query = query.or("error.neq.null,response_preview.ilike.%no entendí%,response_preview.ilike.%Perdón%,action_taken.eq.unknown");
+      query = query.or("error.neq.null,response_preview.ilike.%no entendí%,response_preview.ilike.%Perdón%,response_preview.ilike.%Te ayudo%,response_preview.ilike.%No encontré%,response_preview.ilike.%No pude%,action_taken.eq.unknown,action_taken.eq.fallback");
     } else if (filter === "low_confidence") {
       query = query.lt("confidence", 0.5);
     } else if (filter === "fallback") {
-      query = query.or("response_preview.ilike.%no entendí%,response_preview.ilike.%Perdón%,action_taken.eq.unknown");
+      query = query.or("response_preview.ilike.%no entendí%,response_preview.ilike.%Perdón%,response_preview.ilike.%Te ayudo%,response_preview.ilike.%No encontré%,action_taken.eq.unknown,action_taken.eq.fallback");
     }
 
     const { data, error } = await query;
@@ -77,9 +77,7 @@ export default function BotInteractionReview() {
     setLoading(false);
   };
 
-  const visibleInteractions = interactions.filter(i => !dismissed.has(i.id));
-
-  const filteredInteractions = visibleInteractions.filter((i) => {
+  const filteredInteractions = interactions.filter((i) => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -101,19 +99,23 @@ export default function BotInteractionReview() {
     return (
       i.error ||
       i.action_taken === "unknown" ||
+      i.action_taken === "fallback" ||
       i.response_preview?.includes("no entendí") ||
       i.response_preview?.includes("Perdón") ||
+      i.response_preview?.includes("Te ayudo") ||
+      i.response_preview?.includes("No encontré") ||
+      i.response_preview?.includes("No pude") ||
       (i.confidence !== null && i.confidence < 0.3)
     );
   };
 
-  const errorCount = visibleInteractions.filter(isErrorInteraction).length;
+  const errorCount = filteredInteractions.filter(isErrorInteraction).length;
 
   const stats = {
-    total: visibleInteractions.length,
+    total: filteredInteractions.length,
     errors: errorCount,
-    avgConfidence: visibleInteractions.length > 0
-      ? (visibleInteractions.reduce((sum, i) => sum + (i.confidence || 0), 0) / visibleInteractions.length * 100).toFixed(0)
+    avgConfidence: filteredInteractions.length > 0
+      ? (filteredInteractions.reduce((sum, i) => sum + (i.confidence || 0), 0) / filteredInteractions.length * 100).toFixed(0)
       : 0,
   };
 
@@ -142,10 +144,29 @@ export default function BotInteractionReview() {
     toast({ title: `${errors.length} errores copiados al portapapeles` });
   };
 
-  const dismissInteraction = (id: string, e: React.MouseEvent) => {
+  const deleteInteraction = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setDismissed(prev => new Set(prev).add(id));
-    toast({ title: "Interacción desestimada" });
+    setDeleting(prev => new Set(prev).add(id));
+    const { error } = await supabase.from("bot_interaction_logs").delete().eq("id", id);
+    if (error) {
+      toast({ title: "Error al eliminar", description: error.message, variant: "destructive" });
+    } else {
+      setInteractions(prev => prev.filter(i => i.id !== id));
+      toast({ title: "Interacción eliminada" });
+    }
+    setDeleting(prev => { const n = new Set(prev); n.delete(id); return n; });
+  };
+
+  const deleteAllVisible = async () => {
+    const ids = filteredInteractions.map(i => i.id);
+    if (ids.length === 0) return;
+    const { error } = await supabase.from("bot_interaction_logs").delete().in("id", ids);
+    if (error) {
+      toast({ title: "Error al eliminar", description: error.message, variant: "destructive" });
+    } else {
+      setInteractions(prev => prev.filter(i => !ids.includes(i.id)));
+      toast({ title: `${ids.length} interacciones eliminadas` });
+    }
   };
 
   return (
@@ -199,12 +220,11 @@ export default function BotInteractionReview() {
         </Card>
       </div>
 
-      {dismissed.size > 0 && (
+      {filteredInteractions.length > 0 && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <EyeOff className="h-4 w-4" />
-          {dismissed.size} desestimada{dismissed.size > 1 ? "s" : ""}
-          <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => setDismissed(new Set())}>
-            Restaurar todas
+          <Button variant="outline" size="sm" className="text-destructive" onClick={deleteAllVisible}>
+            <Trash2 className="h-4 w-4 mr-1" />
+            Eliminar todas ({filteredInteractions.length})
           </Button>
         </div>
       )}
@@ -288,18 +308,16 @@ export default function BotInteractionReview() {
                           </span>
                         </TableCell>
                         <TableCell>
-                          <div className="flex gap-1">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-7 w-7"
-                              title="Desestimar"
-                              onClick={(e) => dismissInteraction(interaction.id, e)}
-                            >
-                              <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
-                            </Button>
-                            <MessageSquare className="h-4 w-4 text-muted-foreground mt-1.5" />
-                          </div>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-destructive"
+                            title="Eliminar"
+                            disabled={deleting.has(interaction.id)}
+                            onClick={(e) => deleteInteraction(interaction.id, e)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                       {expandedId === interaction.id && (
