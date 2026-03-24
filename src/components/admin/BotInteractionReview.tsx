@@ -44,7 +44,7 @@ export default function BotInteractionReview() {
   const [filter, setFilter] = useState<"all" | "errors" | "low_confidence" | "fallback">("errors");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
@@ -61,11 +61,11 @@ export default function BotInteractionReview() {
       .limit(100);
 
     if (filter === "errors") {
-      query = query.or("error.neq.null,response_preview.ilike.%no entendí%,response_preview.ilike.%Perdón%,action_taken.eq.unknown");
+      query = query.or("error.neq.null,response_preview.ilike.%no entendí%,response_preview.ilike.%Perdón%,response_preview.ilike.%Te ayudo%,response_preview.ilike.%No encontré%,response_preview.ilike.%No pude%,action_taken.eq.unknown,action_taken.eq.fallback");
     } else if (filter === "low_confidence") {
       query = query.lt("confidence", 0.5);
     } else if (filter === "fallback") {
-      query = query.or("response_preview.ilike.%no entendí%,response_preview.ilike.%Perdón%,action_taken.eq.unknown");
+      query = query.or("response_preview.ilike.%no entendí%,response_preview.ilike.%Perdón%,response_preview.ilike.%Te ayudo%,response_preview.ilike.%No encontré%,action_taken.eq.unknown,action_taken.eq.fallback");
     }
 
     const { data, error } = await query;
@@ -77,9 +77,7 @@ export default function BotInteractionReview() {
     setLoading(false);
   };
 
-  const visibleInteractions = interactions.filter(i => !dismissed.has(i.id));
-
-  const filteredInteractions = visibleInteractions.filter((i) => {
+  const filteredInteractions = interactions.filter((i) => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
