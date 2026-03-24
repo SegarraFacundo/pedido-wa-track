@@ -3551,6 +3551,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       // ✅ Usuario confirma el cambio
       if (userResponse.match(/^(s[ií]|si|yes|dale|ok|confirmo|cambio)/)) {
         console.log(`✅ User confirmed vendor change`);
+        context.confusion_count = 0;
         
         // Registrar analytics
         await trackVendorChange(context, 'confirmed', supabase);
