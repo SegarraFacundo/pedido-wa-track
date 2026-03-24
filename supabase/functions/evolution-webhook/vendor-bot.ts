@@ -361,7 +361,7 @@ function parseProductSegment(segment: string): { quantity: number; searchTerm: s
   if (!cleanSegment) return null;
   if (isClarificationOnlySegment(cleanSegment)) return null;
 
-  const commandOnlySegment = /^(?:ver|mostrar|mirar|revisar|confirmar|finalizar|terminar|pagar|vaciar)\b/i.test(cleanSegment)
+  const commandOnlySegment = /^(?:ver|mostrar|mirar|revisar|confirma(?:r|do|mos)?|finalizar|terminar|pagar|vaciar|listo|ya\s+est[aá])\b/i.test(cleanSegment)
     && !looksLikePurchaseIntent(cleanSegment);
   if (commandOnlySegment) return null;
 
