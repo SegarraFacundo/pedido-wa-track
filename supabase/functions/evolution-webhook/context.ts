@@ -119,6 +119,8 @@ export async function getContext(phone: string, supabase: any): Promise<Conversa
         pending_cancellation: saved.pending_cancellation,
         confusion_count: saved.confusion_count || 0,
         last_interaction_at: saved.last_interaction_at,
+        checkout_step: saved.checkout_step,
+        checkout_retry_count: saved.checkout_retry_count || 0,
       };
       
       // ✅ SINCRONIZAR CON LA DB - verificar si el pedido sigue activo
