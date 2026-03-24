@@ -99,19 +99,23 @@ export default function BotInteractionReview() {
     return (
       i.error ||
       i.action_taken === "unknown" ||
+      i.action_taken === "fallback" ||
       i.response_preview?.includes("no entendí") ||
       i.response_preview?.includes("Perdón") ||
+      i.response_preview?.includes("Te ayudo") ||
+      i.response_preview?.includes("No encontré") ||
+      i.response_preview?.includes("No pude") ||
       (i.confidence !== null && i.confidence < 0.3)
     );
   };
 
-  const errorCount = visibleInteractions.filter(isErrorInteraction).length;
+  const errorCount = filteredInteractions.filter(isErrorInteraction).length;
 
   const stats = {
-    total: visibleInteractions.length,
+    total: filteredInteractions.length,
     errors: errorCount,
-    avgConfidence: visibleInteractions.length > 0
-      ? (visibleInteractions.reduce((sum, i) => sum + (i.confidence || 0), 0) / visibleInteractions.length * 100).toFixed(0)
+    avgConfidence: filteredInteractions.length > 0
+      ? (filteredInteractions.reduce((sum, i) => sum + (i.confidence || 0), 0) / filteredInteractions.length * 100).toFixed(0)
       : 0,
   };
 
@@ -140,10 +144,29 @@ export default function BotInteractionReview() {
     toast({ title: `${errors.length} errores copiados al portapapeles` });
   };
 
-  const dismissInteraction = (id: string, e: React.MouseEvent) => {
+  const deleteInteraction = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setDismissed(prev => new Set(prev).add(id));
-    toast({ title: "Interacción desestimada" });
+    setDeleting(prev => new Set(prev).add(id));
+    const { error } = await supabase.from("bot_interaction_logs").delete().eq("id", id);
+    if (error) {
+      toast({ title: "Error al eliminar", description: error.message, variant: "destructive" });
+    } else {
+      setInteractions(prev => prev.filter(i => i.id !== id));
+      toast({ title: "Interacción eliminada" });
+    }
+    setDeleting(prev => { const n = new Set(prev); n.delete(id); return n; });
+  };
+
+  const deleteAllVisible = async () => {
+    const ids = filteredInteractions.map(i => i.id);
+    if (ids.length === 0) return;
+    const { error } = await supabase.from("bot_interaction_logs").delete().in("id", ids);
+    if (error) {
+      toast({ title: "Error al eliminar", description: error.message, variant: "destructive" });
+    } else {
+      setInteractions(prev => prev.filter(i => !ids.includes(i.id)));
+      toast({ title: `${ids.length} interacciones eliminadas` });
+    }
   };
 
   return (
