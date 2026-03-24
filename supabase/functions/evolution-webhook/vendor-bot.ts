@@ -164,10 +164,13 @@ async function handleShoppingInterceptor(
     return `${cartSummary}\n¿Querés que te muestre el menú de ${context.selected_vendor_name || "este negocio"} o preferís ver otros locales?`;
   }
 
-  // Evitar tratar comandos de flujo (carrito/confirmar/menú) como nombre de producto
+  // Evitar tratar comandos de flujo/confirmaciones como nombre de producto
   const wantsCartView = /(?:\bcarrito\b|ver\s+productos?\s+en\s+el\s+carrito|mostrar\s+carrito|ver\s+carrito)/i.test(textLower);
-  const wantsFlowCommand = /^(?:confirma(?:r|do|mos)?(?:\s+pedido)?|listo|finalizar|terminar(?:\s+pedido)?|pagar|vaciar\s+carrito|ver\s+men[uú]|men[uú]|eso\s+(?:es\s+)?todo|ya\s+est[aá]|nada\s+m[aá]s)\b/i.test(textLower);
-  if ((wantsCartView || wantsFlowCommand) && !looksLikePurchaseIntent(text)) {
+  const normalizedIntent = normalizeIntentText(text);
+  const wantsFlowCommand = /^(?:confirma(?:r|do|mos)?(?:\s+pedido)?|(?:lo\s+)?confirm(?:o|ado|ar|amos)?|listo|finalizar|terminar(?:\s+pedido)?|pagar|vaciar\s+carrito|ver\s+menu|menu|eso\s+(?:es\s+)?todo|ya\s+esta|nada\s+mas)$/.test(normalizedIntent);
+  const looksLikeConfirmation = isOrderConfirmationSignal(text);
+
+  if ((wantsCartView || wantsFlowCommand || looksLikeConfirmation) && !looksLikePurchaseIntent(text)) {
     return null;
   }
 
