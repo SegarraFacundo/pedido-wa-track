@@ -4084,7 +4084,37 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       const isConfirmation = /^(s[ií]|si|yes|dale|ok|confirmo|listo|confirmar|vamos|va|claro|obvio|seguro|por supuesto|manda|dale que si)\b/i.test(userResponse);
       const isCancellation = /^(no\b|nop|cancel|cancela|cambiar)/i.test(userResponse);
       
-      if (isConfirmation) {
+      // v3/v4: Detectar doble intención — usuario modifica el pedido en review → volver a cart
+      const wantsModification = CART_MODIFICATION_REGEX.test(userResponse) || 
+        /\b(mejor|prefiero|cambi[aá]r?|reemplaz[aá]r?)\b/i.test(userResponse);
+      
+      if (wantsModification) {
+        console.log(`🔄 MODIFICATION in review detected: "${userResponse}" → back to shopping`);
+        context.resumen_mostrado = false;
+        context.order_state = 'shopping';
+        await saveContext(context, supabase);
+        // Let LLM handle the modification request with shopping tools
+      } else if (isConfirmation) {
+        // v5: Block confirmation if missing structural data
+        if (!context.delivery_type) {
+          const retryResponse = "⚠️ Falta elegir el tipo de entrega (delivery o retiro). ¿Cómo lo querés?";
+          context.conversation_history.push({ role: "assistant", content: retryResponse });
+          await saveContext(context, supabase);
+          return retryResponse;
+        }
+        if (context.delivery_type === 'delivery' && !context.delivery_address) {
+          const retryResponse = "⚠️ Falta tu dirección de entrega. ¿A dónde te lo mando? 📍";
+          context.conversation_history.push({ role: "assistant", content: retryResponse });
+          await saveContext(context, supabase);
+          return retryResponse;
+        }
+        if (!context.payment_method) {
+          const retryResponse = "⚠️ Falta elegir el método de pago. ¿Cómo querés pagar?";
+          context.conversation_history.push({ role: "assistant", content: retryResponse });
+          await saveContext(context, supabase);
+          return retryResponse;
+        }
+        
         console.log(`✅ PROGRAMMATIC: User confirmed order post-summary, calling crear_pedido directly`);
         const result = await ejecutarHerramienta("crear_pedido", {
           direccion: context.delivery_address,
