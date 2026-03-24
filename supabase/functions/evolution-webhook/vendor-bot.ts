@@ -4852,16 +4852,20 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     console.log("💾 Context saved successfully");
 
     // 📊 Log ALL interactions (non-blocking)
-    await supabase.from("bot_interaction_logs").insert({
-      phone: normalizedPhone,
-      message_preview: message.slice(0, 500),
-      response_preview: finalResponse.slice(0, 500),
-      intent_detected: lastToolUsed || "conversational",
-      action_taken: lastToolUsed || "text_response",
-      state_before: orderStateBefore,
-      state_after: context.order_state || "idle",
-      error: null,
-    }).catch((e: any) => console.error("📊 Log insert error:", e));
+    try {
+      await supabase.from("bot_interaction_logs").insert({
+        phone: normalizedPhone,
+        message_preview: message.slice(0, 500),
+        response_preview: finalResponse.slice(0, 500),
+        intent_detected: lastToolUsed || "conversational",
+        action_taken: lastToolUsed || "text_response",
+        state_before: orderStateBefore,
+        state_after: context.order_state || "idle",
+        error: null,
+      });
+    } catch (logErr) {
+      console.error("📊 Log insert error:", logErr);
+    }
 
     console.log("🤖 AI Bot END - Returning response");
     return finalResponse;
