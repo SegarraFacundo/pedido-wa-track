@@ -58,7 +58,7 @@ export default function BotInteractionReview() {
       .from("bot_interaction_logs")
       .select("*")
       .order("created_at", { ascending: false })
-      .limit(100);
+      .limit(200);
 
     if (filter === "errors") {
       query = query.or("error.neq.null,response_preview.ilike.%no entendí%,response_preview.ilike.%Perdón%,response_preview.ilike.%Te ayudo%,response_preview.ilike.%No encontré%,response_preview.ilike.%No pude%,action_taken.eq.unknown,action_taken.eq.fallback");
