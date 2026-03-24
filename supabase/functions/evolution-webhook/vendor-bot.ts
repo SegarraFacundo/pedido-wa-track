@@ -143,7 +143,7 @@ async function handleShoppingInterceptor(
 
   // Evitar tratar comandos de flujo (carrito/confirmar/menú) como nombre de producto
   const wantsCartView = /(?:\bcarrito\b|ver\s+productos?\s+en\s+el\s+carrito|mostrar\s+carrito|ver\s+carrito)/i.test(textLower);
-  const wantsFlowCommand = /^(?:confirmar(?:\s+pedido)?|listo|finalizar|terminar(?:\s+pedido)?|pagar|vaciar\s+carrito|ver\s+men[uú]|men[uú])\b/i.test(textLower);
+  const wantsFlowCommand = /^(?:confirma(?:r|do|mos)?(?:\s+pedido)?|listo|finalizar|terminar(?:\s+pedido)?|pagar|vaciar\s+carrito|ver\s+men[uú]|men[uú]|eso\s+(?:es\s+)?todo|ya\s+est[aá]|nada\s+m[aá]s)\b/i.test(textLower);
   if ((wantsCartView || wantsFlowCommand) && !looksLikePurchaseIntent(text)) {
     return null;
   }
