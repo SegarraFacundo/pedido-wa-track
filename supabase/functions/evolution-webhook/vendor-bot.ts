@@ -10,11 +10,34 @@ const PURCHASE_VERB_REGEX = /\b(dame|deme|quer[ée]s?|quiero|quer(?:ia|ía)|quis
 const NUMERIC_PURCHASE_REGEX = /^(?:(?:los|las|unos?|unas?)\s+)?\d+\s+\w/i;
 const WORD_QTY_PURCHASE_REGEX = /^(?:un[oa]?|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|media|docena|quince|veinte)\s+\w/i;
 
+function normalizeIntentText(message: string): string {
+  return message
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/([a-z])\1{2,}/g, "$1$1") // siii -> sii
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function looksLikePurchaseIntent(message: string): boolean {
   const trimmed = message.trim();
   return PURCHASE_VERB_REGEX.test(trimmed)
     || NUMERIC_PURCHASE_REGEX.test(trimmed)
     || WORD_QTY_PURCHASE_REGEX.test(trimmed);
+}
+
+function isOrderConfirmationSignal(message: string): boolean {
+  const normalized = normalizeIntentText(message);
+
+  // Confirmaciones naturales (incluye variantes como "siii", "lo confirmo")
+  if (/^(?:(?:lo\s+)?confirm(?:o|ado|ar|amos)?|s[i]+|yes+|ok(?:ay)?|dale|listo|va(?:mos)?|claro|obvio|ya\s+esta|eso\s+es\s+todo|nada\s+mas)$/.test(normalized)) {
+    return true;
+  }
+
+  // Confirmaciones embebidas cortas: "si confirmo", "ok confirmo"
+  return /(?:^|\s)(?:confirm(?:o|ado|ar|amos)?|listo|ya\s+esta|eso\s+es\s+todo|nada\s+mas)(?:\s|$)/.test(normalized);
 }
 
 // ==================== HELPER: CONTEXTUAL FALLBACK ====================
@@ -141,10 +164,13 @@ async function handleShoppingInterceptor(
     return `${cartSummary}\n¿Querés que te muestre el menú de ${context.selected_vendor_name || "este negocio"} o preferís ver otros locales?`;
   }
 
-  // Evitar tratar comandos de flujo (carrito/confirmar/menú) como nombre de producto
+  // Evitar tratar comandos de flujo/confirmaciones como nombre de producto
   const wantsCartView = /(?:\bcarrito\b|ver\s+productos?\s+en\s+el\s+carrito|mostrar\s+carrito|ver\s+carrito)/i.test(textLower);
-  const wantsFlowCommand = /^(?:confirma(?:r|do|mos)?(?:\s+pedido)?|listo|finalizar|terminar(?:\s+pedido)?|pagar|vaciar\s+carrito|ver\s+men[uú]|men[uú]|eso\s+(?:es\s+)?todo|ya\s+est[aá]|nada\s+m[aá]s)\b/i.test(textLower);
-  if ((wantsCartView || wantsFlowCommand) && !looksLikePurchaseIntent(text)) {
+  const normalizedIntent = normalizeIntentText(text);
+  const wantsFlowCommand = /^(?:confirma(?:r|do|mos)?(?:\s+pedido)?|(?:lo\s+)?confirm(?:o|ado|ar|amos)?|listo|finalizar|terminar(?:\s+pedido)?|pagar|vaciar\s+carrito|ver\s+menu|menu|eso\s+(?:es\s+)?todo|ya\s+esta|nada\s+mas)$/.test(normalizedIntent);
+  const looksLikeConfirmation = isOrderConfirmationSignal(text);
+
+  if ((wantsCartView || wantsFlowCommand || looksLikeConfirmation) && !looksLikePurchaseIntent(text)) {
     return null;
   }
 
@@ -361,7 +387,9 @@ function parseProductSegment(segment: string): { quantity: number; searchTerm: s
   if (!cleanSegment) return null;
   if (isClarificationOnlySegment(cleanSegment)) return null;
 
-  const commandOnlySegment = /^(?:ver|mostrar|mirar|revisar|confirma(?:r|do|mos)?|finalizar|terminar|pagar|vaciar|listo|ya\s+est[aá])\b/i.test(cleanSegment)
+  const normalizedSegment = normalizeIntentText(cleanSegment);
+  const commandOnlySegment = (/^(?:ver|mostrar|mirar|revisar|confirma(?:r|do|mos)?|(?:lo\s+)?confirm(?:o|ado|ar|amos)?|finalizar|terminar|pagar|vaciar|listo|ya\s+esta)$/.test(normalizedSegment)
+    || isOrderConfirmationSignal(cleanSegment))
     && !looksLikePurchaseIntent(cleanSegment);
   if (commandOnlySegment) return null;
 
@@ -3928,10 +3956,8 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
     }
 
-    // 🔍 VALIDACIÓN: Detectar intentos de confirmar pedido sin productos en carrito
-    const confirmPhrases = ['confirmar', 'confirmo', 'confirmado', 'listo', 'eso es todo', 'si confirmo', 'confirma', 'dale', 'ya esta', 'ya está', 'nada mas', 'nada más'];
-    const normalizedMsgConfirm = message.toLowerCase().trim();
-    const isConfirming = confirmPhrases.some(phrase => normalizedMsgConfirm.includes(phrase));
+    // 🔍 VALIDACIÓN: Detectar intentos de confirmar pedido sin tratarlo como producto
+    const isConfirming = isOrderConfirmationSignal(message) && !looksLikePurchaseIntent(message);
 
     if (isConfirming && context.order_state === 'shopping') {
       console.log(`🔍 User attempting to confirm order. Cart items: ${context.cart.length}`);
