@@ -3879,10 +3879,13 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
 
         let response: string;
         if (forcedType === "delivery") {
+          context.order_state = "needs_address";
           response = "✅ Perfecto, seguimos con *envío a domicilio*.\n\n📍 ¿Cuál es tu dirección de entrega?";
         } else {
+          context.order_state = "checkout";
           const vendorConfig = await getVendorConfig(context.selected_vendor_id, supabase);
-          response = `✅ Perfecto, seguimos con *retiro en local*.\n\n📍 Retirá en: ${vendorConfig.address || context.selected_vendor_name || "el local"}`;
+          const paymentResult = await ejecutarHerramienta("ver_metodos_pago", {}, context, supabase);
+          response = `✅ Perfecto, seguimos con *retiro en local*.\n\n📍 Retirá en: ${vendorConfig.address || context.selected_vendor_name || "el local"}\n\n${paymentResult}`;
         }
 
         context.conversation_history.push({ role: "assistant", content: response });
@@ -3945,6 +3948,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       if (isCancellation) {
         console.log(`❌ PROGRAMMATIC: User cancelled post-summary, resetting resumen_mostrado`);
         context.resumen_mostrado = false;
+        context.awaiting_delivery_mode_confirmation = undefined;
         await saveContext(context, supabase);
         // Dejar que el LLM maneje la cancelacion/modificacion
       }
@@ -4091,7 +4095,8 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
             confirmResponse += "\n\n✅ Este negocio trabaja solo con *delivery*.\n📍 Escribí tu dirección de entrega (calle y número).";
           } else if (vendorConfig.allows_pickup && !vendorConfig.allows_delivery) {
             context.delivery_type = 'pickup';
-            confirmResponse += "\n\n✅ Este negocio trabaja solo con *retiro en local*.\n💳 Ahora elegí el método de pago.";
+            const paymentResult = await ejecutarHerramienta("ver_metodos_pago", {}, context, supabase);
+            confirmResponse += `\n\n✅ Este negocio trabaja solo con *retiro en local*.\n\n${paymentResult}`;
           } else {
             confirmResponse += "\n\n¿Lo retirás en el local o te lo enviamos? 🏪🚚";
           }
