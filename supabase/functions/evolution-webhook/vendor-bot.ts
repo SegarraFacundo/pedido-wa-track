@@ -2770,7 +2770,12 @@ Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
         const direccion = args.direccion?.trim();
         
         if (!direccion || direccion.length < 3) {
-          return "⚠️ Por favor proporcioná una dirección más completa (calle y número).";
+          return "⚠️ Por favor proporcioná una dirección más completa (calle y número).\nEjemplo: Av. San Martín 1234";
+        }
+        
+        // v3: Validar que tenga texto + número
+        if (!isValidAddress(direccion)) {
+          return "⚠️ La dirección debe incluir calle y número.\nEjemplo: *Belgrano 450* o *Av. San Martín 1234*";
         }
         
         // Guardar la dirección en el contexto
