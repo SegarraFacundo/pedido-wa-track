@@ -354,7 +354,8 @@ function parseProductSegment(segment: string): { quantity: number; searchTerm: s
   const cleanSegment = segment
     .trim()
     .replace(/^[,.;:!?]+|[,.;:!?]+$/g, "")
-    .replace(/^(?:bueno|ok(?:ay)?|dale|che)\s+/i, "")
+    .replace(/^(?:bueno|ok(?:ay)?|dale|che|genial|perfecto|por\s+(?:ultimo|favor))\s*/i, "")
+    .replace(/^(?:y\s+)?(?:por\s+ultimo|tambien|ademas)\s+/i, "")
     .trim();
 
   if (!cleanSegment) return null;
