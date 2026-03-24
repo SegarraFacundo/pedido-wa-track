@@ -1441,6 +1441,7 @@ async function ejecutarHerramienta(
         
         if (args.tipo === "pickup") {
           console.log(`✅ Customer selected PICKUP`);
+          context.delivery_address = undefined; // Pickup: limpiar dirección residual
           
           let respuesta = `✅ Perfecto! Tu pedido será para *retiro en local*.\n\n`;
           respuesta += `📍 *Retirá en:*\n${context.selected_vendor_name}\n`;
