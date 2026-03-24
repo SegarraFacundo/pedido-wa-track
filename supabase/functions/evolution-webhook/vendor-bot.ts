@@ -4019,7 +4019,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     // 🔍 VALIDACIÓN: Detectar intentos de confirmar pedido sin tratarlo como producto
     const isConfirming = isOrderConfirmationSignal(message) && !looksLikePurchaseIntent(message);
 
-    if (isConfirming && context.order_state === 'shopping') {
+    if (isConfirming && (context.order_state === 'shopping' || context.order_state === 'checkout')) {
       console.log(`🔍 User attempting to confirm order. Cart items: ${context.cart.length}`);
       console.log(`📋 Cart validation: ${context.cart.length} items in DB`);
       console.log(`🔍 Cart contents: ${context.cart.map(i => `${i.product_name}x${i.quantity}`).join(', ') || 'EMPTY'}`);
