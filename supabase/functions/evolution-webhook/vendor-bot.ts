@@ -165,12 +165,15 @@ async function handleShoppingInterceptor(
   }
 
   // Evitar tratar comandos de flujo/confirmaciones como nombre de producto
-  const wantsCartView = /(?:\bcarrito\b|ver\s+productos?\s+en\s+el\s+carrito|mostrar\s+carrito|ver\s+carrito)/i.test(textLower);
+  // CRÍTICO: "carrito" siempre es un comando, incluso con "quiero ver el carrito"
+  const wantsCartView = /\bcarrito\b/i.test(textLower);
+  if (wantsCartView) return null;
+
   const normalizedIntent = normalizeIntentText(text);
   const wantsFlowCommand = /^(?:confirma(?:r|do|mos)?(?:\s+pedido)?|(?:lo\s+)?confirm(?:o|ado|ar|amos)?|listo|finalizar|terminar(?:\s+pedido)?|pagar|vaciar\s+carrito|ver\s+menu|menu|eso\s+(?:es\s+)?todo|ya\s+esta|nada\s+mas)$/.test(normalizedIntent);
   const looksLikeConfirmation = isOrderConfirmationSignal(text);
 
-  if ((wantsCartView || wantsFlowCommand || looksLikeConfirmation) && !looksLikePurchaseIntent(text)) {
+  if ((wantsFlowCommand || looksLikeConfirmation) && !looksLikePurchaseIntent(text)) {
     return null;
   }
 
