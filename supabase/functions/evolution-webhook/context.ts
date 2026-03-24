@@ -50,6 +50,8 @@ async function syncOrderStateWithDB(context: ConversationContext, supabase: any)
     context.resumen_mostrado = false;
     context.payment_methods_fetched = false;
     context.pending_cancellation = undefined;
+    context.checkout_step = undefined;
+    context.checkout_retry_count = 0;
     // 🧹 CRÍTICO: Limpiar historial de conversación al resetear
     // El historial viejo contiene datos de menús/vendors que causan alucinaciones
     context.conversation_history = [];
