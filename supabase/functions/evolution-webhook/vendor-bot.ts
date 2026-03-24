@@ -2758,16 +2758,20 @@ Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
         
         // Si tiene carrito y vendor, mostrar próximo paso
         if (context.cart.length > 0 && context.selected_vendor_id) {
-          // Verificar método de pago
+          // Verificar método de pago — transicionar a checkout
+          context.order_state = 'checkout';
           if (!context.payment_method) {
             if (context.available_payment_methods && context.available_payment_methods.length > 0) {
+              context.payment_methods_fetched = true;
               response += `¿Con qué método de pago querés confirmar?\n`;
               context.available_payment_methods.forEach(method => {
                 const icons: Record<string, string> = { 'efectivo': '💵', 'transferencia': '🏦', 'mercadopago': '💳' };
                 response += `- ${method.charAt(0).toUpperCase() + method.slice(1)} ${icons[method] || '💰'}\n`;
               });
             } else {
-              response += `¿Querés confirmar el pedido? 📦`;
+              // Fetch payment methods
+              const paymentResult = await ejecutarHerramienta("ver_metodos_pago", {}, context, supabase);
+              response += paymentResult;
             }
           } else {
             response += `¿Confirmás el pedido con pago en ${context.payment_method}? 📦`;
@@ -3910,12 +3914,77 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       return reminder;
     }
 
+    // 🔍 INTERCEPTOR PAGO: Si ya se mostraron métodos de pago y falta elegir, capturar selección ANTES del shopping
+    // Esto evita que "1" se interprete como producto cuando debería ser método de pago
+    if (context.payment_methods_fetched && !context.payment_method && 
+        (context.delivery_address || context.delivery_type === 'pickup')) {
+      console.log(`🔍 [PAYMENT INTERCEPTOR] Checking payment selection. Message: ${message}`);
+      console.log(`📋 Available methods: ${context.available_payment_methods?.join(', ')}`);
+      
+      const normalizedMsg = message.toLowerCase().trim();
+      let selectedMethod: string | null = null;
+      
+      // Detectar números "1", "2", "3"
+      if (/^[123]$/.test(normalizedMsg) && context.available_payment_methods && context.available_payment_methods.length > 0) {
+        const index = parseInt(normalizedMsg) - 1;
+        if (index >= 0 && index < context.available_payment_methods.length) {
+          selectedMethod = context.available_payment_methods[index];
+          console.log(`✅ Numeric selection: "${normalizedMsg}" → "${selectedMethod}"`);
+        }
+      }
+      
+      // Detectar método por texto
+      if (!selectedMethod) {
+        if (normalizedMsg.includes('efectivo') || normalizedMsg.includes('cash')) {
+          selectedMethod = 'efectivo';
+        } else if (normalizedMsg.includes('transferencia') || normalizedMsg.includes('transfer')) {
+          selectedMethod = 'transferencia';
+        } else if (normalizedMsg.includes('mercado') || normalizedMsg.includes('mp') || normalizedMsg.includes('mercadopago')) {
+          selectedMethod = 'mercadopago';
+        }
+      }
+      
+      // Si confirma con "Sí/Dale" y hay UN solo método, auto-seleccionar
+      if (!selectedMethod) {
+        const confirmKeywords = /^(s[ií]|si|yes|dale|ok|confirmo|listo|confirmar)$/i;
+        if (confirmKeywords.test(normalizedMsg) && context.available_payment_methods?.length === 1) {
+          selectedMethod = context.available_payment_methods[0];
+          console.log(`✅ Auto-selected single method: ${selectedMethod}`);
+        }
+      }
+      
+      if (selectedMethod) {
+        // Validar que está disponible
+        if (!context.available_payment_methods || !context.available_payment_methods.includes(selectedMethod)) {
+          const availableList = context.available_payment_methods?.map(m => `- ${m}`).join('\n') || '- (ninguno disponible)';
+          const errorResponse = `⚠️ El método "${selectedMethod}" no está disponible en ${context.selected_vendor_name}.\n\nPor favor elegí uno de estos:\n${availableList}`;
+          context.conversation_history.push({ role: "assistant", content: errorResponse });
+          await saveContext(context, supabase);
+          return errorResponse;
+        }
+        
+        // Guardar método y mostrar resumen (NO crear pedido directo)
+        console.log(`✅ Valid payment method: ${selectedMethod}. Showing summary for confirmation.`);
+        context.payment_method = selectedMethod;
+        context.order_state = 'checkout';
+        await saveContext(context, supabase);
+        
+        const resumenResult = await ejecutarHerramienta("mostrar_resumen_pedido", {}, context, supabase);
+        
+        context.conversation_history.push({ role: "assistant", content: resumenResult });
+        await saveContext(context, supabase);
+        return resumenResult;
+      }
+    }
+
     // 🛒 INTERCEPTOR: Estado shopping + número/producto → agregar al carrito directamente
     // SOLO interceptar cuando hay intención de compra clara (número, "dame X", "quiero X")
     // Todo lo demás (confirmaciones, saludos, preguntas) fluye al LLM
     if (context.order_state === "shopping" && context.selected_vendor_id) {
+      // Guard: si estamos esperando selección de pago, NO interceptar números como productos
+      const isWaitingPayment = context.payment_methods_fetched && !context.payment_method;
       const isPurchaseOrNumber = looksLikePurchaseIntent(message) || /^\d+$/.test(message.trim());
-      if (isPurchaseOrNumber) {
+      if (isPurchaseOrNumber && !isWaitingPayment) {
         const shoppingResult = await handleShoppingInterceptor(message, context, supabase);
         if (shoppingResult) {
           context.conversation_history.push({ role: "assistant", content: shoppingResult });
@@ -4157,7 +4226,8 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       } else if (context.delivery_type === 'delivery' && !context.delivery_address) {
         confirmResponse += "\n\n✍️ Escribí tu dirección de entrega (calle y número)";
       } else if (!context.payment_method) {
-        // Mostrar métodos de pago disponibles
+        // Mostrar métodos de pago disponibles y transicionar a checkout
+        context.order_state = 'checkout';
         const paymentResult = await ejecutarHerramienta("ver_metodos_pago", {}, context, supabase);
         confirmResponse += "\n\n" + paymentResult;
       }
@@ -4199,103 +4269,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       await ejecutarHerramienta("ver_metodos_pago", {}, context, supabase);
     }
 
-    // 🔍 DETECCIÓN AUTOMÁTICA: Usuario eligiendo método de pago
-    // Si el bot ya mostró los métodos de pago, el usuario aún no eligió, y tiene dirección O es pickup
-    if (context.payment_methods_fetched && !context.payment_method && 
-        (context.delivery_address || context.delivery_type === 'pickup')) {
-      console.log(`🔍 User seems to be choosing payment method. Message: ${message}`);
-      console.log(`📋 Available methods: ${context.available_payment_methods?.join(', ')}`);
-      console.log(`🚚 Delivery type: ${context.delivery_type}`);
-      
-      const normalizedMsg = message.toLowerCase().trim();
-      let selectedMethod: string | null = null;
-      
-      // ⭐ BUG FIX #1 (parte 2): Detectar números "1", "2", "3" PRIMERO
-      if (/^[123]$/.test(normalizedMsg) && context.available_payment_methods && context.available_payment_methods.length > 0) {
-        const index = parseInt(normalizedMsg) - 1;
-        if (index >= 0 && index < context.available_payment_methods.length) {
-          selectedMethod = context.available_payment_methods[index];
-          console.log(`✅ Numeric selection: "${normalizedMsg}" → index ${index} → "${selectedMethod}"`);
-        }
-      }
-      
-      // Detectar método seleccionado explícitamente por texto
-      if (!selectedMethod) {
-        if (normalizedMsg.includes('efectivo') || normalizedMsg.includes('cash')) {
-          selectedMethod = 'efectivo';
-        } else if (normalizedMsg.includes('transferencia') || normalizedMsg.includes('transfer')) {
-          selectedMethod = 'transferencia';
-        } else if (normalizedMsg.includes('mercado') || normalizedMsg.includes('mp') || normalizedMsg.includes('mercadopago')) {
-          selectedMethod = 'mercadopago';
-        }
-      }
-      
-      // 🆕 Si el usuario confirma con "Si/Ok/Dale" y hay UN solo método disponible, auto-seleccionarlo
-      if (!selectedMethod) {
-        const confirmKeywords = /^(s[ií]|si|yes|dale|ok|confirmo|listo|confirmar)$/i;
-        if (confirmKeywords.test(normalizedMsg) && 
-            context.available_payment_methods?.length === 1) {
-          selectedMethod = context.available_payment_methods[0];
-          console.log(`✅ Auto-selected single available method: ${selectedMethod}`);
-        }
-      }
-      
-      if (selectedMethod) {
-        // Validar que el método seleccionado está en la lista de disponibles
-        if (!context.available_payment_methods || !context.available_payment_methods.includes(selectedMethod)) {
-          console.warn(`❌ User selected unavailable method: ${selectedMethod}`);
-          const availableList = context.available_payment_methods?.map(m => `- ${m}`).join('\n') || '- (ninguno disponible)';
-          const errorResponse = `⚠️ El método "${selectedMethod}" no está disponible en ${context.selected_vendor_name}.\n\n` +
-                                `Por favor elegí uno de estos:\n${availableList}`;
-          
-          context.conversation_history.push({
-            role: "assistant",
-            content: errorResponse,
-          });
-          await saveContext(context, supabase);
-          
-          return errorResponse;
-        }
-        
-        // Método válido - guardar y proceder a crear pedido
-        console.log(`✅ Valid payment method selected: ${selectedMethod}`);
-        context.payment_method = selectedMethod;
-        
-        // 🆕 CRÍTICO: Guardar el contexto ANTES de llamar a crear_pedido
-        // para que payment_method esté disponible cuando se muestre el resumen
-        await saveContext(context, supabase);
-        console.log(`✅ Context saved with payment_method: ${selectedMethod}`);
-        
-        // Determinar la dirección correcta según el tipo de entrega
-        const orderAddress = context.delivery_type === 'pickup' 
-          ? `Retiro en local: ${context.selected_vendor_name}` 
-          : context.delivery_address;
-        
-        // Llamar automáticamente a crear_pedido
-        try {
-          const orderResult = await ejecutarHerramienta(
-            "crear_pedido",
-            {
-              direccion: orderAddress,
-              metodo_pago: selectedMethod
-            },
-            context,
-            supabase
-          );
-          
-          context.conversation_history.push({
-            role: "assistant",
-            content: orderResult,
-          });
-          await saveContext(context, supabase);
-          
-          return orderResult;
-        } catch (error) {
-          console.error("❌ Error creating order:", error);
-          return "Hubo un error al crear tu pedido. Por favor intentá de nuevo.";
-        }
-      }
-    }
+    // (Payment method selection interceptor moved earlier in the flow — before shopping interceptor)
 
     // 🔄 MANEJO ESPECIAL: Confirmación de transferencia bancaria
     if (context.order_state === "order_pending_transfer") {
