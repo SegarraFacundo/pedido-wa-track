@@ -4367,15 +4367,11 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         // Sin vendors disponibles, hacer búsqueda normal (caerá al bloque de abajo)
       }
 
-      const foodKeywords = /\b(pizza|hamburguesa|empanada|milanesa|sushi|helado|cerveza|coca|fanta|sprite|agua|café|cafe|pollo|asado|lomito|sandwich|tarta|torta|postre|ensalada|papas|sándwich|medialunas?|facturas?|alfajor|ravioles?|ñoquis?|pastas?)\b/i;
-      // Detectar queries de producto: no es un saludo, no es un comando, tiene 2+ caracteres
-      const isGreeting = /^(hola|buenas?|buen[ao]s?\s+(dias?|tardes?|noches?)|hey|hi|hello|que\s+tal)\b/i.test(message.trim());
-      const isCommand = /^(ayuda|help|opciones|estado|cancelar|carrito|ver\s+(?:productos?\s+en\s+)?(?:el\s+)?carrito|menu|men[uú]|volver|salir|calificar)\b/i.test(message.trim());
-      const isGibberish = /^[^a-záéíóúñü]*$/i.test(message.trim()); // Only symbols/numbers
-      const isProductQuery = !isGreeting && !isCommand && !isGibberish && !purchaseIntent && message.trim().length >= 3 && message.trim().length <= 80;
-      
-      if (foodKeywords.test(message) || isProductQuery) {
-        console.log(`🍕 INTERCEPTOR: Product query detected in idle/browsing: "${message.trim()}", calling buscar_productos`);
+      // 🎯 Solo interceptar búsquedas EXPLÍCITAS con verbo de descubrimiento
+      // Todo lo demás fluye al LLM para que interprete el contexto
+      const explicitSearchIntent = /\b(?:busc[oa]r?|hay|donde\s+(?:encuentro|consigo|hay)|tienen|que\s+(?:hay|tienen|venden))\b/i.test(msgLower);
+      if (explicitSearchIntent && message.trim().length >= 3 && message.trim().length <= 80) {
+        console.log(`🔍 INTERCEPTOR: Explicit search intent in idle/browsing: "${message.trim()}", calling buscar_productos`);
         const result = await ejecutarHerramienta("buscar_productos", {
           consulta: message.trim(),
         }, context, supabase);
@@ -4385,6 +4381,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         await saveContext(context, supabase);
         return result;
       }
+      // Si no es búsqueda explícita, dejar que el LLM decida con las herramientas disponibles
     }
     
     // INTERCEPTOR: Estado browsing + número solo → seleccionar negocio de la lista
