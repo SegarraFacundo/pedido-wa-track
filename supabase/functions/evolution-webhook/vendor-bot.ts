@@ -3588,6 +3588,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       // ❌ Usuario rechaza el cambio
       if (userResponse.match(/^(no|nop|cancel|cancela)/)) {
         console.log(`❌ User rejected vendor change`);
+        context.confusion_count = 0;
         
         // Registrar analytics
         await trackVendorChange(context, 'cancelled', supabase);
