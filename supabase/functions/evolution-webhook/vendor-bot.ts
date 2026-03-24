@@ -387,7 +387,9 @@ function parseProductSegment(segment: string): { quantity: number; searchTerm: s
   if (!cleanSegment) return null;
   if (isClarificationOnlySegment(cleanSegment)) return null;
 
-  const commandOnlySegment = /^(?:ver|mostrar|mirar|revisar|confirma(?:r|do|mos)?|finalizar|terminar|pagar|vaciar|listo|ya\s+est[aá])\b/i.test(cleanSegment)
+  const normalizedSegment = normalizeIntentText(cleanSegment);
+  const commandOnlySegment = (/^(?:ver|mostrar|mirar|revisar|confirma(?:r|do|mos)?|(?:lo\s+)?confirm(?:o|ado|ar|amos)?|finalizar|terminar|pagar|vaciar|listo|ya\s+esta)$/.test(normalizedSegment)
+    || isOrderConfirmationSignal(cleanSegment))
     && !looksLikePurchaseIntent(cleanSegment);
   if (commandOnlySegment) return null;
 
