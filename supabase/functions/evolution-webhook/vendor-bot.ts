@@ -1193,7 +1193,11 @@ async function ejecutarHerramienta(
         console.log(`💰 Cart total: $${total}`);
         console.log("================================");
         
-        return `✅ Productos agregados al carrito de *${context.selected_vendor_name}*.\n\n💰 Total actual: $${total}\n\n¿Querés agregar algo más o confirmás el pedido? 📦`;
+        const cartList = context.cart.map((item, i) => 
+          `${i + 1}. ${item.product_name} x${item.quantity} — $${Math.round(item.price * item.quantity)}`
+        ).join('\n');
+
+        return `✅ Productos agregados al carrito de *${context.selected_vendor_name}*.\n\n🛒 *Tu carrito:*\n${cartList}\n\n💰 *Total: $${Math.round(total)}*\n\n¿Querés agregar algo más o confirmás el pedido? 📦`;
       }
 
       case "ver_carrito": {
