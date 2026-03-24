@@ -3956,10 +3956,8 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
     }
 
-    // 🔍 VALIDACIÓN: Detectar intentos de confirmar pedido sin productos en carrito
-    const confirmPhrases = ['confirmar', 'confirmo', 'confirmado', 'listo', 'eso es todo', 'si confirmo', 'confirma', 'dale', 'ya esta', 'ya está', 'nada mas', 'nada más'];
-    const normalizedMsgConfirm = message.toLowerCase().trim();
-    const isConfirming = confirmPhrases.some(phrase => normalizedMsgConfirm.includes(phrase));
+    // 🔍 VALIDACIÓN: Detectar intentos de confirmar pedido sin tratarlo como producto
+    const isConfirming = isOrderConfirmationSignal(message) && !looksLikePurchaseIntent(message);
 
     if (isConfirming && context.order_state === 'shopping') {
       console.log(`🔍 User attempting to confirm order. Cart items: ${context.cart.length}`);
