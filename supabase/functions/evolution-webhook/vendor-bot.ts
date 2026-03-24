@@ -4852,16 +4852,20 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     console.log("💾 Context saved successfully");
 
     // 📊 Log ALL interactions (non-blocking)
-    await supabase.from("bot_interaction_logs").insert({
-      phone: normalizedPhone,
-      message_preview: message.slice(0, 500),
-      response_preview: finalResponse.slice(0, 500),
-      intent_detected: lastToolUsed || "conversational",
-      action_taken: lastToolUsed || "text_response",
-      state_before: orderStateBefore,
-      state_after: context.order_state || "idle",
-      error: null,
-    }).catch((e: any) => console.error("📊 Log insert error:", e));
+    try {
+      await supabase.from("bot_interaction_logs").insert({
+        phone: normalizedPhone,
+        message_preview: message.slice(0, 500),
+        response_preview: finalResponse.slice(0, 500),
+        intent_detected: lastToolUsed || "conversational",
+        action_taken: lastToolUsed || "text_response",
+        state_before: orderStateBefore,
+        state_after: context.order_state || "idle",
+        error: null,
+      });
+    } catch (logErr) {
+      console.error("📊 Log insert error:", logErr);
+    }
 
     console.log("🤖 AI Bot END - Returning response");
     return finalResponse;
@@ -4915,16 +4919,20 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     }
     
     // 📊 Log error interaction
-    await supabase.from("bot_interaction_logs").insert({
-      phone: normalizedPhone,
-      message_preview: message.slice(0, 500),
-      response_preview: null,
-      intent_detected: null,
-      action_taken: "error",
-      state_before: null,
-      state_after: null,
-      error: (error as any).message?.slice(0, 500) || "Unknown error",
-    }).catch((e: any) => console.error("📊 Log insert error:", e));
+    try {
+      await supabase.from("bot_interaction_logs").insert({
+        phone: normalizedPhone,
+        message_preview: message.slice(0, 500),
+        response_preview: null,
+        intent_detected: null,
+        action_taken: "error",
+        state_before: null,
+        state_after: null,
+        error: (error as any).message?.slice(0, 500) || "Unknown error",
+      });
+    } catch (logErr) {
+      console.error("📊 Log insert error:", logErr);
+    }
 
     return "Disculpá, tuve un problema técnico. Por favor intentá de nuevo en un momento.";
   }
