@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { AlertTriangle, CheckCircle2, Search, RefreshCw, MessageSquare, Bot, Copy, ClipboardCheck, EyeOff } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Search, RefreshCw, MessageSquare, Bot, Copy, ClipboardCheck, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
