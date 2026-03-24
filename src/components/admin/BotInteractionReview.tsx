@@ -272,6 +272,7 @@ export default function BotInteractionReview() {
                     <TableHead className="w-[140px]">Fecha</TableHead>
                     <TableHead>Mensaje</TableHead>
                     <TableHead className="w-[130px]">Intención</TableHead>
+                    <TableHead className="w-[100px]">Acción</TableHead>
                     <TableHead className="w-[80px]">Confianza</TableHead>
                     <TableHead className="w-[120px]">Estado</TableHead>
                     <TableHead className="w-[80px]"></TableHead>
