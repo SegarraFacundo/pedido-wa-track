@@ -237,7 +237,7 @@ async function handleShoppingInterceptor(
     .select("id, name, price, is_available, stock_enabled, stock_quantity")
     .eq("vendor_id", vendorId)
     .eq("is_available", true)
-    .order("name");
+;
 
   if (error) {
     console.error("❌ Shopping interceptor: Error fetching products:", error);
