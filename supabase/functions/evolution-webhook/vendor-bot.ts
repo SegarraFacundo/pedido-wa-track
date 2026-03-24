@@ -4222,7 +4222,8 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       } else if (context.delivery_type === 'delivery' && !context.delivery_address) {
         confirmResponse += "\n\n✍️ Escribí tu dirección de entrega (calle y número)";
       } else if (!context.payment_method) {
-        // Mostrar métodos de pago disponibles
+        // Mostrar métodos de pago disponibles y transicionar a checkout
+        context.order_state = 'checkout';
         const paymentResult = await ejecutarHerramienta("ver_metodos_pago", {}, context, supabase);
         confirmResponse += "\n\n" + paymentResult;
       }
