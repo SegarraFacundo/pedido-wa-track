@@ -3897,6 +3897,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
           response = "✅ Perfecto, seguimos con *envío a domicilio*.\n\n📍 ¿Cuál es tu dirección de entrega?";
         } else {
           context.order_state = "checkout";
+          context.delivery_address = undefined; // Pickup: limpiar dirección residual
           const vendorConfig = await getVendorConfig(context.selected_vendor_id, supabase);
           const paymentResult = await ejecutarHerramienta("ver_metodos_pago", {}, context, supabase);
           response = `✅ Perfecto, seguimos con *retiro en local*.\n\n📍 Retirá en: ${vendorConfig.address || context.selected_vendor_name || "el local"}\n\n${paymentResult}`;
