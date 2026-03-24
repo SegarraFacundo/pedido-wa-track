@@ -4192,6 +4192,13 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       return pickupReminder;
     }
 
+    // 🔄 FALLBACK: Si está en checkout sin payment_methods_fetched, cargar métodos automáticamente
+    if (context.order_state === 'checkout' && !context.payment_methods_fetched && 
+        context.selected_vendor_id && !context.payment_method) {
+      console.log(`🔄 Auto-fetching payment methods for checkout state...`);
+      await ejecutarHerramienta("ver_metodos_pago", {}, context, supabase);
+    }
+
     // 🔍 DETECCIÓN AUTOMÁTICA: Usuario eligiendo método de pago
     // Si el bot ya mostró los métodos de pago, el usuario aún no eligió, y tiene dirección O es pickup
     if (context.payment_methods_fetched && !context.payment_method && 
