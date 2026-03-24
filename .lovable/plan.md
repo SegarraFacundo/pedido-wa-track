@@ -1,70 +1,76 @@
 
 
-# Plan: Ultra Hardening Patch v6 — 3 controles de consistencia
+# Estado de aplicación de los patches v1-v6
 
-## Cambios en `vendor-bot.ts`
+## ✅ Aplicado
 
-### 1. Limpieza de `pending_vendor_change` por timeout
+| Patch | Cambio | Estado |
+|-------|--------|--------|
+| **v6** | `confusion_count` timeout en `pending_vendor_change` (2 intentos → limpiar) | ✅ Aplicado (líneas 3622-3628) |
+| **v6** | Reset `confusion_count = 0` en sí/no (líneas 3564, 3601) | ✅ Aplicado |
+| **v6** | Validación de pago vs `available_payment_methods` en interceptor (línea 3978-3982) | ✅ Aplicado |
+| **Checkout flow fix** | Reordenamiento de interceptores (pago antes de shopping) | ✅ Aplicado |
+| **Checkout flow fix** | `order_state = "checkout"` al mostrar pagos | ✅ Aplicado |
+| **Base** | `confusion_count` como campo en contexto/types | ✅ Aplicado |
 
-El interceptor actual (línea 3548-3618) re-pregunta indefinidamente si el usuario no dice sí/no. Agregar un contador de reintentos: si el usuario envía 2 mensajes consecutivos que no son sí/no, limpiar `pending_vendor_change` y dejar fluir el mensaje al flujo normal.
+## ❌ NO Aplicado
 
-```typescript
-// Línea ~3609, reemplazar el bloque de "respuesta no clara":
-context.confusion_count = (context.confusion_count || 0) + 1;
-if (context.confusion_count >= 2) {
-  // El usuario ignoró la pregunta, cancelar cambio pendiente
-  context.pending_vendor_change = undefined;
-  context.confusion_count = 0;
-  await saveContext(context, supabase);
-  // NO retornar — dejar que el mensaje fluya al resto del flujo
-} else {
-  // Primera vez no clara: re-preguntar
-  await saveContext(context, supabase);
-  return clarificationResponse;
-}
-```
+| Patch | Cambio | Estado |
+|-------|--------|--------|
+| **v6** | Filtrar detección por texto de pago contra `available_payment_methods` (efectivo/cash solo si `available.includes('efectivo')`) | ❌ No aplicado — la detección por texto libre NO cruza con `available` |
+| **v6** | Limpiar `delivery_address = undefined` cuando `delivery_type = 'pickup'` | ❌ No aplicado en ningún punto |
+| **v5** | Negación inteligente (`negationOnly`, "no efectivo" vs "no efectivo, transferencia") | ❌ No aplicado |
+| **v5** | Confirmaciones ambiguas: bloquear "sí" si faltan datos estructurales | ❌ No aplicado |
+| **v5** | Advertencia de cambio de negocio con carrito activo | ❌ Parcial — `pending_vendor_change` existe pero no en `ver_menu_negocio` |
+| **v5** | Doble envío: idempotencia reforzada en `crear_pedido` | ❌ No aplicado |
+| **v4** | Regex ampliada de modificación (sumá/sacá/poné) en review | ❌ No aplicado |
+| **v4** | Invalidación de `_preloaded_*` conflictivos | ❌ No aplicado (campos ni existen) |
+| **v3** | `normalizePaymentInput()` centralizada con frases ("te transfiero") | ❌ No aplicado |
+| **v3** | Validación de dirección (texto + número) | ❌ No aplicado |
+| **v3** | `isVendorCurrentlyOpen()` centralizada | ❌ No aplicado |
+| **v3** | Doble intención en review → volver a cart | ❌ No aplicado |
+| **v3** | Limpieza de `_preloaded_*` + exclusión en `saveContext` | ❌ No aplicado |
+| **v3** | Confirmación inteligente (datos completos → directo a resumen) | ❌ No aplicado |
+| **v2** | `checkout_step` explícito (delivery_type → address → payment → review) | ❌ No aplicado |
+| **v2** | `checkout_retry_count` (3 fallos → ofrecer salir) | ❌ No aplicado |
+| **v2** | Transiciones seguras (solo si `tool_result.success`) | ❌ No aplicado |
+| **v2** | Reducción de tools por estado (cart → solo carrito tools) | ❌ No aplicado |
+| **v2** | Una tool por turno | ❌ No aplicado |
 
-Resetear `confusion_count = 0` cuando el usuario responde sí o no (líneas 3553 y 3588).
+## Resumen
 
-### 2. Validación de método de pago vs vendor
+**Solo se aplicó el patch v6 (parcialmente) y el fix de checkout flow.** Los patches v2, v3, v4 y v5 NO fueron aplicados. De v6, falta la limpieza de dirección en pickup y el filtrado de detección de pago por texto contra `available_payment_methods`.
 
-El interceptor de pago (línea 3956-3964) ya valida contra `available_payment_methods` del contexto. Pero el texto libre podría detectar un método que no está en esa lista. Reforzar: en la detección por texto (líneas 3937-3944), solo aceptar métodos que estén en `context.available_payment_methods`:
+## Plan: Aplicar todos los cambios faltantes
 
-```typescript
-// Línea ~3937, reemplazar detección por texto:
-if (!selectedMethod) {
-  const available = context.available_payment_methods || [];
-  if ((normalizedMsg.includes('efectivo') || normalizedMsg.includes('cash')) && available.includes('efectivo')) {
-    selectedMethod = 'efectivo';
-  } else if ((normalizedMsg.includes('transferencia') || normalizedMsg.includes('transfer')) && available.includes('transferencia')) {
-    selectedMethod = 'transferencia';
-  } else if ((normalizedMsg.includes('mercado') || normalizedMsg.includes('mp')) && available.includes('mercadopago')) {
-    selectedMethod = 'mercadopago';
-  }
-}
-```
+Dado el volumen, propongo aplicar en orden de impacto y prioridad:
 
-Esto evita que el bot seleccione "efectivo" cuando el vendor solo tiene "transferencia".
+### Fase 1 — Cambios críticos faltantes de v6
+1. **Filtrar detección por texto de pago** contra `context.available_payment_methods`
+2. **Limpiar `delivery_address`** cuando `delivery_type = 'pickup'` en todos los puntos
 
-### 3. Consistencia delivery/pickup: limpiar dirección si es pickup
+### Fase 2 — v5: Protecciones de flujo
+3. **Negación inteligente** en pago ("no efectivo" vs "no efectivo, transferencia")
+4. **Bloquear confirmación** si faltan datos estructurales
+5. **Idempotencia** en `crear_pedido` (check `pending_order_id`)
 
-En todos los puntos donde se setea `delivery_type = 'pickup'`, limpiar `delivery_address`:
+### Fase 3 — v3: Normalización y validación
+6. **`normalizePaymentInput()`** centralizada con frases coloquiales
+7. **Validación de dirección** (texto + número)
+8. **Doble intención en review** → volver a cart (regex ampliada de v4)
 
-- **Línea ~3889** (interceptor delivery mode → pickup confirmado): agregar `context.delivery_address = undefined;`
-- **Línea ~4219** (confirmación → vendor solo pickup): agregar `context.delivery_address = undefined;`
-- **Herramienta `seleccionar_tipo_entrega`**: buscar donde se setea pickup y agregar `context.delivery_address = undefined;`
+### Fase 4 — v2: Flujo estructurado (mayor cambio)
+9. **`checkout_step`** explícito con secuencia obligatoria
+10. **`checkout_retry_count`** para protección de loops
 
-Además, en `mostrar_resumen_pedido` y `crear_pedido`, si `delivery_type === 'pickup'`, forzar `delivery_address = undefined` como guard final.
+Los cambios de v2 sobre reducción de tools y una tool por turno son configuración del prompt del LLM, no código — se pueden aplicar en `simplified-prompt.ts`.
 
-## Archivo a modificar
+### Archivos a modificar
 
-| Archivo | Cambio |
-|---------|--------|
-| `vendor-bot.ts` | Timeout de pending_vendor_change (2 intentos), filtrar métodos de pago por disponibilidad del vendor en detección por texto, limpiar dirección en pickup |
-
-## Resultado esperado
-
-- Usuario ignora pregunta de cambio de negocio → se cancela y sigue el flujo normal
-- "Efectivo" cuando vendor solo acepta transferencia → no se selecciona
-- Pickup nunca tiene dirección residual de un delivery anterior
+| Archivo | Cambios |
+|---------|---------|
+| `vendor-bot.ts` | Fases 1-3: ~10 bloques quirúrgicos |
+| `types.ts` | Agregar `checkout_step`, `checkout_retry_count` |
+| `context.ts` | Persistir `checkout_step`, `checkout_retry_count` |
+| `simplified-prompt.ts` | Regla de una tool por turno, prioridad CORE>AUX>GLOBAL |
 
