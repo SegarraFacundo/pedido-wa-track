@@ -1530,6 +1530,23 @@ async function ejecutarHerramienta(
         if (context.delivery_type === 'pickup') {
           context.delivery_address = undefined;
         }
+        
+        // 🛡️ v5: Idempotencia — si ya hay un pending_order_id, reutilizar
+        if (context.pending_order_id) {
+          console.log(`🛡️ IDEMPOTENCY: Order already exists: ${context.pending_order_id}`);
+          const { data: existingOrder } = await supabase
+            .from("orders")
+            .select("id, status")
+            .eq("id", context.pending_order_id)
+            .maybeSingle();
+          
+          if (existingOrder && !['cancelled', 'delivered'].includes(existingOrder.status)) {
+            return `✅ Ya tenés un pedido activo (#${context.pending_order_id.substring(0, 8)}).\n\n` +
+                   `📊 Decí "estado del pedido" para ver cómo va. 😊`;
+          }
+          // Si el pedido ya terminó, limpiar y permitir crear nuevo
+          context.pending_order_id = undefined;
+        }
         // 🆕 CRÍTICO: Guardar el método de pago de los args ANTES de cualquier verificación
         // Esto asegura que mostrar_resumen_pedido tenga el payment_method disponible
         if (args.metodo_pago && !context.payment_method) {
