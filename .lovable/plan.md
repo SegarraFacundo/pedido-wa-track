@@ -1,72 +1,70 @@
 
 
-# Plan: Fix checkout flow — payment selection and confirmation
+# Plan: Ultra Hardening Patch v6 — 3 controles de consistencia
 
-## Problems identified
+## Cambios en `vendor-bot.ts`
 
-1. **"1" in checkout captured by shopping interceptor**: When payment methods are shown and user types "1", the shopping interceptor (line 3916) fires first because `order_state` is still `"shopping"` — it adds product #1 to cart instead of selecting "Efectivo".
+### 1. Limpieza de `pending_vendor_change` por timeout
 
-2. **State not transitioning to checkout**: When the confirmation interceptor shows payment methods (line 4159-4162), it never sets `order_state = "checkout"`. So subsequent messages still match `order_state === "shopping"`.
+El interceptor actual (línea 3548-3618) re-pregunta indefinidamente si el usuario no dice sí/no. Agregar un contador de reintentos: si el usuario envía 2 mensajes consecutivos que no son sí/no, limpiar `pending_vendor_change` y dejar fluir el mensaje al flujo normal.
 
-3. **After payment selection, "Listo" loops**: The payment interceptor (line 4204) selects the method and calls `crear_pedido`, but `crear_pedido` checks `resumen_mostrado` (line 1519) and shows the summary instead. Then "Listo" hits the confirmation interceptor which calls `crear_pedido` again... which shows the summary again because `resumen_mostrado` was reset.
-
-## Changes in `vendor-bot.ts`
-
-### 1. Move payment method interceptor BEFORE shopping interceptor
-The block at lines 4195-4297 (payment_methods_fetched check + selection) must run **before** the shopping interceptor at line 3916. This way "1" in checkout goes to payment selection, not product addition.
-
-### 2. Set `order_state = "checkout"` when showing payment methods from confirmation
-In the confirmation interceptor block (lines 4128-4171), when showing payment methods:
-- Line 4159-4162: add `context.order_state = "checkout"` before showing payment methods
-- Line 4148: when auto-setting delivery to `needs_address`, already done correctly
-- Line 4151: when auto-setting pickup to `checkout`, already done correctly
-- But the `else` branch (line 4155, both delivery options) should also set a transitional state
-
-### 3. Set `order_state = "checkout"` when `confirmar_direccion_entrega` shows payment methods
-In `confirmar_direccion_entrega` (line 2730), after saving address, if it shows payment methods, set `context.order_state = "checkout"`.
-
-### 4. Fix payment selection flow: show summary after selecting payment
-When the payment interceptor selects a method (line 4260-4297), instead of calling `crear_pedido` directly, call `mostrar_resumen_pedido` first. This shows the summary and sets `resumen_mostrado = true`. Then when user says "Listo"/"Sí", the `resumen_mostrado` interceptor (line 3932) catches it and calls `crear_pedido`.
-
-### 5. Guard shopping interceptor: skip when payment_methods_fetched and no payment_method
-Add a condition to the shopping interceptor gate (line 3916): if `payment_methods_fetched === true` and `payment_method` is not set, skip the shopping interceptor for numeric inputs — they're payment selections, not product selections.
-
-## Summary of interceptor order (after changes)
-
-```text
-1. awaiting_delivery_mode_confirmation → sí/no
-2. payment_methods_fetched + no payment_method → numeric/text selection
-3. shopping + purchase intent → add to cart
-4. resumen_mostrado → sí = crear_pedido
-5. confirmation signal (shopping/checkout) → show cart + next step
-6. needs_address → capture address
-7. idle/browsing interceptors
-8. LLM fallback
+```typescript
+// Línea ~3609, reemplazar el bloque de "respuesta no clara":
+context.confusion_count = (context.confusion_count || 0) + 1;
+if (context.confusion_count >= 2) {
+  // El usuario ignoró la pregunta, cancelar cambio pendiente
+  context.pending_vendor_change = undefined;
+  context.confusion_count = 0;
+  await saveContext(context, supabase);
+  // NO retornar — dejar que el mensaje fluya al resto del flujo
+} else {
+  // Primera vez no clara: re-preguntar
+  await saveContext(context, supabase);
+  return clarificationResponse;
+}
 ```
 
-## Expected flow after fix
+Resetear `confusion_count = 0` cuando el usuario responde sí o no (líneas 3553 y 3588).
 
-```text
-User: "Listo" (in shopping)
-→ confirmation interceptor shows cart + auto-selects delivery + asks address
-→ state = needs_address
+### 2. Validación de método de pago vs vendor
 
-User: "Av. Villada 1508"
-→ address interceptor saves address + shows payment methods
-→ state = checkout
+El interceptor de pago (línea 3956-3964) ya valida contra `available_payment_methods` del contexto. Pero el texto libre podría detectar un método que no está en esa lista. Reforzar: en la detección por texto (líneas 3937-3944), solo aceptar métodos que estén en `context.available_payment_methods`:
 
-User: "1"
-→ payment interceptor selects "efectivo" → shows summary
-→ resumen_mostrado = true
-
-User: "Sí"
-→ resumen_mostrado interceptor → crear_pedido
-→ Order created ✅
+```typescript
+// Línea ~3937, reemplazar detección por texto:
+if (!selectedMethod) {
+  const available = context.available_payment_methods || [];
+  if ((normalizedMsg.includes('efectivo') || normalizedMsg.includes('cash')) && available.includes('efectivo')) {
+    selectedMethod = 'efectivo';
+  } else if ((normalizedMsg.includes('transferencia') || normalizedMsg.includes('transfer')) && available.includes('transferencia')) {
+    selectedMethod = 'transferencia';
+  } else if ((normalizedMsg.includes('mercado') || normalizedMsg.includes('mp')) && available.includes('mercadopago')) {
+    selectedMethod = 'mercadopago';
+  }
+}
 ```
 
-## Files to modify
+Esto evita que el bot seleccione "efectivo" cuando el vendor solo tiene "transferencia".
 
-| File | Change |
-|------|--------|
-| `vendor-bot.ts` | Reorder interceptors; set checkout state when showing payments; show summary after payment selection instead of creating order directly |
+### 3. Consistencia delivery/pickup: limpiar dirección si es pickup
+
+En todos los puntos donde se setea `delivery_type = 'pickup'`, limpiar `delivery_address`:
+
+- **Línea ~3889** (interceptor delivery mode → pickup confirmado): agregar `context.delivery_address = undefined;`
+- **Línea ~4219** (confirmación → vendor solo pickup): agregar `context.delivery_address = undefined;`
+- **Herramienta `seleccionar_tipo_entrega`**: buscar donde se setea pickup y agregar `context.delivery_address = undefined;`
+
+Además, en `mostrar_resumen_pedido` y `crear_pedido`, si `delivery_type === 'pickup'`, forzar `delivery_address = undefined` como guard final.
+
+## Archivo a modificar
+
+| Archivo | Cambio |
+|---------|--------|
+| `vendor-bot.ts` | Timeout de pending_vendor_change (2 intentos), filtrar métodos de pago por disponibilidad del vendor en detección por texto, limpiar dirección en pickup |
+
+## Resultado esperado
+
+- Usuario ignora pregunta de cambio de negocio → se cancela y sigue el flujo normal
+- "Efectivo" cuando vendor solo acepta transferencia → no se selecciona
+- Pickup nunca tiene dirección residual de un delivery anterior
 
