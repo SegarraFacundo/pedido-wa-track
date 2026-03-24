@@ -328,7 +328,7 @@ export default function BotInteractionReview() {
                       </TableRow>
                       {expandedId === interaction.id && (
                         <TableRow key={`${interaction.id}-detail`}>
-                          <TableCell colSpan={6} className="bg-muted/30">
+                          <TableCell colSpan={7} className="bg-muted/30">
                             <div className="p-4 space-y-3">
                               <div>
                                 <span className="text-xs font-medium text-muted-foreground">📱 Teléfono:</span>
