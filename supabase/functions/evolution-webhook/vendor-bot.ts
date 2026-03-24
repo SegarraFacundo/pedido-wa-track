@@ -2758,16 +2758,20 @@ Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
         
         // Si tiene carrito y vendor, mostrar próximo paso
         if (context.cart.length > 0 && context.selected_vendor_id) {
-          // Verificar método de pago
+          // Verificar método de pago — transicionar a checkout
+          context.order_state = 'checkout';
           if (!context.payment_method) {
             if (context.available_payment_methods && context.available_payment_methods.length > 0) {
+              context.payment_methods_fetched = true;
               response += `¿Con qué método de pago querés confirmar?\n`;
               context.available_payment_methods.forEach(method => {
                 const icons: Record<string, string> = { 'efectivo': '💵', 'transferencia': '🏦', 'mercadopago': '💳' };
                 response += `- ${method.charAt(0).toUpperCase() + method.slice(1)} ${icons[method] || '💰'}\n`;
               });
             } else {
-              response += `¿Querés confirmar el pedido? 📦`;
+              // Fetch payment methods
+              const paymentResult = await ejecutarHerramienta("ver_metodos_pago", {}, context, supabase);
+              response += paymentResult;
             }
           } else {
             response += `¿Confirmás el pedido con pago en ${context.payment_method}? 📦`;
