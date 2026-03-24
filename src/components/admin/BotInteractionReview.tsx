@@ -41,7 +41,7 @@ interface BotInteraction {
 export default function BotInteractionReview() {
   const [interactions, setInteractions] = useState<BotInteraction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"all" | "errors" | "low_confidence" | "fallback">("errors");
+  const [filter, setFilter] = useState<"all" | "errors" | "low_confidence" | "fallback">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<Set<string>>(new Set());
