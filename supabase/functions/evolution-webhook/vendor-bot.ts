@@ -4786,6 +4786,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
           toolCallTracker.set(toolName, callCount + 1);
           
           console.log(`🔧 Executing tool: ${toolName} (call #${callCount + 1})`, toolArgs);
+          lastToolUsed = toolName;
 
           const toolResult = await ejecutarHerramienta(toolName, toolArgs, context, supabase);
           console.log(`✅ Tool ${toolName} result preview:`, toolResult.slice(0, 100));
