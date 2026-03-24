@@ -1,34 +1,32 @@
 
 
-# Plan: Auto-seleccionar modo de entrega cuando solo hay una opción
+# Plan: Fix checkout confirmation loop
 
-## Problema
-Cuando el usuario confirma el pedido, el bot siempre pregunta "¿Lo retirás en el local o te lo enviamos?" incluso cuando el vendor solo permite una opción. Esto ya se maneja correctamente en la herramienta `confirmar_pedido` (líneas 1670-1686), pero el interceptor de confirmación (líneas 4089-4105) tiene un `else` que muestra ambas opciones como fallback.
+## Problem
+When the user reaches checkout and says "Sí" or "Listo":
+1. The confirmation interceptor (line 4022) only handles `order_state === 'shopping'` — checkout state falls through
+2. The payment selection interceptor (line 4151) requires `payment_methods_fetched === true`, but the LLM may show payment info without calling `ver_metodos_pago` (which sets that flag)
+3. Result: the message falls to the LLM, which loops showing the cart and payment methods again
 
-## Cambio en `vendor-bot.ts`
+## Changes in `vendor-bot.ts`
 
-### 1. Eliminar el fallback genérico (líneas 4100-4105)
-Reemplazar el bloque que muestra "¿Lo retirás...?" por defecto:
+### 1. Extend confirmation interceptor to handle `checkout` state
+Add `checkout` to the state check at line 4022. When confirming in checkout:
+- If `payment_method` is already set → create order directly
+- If only 1 payment method available → auto-select it and create order
+- If no payment method → show payment methods via `ver_metodos_pago`
 
-- **Si `allows_delivery && allows_pickup`**: preguntar cuál prefiere (único caso donde se muestra la pregunta)
-- **Si no hay `selected_vendor_id`** (línea 4103-4104): buscar el vendor config igualmente o asumir delivery como default
-- **Si solo delivery**: auto-setear `delivery_type = 'delivery'` y pedir dirección
-- **Si solo pickup**: auto-setear `delivery_type = 'pickup'` y saltar a métodos de pago
+### 2. Add fallback: set `payment_methods_fetched` when checkout state has available methods
+Before the LLM call, if `order_state === 'checkout'` and `available_payment_methods` is empty but `selected_vendor_id` exists, auto-fetch payment methods and set the flag. This ensures the payment interceptor at line 4151 fires on subsequent messages.
 
-Esto unifica la lógica con lo que ya hace `confirmar_pedido` en líneas 1670-1686.
+## File to modify
 
-### 2. Agregar el caso `allows_delivery && allows_pickup` explícito
-En el bloque `else` actual (línea 4100), agregar la condición que falta para solo preguntar cuando ambos están habilitados.
+| File | Change |
+|------|--------|
+| `vendor-bot.ts` | Line 4022: expand to `shopping` or `checkout`; add auto-select logic for single payment method in checkout |
 
-## Archivo a modificar
-
-| Archivo | Cambio |
-|---------|--------|
-| `vendor-bot.ts` | Líneas 4089-4105: unificar lógica de auto-selección de delivery/pickup con la de `confirmar_pedido` |
-
-## Resultado esperado
-- Vendor solo delivery → "Este negocio trabaja solo con delivery. ¿Tu dirección?"
-- Vendor solo pickup → "Este negocio trabaja solo con retiro en local." + métodos de pago
-- Vendor ambos → "¿Lo retirás en el local o te lo enviamos?"
-- Sin vendor (edge case) → asumir delivery y pedir dirección
+## Expected result
+- "Sí" in checkout with 1 method → auto-selects efectivo → creates order
+- "Listo" in checkout → same
+- No more cart/payment loop
 
