@@ -3943,13 +3943,14 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         }
       }
       
-      // Detectar método por texto
+      // Detectar método por texto — SOLO si el vendor lo soporta
       if (!selectedMethod) {
-        if (normalizedMsg.includes('efectivo') || normalizedMsg.includes('cash')) {
+        const available = context.available_payment_methods || [];
+        if ((normalizedMsg.includes('efectivo') || normalizedMsg.includes('cash')) && available.some(m => m.toLowerCase().includes('efectivo'))) {
           selectedMethod = 'efectivo';
-        } else if (normalizedMsg.includes('transferencia') || normalizedMsg.includes('transfer')) {
+        } else if ((normalizedMsg.includes('transferencia') || normalizedMsg.includes('transfer') || normalizedMsg.includes('transfiero') || normalizedMsg.includes('cbu') || normalizedMsg.includes('alias')) && available.some(m => m.toLowerCase().includes('transferencia'))) {
           selectedMethod = 'transferencia';
-        } else if (normalizedMsg.includes('mercado') || normalizedMsg.includes('mp') || normalizedMsg.includes('mercadopago')) {
+        } else if ((normalizedMsg.includes('mercado') || /\bmp\b/.test(normalizedMsg) || normalizedMsg.includes('mercadopago')) && available.some(m => m.toLowerCase().includes('mercadopago') || m.toLowerCase().includes('mercado'))) {
           selectedMethod = 'mercadopago';
         }
       }
