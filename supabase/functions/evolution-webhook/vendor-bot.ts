@@ -6,9 +6,33 @@ import { getContext, saveContext } from "./context.ts";
 import { tools } from "./tools-definitions.ts";
 import { buildSystemPrompt } from "./simplified-prompt.ts";
 
-const PURCHASE_VERB_REGEX = /\b(dame|deme|quer[ée]s?|quiero|quer(?:ia|ía)|quisiera|poneme|agrega|agreg[aá]me|mand[aá]me|trae(?:me|r)?|ped[ií](?:me)?|necesito|llevo|meti?|pone)\b/i;
+const PURCHASE_VERB_REGEX = /\b(dame|deme|quer[ée]s?|quiero|quer(?:ia|ía)|quisiera|poneme|agrega|agreg[aá]me|mand[aá]me|trae(?:me|r)?|ped[ií](?:me)?|necesito|llevo|meti?|pone|sum[aá](?:me)?|pon[eé](?:me)?)\b/i;
 const NUMERIC_PURCHASE_REGEX = /^(?:(?:los|las|unos?|unas?)\s+)?\d+\s+\w/i;
 const WORD_QTY_PURCHASE_REGEX = /^(?:un[oa]?|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|media|docena|quince|veinte)\s+\w/i;
+const CART_MODIFICATION_REGEX = /\b(sum[aá](?:me|le)?|sac[aá](?:me|le)?|pon[eé](?:me|le)?|m[aá]s|otro|otra|agreg[aá]|quit[aá]|cambi[aá]|modific[aá])\b/i;
+
+// ==================== NORMALIZACIÓN DE PAGO ====================
+function normalizePaymentInput(input: string): string | null {
+  const normalized = input.toLowerCase().trim()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  
+  // Frases coloquiales → método
+  if (/\b(efectivo|cash|plata en mano|pago al recibir|contra\s*entrega|en mano)\b/.test(normalized)) return 'efectivo';
+  if (/\b(transferencia|transfer|transfiero|te transfiero|cbu|alias|deposito|banco|bancaria)\b/.test(normalized)) return 'transferencia';
+  if (/\b(mercado\s*pago|mercadopago|mp)\b/.test(normalized)) return 'mercadopago';
+  
+  return null;
+}
+
+// ==================== VALIDACIÓN DE DIRECCIÓN ====================
+function isValidAddress(address: string): boolean {
+  const trimmed = address.trim();
+  if (trimmed.length < 5) return false;
+  // Debe tener texto Y número (calle + altura/número)
+  const hasText = /[a-záéíóúñ]{2,}/i.test(trimmed);
+  const hasNumber = /\d+/.test(trimmed);
+  return hasText && hasNumber;
+}
 
 function normalizeIntentText(message: string): string {
   return message
