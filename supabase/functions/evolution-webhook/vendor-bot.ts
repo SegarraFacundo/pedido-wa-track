@@ -3309,6 +3309,8 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
 
     // Cargar contexto
     const context = await getContext(normalizedPhone, supabase);
+    const orderStateBefore = context.order_state || "idle";
+    let lastToolUsed: string | null = null;
 
     // ⏱️ RESET AUTOMÁTICO POR INACTIVIDAD (sin pedido activo)
     // Usamos timestamps del propio contexto (last_interaction_at, last_menu_fetch, last_vendors_fetch)
