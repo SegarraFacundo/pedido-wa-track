@@ -143,7 +143,7 @@ async function handleShoppingInterceptor(
 
   // Evitar tratar comandos de flujo (carrito/confirmar/menú) como nombre de producto
   const wantsCartView = /(?:\bcarrito\b|ver\s+productos?\s+en\s+el\s+carrito|mostrar\s+carrito|ver\s+carrito)/i.test(textLower);
-  const wantsFlowCommand = /^(?:confirmar(?:\s+pedido)?|listo|finalizar|terminar(?:\s+pedido)?|pagar|vaciar\s+carrito|ver\s+men[uú]|men[uú])\b/i.test(textLower);
+  const wantsFlowCommand = /^(?:confirma(?:r|do|mos)?(?:\s+pedido)?|listo|finalizar|terminar(?:\s+pedido)?|pagar|vaciar\s+carrito|ver\s+men[uú]|men[uú]|eso\s+(?:es\s+)?todo|ya\s+est[aá]|nada\s+m[aá]s)\b/i.test(textLower);
   if ((wantsCartView || wantsFlowCommand) && !looksLikePurchaseIntent(text)) {
     return null;
   }
@@ -295,7 +295,8 @@ function isClarificationOnlySegment(segment: string): boolean {
     .replace(/[.,;:!?]/g, "")
     .trim();
 
-  return /^(?:no\s+solo\s+(?:uno|una|1)|(?:solo|solamente)\s+(?:uno|una|1)|no\s+(?:uno|una|1)|nada\s+mas|eso(?:\s+solo)?|nomas)$/.test(normalized);
+  // Filter out conversational noise: "genial", "por ultimo", "una", "y listo", etc.
+  return /^(?:no\s+solo\s+(?:uno|una|1)|(?:solo|solamente)\s+(?:uno|una|1)|no\s+(?:uno|una|1)|nada\s+mas|eso(?:\s+solo)?|nomas|genial|perfecto|buenisimo|excelente|dale|ok(?:ay)?|bien|por\s+(?:ultimo|favor)|y\s+(?:listo|ya|nada\s+mas)|una|uno|eso)$/.test(normalized);
 }
 
 function splitProductSegments(text: string): string[] {
@@ -353,13 +354,14 @@ function parseProductSegment(segment: string): { quantity: number; searchTerm: s
   const cleanSegment = segment
     .trim()
     .replace(/^[,.;:!?]+|[,.;:!?]+$/g, "")
-    .replace(/^(?:bueno|ok(?:ay)?|dale|che)\s+/i, "")
+    .replace(/^(?:bueno|ok(?:ay)?|dale|che|genial|perfecto|por\s+(?:ultimo|favor))\s*/i, "")
+    .replace(/^(?:y\s+)?(?:por\s+ultimo|tambien|ademas)\s+/i, "")
     .trim();
 
   if (!cleanSegment) return null;
   if (isClarificationOnlySegment(cleanSegment)) return null;
 
-  const commandOnlySegment = /^(?:ver|mostrar|mirar|revisar|confirmar|finalizar|terminar|pagar|vaciar)\b/i.test(cleanSegment)
+  const commandOnlySegment = /^(?:ver|mostrar|mirar|revisar|confirma(?:r|do|mos)?|finalizar|terminar|pagar|vaciar|listo|ya\s+est[aá])\b/i.test(cleanSegment)
     && !looksLikePurchaseIntent(cleanSegment);
   if (commandOnlySegment) return null;
 
@@ -3927,7 +3929,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     }
 
     // 🔍 VALIDACIÓN: Detectar intentos de confirmar pedido sin productos en carrito
-    const confirmPhrases = ['confirmar', 'confirmo', 'listo', 'eso es todo', 'si confirmo', 'confirma', 'dale'];
+    const confirmPhrases = ['confirmar', 'confirmo', 'confirmado', 'listo', 'eso es todo', 'si confirmo', 'confirma', 'dale', 'ya esta', 'ya está', 'nada mas', 'nada más'];
     const normalizedMsgConfirm = message.toLowerCase().trim();
     const isConfirming = confirmPhrases.some(phrase => normalizedMsgConfirm.includes(phrase));
 
