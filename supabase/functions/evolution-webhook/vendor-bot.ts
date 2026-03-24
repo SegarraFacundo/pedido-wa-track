@@ -4087,19 +4087,24 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       
       // Agregar lo que falta
       if (!context.delivery_type) {
+        let allowsDelivery = true;
+        let allowsPickup = false;
+        
         if (context.selected_vendor_id) {
           const vendorConfig = await getVendorConfig(context.selected_vendor_id, supabase);
+          allowsDelivery = vendorConfig.allows_delivery !== false;
+          allowsPickup = vendorConfig.allows_pickup === true;
+        }
 
-          if (vendorConfig.allows_delivery && !vendorConfig.allows_pickup) {
-            context.delivery_type = 'delivery';
-            confirmResponse += "\n\n✅ Este negocio trabaja solo con *delivery*.\n📍 Escribí tu dirección de entrega (calle y número).";
-          } else if (vendorConfig.allows_pickup && !vendorConfig.allows_delivery) {
-            context.delivery_type = 'pickup';
-            const paymentResult = await ejecutarHerramienta("ver_metodos_pago", {}, context, supabase);
-            confirmResponse += `\n\n✅ Este negocio trabaja solo con *retiro en local*.\n\n${paymentResult}`;
-          } else {
-            confirmResponse += "\n\n¿Lo retirás en el local o te lo enviamos? 🏪🚚";
-          }
+        if (allowsDelivery && !allowsPickup) {
+          context.delivery_type = 'delivery';
+          context.order_state = 'needs_address';
+          confirmResponse += "\n\n🚚 Este negocio trabaja solo con *delivery*.\n📍 Escribí tu dirección de entrega (calle y número).";
+        } else if (allowsPickup && !allowsDelivery) {
+          context.delivery_type = 'pickup';
+          context.order_state = 'checkout';
+          const paymentResult = await ejecutarHerramienta("ver_metodos_pago", {}, context, supabase);
+          confirmResponse += `\n\n🏪 Este negocio trabaja solo con *retiro en local*.\n\n${paymentResult}`;
         } else {
           confirmResponse += "\n\n¿Lo retirás en el local o te lo enviamos? 🏪🚚";
         }
