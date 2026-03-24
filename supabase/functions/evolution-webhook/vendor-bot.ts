@@ -3969,6 +3969,17 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       const normalizedMsg = message.toLowerCase().trim();
       let selectedMethod: string | null = null;
       
+      // 🔴 v5: Detectar negaciones puras ("no efectivo", "no transferencia") → NO seleccionar
+      const negationOnly = /^\s*no\s+(efectivo|transferencia|mercado\s*pago|mp|cash)\s*[.!?]*$/i.test(normalizedMsg);
+      if (negationOnly) {
+        console.log(`🔴 Negation detected: "${normalizedMsg}" — NOT selecting any method`);
+        const availableList = context.available_payment_methods?.map((m, i) => `${i+1}️⃣ ${m.charAt(0).toUpperCase() + m.slice(1)}`).join('\n') || '';
+        const negResponse = `Entendido 👍 Entonces, ¿con cuál preferís pagar?\n\n${availableList}`;
+        context.conversation_history.push({ role: "assistant", content: negResponse });
+        await saveContext(context, supabase);
+        return negResponse;
+      }
+      
       // Detectar números "1", "2", "3"
       if (/^[123]$/.test(normalizedMsg) && context.available_payment_methods && context.available_payment_methods.length > 0) {
         const index = parseInt(normalizedMsg) - 1;
@@ -3978,15 +3989,17 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         }
       }
       
-      // Detectar método por texto — SOLO si el vendor lo soporta
+      // Detectar método por texto — usando normalizePaymentInput + cruzar con available
       if (!selectedMethod) {
-        const available = context.available_payment_methods || [];
-        if ((normalizedMsg.includes('efectivo') || normalizedMsg.includes('cash')) && available.some(m => m.toLowerCase().includes('efectivo'))) {
-          selectedMethod = 'efectivo';
-        } else if ((normalizedMsg.includes('transferencia') || normalizedMsg.includes('transfer') || normalizedMsg.includes('transfiero') || normalizedMsg.includes('cbu') || normalizedMsg.includes('alias')) && available.some(m => m.toLowerCase().includes('transferencia'))) {
-          selectedMethod = 'transferencia';
-        } else if ((normalizedMsg.includes('mercado') || /\bmp\b/.test(normalizedMsg) || normalizedMsg.includes('mercadopago')) && available.some(m => m.toLowerCase().includes('mercadopago') || m.toLowerCase().includes('mercado'))) {
-          selectedMethod = 'mercadopago';
+        const detected = normalizePaymentInput(normalizedMsg);
+        if (detected) {
+          const available = context.available_payment_methods || [];
+          if (available.some(m => m.toLowerCase().includes(detected))) {
+            selectedMethod = detected;
+            console.log(`✅ Text detection: "${normalizedMsg}" → "${selectedMethod}" (validated vs available)`);
+          } else {
+            console.log(`⚠️ Detected "${detected}" but NOT in available methods: [${available.join(', ')}]`);
+          }
         }
       }
       
