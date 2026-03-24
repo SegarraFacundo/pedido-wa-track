@@ -4491,24 +4491,18 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       // 🔄 Actualizar SOLO el system prompt (primer mensaje) con el estado actualizado
       messages[0] = { role: "system", content: buildSystemPrompt(context) };
 
-      // 🎯 Forzar tool_choice en primera iteración para estados pre-checkout
-      // PERO NO cuando ya se mostró el resumen (para que pueda llamar crear_pedido libremente)
-      const nonCheckoutStates = ["idle", "browsing", "shopping", "needs_address"];
-      const forceTools = nonCheckoutStates.includes(context.order_state || "idle") 
-        && iterationCount === 1
-        && !context.resumen_mostrado;
-
       // 🎯 FASE 1: Filtrado agresivo de herramientas por estado
       const currentState = context.order_state || "idle";
       const filteredTools = filterToolsByState(currentState, context);
 
+      // 🎯 tool_choice siempre "auto" — la IA decide si usar herramienta o responder con texto
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: messages,
         tools: filteredTools,
         temperature: 0, // 🎯 Determinístico: previene alucinaciones de productos/negocios/pagos
         max_tokens: 800,
-        tool_choice: forceTools ? "required" : "auto",
+        tool_choice: "auto",
       });
 
       const assistantMessage = completion.choices[0].message;
