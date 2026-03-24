@@ -4253,7 +4253,10 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       const msgLower = message.toLowerCase().trim();
 
       // Frases que significan "mostrame qué hay" → ver_locales_abiertos
-      const wantsVendorList = /(?:\bver\s+(?:opciones|locales|negocios|tiendas|categor[ií]as?|todo|men[uú])\b|\bopciones\b|\b(?:que|qué)\s+hay\b|\b(?:que|qué)\s+ten[eé]s\b|\b(?:que|qué)\s+puedo\s+pedir\b|\bd[oó]nde\s+puedo\s+pedir\b|\bmostrame\b|\bnegocios\s+abiertos\b|\blocales\s+abiertos\b)/i.test(msgLower);
+      // IMPORTANT: "qué hay en X" means "show me vendor X menu", NOT "show vendor list"
+      // So we exclude "qué hay" when followed by "en/del/de la" (vendor-specific intent)
+      const hasVendorSpecificSuffix = /\b(?:que|qué)\s+(?:hay|tienen|tenemos|ofrecen)\s+(?:en|del?|de\s+la)\s+\w/i.test(msgLower);
+      const wantsVendorList = !hasVendorSpecificSuffix && /(?:\bver\s+(?:opciones|locales|negocios|tiendas|categor[ií]as?|todo|men[uú])\b|\bopciones\b|\b(?:que|qué)\s+hay\b|\b(?:que|qué)\s+ten[eé]s\b|\b(?:que|qué)\s+puedo\s+pedir\b|\bd[oó]nde\s+puedo\s+pedir\b|\bmostrame\b|\bnegocios\s+abiertos\b|\blocales\s+abiertos\b)/i.test(msgLower);
 
       if (wantsVendorList) {
         console.log(`🏪 INTERCEPTOR: User wants to see options/vendors: "${message.trim()}", calling ver_locales_abiertos`);
