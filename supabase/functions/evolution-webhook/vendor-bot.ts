@@ -3309,6 +3309,8 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
 
     // Cargar contexto
     const context = await getContext(normalizedPhone, supabase);
+    const orderStateBefore = context.order_state || "idle";
+    let lastToolUsed: string | null = null;
 
     // ⏱️ RESET AUTOMÁTICO POR INACTIVIDAD (sin pedido activo)
     // Usamos timestamps del propio contexto (last_interaction_at, last_menu_fetch, last_vendors_fetch)
@@ -4784,6 +4786,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
           toolCallTracker.set(toolName, callCount + 1);
           
           console.log(`🔧 Executing tool: ${toolName} (call #${callCount + 1})`, toolArgs);
+          lastToolUsed = toolName;
 
           const toolResult = await ejecutarHerramienta(toolName, toolArgs, context, supabase);
           console.log(`✅ Tool ${toolName} result preview:`, toolResult.slice(0, 100));
@@ -4848,6 +4851,18 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     await saveContext(context, supabase);
     console.log("💾 Context saved successfully");
 
+    // 📊 Log ALL interactions (non-blocking)
+    await supabase.from("bot_interaction_logs").insert({
+      phone: normalizedPhone,
+      message_preview: message.slice(0, 500),
+      response_preview: finalResponse.slice(0, 500),
+      intent_detected: lastToolUsed || "conversational",
+      action_taken: lastToolUsed || "text_response",
+      state_before: orderStateBefore,
+      state_after: context.order_state || "idle",
+      error: null,
+    }).catch((e: any) => console.error("📊 Log insert error:", e));
+
     console.log("🤖 AI Bot END - Returning response");
     return finalResponse;
   } catch (error) {
@@ -4899,6 +4914,18 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       );
     }
     
+    // 📊 Log error interaction
+    await supabase.from("bot_interaction_logs").insert({
+      phone: normalizedPhone,
+      message_preview: message.slice(0, 500),
+      response_preview: null,
+      intent_detected: null,
+      action_taken: "error",
+      state_before: null,
+      state_after: null,
+      error: (error as any).message?.slice(0, 500) || "Unknown error",
+    }).catch((e: any) => console.error("📊 Log insert error:", e));
+
     return "Disculpá, tuve un problema técnico. Por favor intentá de nuevo en un momento.";
   }
 }

@@ -41,7 +41,7 @@ interface BotInteraction {
 export default function BotInteractionReview() {
   const [interactions, setInteractions] = useState<BotInteraction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"all" | "errors" | "low_confidence" | "fallback">("errors");
+  const [filter, setFilter] = useState<"all" | "errors" | "low_confidence" | "fallback">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<Set<string>>(new Set());
@@ -58,7 +58,7 @@ export default function BotInteractionReview() {
       .from("bot_interaction_logs")
       .select("*")
       .order("created_at", { ascending: false })
-      .limit(100);
+      .limit(200);
 
     if (filter === "errors") {
       query = query.or("error.neq.null,response_preview.ilike.%no entendí%,response_preview.ilike.%Perdón%,response_preview.ilike.%Te ayudo%,response_preview.ilike.%No encontré%,response_preview.ilike.%No pude%,action_taken.eq.unknown,action_taken.eq.fallback");
@@ -272,6 +272,7 @@ export default function BotInteractionReview() {
                     <TableHead className="w-[140px]">Fecha</TableHead>
                     <TableHead>Mensaje</TableHead>
                     <TableHead className="w-[130px]">Intención</TableHead>
+                    <TableHead className="w-[100px]">Acción</TableHead>
                     <TableHead className="w-[80px]">Confianza</TableHead>
                     <TableHead className="w-[120px]">Estado</TableHead>
                     <TableHead className="w-[80px]"></TableHead>
@@ -301,6 +302,11 @@ export default function BotInteractionReview() {
                             {interaction.intent_detected || "N/A"}
                           </Badge>
                         </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="text-xs font-mono">
+                            {interaction.action_taken || "N/A"}
+                          </Badge>
+                        </TableCell>
                         <TableCell>{getConfidenceBadge(interaction.confidence)}</TableCell>
                         <TableCell>
                           <span className="text-xs text-muted-foreground">
@@ -322,7 +328,7 @@ export default function BotInteractionReview() {
                       </TableRow>
                       {expandedId === interaction.id && (
                         <TableRow key={`${interaction.id}-detail`}>
-                          <TableCell colSpan={6} className="bg-muted/30">
+                          <TableCell colSpan={7} className="bg-muted/30">
                             <div className="p-4 space-y-3">
                               <div>
                                 <span className="text-xs font-medium text-muted-foreground">📱 Teléfono:</span>
