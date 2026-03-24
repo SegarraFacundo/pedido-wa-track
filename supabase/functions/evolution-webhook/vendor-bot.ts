@@ -3861,13 +3861,19 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     }
 
     // 🛒 INTERCEPTOR: Estado shopping + número/producto → agregar al carrito directamente
+    // SOLO interceptar cuando hay intención de compra clara (número, "dame X", "quiero X")
+    // Todo lo demás (confirmaciones, saludos, preguntas) fluye al LLM
     if (context.order_state === "shopping" && context.selected_vendor_id) {
-      const shoppingResult = await handleShoppingInterceptor(message, context, supabase);
-      if (shoppingResult) {
-        context.conversation_history.push({ role: "assistant", content: shoppingResult });
-        await saveContext(context, supabase);
-        return shoppingResult;
+      const isPurchaseOrNumber = looksLikePurchaseIntent(message) || /^\d+$/.test(message.trim());
+      if (isPurchaseOrNumber) {
+        const shoppingResult = await handleShoppingInterceptor(message, context, supabase);
+        if (shoppingResult) {
+          context.conversation_history.push({ role: "assistant", content: shoppingResult });
+          await saveContext(context, supabase);
+          return shoppingResult;
+        }
       }
+      // "Siii", "lo confirmo", "carrito", "menú", etc. → fluye al LLM con herramientas de shopping
     }
 
 
@@ -4396,21 +4402,8 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         // Sin vendors disponibles, hacer búsqueda normal (caerá al bloque de abajo)
       }
 
-      // 🎯 Solo interceptar búsquedas EXPLÍCITAS con verbo de descubrimiento
-      // Todo lo demás fluye al LLM para que interprete el contexto
-      const explicitSearchIntent = /\b(?:busc[oa]r?|hay|donde\s+(?:encuentro|consigo|hay)|tienen|que\s+(?:hay|tienen|venden))\b/i.test(msgLower);
-      if (explicitSearchIntent && message.trim().length >= 3 && message.trim().length <= 80) {
-        console.log(`🔍 INTERCEPTOR: Explicit search intent in idle/browsing: "${message.trim()}", calling buscar_productos`);
-        const result = await ejecutarHerramienta("buscar_productos", {
-          consulta: message.trim(),
-        }, context, supabase);
-        
-        context.confusion_count = 0;
-        context.conversation_history.push({ role: "assistant", content: result });
-        await saveContext(context, supabase);
-        return result;
-      }
-      // Si no es búsqueda explícita, dejar que el LLM decida con las herramientas disponibles
+      // 🎯 Búsquedas en idle/browsing → el LLM decide si llamar buscar_productos o ver_locales_abiertos
+      // Ya no interceptamos búsquedas explícitas — la IA tiene las herramientas disponibles
     }
     
     // INTERCEPTOR: Estado browsing + número solo → seleccionar negocio de la lista
