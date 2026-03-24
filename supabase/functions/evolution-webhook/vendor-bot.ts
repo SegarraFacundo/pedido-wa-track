@@ -4064,6 +4064,52 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         return orderResult;
       }
       
+      // 🔄 CHECKOUT: Si está en checkout sin payment_method, auto-seleccionar si hay 1 solo método
+      if (context.order_state === 'checkout' && context.delivery_type && !context.payment_method) {
+        console.log(`🔍 Checkout confirmation without payment method. Auto-selecting if single method available...`);
+        
+        // Si no tenemos los métodos cargados, cargarlos
+        if (!context.available_payment_methods || context.available_payment_methods.length === 0) {
+          await ejecutarHerramienta("ver_metodos_pago", {}, context, supabase);
+        }
+        
+        if (context.available_payment_methods && context.available_payment_methods.length === 1) {
+          const autoMethod = context.available_payment_methods[0];
+          console.log(`✅ Auto-selecting single payment method: ${autoMethod}`);
+          context.payment_method = autoMethod;
+          
+          const orderResult = await ejecutarHerramienta(
+            "crear_pedido",
+            {
+              direccion: context.delivery_address || '',
+              metodo_pago: autoMethod
+            },
+            context,
+            supabase
+          );
+          
+          context.conversation_history.push({
+            role: "assistant",
+            content: orderResult,
+          });
+          await saveContext(context, supabase);
+          
+          return orderResult;
+        }
+        
+        // Múltiples métodos: mostrar la lista
+        const paymentResult = await ejecutarHerramienta("ver_metodos_pago", {}, context, supabase);
+        const chooseResponse = `Elegí un método de pago:\n\n${paymentResult}`;
+        
+        context.conversation_history.push({
+          role: "assistant",
+          content: chooseResponse,
+        });
+        await saveContext(context, supabase);
+        
+        return chooseResponse;
+      }
+      
       // 🔄 NUEVO: Si tiene delivery_type y payment_method pero no se mostró resumen, mostrarlo
       if (context.delivery_type && context.payment_method && !context.resumen_mostrado) {
         console.log(`📋 Showing summary before creating order...`);
