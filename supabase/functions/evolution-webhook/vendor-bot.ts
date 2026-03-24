@@ -1410,6 +1410,7 @@ async function ejecutarHerramienta(
       case "vaciar_carrito": {
         context.cart = [];
         context.delivery_type = undefined;  // ⭐ Limpiar tipo de entrega
+        context.awaiting_delivery_mode_confirmation = undefined;
         context.conversation_history = []; // 🧹 Limpiar historial al vaciar carrito
         console.log(`🧹 Cart, delivery_type and conversation history cleared`);
         return "🗑️ Carrito vaciado";
@@ -1422,14 +1423,19 @@ async function ejecutarHerramienta(
         
         // Validar pickup EN TIEMPO REAL
         if (!vendorConfig.allows_pickup && args.tipo === "pickup") {
-          return `⚠️ ${context.selected_vendor_name} no acepta retiro en local. Solo delivery.`;
+          context.awaiting_delivery_mode_confirmation = "delivery";
+          await saveContext(context, supabase);
+          return `${context.selected_vendor_name} no acepta retiro en local, solo delivery. ¿Querés que sigamos con envío a domicilio? Respondé "sí" o "no".`;
         }
         
         // Validar delivery EN TIEMPO REAL
         if (!vendorConfig.allows_delivery && args.tipo === "delivery") {
-          return `⚠️ ${context.selected_vendor_name} no hace delivery. Solo retiro en local.`;
+          context.awaiting_delivery_mode_confirmation = "pickup";
+          await saveContext(context, supabase);
+          return `${context.selected_vendor_name} no hace delivery, solo retiro en local. ¿Querés que sigamos con retiro en local? Respondé "sí" o "no".`;
         }
         
+        context.awaiting_delivery_mode_confirmation = undefined;
         context.delivery_type = args.tipo;
         await saveContext(context, supabase);
         
@@ -3860,6 +3866,47 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       }
     }
 
+    // 🎯 INTERCEPTOR: Confirmación sí/no cuando el negocio solo permite un tipo de entrega
+    if (context.awaiting_delivery_mode_confirmation && context.selected_vendor_id) {
+      const normalizedReply = normalizeIntentText(message);
+      const confirms = /^(s[i]+|yes+|ok(?:ay)?|dale|listo|va(?:mos)?|claro|obvio|confirmo|de una|si quiero)$/.test(normalizedReply);
+      const rejects = /^(no|nop|nope|cancel(?:ar|a)?|mejor no)$/.test(normalizedReply);
+
+      if (confirms) {
+        const forcedType = context.awaiting_delivery_mode_confirmation;
+        context.awaiting_delivery_mode_confirmation = undefined;
+        context.delivery_type = forcedType;
+
+        let response: string;
+        if (forcedType === "delivery") {
+          response = "✅ Perfecto, seguimos con *envío a domicilio*.\n\n📍 ¿Cuál es tu dirección de entrega?";
+        } else {
+          const vendorConfig = await getVendorConfig(context.selected_vendor_id, supabase);
+          response = `✅ Perfecto, seguimos con *retiro en local*.\n\n📍 Retirá en: ${vendorConfig.address || context.selected_vendor_name || "el local"}`;
+        }
+
+        context.conversation_history.push({ role: "assistant", content: response });
+        await saveContext(context, supabase);
+        return response;
+      }
+
+      if (rejects) {
+        context.awaiting_delivery_mode_confirmation = undefined;
+        const response = "Entendido 👍 ¿Querés seguir comprando, cambiar de negocio o cancelar el pedido?";
+        context.conversation_history.push({ role: "assistant", content: response });
+        await saveContext(context, supabase);
+        return response;
+      }
+
+      const reminder = context.awaiting_delivery_mode_confirmation === "delivery"
+        ? "Este negocio trabaja solo con *delivery*. ¿Seguimos con envío a domicilio? Respondé \"sí\" o \"no\"."
+        : "Este negocio trabaja solo con *retiro en local*. ¿Seguimos con retiro? Respondé \"sí\" o \"no\".";
+
+      context.conversation_history.push({ role: "assistant", content: reminder });
+      await saveContext(context, supabase);
+      return reminder;
+    }
+
     // 🛒 INTERCEPTOR: Estado shopping + número/producto → agregar al carrito directamente
     // SOLO interceptar cuando hay intención de compra clara (número, "dame X", "quiero X")
     // Todo lo demás (confirmaciones, saludos, preguntas) fluye al LLM
@@ -4036,7 +4083,21 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       
       // Agregar lo que falta
       if (!context.delivery_type) {
-        confirmResponse += "\n\n¿Lo retirás en el local o te lo enviamos? 🏪🚚";
+        if (context.selected_vendor_id) {
+          const vendorConfig = await getVendorConfig(context.selected_vendor_id, supabase);
+
+          if (vendorConfig.allows_delivery && !vendorConfig.allows_pickup) {
+            context.delivery_type = 'delivery';
+            confirmResponse += "\n\n✅ Este negocio trabaja solo con *delivery*.\n📍 Escribí tu dirección de entrega (calle y número).";
+          } else if (vendorConfig.allows_pickup && !vendorConfig.allows_delivery) {
+            context.delivery_type = 'pickup';
+            confirmResponse += "\n\n✅ Este negocio trabaja solo con *retiro en local*.\n💳 Ahora elegí el método de pago.";
+          } else {
+            confirmResponse += "\n\n¿Lo retirás en el local o te lo enviamos? 🏪🚚";
+          }
+        } else {
+          confirmResponse += "\n\n¿Lo retirás en el local o te lo enviamos? 🏪🚚";
+        }
       } else if (context.delivery_type === 'delivery' && !context.delivery_address) {
         confirmResponse += "\n\n✍️ Escribí tu dirección de entrega (calle y número)";
       } else if (!context.payment_method) {
