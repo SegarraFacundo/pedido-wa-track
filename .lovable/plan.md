@@ -1,50 +1,72 @@
 
 
-# Plan: Dejar que la IA interprete el contexto en vez de interceptores rígidos
+# Plan: Invertir el flujo — LLM primero, interceptores como fallback
 
-## Problema
-El bloque `isProductQuery` (línea 4375-4387) es un catch-all que envía **cualquier mensaje** que no sea saludo, comando o gibberish directamente a `buscar_productos`. Esto significa que la IA nunca tiene oportunidad de interpretar el contexto — el interceptor determinista decide antes. Cada vez que aparece una palabra nueva ("confirmado", "genial", "remera", etc.) hay que agregarla manualmente a una lista de exclusión. Es un juego infinito de whack-a-mole.
+## Problema actual
+En estado `shopping`, **todo mensaje** pasa por `handleShoppingInterceptor` (línea 3864) que intenta parsearlo como producto. Si no matchea con confirmación/comando (regex limitado), lo trata como búsqueda de producto y devuelve "No encontré X en el menú". El LLM nunca ve el mensaje.
+
+Lo mismo ocurre en `idle/browsing`: hay una cadena de interceptores (vendor list, vendor name match, purchase intent, explicit search) que capturan casi todo antes del LLM.
 
 ## Solución
-Reducir los interceptores deterministas a lo **mínimo necesario** (selección de vendor por número, dirección, pago) y dejar que el resto fluya al LLM, que ya tiene el system prompt con contexto completo y herramientas filtradas por estado.
+Reducir el interceptor de shopping a **solo números y frases con intención de compra clara**, y dejar que todo lo demás fluya al LLM que ya tiene las herramientas correctas filtradas por estado.
 
 ## Cambios en `vendor-bot.ts`
 
-### 1. Eliminar el catch-all `isProductQuery` → `buscar_productos`
-El bloque de líneas ~4370-4387 que envía todo a `buscar_productos` se elimina. En su lugar, solo se mantiene el interceptor de `foodKeywords` **cuando el usuario explícitamente dice "buscar X"** o usa palabras de descubrimiento ("busco", "hay", "dónde encuentro").
+### 1. Restringir `handleShoppingInterceptor` (línea 3864)
+Solo invocar el interceptor cuando el mensaje tiene **intención de compra explícita**:
 
-### 2. Restringir `foodKeywords` a intención de búsqueda explícita
-En vez de disparar `buscar_productos` por cualquier mención de comida, solo hacerlo cuando hay un verbo de búsqueda: "busco pizza", "hay helado?", "dónde encuentro cerveza". Si dice "pizza" a secas en idle, dejar que la IA decida (puede preguntar "¿Querés que busque pizza?" o mostrar negocios).
+```
+if (context.order_state === "shopping" && context.selected_vendor_id) {
+  // Solo interceptar si parece pedido de producto (número, "dame X", "quiero X")
+  const isPurchaseOrNumber = looksLikePurchaseIntent(message) || /^\d+$/.test(message.trim());
+  if (isPurchaseOrNumber) {
+    const shoppingResult = await handleShoppingInterceptor(message, context, supabase);
+    if (shoppingResult) { ... return shoppingResult; }
+  }
+  // Todo lo demás → fluye al LLM con herramientas de shopping
+}
+```
 
-### 3. Dejar que la IA use las herramientas disponibles
-Cuando no hay interceptor que atrape el mensaje, el flujo llega al LLM (línea 4508). La IA ya tiene:
-- `buscar_productos` en sus herramientas (para idle/browsing)
-- `agregar_al_carrito` (para shopping)
-- El system prompt con el contexto completo
+Esto significa que "Siii", "genial", "lo confirmo", "qué hay", "carrito" ya no entran al parser de productos. Van directo al LLM que puede interpretar el contexto y llamar `ver_carrito`, `confirmar_pedido`, o responder con texto.
 
-La IA puede interpretar "remera" como búsqueda de producto, "confirmado" como confirmación, "genial, dame dos más" como agregado al carrito — sin necesidad de regex.
+### 2. Simplificar los guards internos del interceptor
+Dado que el interceptor ya solo recibe mensajes con intención de compra, se pueden eliminar los checks redundantes de `isGreetingOnly`, `wantsCartView`, `wantsFlowCommand`, `isOrderConfirmationSignal` dentro de `handleShoppingInterceptor` (líneas 157-178) — ya no son necesarios porque esos mensajes nunca llegan.
 
-### 4. Quitar `tool_choice: "required"` en primera iteración
-Línea 4514: actualmente se fuerza `tool_choice: "required"` en estados pre-checkout. Esto obliga a la IA a llamar una herramienta incluso cuando debería solo responder con texto (ej. "¿Qué querés hacer?"). Cambiar a `"auto"` siempre para que la IA decida.
+### 3. Reducir interceptores en idle/browsing (líneas 4282-4412)
+Mantener solo:
+- **Vendor list** (`wantsVendorList`) — necesario, es mecánico
+- **Vendor by number** en browsing (línea 4417) — necesario, es mecánico
+- **Vendor by name** desde `available_vendors_map` (línea 4334) — necesario
+- **Vendor intent** ("qué hay en X") (línea 4301) — necesario
 
-### 5. Mantener interceptores esenciales (no se tocan)
-- Selección de vendor por número en browsing (línea 4391)
-- Dirección en needs_address (línea 4234)
-- Pago en checkout (línea 4045)
-- Confirmación de pedido (línea 4936)
-- Shopping interceptor para parsing multi-producto (línea 124) — solo cuando ya está en shopping con vendor
+**Eliminar/reducir:**
+- `explicitSearchIntent` (línea 4399-4412): eliminar este interceptor. El LLM tiene `buscar_productos` en sus herramientas para idle/browsing y puede decidir cuándo usarlo.
+- `purchaseIntent` sin vendor (línea 4359-4397): mantener la lógica de auto-seleccionar vendor o guiar, pero no capturar el mensaje — dejar que fluya al LLM después de setear el estado.
+
+### 4. Mejorar el system prompt para shopping
+En `simplified-prompt.ts`, reforzar las instrucciones del estado `shopping`:
+
+```
+PASO ACTUAL: Comprando en ${vendor}.
+- Para agregar productos: usá agregar_al_carrito con los productos del menú.
+- Si el usuario confirma (sí, dale, listo, confirmo): mostrá el carrito con ver_carrito.
+- Si pide ver el carrito: usá ver_carrito.
+- Si quiere ver el menú: usá ver_menu_negocio.
+- NUNCA respondas "no encontré X" — si no entendés, preguntá qué quiere.
+```
 
 ## Archivos a modificar
 
 | Archivo | Cambio |
 |---------|--------|
-| `vendor-bot.ts` | Eliminar catch-all `isProductQuery`, restringir `foodKeywords`, cambiar `tool_choice` a `auto` |
+| `vendor-bot.ts` | Gate `handleShoppingInterceptor` con `looksLikePurchaseIntent`, eliminar `explicitSearchIntent` interceptor |
+| `simplified-prompt.ts` | Mejorar instrucciones de shopping para que la IA maneje confirmaciones y comandos |
 
 ## Resultado esperado
-- La IA interpreta el contexto y decide qué herramienta usar (o si responder con texto)
-- No hay más listas de palabras ignoradas que mantener
-- Los interceptores solo quedan para flujos mecánicos (números, direcciones, pagos)
-- "Remera" en idle → la IA llama `buscar_productos` por su cuenta
-- "Confirmado" en shopping → la IA entiende la intención sin regex
-- "Genial, dame dos onion rings" → la IA no se confunde con "genial"
+- "Siii" en shopping → LLM interpreta como confirmación → muestra carrito/confirma
+- "Lo confirmo!" → LLM entiende → avanza el pedido
+- "genial, dame dos onion rings" → "dame dos onion rings" pasa al interceptor (tiene verbo de compra), "genial" se ignora
+- "qué hay" en shopping → LLM llama `ver_menu_negocio`
+- "carrito" → LLM llama `ver_carrito`
+- Búsquedas en idle → LLM decide si llamar `buscar_productos` o `ver_locales_abiertos`
 
