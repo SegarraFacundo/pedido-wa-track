@@ -1205,6 +1205,11 @@ async function ejecutarHerramienta(
       case "mostrar_resumen_pedido": {
         console.log("📋 ========== MOSTRAR RESUMEN PEDIDO ==========");
         
+        // Guard: pickup nunca debe tener dirección
+        if (context.delivery_type === 'pickup') {
+          context.delivery_address = undefined;
+        }
+        
         if (context.cart.length === 0) {
           return "⚠️ Tu carrito está vacío. No hay nada que confirmar todavía.";
         }
