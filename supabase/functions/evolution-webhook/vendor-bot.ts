@@ -1205,6 +1205,11 @@ async function ejecutarHerramienta(
       case "mostrar_resumen_pedido": {
         console.log("📋 ========== MOSTRAR RESUMEN PEDIDO ==========");
         
+        // Guard: pickup nunca debe tener dirección
+        if (context.delivery_type === 'pickup') {
+          context.delivery_address = undefined;
+        }
+        
         if (context.cart.length === 0) {
           return "⚠️ Tu carrito está vacío. No hay nada que confirmar todavía.";
         }
@@ -1441,6 +1446,7 @@ async function ejecutarHerramienta(
         
         if (args.tipo === "pickup") {
           console.log(`✅ Customer selected PICKUP`);
+          context.delivery_address = undefined; // Pickup: limpiar dirección residual
           
           let respuesta = `✅ Perfecto! Tu pedido será para *retiro en local*.\n\n`;
           respuesta += `📍 *Retirá en:*\n${context.selected_vendor_name}\n`;
@@ -1496,6 +1502,10 @@ async function ejecutarHerramienta(
       }
 
       case "crear_pedido": {
+        // Guard: pickup nunca debe tener dirección
+        if (context.delivery_type === 'pickup') {
+          context.delivery_address = undefined;
+        }
         // 🆕 CRÍTICO: Guardar el método de pago de los args ANTES de cualquier verificación
         // Esto asegura que mostrar_resumen_pedido tenga el payment_method disponible
         if (args.metodo_pago && !context.payment_method) {
@@ -3551,6 +3561,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       // ✅ Usuario confirma el cambio
       if (userResponse.match(/^(s[ií]|si|yes|dale|ok|confirmo|cambio)/)) {
         console.log(`✅ User confirmed vendor change`);
+        context.confusion_count = 0;
         
         // Registrar analytics
         await trackVendorChange(context, 'confirmed', supabase);
@@ -3587,6 +3598,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       // ❌ Usuario rechaza el cambio
       if (userResponse.match(/^(no|nop|cancel|cancela)/)) {
         console.log(`❌ User rejected vendor change`);
+        context.confusion_count = 0;
         
         // Registrar analytics
         await trackVendorChange(context, 'cancelled', supabase);
@@ -3606,16 +3618,24 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         return response;
       }
       
-      // Si la respuesta no es clara, volver a preguntar
-      const clarificationResponse = `Por favor confirmá si querés cambiar de negocio.\n\nRespondé *"sí"* para cambiar a ${context.pending_vendor_change.new_vendor_name} o *"no"* para seguir con ${context.selected_vendor_name}.`;
-      
-      context.conversation_history.push({
-        role: "assistant",
-        content: clarificationResponse,
-      });
-      await saveContext(context, supabase);
-      
-      return clarificationResponse;
+      // Si la respuesta no es clara, contar intentos
+      context.confusion_count = (context.confusion_count || 0) + 1;
+      if (context.confusion_count >= 2) {
+        // El usuario ignoró la pregunta 2 veces, cancelar cambio pendiente
+        console.log(`⏰ pending_vendor_change timeout after ${context.confusion_count} unclear responses, clearing`);
+        context.pending_vendor_change = undefined;
+        context.confusion_count = 0;
+        await saveContext(context, supabase);
+        // NO retornar — dejar que el mensaje fluya al resto del flujo
+      } else {
+        const clarificationResponse = `Por favor confirmá si querés cambiar de negocio.\n\nRespondé *"sí"* para cambiar a ${context.pending_vendor_change.new_vendor_name} o *"no"* para seguir con ${context.selected_vendor_name}.`;
+        context.conversation_history.push({
+          role: "assistant",
+          content: clarificationResponse,
+        });
+        await saveContext(context, supabase);
+        return clarificationResponse;
+      }
     }
 
     // 🔄 MANEJO PROGRAMATICO: Flujo de cancelación con captura de motivo
@@ -3887,6 +3907,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
           response = "✅ Perfecto, seguimos con *envío a domicilio*.\n\n📍 ¿Cuál es tu dirección de entrega?";
         } else {
           context.order_state = "checkout";
+          context.delivery_address = undefined; // Pickup: limpiar dirección residual
           const vendorConfig = await getVendorConfig(context.selected_vendor_id, supabase);
           const paymentResult = await ejecutarHerramienta("ver_metodos_pago", {}, context, supabase);
           response = `✅ Perfecto, seguimos con *retiro en local*.\n\n📍 Retirá en: ${vendorConfig.address || context.selected_vendor_name || "el local"}\n\n${paymentResult}`;
@@ -3933,13 +3954,14 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         }
       }
       
-      // Detectar método por texto
+      // Detectar método por texto — SOLO si el vendor lo soporta
       if (!selectedMethod) {
-        if (normalizedMsg.includes('efectivo') || normalizedMsg.includes('cash')) {
+        const available = context.available_payment_methods || [];
+        if ((normalizedMsg.includes('efectivo') || normalizedMsg.includes('cash')) && available.some(m => m.toLowerCase().includes('efectivo'))) {
           selectedMethod = 'efectivo';
-        } else if (normalizedMsg.includes('transferencia') || normalizedMsg.includes('transfer')) {
+        } else if ((normalizedMsg.includes('transferencia') || normalizedMsg.includes('transfer') || normalizedMsg.includes('transfiero') || normalizedMsg.includes('cbu') || normalizedMsg.includes('alias')) && available.some(m => m.toLowerCase().includes('transferencia'))) {
           selectedMethod = 'transferencia';
-        } else if (normalizedMsg.includes('mercado') || normalizedMsg.includes('mp') || normalizedMsg.includes('mercadopago')) {
+        } else if ((normalizedMsg.includes('mercado') || /\bmp\b/.test(normalizedMsg) || normalizedMsg.includes('mercadopago')) && available.some(m => m.toLowerCase().includes('mercadopago') || m.toLowerCase().includes('mercado'))) {
           selectedMethod = 'mercadopago';
         }
       }
@@ -4217,6 +4239,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
           confirmResponse += "\n\n🚚 Este negocio trabaja solo con *delivery*.\n📍 Escribí tu dirección de entrega (calle y número).";
         } else if (allowsPickup && !allowsDelivery) {
           context.delivery_type = 'pickup';
+          context.delivery_address = undefined; // Pickup: limpiar dirección residual
           context.order_state = 'checkout';
           const paymentResult = await ejecutarHerramienta("ver_metodos_pago", {}, context, supabase);
           confirmResponse += `\n\n🏪 Este negocio trabaja solo con *retiro en local*.\n\n${paymentResult}`;
