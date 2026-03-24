@@ -295,7 +295,8 @@ function isClarificationOnlySegment(segment: string): boolean {
     .replace(/[.,;:!?]/g, "")
     .trim();
 
-  return /^(?:no\s+solo\s+(?:uno|una|1)|(?:solo|solamente)\s+(?:uno|una|1)|no\s+(?:uno|una|1)|nada\s+mas|eso(?:\s+solo)?|nomas)$/.test(normalized);
+  // Filter out conversational noise: "genial", "por ultimo", "una", "y listo", etc.
+  return /^(?:no\s+solo\s+(?:uno|una|1)|(?:solo|solamente)\s+(?:uno|una|1)|no\s+(?:uno|una|1)|nada\s+mas|eso(?:\s+solo)?|nomas|genial|perfecto|buenisimo|excelente|dale|ok(?:ay)?|bien|por\s+(?:ultimo|favor)|y\s+(?:listo|ya|nada\s+mas)|una|uno|eso)$/.test(normalized);
 }
 
 function splitProductSegments(text: string): string[] {
