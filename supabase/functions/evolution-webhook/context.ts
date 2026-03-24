@@ -46,6 +46,7 @@ async function syncOrderStateWithDB(context: ConversationContext, supabase: any)
     context.delivery_address = undefined;
     context.payment_method = undefined;
     context.delivery_type = undefined;
+    context.awaiting_delivery_mode_confirmation = undefined;
     context.resumen_mostrado = false;
     context.payment_methods_fetched = false;
     context.pending_cancellation = undefined;
@@ -106,6 +107,7 @@ export async function getContext(phone: string, supabase: any): Promise<Conversa
         // ⭐ CAMPOS CRÍTICOS QUE FALTABAN:
         resumen_mostrado: saved.resumen_mostrado || false,
         delivery_type: saved.delivery_type,
+        awaiting_delivery_mode_confirmation: saved.awaiting_delivery_mode_confirmation,
         vendor_allows_pickup: saved.vendor_allows_pickup,
         vendor_allows_delivery: saved.vendor_allows_delivery,
         pickup_instructions: saved.pickup_instructions,
