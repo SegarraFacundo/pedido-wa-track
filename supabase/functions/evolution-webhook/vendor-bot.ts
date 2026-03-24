@@ -1502,6 +1502,10 @@ async function ejecutarHerramienta(
       }
 
       case "crear_pedido": {
+        // Guard: pickup nunca debe tener dirección
+        if (context.delivery_type === 'pickup') {
+          context.delivery_address = undefined;
+        }
         // 🆕 CRÍTICO: Guardar el método de pago de los args ANTES de cualquier verificación
         // Esto asegura que mostrar_resumen_pedido tenga el payment_method disponible
         if (args.metodo_pago && !context.payment_method) {
