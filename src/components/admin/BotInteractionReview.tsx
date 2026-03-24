@@ -308,18 +308,16 @@ export default function BotInteractionReview() {
                           </span>
                         </TableCell>
                         <TableCell>
-                          <div className="flex gap-1">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-7 w-7"
-                              title="Desestimar"
-                              onClick={(e) => dismissInteraction(interaction.id, e)}
-                            >
-                              <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
-                            </Button>
-                            <MessageSquare className="h-4 w-4 text-muted-foreground mt-1.5" />
-                          </div>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-destructive"
+                            title="Eliminar"
+                            disabled={deleting.has(interaction.id)}
+                            onClick={(e) => deleteInteraction(interaction.id, e)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                       {expandedId === interaction.id && (
