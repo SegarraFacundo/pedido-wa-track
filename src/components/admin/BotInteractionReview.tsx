@@ -220,12 +220,11 @@ export default function BotInteractionReview() {
         </Card>
       </div>
 
-      {dismissed.size > 0 && (
+      {filteredInteractions.length > 0 && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <EyeOff className="h-4 w-4" />
-          {dismissed.size} desestimada{dismissed.size > 1 ? "s" : ""}
-          <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => setDismissed(new Set())}>
-            Restaurar todas
+          <Button variant="outline" size="sm" className="text-destructive" onClick={deleteAllVisible}>
+            <Trash2 className="h-4 w-4 mr-1" />
+            Eliminar todas ({filteredInteractions.length})
           </Button>
         </div>
       )}
