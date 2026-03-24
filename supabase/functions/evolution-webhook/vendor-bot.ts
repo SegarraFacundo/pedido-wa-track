@@ -3929,7 +3929,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     }
 
     // 🔍 VALIDACIÓN: Detectar intentos de confirmar pedido sin productos en carrito
-    const confirmPhrases = ['confirmar', 'confirmo', 'listo', 'eso es todo', 'si confirmo', 'confirma', 'dale'];
+    const confirmPhrases = ['confirmar', 'confirmo', 'confirmado', 'listo', 'eso es todo', 'si confirmo', 'confirma', 'dale', 'ya esta', 'ya está', 'nada mas', 'nada más'];
     const normalizedMsgConfirm = message.toLowerCase().trim();
     const isConfirming = confirmPhrases.some(phrase => normalizedMsgConfirm.includes(phrase));
 
