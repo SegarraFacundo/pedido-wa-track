@@ -4919,16 +4919,20 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     }
     
     // 📊 Log error interaction
-    await supabase.from("bot_interaction_logs").insert({
-      phone: normalizedPhone,
-      message_preview: message.slice(0, 500),
-      response_preview: null,
-      intent_detected: null,
-      action_taken: "error",
-      state_before: null,
-      state_after: null,
-      error: (error as any).message?.slice(0, 500) || "Unknown error",
-    }).catch((e: any) => console.error("📊 Log insert error:", e));
+    try {
+      await supabase.from("bot_interaction_logs").insert({
+        phone: normalizedPhone,
+        message_preview: message.slice(0, 500),
+        response_preview: null,
+        intent_detected: null,
+        action_taken: "error",
+        state_before: null,
+        state_after: null,
+        error: (error as any).message?.slice(0, 500) || "Unknown error",
+      });
+    } catch (logErr) {
+      console.error("📊 Log insert error:", logErr);
+    }
 
     return "Disculpá, tuve un problema técnico. Por favor intentá de nuevo en un momento.";
   }
