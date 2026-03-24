@@ -3861,13 +3861,19 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
     }
 
     // 🛒 INTERCEPTOR: Estado shopping + número/producto → agregar al carrito directamente
+    // SOLO interceptar cuando hay intención de compra clara (número, "dame X", "quiero X")
+    // Todo lo demás (confirmaciones, saludos, preguntas) fluye al LLM
     if (context.order_state === "shopping" && context.selected_vendor_id) {
-      const shoppingResult = await handleShoppingInterceptor(message, context, supabase);
-      if (shoppingResult) {
-        context.conversation_history.push({ role: "assistant", content: shoppingResult });
-        await saveContext(context, supabase);
-        return shoppingResult;
+      const isPurchaseOrNumber = looksLikePurchaseIntent(message) || /^\d+$/.test(message.trim());
+      if (isPurchaseOrNumber) {
+        const shoppingResult = await handleShoppingInterceptor(message, context, supabase);
+        if (shoppingResult) {
+          context.conversation_history.push({ role: "assistant", content: shoppingResult });
+          await saveContext(context, supabase);
+          return shoppingResult;
+        }
       }
+      // "Siii", "lo confirmo", "carrito", "menú", etc. → fluye al LLM con herramientas de shopping
     }
 
 
