@@ -79,6 +79,7 @@ export interface ConversationContext {
   payment_methods_fetched?: boolean;
   available_payment_methods?: string[];
   delivery_type?: 'delivery' | 'pickup';  // Tipo de entrega elegido
+  awaiting_delivery_mode_confirmation?: 'delivery' | 'pickup'; // Esperando confirmación sí/no para modo único disponible
   vendor_allows_pickup?: boolean;          // Si el vendor acepta retiro
   vendor_allows_delivery?: boolean;        // ⭐ NUEVO: Si el vendor hace delivery
   pickup_instructions?: string;            // Instrucciones de retiro
