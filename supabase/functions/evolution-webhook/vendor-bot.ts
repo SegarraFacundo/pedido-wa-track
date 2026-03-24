@@ -3608,16 +3608,24 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         return response;
       }
       
-      // Si la respuesta no es clara, volver a preguntar
-      const clarificationResponse = `Por favor confirmá si querés cambiar de negocio.\n\nRespondé *"sí"* para cambiar a ${context.pending_vendor_change.new_vendor_name} o *"no"* para seguir con ${context.selected_vendor_name}.`;
-      
-      context.conversation_history.push({
-        role: "assistant",
-        content: clarificationResponse,
-      });
-      await saveContext(context, supabase);
-      
-      return clarificationResponse;
+      // Si la respuesta no es clara, contar intentos
+      context.confusion_count = (context.confusion_count || 0) + 1;
+      if (context.confusion_count >= 2) {
+        // El usuario ignoró la pregunta 2 veces, cancelar cambio pendiente
+        console.log(`⏰ pending_vendor_change timeout after ${context.confusion_count} unclear responses, clearing`);
+        context.pending_vendor_change = undefined;
+        context.confusion_count = 0;
+        await saveContext(context, supabase);
+        // NO retornar — dejar que el mensaje fluya al resto del flujo
+      } else {
+        const clarificationResponse = `Por favor confirmá si querés cambiar de negocio.\n\nRespondé *"sí"* para cambiar a ${context.pending_vendor_change.new_vendor_name} o *"no"* para seguir con ${context.selected_vendor_name}.`;
+        context.conversation_history.push({
+          role: "assistant",
+          content: clarificationResponse,
+        });
+        await saveContext(context, supabase);
+        return clarificationResponse;
+      }
     }
 
     // 🔄 MANEJO PROGRAMATICO: Flujo de cancelación con captura de motivo
