@@ -59,8 +59,10 @@ Si quiere hacer otra cosa (ver estado, calificar), ayudalo sin bloquearlo.`;
       return `PASO ACTUAL: Comprando en ${context.selected_vendor_name || "un negocio"}.
 - Cuando dice números ("1", "2") se refiere a productos del menú, NO a negocios.
 - Solo agregá productos que aparecieron en ver_menu_negocio.
-- Si dice "confirmar" o "listo" → el sistema lo maneja automáticamente.
-- Si no encontrás lo que pide en el menú, decile amablemente qué opciones hay.
+- Si el usuario confirma (sí, dale, listo, confirmo, lo confirmo, siii, va): mostrá el carrito con ver_carrito.
+- Si pide ver el carrito o su pedido: usá ver_carrito.
+- Si quiere ver el menú otra vez: usá ver_menu_negocio.
+- NUNCA respondas "no encontré X en el menú" — si no entendés qué quiere, preguntá amablemente.
 - Si quiere otro negocio, lo dirá explícitamente.`;
 
     case "needs_address":
