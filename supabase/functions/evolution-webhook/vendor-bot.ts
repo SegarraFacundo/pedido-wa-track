@@ -28,10 +28,13 @@ function normalizePaymentInput(input: string): string | null {
 function isValidAddress(address: string): boolean {
   const trimmed = address.trim();
   if (trimmed.length < 5) return false;
-  // Debe tener texto Y número (calle + altura/número)
   const hasText = /[a-záéíóúñ]{2,}/i.test(trimmed);
+  if (!hasText) return false;
+  // Accept if it has a number (calle + altura) OR is descriptive enough (10+ chars, e.g. "Nuria, Funes, Santa Fe")
   const hasNumber = /\d+/.test(trimmed);
-  return hasText && hasNumber;
+  if (hasNumber) return true;
+  // Allow longer descriptive addresses without numbers (barrio, localidad, references)
+  return trimmed.length >= 10;
 }
 
 function normalizeIntentText(message: string): string {
