@@ -86,14 +86,26 @@ Responde solo con las palabras clave corregidas, sin explicación ni ejemplos.`
     
     console.log("Día actual (Argentina):", dayOfWeek, "Hora actual (Argentina):", currentTime);
 
+    // Generar variaciones de keywords (singular/plural español)
+    const expandedKeywords = new Set<string>();
+    for (const keyword of keywordArray) {
+      expandedKeywords.add(keyword);
+      // Plurales: bebida → bebidas, bebidas → bebida
+      if (keyword.endsWith('s')) {
+        expandedKeywords.add(keyword.slice(0, -1));
+      } else {
+        expandedKeywords.add(keyword + 's');
+      }
+      if (keyword.endsWith('es') && keyword.length > 3) {
+        expandedKeywords.add(keyword.slice(0, -2));
+      }
+    }
+    console.log("Keywords expandidas:", Array.from(expandedKeywords));
+
     // Buscar productos con búsqueda flexible
-    // Para cada keyword, buscar con wildcards generosos
     let allProducts: any[] = [];
     
-    for (const keyword of keywordArray) {
-      // Buscar en nombre, descripción y categoría
-      // Para categoría, soportar tanto string como array
-      // Usar % en ambos lados para buscar la palabra en cualquier parte
+    for (const keyword of expandedKeywords) {
       let query = supabase
         .from('products')
         .select(`
@@ -118,11 +130,16 @@ Responde solo con las palabras clave corregidas, sin explicación ni ejemplos.`
         `)
         .eq('is_available', true);
       
-      // Buscar en nombre, descripción y categoría (soportando array en category)
-      // cs = contains (para arrays), ilike para strings
-      query = query.or(`name.ilike.%${keyword}%,description.ilike.%${keyword}%,category.cs.{${keyword}}`);
+      // Buscar en nombre y descripción con ilike (case-insensitive)
+      // Para categoría: usar cs para match exacto Y también buscar variaciones
+      const orConditions = [
+        `name.ilike.%${keyword}%`,
+        `description.ilike.%${keyword}%`,
+        `category.cs.{${keyword}}`,
+        `category.cs.{${keyword.charAt(0).toUpperCase() + keyword.slice(1)}}`,
+      ];
+      query = query.or(orConditions.join(','));
       
-      // Si se proporcionan vendorIds, filtrar solo esos vendors
       if (vendorIds && Array.isArray(vendorIds) && vendorIds.length > 0) {
         query = query.in('vendor_id', vendorIds);
       }
