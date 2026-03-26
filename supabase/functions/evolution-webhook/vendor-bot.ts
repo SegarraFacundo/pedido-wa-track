@@ -4524,6 +4524,18 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         return result;
       }
 
+      // INTERCEPTOR: Respuestas conversacionales a sugerencias del bot
+      // "algo puntual", "algo específico", "buscar algo", "algo en particular", "sí, buscar"
+      const wantsToSearch = /^(?:algo\s+(?:puntual|espec[ií]fico|en\s+particular|particular)|buscar\s+algo|s[ií],?\s*buscar|quiero\s+buscar|s[ií],?\s*algo\s+puntual)$/i.test(msgLower);
+      if (wantsToSearch) {
+        console.log(`🔍 INTERCEPTOR: User wants to search but didn't specify what: "${message.trim()}"`);
+        const response = "¡Dale! 😊 Decime qué producto o tipo de producto estás buscando (ej: \"pizza\", \"helado\", \"bebidas\").";
+        context.confusion_count = 0;
+        context.conversation_history.push({ role: "assistant", content: response });
+        await saveContext(context, supabase);
+        return response;
+      }
+
       // INTERCEPTOR: Preguntas tipo "¿qué hay en el vivero?" → abrir menú de negocio (sin buscar literal producto)
       const vendorIntentMatch = msgLower.match(
         /(?:que|qué)\s+(?:tenemos|hay|tienen|ofrecen)\s+(?:en|del?|de la)\s+(.+)$|(?:ver|mostrar|mostrame)\s+(?:el\s+)?men[uú]\s+(?:de|del|de la)\s+(.+)$|(?:productos?|cat[aá]logo)\s+(?:de|del|de la)\s+(.+)$/i,
