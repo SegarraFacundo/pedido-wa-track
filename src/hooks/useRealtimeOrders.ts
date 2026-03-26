@@ -260,12 +260,12 @@ export function useRealtimeOrders(vendorId?: string) {
 
       const isPickup = currentOrder.delivery_type === 'pickup';
       const statusDescriptions = {
-        confirmed: 'El vendedor está preparando tu pedido.',
-        preparing: 'Tu pedido está siendo preparado.',
+        confirmed: 'El vendedor lo está preparando.',
+        preparing: 'En breve estará listo.',
         ready: isPickup
-          ? 'Tu pedido está listo para retirar en el local.'
-          : 'Tu pedido está listo para entrega.',
-        delivering: 'Tu pedido está en camino.',
+          ? 'Podés pasar a retirarlo por el local.'
+          : 'Pronto saldrá a entrega.',
+        delivering: 'El repartidor va en camino.',
         delivered: isPickup
           ? '¡Gracias por retirarlo!'
           : '¡Gracias por tu compra!',
