@@ -877,6 +877,41 @@ async function ejecutarHerramienta(
 
         console.log(`✅ Vendor found: ${vendor.id} (${vendor.name}) - Active: ${vendor.is_active}, Payment: ${vendor.payment_status}`);
 
+        // ✅ VALIDACIÓN: ¿Está abierto el negocio?
+        const argTimeNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' }));
+        const dayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+        const todayDay = dayNames[argTimeNow.getDay()];
+        const nowTimeStr = argTimeNow.toTimeString().slice(0, 5);
+
+        const { data: vendorHoursCheck } = await supabase
+          .from("vendor_hours")
+          .select("opening_time, closing_time, is_closed, is_open_24_hours")
+          .eq("vendor_id", vendorId)
+          .eq("day_of_week", todayDay);
+
+        let vendorIsOpen = true; // Default: abierto si no tiene horarios configurados
+        if (vendorHoursCheck && vendorHoursCheck.length > 0) {
+          vendorIsOpen = vendorHoursCheck.some((h: any) => {
+            if (h.is_closed) return false;
+            if (h.is_open_24_hours) return true;
+            return nowTimeStr >= h.opening_time.slice(0, 5) && nowTimeStr <= h.closing_time.slice(0, 5);
+          });
+        }
+
+        if (!vendorIsOpen) {
+          console.log(`🔒 Vendor ${vendor.name} is CLOSED - blocking menu`);
+          
+          // Buscar horarios para mostrar al usuario
+          const hoursInfo = vendorHoursCheck
+            ?.filter((h: any) => !h.is_closed)
+            .map((h: any) => `${h.opening_time.slice(0, 5)} - ${h.closing_time.slice(0, 5)}`)
+            .join(', ') || 'No disponible';
+          
+          return `🔒 *${vendor.name}* está cerrado en este momento.\n\n` +
+                 `⏰ Horario de hoy: ${hoursInfo}\n\n` +
+                 `¿Querés ver los negocios que están abiertos ahora? 😊`;
+        }
+
         // ✅ VALIDACIÓN: ¿Hay carrito activo de OTRO negocio?
         if (context.cart.length > 0 && 
             context.selected_vendor_id && 
