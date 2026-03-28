@@ -50,6 +50,14 @@ Ejemplos:
 - "hamburgueza" → "hamburguesa"
 - "suchi" → "sushi"
 - "quiero pedir 4 pizzas" → "pizza"
+- "birra" → "cerveza, birra, beer"
+- "birras" → "cerveza, birra, beer"
+- "fernet" → "fernet"
+- "helado" → "helado"
+- "gaseosa" → "gaseosa, coca, bebida"
+- "milanga" → "milanesa, milanga"
+
+Importante: incluí sinónimos argentinos y variaciones coloquiales. Si el término es lunfardo o jerga argentina, agregá también la palabra formal.
 
 Responde solo con las palabras clave corregidas, sin explicación ni ejemplos.`
           }
