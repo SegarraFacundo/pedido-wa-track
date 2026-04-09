@@ -1032,7 +1032,7 @@ export async function ejecutarHerramienta(
 
       case "seleccionar_tipo_entrega": {
         // ✅ SIEMPRE consultar en tiempo real - NUNCA usar caché
-        const vendorConfig = await getVendorConfig(context.selected_vendor_id!, supabase);
+        const vendorConfig = await _getVendorConfig(context.selected_vendor_id!, supabase);
         console.log(`🔄 Real-time vendor config for ${context.selected_vendor_id}:`, vendorConfig);
         
         // Validar pickup EN TIEMPO REAL
@@ -1304,7 +1304,7 @@ export async function ejecutarHerramienta(
 
         // ✅ SIEMPRE consultar en tiempo real para tipo de entrega
         if (!context.delivery_type) {
-          const vendorConfig = await getVendorConfig(context.selected_vendor_id!, supabase);
+          const vendorConfig = await _getVendorConfig(context.selected_vendor_id!, supabase);
           console.log(`🔄 Real-time vendor config for delivery type:`, vendorConfig);
           
           // Si el vendor acepta ambos, preguntar
@@ -2376,7 +2376,7 @@ Escribí lo que necesites y te ayudo. ¡Es muy fácil! 😊`;
         }
         
         // v3: Validar que tenga texto + número
-        if (!isValidAddress(direccion)) {
+        if (!_isValidAddress(direccion)) {
           return "⚠️ La dirección es muy corta. Escribí al menos la calle o zona.\nEjemplo: *Belgrano 450* o *Barrio Norte, Funes*";
         }
         
