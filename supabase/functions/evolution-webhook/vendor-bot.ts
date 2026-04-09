@@ -4369,7 +4369,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         if (allowsDelivery && !allowsPickup) {
           context.delivery_type = 'delivery';
           context.order_state = 'needs_address';
-          confirmResponse += "\n\n🚚 Este negocio trabaja solo con *delivery*.\n📍 Escribí tu dirección de entrega (calle y número).";
+          confirmResponse += "\n\n🚚 Este negocio trabaja solo con *delivery*.\n📍 Por favor, escribí tu dirección de entrega (calle y número).";
         } else if (allowsPickup && !allowsDelivery) {
           context.delivery_type = 'pickup';
           context.delivery_address = undefined; // Pickup: limpiar dirección residual
@@ -4525,7 +4525,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         (context.order_state === "shopping" && context.delivery_type === "delivery" && !context.delivery_address && context.cart.length > 0)) 
         && message.trim().length > 3) {
       const msgLower = message.toLowerCase().trim();
-      const notAddress = /^(cancel|volver|cambiar|no|menu|carrito|ayuda|estado|hola)/i.test(msgLower);
+      const notAddress = /^(cancel|volver|cambiar|no\b|menu|carrito|ayuda|estado|hola|confirm|pedido|listo|dale|ok\b|s[ií]\b)/i.test(msgLower);
       
       if (!notAddress) {
         console.log(`📍 INTERCEPTOR: Treating message as address in needs_address state: "${message}"`);
@@ -4656,17 +4656,31 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
           }
           // No interceptar, dejar que fluya al LLM con herramientas de shopping
         } 
-        // Si hay un solo vendor en el mapa, auto-seleccionarlo
+        // Si hay un solo vendor en el mapa, auto-seleccionarlo y procesar compra
         else if (context.available_vendors_map && context.available_vendors_map.length === 1) {
           const singleVendor = context.available_vendors_map[0];
-          console.log(`🛒 INTERCEPTOR: Purchase intent with single vendor available "${singleVendor.name}": "${message.trim()}"`);
-          const menuResult = await ejecutarHerramienta("ver_menu_negocio", {
+          console.log(`🛒 INTERCEPTOR: Purchase intent with single vendor available "${singleVendor.name}", auto-selecting and processing: "${message.trim()}"`);
+          
+          // Auto-seleccionar vendor primero (ver_menu_negocio setea selected_vendor_id)
+          await ejecutarHerramienta("ver_menu_negocio", {
             vendor_id: String(singleVendor.index),
           }, context, supabase);
+          
+          // Ahora procesar la intención de compra con el vendor ya seleccionado
+          const shoppingResult = await handleShoppingInterceptor(message, context, supabase);
+          if (shoppingResult) {
+            context.confusion_count = 0;
+            context.conversation_history.push({ role: "assistant", content: shoppingResult });
+            await saveContext(context, supabase);
+            return shoppingResult;
+          }
+          
+          // Si el shopping interceptor no pudo procesarlo, mostrar el menú
+          const menuText = `Estos son los productos de *${singleVendor.name}*. Decime qué querés pedir 😊`;
           context.confusion_count = 0;
-          context.conversation_history.push({ role: "assistant", content: menuResult });
+          context.conversation_history.push({ role: "assistant", content: menuText });
           await saveContext(context, supabase);
-          return menuResult;
+          return menuText;
         }
         // Si hay vendors pero no uno seleccionado, guiar a elegir
         else if (context.available_vendors_map && context.available_vendors_map.length > 1) {
