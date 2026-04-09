@@ -1222,8 +1222,17 @@ async function ejecutarHerramienta(
         for (const item of resolvedItems) {
           const existing = context.cart.find((c) => c.product_id === item.product_id);
           if (existing) {
-            existing.quantity += item.quantity;
-            if (item.notes) existing.notes = item.notes;
+            // 🛡️ SAFEGUARD: If item already exists and only a note is being added/changed,
+            // don't accumulate quantity. Only add quantity if there's NO note or 
+            // the quantity is explicitly different from what's already in cart.
+            if (item.notes && item.quantity === existing.quantity) {
+              // Same quantity + has note = user is just adding/changing a note, not ordering more
+              console.log(`📝 Updating note only for ${existing.product_name} (qty unchanged: ${existing.quantity})`);
+              existing.notes = item.notes;
+            } else {
+              existing.quantity += item.quantity;
+              if (item.notes) existing.notes = item.notes;
+            }
           } else {
             context.cart.push(item);
           }
