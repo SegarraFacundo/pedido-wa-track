@@ -4369,7 +4369,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
         if (allowsDelivery && !allowsPickup) {
           context.delivery_type = 'delivery';
           context.order_state = 'needs_address';
-          confirmResponse += "\n\n🚚 Este negocio trabaja solo con *delivery*.\n📍 Escribí tu dirección de entrega (calle y número).";
+          confirmResponse += "\n\n🚚 Este negocio trabaja solo con *delivery*.\n📍 Por favor, escribí tu dirección de entrega (calle y número).";
         } else if (allowsPickup && !allowsDelivery) {
           context.delivery_type = 'pickup';
           context.delivery_address = undefined; // Pickup: limpiar dirección residual
