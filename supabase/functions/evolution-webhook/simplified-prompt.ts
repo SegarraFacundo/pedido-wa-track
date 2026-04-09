@@ -69,7 +69,8 @@ Si quiere hacer otra cosa (ver estado, calificar), ayudalo sin bloquearlo.`;
 - Si pide ver el carrito o su pedido: usá ver_carrito.
 - Si quiere ver el menú otra vez: usá ver_menu_negocio.
 - NUNCA respondas "no encontré X en el menú" — si no entendés qué quiere, preguntá amablemente.
-- Si quiere otro negocio, lo dirá explícitamente.`;
+- Si quiere otro negocio, lo dirá explícitamente.
+- El usuario puede agregar observaciones a productos (ej: "sin sal", "extra queso"). Usá el campo notes de agregar_al_carrito o agregar_nota_producto para items ya en el carrito.`;
 
     case "needs_address":
       return `PASO ACTUAL: Necesitás la dirección de entrega.

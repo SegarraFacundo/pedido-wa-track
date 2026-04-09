@@ -56,6 +56,7 @@ export interface CartItem {
   product_name: string;
   quantity: number;
   price: number;
+  notes?: string;
 }
 
 export interface ConversationContext {

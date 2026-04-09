@@ -154,6 +154,11 @@ Ejemplo INCORRECTO:
                   description: "Precio unitario del producto tal como aparece en el menú"
                 },
               },
+                notes: {
+                  type: "string",
+                  description: "Observación o personalización del producto (ej: 'sin sal', 'extra queso', 'bien cocida'). Solo incluir si el usuario lo menciona explícitamente."
+                },
+              },
               required: ["product_id", "product_name", "quantity", "price"],
             },
           },
@@ -368,6 +373,31 @@ MUESTRA:
           },
         },
         required: ["asunto", "descripcion"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "agregar_nota_producto",
+      description: "Agrega o modifica una observación/nota a un producto que ya está en el carrito. Usar cuando el cliente dice cosas como 'ponerle nota al 1: sin sal', 'al helado ponerle sin crema', 'la pizza sin aceitunas'.",
+      parameters: {
+        type: "object",
+        properties: {
+          item_index: {
+            type: "number",
+            description: "Número del producto en el carrito (1, 2, 3...). Opcional si se usa item_name.",
+          },
+          item_name: {
+            type: "string",
+            description: "Nombre (parcial o completo) del producto en el carrito. Opcional si se usa item_index.",
+          },
+          nota: {
+            type: "string",
+            description: "Observación o personalización del cliente (ej: 'sin sal', 'extra queso', 'bien cocida')",
+          },
+        },
+        required: ["nota"],
       },
     },
   },
