@@ -1,22 +1,37 @@
 
 
-# Plan: Fix product index mismatch between menu and cart
+# Plan: When user says "ver menú" after a search with 1 result, show that vendor's menu
 
 ## Problem
-
-The menu (`ver_menu_negocio`, line 919) fetches products **without** sorting, so items display in default DB insertion order. But the shopping interceptor (line 240) fetches products with `.order("name")` (alphabetical). When the user types "4" to select item 4 from the menu, the interceptor resolves it against the alphabetically-sorted list — returning a different product.
-
-In the screenshot: menu shows item 4 = "Sundae Especial", but the bot added "Helado de Vainilla" (which is likely #4 alphabetically).
+After searching "helado" and getting 1 result (Heladería Italiana), the user says "Quiero ver todo el menú". The `wantsVendorList` regex on line 4551 catches `ver.*menú` and triggers `ver_locales_abiertos`, ignoring that there's a single vendor in the search results.
 
 ## Fix
 
-One line change — remove `.order("name")` from the shopping interceptor (line 240) so both queries use the same default DB order. This ensures index 4 in the interceptor matches index 4 in the displayed menu.
+In `vendor-bot.ts` line ~4553, before calling `ver_locales_abiertos`, check if `available_vendors_map` has exactly 1 vendor. If so, show that vendor's menu instead of the full vendor list.
+
+```
+if (wantsVendorList) {
+  // If there's exactly 1 vendor from a recent search, show its menu
+  if (context.available_vendors_map?.length === 1) {
+    const singleVendor = context.available_vendors_map[0];
+    const result = await ejecutarHerramienta("ver_menu_negocio", {
+      vendor_id: String(singleVendor.index),
+    }, context, supabase);
+    ...
+    return result;
+  }
+  // Otherwise show all vendors
+  const result = await ejecutarHerramienta("ver_locales_abiertos", ...);
+  ...
+}
+```
+
+## File
 
 | File | Line | Change |
 |------|------|--------|
-| `vendor-bot.ts` | 240 | Remove `.order("name")` |
+| `vendor-bot.ts` | ~4553 | Add single-vendor shortcut before `ver_locales_abiertos` call |
 
 ## Result
-
-When the user types "4", they get item 4 as shown in the menu.
+"Quiero ver todo el menú" after a single-result search will show that vendor's full menu instead of the vendor list.
 
