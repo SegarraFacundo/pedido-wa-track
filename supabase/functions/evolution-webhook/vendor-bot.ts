@@ -4551,6 +4551,18 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       const wantsVendorList = !hasVendorSpecificSuffix && /(?:\bver\s+(?:opciones|locales|negocios|tiendas|categor[ií]as?|todo|men[uú])\b|\bopciones\b|\b(?:que|qué)\s+hay\b|\b(?:que|qué)\s+ten[eé]s\b|\b(?:que|qué)\s+puedo\s+pedir\b|\bd[oó]nde\s+puedo\s+pedir\b|\bmostrame\b|\bnegocios\s+abiertos\b|\blocales\s+abiertos\b)/i.test(msgLower);
 
       if (wantsVendorList) {
+        // If there's exactly 1 vendor from a recent search, show its menu directly
+        if (context.available_vendors_map && context.available_vendors_map.length === 1) {
+          const singleVendor = context.available_vendors_map[0];
+          console.log(`🏪 INTERCEPTOR: Single vendor in map "${singleVendor.name}", showing its menu instead of vendor list`);
+          const result = await ejecutarHerramienta("ver_menu_negocio", {
+            vendor_id: String(singleVendor.index),
+          }, context, supabase);
+          context.confusion_count = 0;
+          context.conversation_history.push({ role: "assistant", content: result });
+          await saveContext(context, supabase);
+          return result;
+        }
         console.log(`🏪 INTERCEPTOR: User wants to see options/vendors: "${message.trim()}", calling ver_locales_abiertos`);
         const result = await ejecutarHerramienta("ver_locales_abiertos", {}, context, supabase);
         context.confusion_count = 0;
