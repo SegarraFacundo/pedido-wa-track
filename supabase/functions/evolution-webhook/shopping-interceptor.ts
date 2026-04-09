@@ -1,6 +1,7 @@
 import type { ConversationContext } from "./types.ts";
 import { saveContext } from "./context.ts";
 import { ejecutarHerramienta } from "./tool-executors.ts";
+import { normalizeIntentText, isOrderConfirmationSignal, looksLikePurchaseIntent } from "./vendor-bot.ts";
 
 export async function handleShoppingInterceptor(
   message: string,

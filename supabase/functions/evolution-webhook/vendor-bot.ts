@@ -46,7 +46,7 @@ function isValidAddress(address: string): boolean {
   return trimmed.length >= 10;
 }
 
-function normalizeIntentText(message: string): string {
+export function normalizeIntentText(message: string): string {
   return message
     .toLowerCase()
     .normalize("NFD")
@@ -57,14 +57,14 @@ function normalizeIntentText(message: string): string {
     .trim();
 }
 
-function looksLikePurchaseIntent(message: string): boolean {
+export function looksLikePurchaseIntent(message: string): boolean {
   const trimmed = message.trim();
   return PURCHASE_VERB_REGEX.test(trimmed)
     || NUMERIC_PURCHASE_REGEX.test(trimmed)
     || WORD_QTY_PURCHASE_REGEX.test(trimmed);
 }
 
-function isOrderConfirmationSignal(message: string): boolean {
+export function isOrderConfirmationSignal(message: string): boolean {
   const normalized = normalizeIntentText(message);
 
   // Confirmaciones naturales (incluye variantes como "siii", "lo confirmo")
