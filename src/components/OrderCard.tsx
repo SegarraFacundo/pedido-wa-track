@@ -328,9 +328,9 @@ export function OrderCard({
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
                         <p className="font-medium">{item.name}</p>
-                        {item.notes && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Nota: {item.notes}
+                        {(item.notes || (item as any).notes) && (
+                          <p className="text-xs text-amber-700 dark:text-amber-400 mt-1 flex items-center gap-1">
+                            <span>📝</span> {item.notes || (item as any).notes}
                           </p>
                         )}
                       </div>

@@ -115,6 +115,7 @@ const TOOLS_BY_STATE: Record<string, string[]> = {
     "seleccionar_tipo_entrega", "confirmar_direccion_entrega",
     "ver_metodos_pago", "seleccionar_metodo_pago",
     "mostrar_resumen_pedido", "vaciar_carrito", "crear_pedido",
+    "agregar_nota_producto",
   ],
   needs_address: ["confirmar_direccion_entrega", "vaciar_carrito", "ver_carrito"],
   checkout: ["seleccionar_metodo_pago", "mostrar_resumen_pedido", "crear_pedido", "ver_carrito", "vaciar_carrito"],
@@ -1184,12 +1185,16 @@ async function ejecutarHerramienta(
               console.log(`✅ STOCK validated: ${product.name} - Requested: ${item.quantity}, Available: ${currentStock}`);
             }
             
-            resolvedItems.push({
+            const resolvedItem: CartItem = {
               product_id: product.id,
               product_name: product.name,
               quantity: item.quantity,
               price: product.price,
-            });
+            };
+            if (item.notes) {
+              resolvedItem.notes = item.notes;
+            }
+            resolvedItems.push(resolvedItem);
           } else {
             console.warn(`⚠️ PRODUCT NOT FOUND: "${item.product_name}" in vendor ${context.selected_vendor_name} (${vendorId})`);
           }
@@ -1216,8 +1221,12 @@ async function ejecutarHerramienta(
         // Agregar productos validados
         for (const item of resolvedItems) {
           const existing = context.cart.find((c) => c.product_id === item.product_id);
-          if (existing) existing.quantity += item.quantity;
-          else context.cart.push(item);
+          if (existing) {
+            existing.quantity += item.quantity;
+            if (item.notes) existing.notes = item.notes;
+          } else {
+            context.cart.push(item);
+          }
         }
 
         const total = context.cart.reduce((s, i) => s + i.price * i.quantity, 0);
@@ -1231,9 +1240,11 @@ async function ejecutarHerramienta(
         console.log(`💰 Cart total: $${total}`);
         console.log("================================");
         
-        const cartList = context.cart.map((item, i) => 
-          `${i + 1}. ${item.product_name} x${item.quantity} — $${Math.round(item.price * item.quantity)}`
-        ).join('\n');
+        const cartList = context.cart.map((item, i) => {
+          let line = `${i + 1}. ${item.product_name} x${item.quantity} — $${Math.round(item.price * item.quantity)}`;
+          if (item.notes) line += `\n   📝 ${item.notes}`;
+          return line;
+        }).join('\n');
 
         return `✅ Productos agregados al carrito de *${context.selected_vendor_name}*.\n\n🛒 *Tu carrito:*\n${cartList}\n\n💰 *Total: $${Math.round(total)}*\n\n¿Querés agregar algo más o confirmás el pedido? 📦`;
       }
@@ -1247,6 +1258,7 @@ async function ejecutarHerramienta(
         let carrito = `🛒 *Tu carrito de ${context.selected_vendor_name}:*\n\n`;
         context.cart.forEach((item, i) => {
           carrito += `${i + 1}. ${item.product_name} x${item.quantity} - $${item.price * item.quantity}\n`;
+          if (item.notes) carrito += `   📝 ${item.notes}\n`;
         });
 
         const total = context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -1291,6 +1303,7 @@ async function ejecutarHerramienta(
         resumen += `📦 *Productos:*\n`;
         context.cart.forEach((item, i) => {
           resumen += `${i + 1}. ${item.product_name} x${item.quantity} - $${item.price * item.quantity}\n`;
+          if (item.notes) resumen += `   📝 ${item.notes}\n`;
         });
         
         const subtotal = context.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -1476,6 +1489,36 @@ async function ejecutarHerramienta(
         console.log(`================================================`);
         
         return response;
+      }
+
+      case "agregar_nota_producto": {
+        if (context.cart.length === 0) {
+          return "El carrito está vacío. Primero agregá productos.";
+        }
+
+        const nota = args.nota as string;
+        let targetItem: CartItem | undefined;
+
+        if (args.item_index) {
+          const idx = Number(args.item_index) - 1;
+          if (idx >= 0 && idx < context.cart.length) {
+            targetItem = context.cart[idx];
+          }
+        } else if (args.item_name) {
+          const name = (args.item_name as string).toLowerCase();
+          targetItem = context.cart.find(c => c.product_name.toLowerCase().includes(name));
+        } else if (context.cart.length === 1) {
+          targetItem = context.cart[0];
+        }
+
+        if (!targetItem) {
+          const cartList = context.cart.map((item, i) => `${i + 1}. ${item.product_name}`).join('\n');
+          return `No encontré ese producto en tu carrito. Estos son tus productos:\n${cartList}\n\n¿A cuál le querés agregar la nota?`;
+        }
+
+        targetItem.notes = nota;
+        await saveContext(context, supabase);
+        return `📝 Nota agregada a *${targetItem.product_name}*: "${nota}"\n\n¿Algo más?`;
       }
 
       case "vaciar_carrito": {
