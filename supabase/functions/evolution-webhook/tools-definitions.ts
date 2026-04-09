@@ -153,7 +153,6 @@ Ejemplo INCORRECTO:
                   type: "number",
                   description: "Precio unitario del producto tal como aparece en el menú"
                 },
-              },
                 notes: {
                   type: "string",
                   description: "Observación o personalización del producto (ej: 'sin sal', 'extra queso', 'bien cocida'). Solo incluir si el usuario lo menciona explícitamente."
