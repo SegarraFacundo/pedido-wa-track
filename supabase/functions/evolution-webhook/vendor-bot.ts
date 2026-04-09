@@ -1491,6 +1491,36 @@ async function ejecutarHerramienta(
         return response;
       }
 
+      case "agregar_nota_producto": {
+        if (context.cart.length === 0) {
+          return "El carrito está vacío. Primero agregá productos.";
+        }
+
+        const nota = args.nota as string;
+        let targetItem: CartItem | undefined;
+
+        if (args.item_index) {
+          const idx = Number(args.item_index) - 1;
+          if (idx >= 0 && idx < context.cart.length) {
+            targetItem = context.cart[idx];
+          }
+        } else if (args.item_name) {
+          const name = (args.item_name as string).toLowerCase();
+          targetItem = context.cart.find(c => c.product_name.toLowerCase().includes(name));
+        } else if (context.cart.length === 1) {
+          targetItem = context.cart[0];
+        }
+
+        if (!targetItem) {
+          const cartList = context.cart.map((item, i) => `${i + 1}. ${item.product_name}`).join('\n');
+          return `No encontré ese producto en tu carrito. Estos son tus productos:\n${cartList}\n\n¿A cuál le querés agregar la nota?`;
+        }
+
+        targetItem.notes = nota;
+        await saveContext(context, supabase);
+        return `📝 Nota agregada a *${targetItem.product_name}*: "${nota}"\n\n¿Algo más?`;
+      }
+
       case "vaciar_carrito": {
         context.cart = [];
         context.delivery_type = undefined;  // ⭐ Limpiar tipo de entrega
