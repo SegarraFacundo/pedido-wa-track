@@ -26,10 +26,23 @@ serve(async (req) => {
 
   try {
     const { products, vendor_id } = await req.json() as { products: Omit<ProductToCreate, 'vendor_id'>[], vendor_id: string };
-    
-    if (!openAIApiKey) {
-      throw new Error('OPENAI_API_KEY not configured');
+
+    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    const useGateway = !!lovableApiKey;
+
+    if (!useGateway && !openAIApiKey) {
+      throw new Error('No AI provider configured (LOVABLE_API_KEY / OPENAI_API_KEY)');
     }
+
+    const imageEndpoint = useGateway
+      ? 'https://ai.gateway.lovable.dev/v1/images/generations'
+      : 'https://api.openai.com/v1/images/generations';
+    const imageModel = useGateway ? 'openai/gpt-image-2' : 'gpt-image-1';
+    const imageHeaders: Record<string, string> = useGateway
+      ? { 'Lovable-API-Key': lovableApiKey!, 'Content-Type': 'application/json' }
+      : { 'Authorization': `Bearer ${openAIApiKey}`, 'Content-Type': 'application/json' };
+
+    console.log(`🖼️ Image provider: ${useGateway ? 'Lovable AI Gateway' : 'OpenAI'} (${imageModel})`);
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const results: { name: string; success: boolean; error?: string }[] = [];
@@ -39,16 +52,12 @@ serve(async (req) => {
     for (const product of products) {
       try {
         console.log(`Generating image for: ${product.name}`);
-        
-        // Generate image with OpenAI
-        const imageResponse = await fetch('https://api.openai.com/v1/images/generations', {
+
+        const imageResponse = await fetch(imageEndpoint, {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openAIApiKey}`,
-            'Content-Type': 'application/json',
-          },
+          headers: imageHeaders,
           body: JSON.stringify({
-            model: 'gpt-image-1',
+            model: imageModel,
             prompt: `Professional product photo of ${product.name} (${product.description}). Pharmaceutical product packaging on clean white background, studio lighting, high quality commercial photography style, centered composition.`,
             n: 1,
             size: '1024x1024',
@@ -58,12 +67,28 @@ serve(async (req) => {
 
         if (!imageResponse.ok) {
           const errorText = await imageResponse.text();
-          console.error(`OpenAI error for ${product.name}:`, errorText);
-          throw new Error(`OpenAI API error: ${errorText}`);
+          console.error(`Image API error for ${product.name}:`, imageResponse.status, errorText);
+          if (imageResponse.status === 429) {
+            throw new Error('Límite de solicitudes de IA alcanzado, probá de nuevo en unos minutos.');
+          }
+          if (imageResponse.status === 402) {
+            throw new Error('Créditos de IA agotados. Recargá créditos para generar imágenes.');
+          }
+          throw new Error(`Image API error: ${errorText}`);
         }
 
         const imageData = await imageResponse.json();
-        const base64Image = imageData.data[0].b64_json;
+        const rawImage: string = imageData.data?.[0]?.b64_json
+          ?? imageData.data?.[0]?.url
+          ?? '';
+        if (!rawImage) {
+          throw new Error('No image returned by provider');
+        }
+        // Soporta b64_json o data URL
+        const base64Image = rawImage.startsWith('data:')
+          ? rawImage.split(',')[1]
+          : rawImage;
+
         
         // Convert base64 to Uint8Array
         const binaryString = atob(base64Image);

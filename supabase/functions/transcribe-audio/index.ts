@@ -58,26 +58,50 @@ serve(async (req) => {
                      mimeType?.includes('mp4') ? 'mp4' : 
                      mimeType?.includes('mpeg') ? 'mp3' : 'webm';
     
+    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    const useGateway = !!lovableApiKey;
+
     // Prepare form data
     const formData = new FormData();
     const blob = new Blob([binaryAudio], { type: mimeType || 'audio/webm' });
     formData.append('file', blob, `audio.${extension}`);
-    formData.append('model', 'whisper-1');
+    formData.append('model', useGateway ? 'openai/gpt-4o-mini-transcribe' : 'whisper-1');
     formData.append('language', 'es'); // Spanish language
 
-    // Send to OpenAI
-    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    console.log(`🎙️ STT provider: ${useGateway ? 'Lovable AI Gateway' : 'OpenAI'}`);
+
+    const endpoint = useGateway
+      ? 'https://ai.gateway.lovable.dev/v1/audio/transcriptions'
+      : 'https://api.openai.com/v1/audio/transcriptions';
+
+    const headers: Record<string, string> = useGateway
+      ? { 'Lovable-API-Key': lovableApiKey! }
+      : { 'Authorization': `Bearer ${openaiApiKey}` };
+
+    const response = await fetch(endpoint, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-      },
+      headers,
       body: formData,
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('OpenAI API error:', errorText);
-      throw new Error(`OpenAI API error: ${errorText}`);
+      console.error('Transcription API error:', response.status, errorText);
+
+      if (response.status === 429) {
+        return new Response(
+          JSON.stringify({ error: 'Límite de solicitudes alcanzado, probá de nuevo en unos segundos.' }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      if (response.status === 402) {
+        return new Response(
+          JSON.stringify({ error: 'Créditos de IA agotados. Recargá créditos para seguir usando audios.' }),
+          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      throw new Error(`Transcription API error: ${errorText}`);
     }
 
     const result = await response.json();
@@ -87,6 +111,7 @@ serve(async (req) => {
       JSON.stringify({ text: result.text }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
+
 
   } catch (error) {
     console.error('Transcription error:', error);
