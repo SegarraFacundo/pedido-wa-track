@@ -1,34 +1,27 @@
+# Migrar transcripción de audio e imágenes de producto al Lovable AI Gateway
 
+Las dos funciones que aún llaman directo a OpenAI dejan de depender de esa cuenta y pasan por el Lovable AI Gateway, igual que ya hace el bot.
 
-# Plan: Agregar observaciones/notas a productos del carrito (sin validación)
+## Qué cambia
 
-## Enfoque
+### 1. Transcripción de audios de WhatsApp (`transcribe-audio`)
+- La llamada a `api.openai.com/v1/audio/transcriptions` se reemplaza por el endpoint de speech-to-text del Lovable AI Gateway (`https://ai.gateway.lovable.dev/v1/audio/transcriptions`), autenticado con `LOVABLE_API_KEY` en el header `Lovable-API-Key`.
+- Se mantiene el mismo contrato: recibe `{ audio, mimeType }` en base64 y devuelve `{ text }`, así el bot y el AudioRecorder no cambian.
+- Se mantiene el idioma español y la detección de extensión por MIME type.
+- Si `LOVABLE_API_KEY` no existe, cae al camino OpenAI actual (mismo patrón que el bot).
+- Errores 429 (límite) y 402 (créditos agotados) se devuelven con mensaje claro en vez de un 500 genérico.
 
-Las notas van directo con el pedido. El vendedor las ve en su dashboard cuando recibe el pedido. Sin paso extra de validación.
+### 2. Generación de imágenes de producto (`generate-product-images`)
+- La llamada a `gpt-image-1` de OpenAI se reemplaza por generación de imágenes del Lovable AI Gateway, con el mismo prompt de foto de producto sobre fondo blanco.
+- El resto del flujo queda igual: base64 → subida a Storage `product-images` → alta del producto en la tabla `products` → resumen de éxitos/fallos.
+- Fallback a OpenAI si no hay `LOVABLE_API_KEY`, y manejo explícito de 429/402.
 
-**Dos formas de agregar notas:**
-1. Al agregar: "Quiero una milanesa sin sal" → se detecta y guarda automáticamente
-2. Después: "Ponerle nota al 1: sin sal" → nueva tool `agregar_nota_producto`
+## Verificación
+- Llamar `transcribe-audio` con un audio corto y confirmar que devuelve texto.
+- Llamar `generate-product-images` con un producto de prueba y confirmar que la imagen se sube y el producto se crea.
+- Revisar logs de ambas funciones para confirmar que el proveedor usado es el gateway.
 
-## Cambios
-
-| Archivo | Cambio |
-|---------|--------|
-| `types.ts` | Agregar `notes?: string` a `CartItem` |
-| `tools-definitions.ts` | Agregar param `notes` a items de `agregar_al_carrito` + nueva tool `agregar_nota_producto` |
-| `vendor-bot.ts` | Implementar `agregar_nota_producto`, mostrar notas en carrito/resumen, incluir notas en items del pedido |
-| `simplified-prompt.ts` | Mencionar en estado `shopping` que el usuario puede agregar observaciones |
-| `OrderCard.tsx` | Mostrar notas de cada item en la tarjeta del pedido del dashboard del vendedor |
-
-## Detalle clave
-
-- `CartItem.notes` es opcional — si el usuario no dice nada, no hay nota
-- Las notas se persisten automáticamente en el JSONB de `items` en la tabla `orders` (no requiere migración)
-- En el carrito se muestran así:
-```text
-1. Milanesa x1 — $5000
-   📝 sin sal
-2. Pizza x1 — $4000
-```
-- En el dashboard del vendedor, cada item con nota muestra un ícono 📝 con el texto
-
+## Notas técnicas
+- `LOVABLE_API_KEY` ya está configurada en el proyecto; no hace falta pedir nada al usuario.
+- Ninguna de las dos funciones cambia su interfaz de entrada/salida, por lo que no hay cambios en el frontend (`AudioRecorder.tsx`, `PharmacyProductLoader.tsx`).
+- Se mantienen los headers CORS actuales.
