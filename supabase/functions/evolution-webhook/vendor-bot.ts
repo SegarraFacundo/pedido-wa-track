@@ -1673,10 +1673,25 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
       return helpText;
     }
 
-    // Inicializar OpenAI
-    const openai = new OpenAI({
-      apiKey: Deno.env.get("OPENAI_API_KEY"),
-    });
+    // 🤖 Lovable AI Gateway (compatible con la API de OpenAI)
+    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+    const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
+    const useGateway = !!lovableApiKey;
+
+    const openai = useGateway
+      ? new OpenAI({
+          apiKey: lovableApiKey,
+          baseURL: "https://ai.gateway.lovable.dev/v1",
+          defaultHeaders: {
+            "Lovable-API-Key": lovableApiKey!,
+            "X-Lovable-AIG-SDK": "openai-sdk",
+          },
+        })
+      : new OpenAI({ apiKey: openaiApiKey });
+
+    const AI_MODEL = useGateway ? "google/gemini-3.6-flash" : "gpt-4o-mini";
+    console.log(`🧠 AI provider: ${useGateway ? "Lovable AI Gateway" : "OpenAI"} (${AI_MODEL})`);
+
 
     console.log("🔄 Starting conversation loop...");
 
@@ -1733,7 +1748,7 @@ export async function handleVendorBot(message: string, phone: string, supabase: 
 
       // 🎯 tool_choice siempre "auto" — la IA decide si usar herramienta o responder con texto
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: AI_MODEL,
         messages: messages,
         tools: filteredTools,
         temperature: 0, // 🎯 Determinístico: previene alucinaciones de productos/negocios/pagos
