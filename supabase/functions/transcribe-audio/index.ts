@@ -52,15 +52,59 @@ serve(async (req) => {
 
     // Process audio in chunks
     const binaryAudio = processBase64Chunks(audio);
-    
+
+    const mt = (mimeType || '').toLowerCase();
     // Determine file extension based on mime type
-    const extension = mimeType?.includes('webm') ? 'webm' : 
-                     mimeType?.includes('mp4') ? 'mp4' : 
-                     mimeType?.includes('mpeg') ? 'mp3' : 'webm';
-    
+    const extension = mt.includes('ogg') || mt.includes('opus') ? 'ogg' :
+                     mt.includes('webm') ? 'webm' :
+                     mt.includes('mp4') || mt.includes('m4a') ? 'mp4' :
+                     mt.includes('mpeg') || mt.includes('mp3') ? 'mp3' :
+                     mt.includes('wav') ? 'wav' : 'webm';
+
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     const useGateway = !!lovableApiKey;
+
+    // WhatsApp envía OGG/Opus, que los modelos de STT de OpenAI rechazan.
+    // En ese caso transcribimos con Gemini vía chat completions (acepta ogg).
+    const transcribeWithGemini = async (): Promise<string> => {
+      const resp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Lovable-API-Key': lovableApiKey!,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-3.6-flash',
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Transcribí este audio en español rioplatense. Devolvé SOLO el texto transcripto, sin comentarios ni comillas. Si no se entiende nada, devolvé una cadena vacía.' },
+              { type: 'input_audio', input_audio: { data: audio, format: extension === 'mp4' ? 'm4a' : extension } },
+            ],
+          }],
+        }),
+      });
+
+      if (!resp.ok) {
+        const errText = await resp.text();
+        throw new Error(`Gemini transcription error: ${resp.status} ${errText}`);
+      }
+      const data = await resp.json();
+      return (data.choices?.[0]?.message?.content ?? '').toString().trim();
+    };
+
+    const isOgg = extension === 'ogg';
+
+    if (useGateway && isOgg) {
+      console.log('🎙️ STT provider: Lovable AI Gateway (Gemini audio, ogg)');
+      const text = await transcribeWithGemini();
+      console.log('Transcription successful:', text);
+      return new Response(
+        JSON.stringify({ text }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Prepare form data
     const formData = new FormData();
@@ -101,6 +145,16 @@ serve(async (req) => {
           { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
+      // Formato rechazado por el STT: intentamos con Gemini como fallback
+      if (useGateway && response.status === 400) {
+        console.log('↩️ Fallback a Gemini para transcribir el audio');
+        const text = await transcribeWithGemini();
+        console.log('Transcription successful (fallback):', text);
+        return new Response(
+          JSON.stringify({ text }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
       throw new Error(`Transcription API error: ${errorText}`);
     }
 
@@ -111,6 +165,7 @@ serve(async (req) => {
       JSON.stringify({ text: result.text }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
+
 
 
   } catch (error) {
