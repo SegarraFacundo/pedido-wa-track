@@ -65,3 +65,6 @@ verify_jwt = false
 
 [functions.enviar-mensaje-vendedor]
 verify_jwt = false
+
+[functions.send-push]
+verify_jwt = false

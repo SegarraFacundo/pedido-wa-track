@@ -232,6 +232,9 @@ export function useRealtimeOrders(vendorId?: string) {
 
       if (error) throw error;
 
+      // Web-push al cliente con el cambio de estado (funciona con la PWA cerrada)
+      supabase.functions.invoke('send-push', { body: { order_id: orderId } }).catch(() => {});
+
       // Notificar al vendedor si el pedido fue cancelado
       if (newStatus === 'cancelled') {
         supabase.functions.invoke('notify-vendor', {

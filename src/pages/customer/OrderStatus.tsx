@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useLocalePath } from "@/hooks/useLocalePath";
 import { useNotificationPermission } from "@/hooks/useNotificationPermission";
+import { enablePushNotifications } from "@/lib/push";
 import { OrderChat } from "@/components/customer/OrderChat";
 import { cn } from "@/lib/utils";
 
@@ -83,7 +84,7 @@ export default function OrderStatus() {
   const transfer = (location.state as any)?.transfer as { alias?: string; cbu?: string; titular?: string } | null;
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  const { permission, requestPermission, showNotification } = useNotificationPermission();
+  const { permission, showNotification } = useNotificationPermission();
 
   // Notificador estable (evita closures viejos en la suscripción realtime).
   const notifyRef = useRef<(status: string) => void>(() => {});
@@ -104,6 +105,21 @@ export default function OrderStatus() {
   const [comment, setComment] = useState("");
   const [rating, setRating] = useState(false);
   const [rated, setRated] = useState(false);
+  const [pushDone, setPushDone] = useState(false);
+
+  const activarPush = async () => {
+    const r = await enablePushNotifications();
+    if (r === "granted") {
+      setPushDone(true);
+      toast({ title: "Notificaciones activadas", description: "Te avisamos cuando cambie tu pedido." });
+    } else if (r === "denied") {
+      toast({ title: "Permiso denegado", description: "Habilitá las notificaciones en el navegador.", variant: "destructive" });
+    } else if (r === "unsupported") {
+      toast({ title: "Tu navegador no soporta notificaciones", variant: "destructive" });
+    } else {
+      toast({ title: "No se pudieron activar", variant: "destructive" });
+    }
+  };
 
   const doCancel = async () => {
     if (!orderId) return;
@@ -256,8 +272,8 @@ export default function OrderStatus() {
         </Card>
       )}
 
-      {permission === "default" && !cancelled && order.status !== "delivered" && (
-        <Button variant="secondary" className="w-full" onClick={() => requestPermission()}>
+      {permission !== "denied" && !pushDone && !cancelled && order.status !== "delivered" && (
+        <Button variant="secondary" className="w-full" onClick={activarPush}>
           <Bell className="mr-2 h-4 w-4" /> Activar notificaciones del pedido
         </Button>
       )}
