@@ -1,0 +1,11 @@
+{
+  // Deploy del front (SPA de Vite) como sitio estático en Cloudflare Workers.
+  // Build: npm run build -> dist ; Deploy: npx wrangler deploy (toma esta config).
+  "name": "pedido-wa-track",
+  "compatibility_date": "2025-01-01",
+  "assets": {
+    "directory": "./dist",
+    // Sirve index.html para cualquier ruta no-archivo (ruteo client-side de React Router).
+    "not_found_handling": "single-page-application"
+  }
+}
