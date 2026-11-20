@@ -1,12 +1,14 @@
 // Service Worker para Lapacho PWA
-const CACHE_NAME = 'lapacho-v2';
+const CACHE_NAME = 'lapacho-v3';
 const urlsToCache = [
   '/',
+  '/tienda',
   '/vendor-dashboard',
   '/soporte',
   '/admin',
   '/lapacho-icon.png',
   '/lapacho-logo.png',
+  '/manifest-cliente.json',
   '/sounds/notification.mp3'
 ];
 

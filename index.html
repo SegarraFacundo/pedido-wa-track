@@ -20,7 +20,7 @@
     <meta name="keywords" content="pedidos, WhatsApp, delivery, asistente automatizado, negocios, restaurantes" />
 
     <!-- PWA Manifests -->
-    <link rel="manifest" href="/manifest-vendor.json" id="manifest-placeholder">
+    <link rel="manifest" href="/manifest-cliente.json" id="manifest-placeholder">
     
     <!-- Apple Touch Icons -->
     <link rel="apple-touch-icon" href="/lapacho-icon.png">
@@ -85,6 +85,10 @@
         } else if (path.includes('/admin')) {
           manifestLink.href = '/manifest-admin.json';
           themeColor.content = '#0EA5E9';
+        } else {
+          // Cliente (tienda, carrito, pedido, mis-pedidos) y landing
+          manifestLink.href = '/manifest-cliente.json';
+          themeColor.content = '#E878A8';
         }
       }
       

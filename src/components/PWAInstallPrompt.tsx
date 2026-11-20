@@ -9,7 +9,7 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 interface PWAInstallPromptProps {
-  userType?: 'vendor' | 'soporte' | 'admin';
+  userType?: 'vendor' | 'soporte' | 'admin' | 'cliente';
 }
 
 export function PWAInstallPrompt({ userType = 'vendor' }: PWAInstallPromptProps) {
@@ -68,13 +68,15 @@ export function PWAInstallPrompt({ userType = 'vendor' }: PWAInstallPromptProps)
   const titles = {
     vendor: 'Instala la App de Vendedor',
     soporte: 'Instala la App de Soporte',
-    admin: 'Instala la App de Admin'
+    admin: 'Instala la App de Admin',
+    cliente: 'Instalá Lapacho'
   };
 
   const descriptions = {
     vendor: 'Accede rápidamente a tus pedidos y productos',
     soporte: 'Gestiona tickets de soporte desde tu celular',
-    admin: 'Controla toda la plataforma desde tu dispositivo'
+    admin: 'Controla toda la plataforma desde tu dispositivo',
+    cliente: 'Pedí más rápido y seguí tus pedidos desde tu celular'
   };
 
   return (

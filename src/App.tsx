@@ -20,6 +20,13 @@ import Privacidad from "./pages/Privacidad";
 import Contacto from "./pages/Contacto";
 import BrandAssets from "./pages/BrandAssets";
 import ProductImage from "./pages/ProductImage";
+import { CustomerLayout } from "./components/customer/CustomerLayout";
+import CustomerHome from "./pages/customer/Home";
+import Store from "./pages/customer/Store";
+import Cart from "./pages/customer/Cart";
+import Checkout from "./pages/customer/Checkout";
+import OrderStatus from "./pages/customer/OrderStatus";
+import MyOrders from "./pages/customer/MyOrders";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -45,6 +52,15 @@ const App = () => (
             <Route path="/contacto" element={<Contacto />} />
             <Route path="/brand-assets" element={<BrandAssets />} />
             <Route path="/p/:productId" element={<ProductImage />} />
+            {/* Tienda del cliente (PWA) */}
+            <Route element={<CustomerLayout />}>
+              <Route path="/tienda" element={<CustomerHome />} />
+              <Route path="/tienda/:vendorId" element={<Store />} />
+              <Route path="/carrito" element={<Cart />} />
+              <Route path="/checkout" element={<Checkout />} />
+              <Route path="/pedido/:orderId" element={<OrderStatus />} />
+              <Route path="/mis-pedidos" element={<MyOrders />} />
+            </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
         </SubdomainRouter>

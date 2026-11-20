@@ -1,0 +1,4 @@
+# SPA fallback: toda ruta no-archivo sirve index.html (ruteo client-side de React Router).
+# Lo leen Cloudflare Pages y Netlify. Los assets reales (/assets/*, /sw.js, manifests) se
+# sirven primero; sólo las rutas de la app caen acá.
+/*    /index.html   200

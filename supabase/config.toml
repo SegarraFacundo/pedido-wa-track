@@ -50,3 +50,18 @@ verify_jwt = false
 
 [functions.generate-qa-tests]
 verify_jwt = false
+
+[functions.crear-pedido]
+verify_jwt = false
+
+[functions.cancelar-pedido]
+verify_jwt = false
+
+[functions.calificar-pedido]
+verify_jwt = false
+
+[functions.contactar-soporte]
+verify_jwt = false
+
+[functions.enviar-mensaje-vendedor]
+verify_jwt = false

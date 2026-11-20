@@ -1,0 +1,272 @@
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useLocalePath } from "@/hooks/useLocalePath";
+import { useCart } from "@/hooks/useCart";
+import { useCustomerAuth } from "@/hooks/useCustomerAuth";
+
+const money = (n: number) => "$ " + Math.round(n).toLocaleString("es-AR");
+type Payment = "efectivo" | "transferencia" | "mercadopago";
+const PAYMENT_LABEL: Record<Payment, string> = {
+  efectivo: "Efectivo",
+  transferencia: "Transferencia",
+  mercadopago: "MercadoPago",
+};
+
+interface VendorConfig {
+  address: string | null;
+  allows_pickup: boolean | null;
+  allows_delivery: boolean | null;
+  delivery_fixed_price: number | null;
+  accepts_cash: boolean | null;
+  accepts_transfer: boolean | null;
+  accepts_mercadopago: boolean | null;
+}
+
+export default function Checkout() {
+  const navigate = useNavigate();
+  const localePath = useLocalePath();
+  const { toast } = useToast();
+  const { cart, subtotal, count, clear } = useCart();
+  const { continueAsGuest } = useCustomerAuth();
+
+  const [vendor, setVendor] = useState<VendorConfig | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  const [deliveryType, setDeliveryType] = useState<"delivery" | "pickup">("delivery");
+  const [address, setAddress] = useState("");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [payment, setPayment] = useState<Payment | "">("");
+
+  useEffect(() => {
+    if (count === 0 || !cart.vendor_id) {
+      navigate(localePath("/tienda"), { replace: true });
+      return;
+    }
+    (async () => {
+      const { data } = await supabase
+        .from("public_vendors")
+        .select("address, allows_pickup, allows_delivery, delivery_fixed_price, accepts_cash, accepts_transfer, accepts_mercadopago")
+        .eq("id", cart.vendor_id)
+        .maybeSingle();
+      if (data) {
+        const v = data as VendorConfig;
+        setVendor(v);
+        if (!v.allows_delivery && v.allows_pickup) setDeliveryType("pickup");
+      }
+      setLoading(false);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart.vendor_id]);
+
+  const paymentMethods = useMemo<Payment[]>(() => {
+    const list: Payment[] = [];
+    if (vendor?.accepts_cash) list.push("efectivo");
+    if (vendor?.accepts_transfer) list.push("transferencia");
+    if (vendor?.accepts_mercadopago) list.push("mercadopago");
+    return list;
+  }, [vendor]);
+
+  const deliveryCost = deliveryType === "pickup" ? 0 : Math.round(vendor?.delivery_fixed_price ?? 0);
+  const total = subtotal + deliveryCost;
+  const canPickup = !!vendor?.allows_pickup;
+  const canDelivery = vendor?.allows_delivery !== false;
+
+  const submit = async () => {
+    if (!cart.vendor_id) return;
+    if (deliveryType === "delivery" && address.trim().length < 4) {
+      toast({ title: "Ingresá una dirección de entrega", variant: "destructive" });
+      return;
+    }
+    if (phone.replace(/\D/g, "").length < 6) {
+      toast({ title: "Ingresá un teléfono de contacto válido", variant: "destructive" });
+      return;
+    }
+    if (!payment) {
+      toast({ title: "Elegí un método de pago", variant: "destructive" });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      // Asegurar sesión: invitado si todavía no hay (fricción cero).
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        await continueAsGuest();
+      }
+
+      const { data, error } = await supabase.functions.invoke("crear-pedido", {
+        body: {
+          vendor_id: cart.vendor_id,
+          items: cart.items.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
+          delivery_type: deliveryType,
+          address: deliveryType === "delivery" ? address.trim() : undefined,
+          payment_method: payment,
+          customer_name: name.trim() || undefined,
+          customer_phone: phone.trim(),
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) {
+        toast({
+          title: "No se pudo crear el pedido",
+          description: data.stock_issues?.join(" · ") || data.error,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      clear();
+
+      if (data?.payment_link) {
+        window.location.href = data.payment_link as string;
+        return;
+      }
+      navigate(localePath(`/pedido/${data.order_id}`), {
+        replace: true,
+        state: { transfer: data.transfer_data ?? null },
+      });
+    } catch (e: any) {
+      console.error(e);
+      toast({ title: "Error al crear el pedido", description: e?.message, variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-20">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 pb-6">
+      <button onClick={() => navigate(localePath("/carrito"))} className="flex items-center gap-1 text-sm text-muted-foreground">
+        <ArrowLeft className="h-4 w-4" /> Volver al carrito
+      </button>
+      <h1 className="text-xl font-bold">Confirmar pedido</h1>
+
+      {/* Entrega */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Entrega</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex gap-2">
+            {canDelivery && (
+              <Button
+                type="button"
+                variant={deliveryType === "delivery" ? "default" : "outline"}
+                className="flex-1"
+                onClick={() => setDeliveryType("delivery")}
+              >
+                Delivery
+              </Button>
+            )}
+            {canPickup && (
+              <Button
+                type="button"
+                variant={deliveryType === "pickup" ? "default" : "outline"}
+                className="flex-1"
+                onClick={() => setDeliveryType("pickup")}
+              >
+                Retiro en local
+              </Button>
+            )}
+          </div>
+          {deliveryType === "delivery" ? (
+            <div className="space-y-1">
+              <Label htmlFor="address">Dirección de entrega</Label>
+              <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Calle y número" />
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Retirás en: {vendor?.address}</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Datos */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Tus datos</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-1">
+            <Label htmlFor="phone">Teléfono de contacto</Label>
+            <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Ej: 3464 55-5555" />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="name">Nombre (opcional)</Label>
+            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Cómo te llamás" />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Pago */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Pago</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {paymentMethods.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Este negocio no tiene métodos de pago configurados.</p>
+          ) : (
+            paymentMethods.map((m) => (
+              <Button
+                key={m}
+                type="button"
+                variant={payment === m ? "default" : "outline"}
+                className="w-full justify-start"
+                onClick={() => setPayment(m)}
+              >
+                {PAYMENT_LABEL[m]}
+              </Button>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Resumen */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Resumen</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-1 text-sm">
+          {cart.items.map((i) => (
+            <div key={i.product_id} className="flex justify-between">
+              <span>{i.quantity}× {i.name}</span>
+              <span>{money(i.price * i.quantity)}</span>
+            </div>
+          ))}
+          <Separator className="my-2" />
+          <div className="flex justify-between"><span>Subtotal</span><span>{money(subtotal)}</span></div>
+          <div className="flex justify-between">
+            <span>Envío</span>
+            <span>{deliveryType === "pickup" ? "Gratis" : money(deliveryCost)}</span>
+          </div>
+          <div className="flex justify-between text-base font-semibold">
+            <span>Total</span><span>{money(total)}</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Button className="w-full" size="lg" disabled={submitting || paymentMethods.length === 0} onClick={submit}>
+        {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+        Confirmar pedido · {money(total)}
+      </Button>
+    </div>
+  );
+}
