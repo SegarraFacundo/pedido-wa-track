@@ -100,7 +100,7 @@ serve(async (req) => {
     // ── Vendor: existe, activo, config de entrega y pago ──
     const { data: vendor, error: vendorError } = await supabase
       .from("vendors")
-      .select("id, name, is_active, address, delivery_fixed_price, allows_pickup, allows_delivery, payment_settings")
+      .select("id, name, is_active, address, delivery_fixed_price, allows_pickup, allows_delivery, payment_settings, eta_min_minutes, eta_max_minutes")
       .eq("id", vendor_id)
       .single();
 
@@ -203,6 +203,12 @@ serve(async (req) => {
       return json({ error: "Pedido duplicado reciente", order_id: activeOrders[0].id, duplicate: true }, 409);
     }
 
+    // ── Hora estimada de entrega (si el negocio configuró un tiempo para delivery) ──
+    let estimatedDelivery: string | null = null;
+    if (delivery_type === "delivery" && vendor.eta_max_minutes) {
+      estimatedDelivery = new Date(Date.now() + Number(vendor.eta_max_minutes) * 60000).toISOString();
+    }
+
     // ── Crear el pedido ──
     const total = subtotal + deliveryCost;
     const { data: order, error: orderError } = await supabase
@@ -221,6 +227,7 @@ serve(async (req) => {
         delivery_type,
         coordinates: body.coordinates ?? null,
         notes: (body.notes || "").trim().slice(0, 500) || null,
+        estimated_delivery: estimatedDelivery,
       })
       .select()
       .single();

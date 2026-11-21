@@ -51,6 +51,8 @@ interface Vendor {
   days_open: string[] | null;
   allows_pickup: boolean | null;
   allows_delivery: boolean | null;
+  eta_min_minutes: number | null;
+  eta_max_minutes: number | null;
 }
 
 interface Product {
@@ -152,7 +154,7 @@ export default function Store() {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(vendorId);
       const { data: v } = await supabase
         .from("public_vendors")
-        .select("id, slug, name, category, image, address, opening_time, closing_time, days_open, allows_pickup, allows_delivery")
+        .select("id, slug, name, category, image, address, opening_time, closing_time, days_open, allows_pickup, allows_delivery, eta_min_minutes, eta_max_minutes")
         .eq(isUuid ? "id" : "slug", vendorId)
         .maybeSingle();
       if (!v) {
@@ -289,6 +291,15 @@ export default function Store() {
             {vendor.allows_delivery !== false && <Badge variant="outline">Delivery</Badge>}
             {vendor.allows_pickup && <Badge variant="outline">Retiro</Badge>}
           </div>
+          {vendor.eta_max_minutes && (
+            <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+              <Clock className="h-3 w-3" /> Entrega{" "}
+              {vendor.eta_min_minutes && vendor.eta_min_minutes !== vendor.eta_max_minutes
+                ? `~${vendor.eta_min_minutes}-${vendor.eta_max_minutes}`
+                : `~${vendor.eta_max_minutes}`}{" "}
+              min
+            </p>
+          )}
         </div>
       </div>
 

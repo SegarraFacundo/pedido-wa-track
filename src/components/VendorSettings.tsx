@@ -30,6 +30,8 @@ interface VendorData {
   allows_pickup?: boolean;
   pickup_instructions?: string | null;
   allows_delivery?: boolean;  // ⭐ NUEVO: permite delivery
+  eta_min_minutes?: number | null;
+  eta_max_minutes?: number | null;
 }
 
 interface VendorSettingsProps {
@@ -172,7 +174,9 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
           delivery_additional_per_km: vendorData.delivery_additional_per_km,
           allows_pickup: vendorData.allows_pickup || false,
           pickup_instructions: vendorData.pickup_instructions || null,
-          allows_delivery: vendorData.allows_delivery ?? true  // ⭐ NUEVO
+          allows_delivery: vendorData.allows_delivery ?? true,  // ⭐ NUEVO
+          eta_min_minutes: vendorData.eta_min_minutes ?? null,
+          eta_max_minutes: vendorData.eta_max_minutes ?? null
         })
         .eq('id', vendorId);
 
@@ -512,9 +516,41 @@ export function VendorSettings({ vendorId }: VendorSettingsProps) {
                 </Label>
               </div>
               {(vendorData.allows_delivery ?? true) && (
-                <p className="text-xs text-muted-foreground pl-6">
-                  Los clientes pueden recibir sus pedidos en su dirección
-                </p>
+                <div className="space-y-2 pl-6">
+                  <p className="text-xs text-muted-foreground">
+                    Los clientes pueden recibir sus pedidos en su dirección
+                  </p>
+                  <Label className="text-sm">Tiempo estimado de entrega (minutos)</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min="0"
+                      step="5"
+                      className="w-24"
+                      value={vendorData.eta_min_minutes ?? ''}
+                      onChange={(e) =>
+                        setVendorData({ ...vendorData, eta_min_minutes: e.target.value ? parseInt(e.target.value) : null })
+                      }
+                      placeholder="30"
+                    />
+                    <span className="text-muted-foreground">a</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="5"
+                      className="w-24"
+                      value={vendorData.eta_max_minutes ?? ''}
+                      onChange={(e) =>
+                        setVendorData({ ...vendorData, eta_max_minutes: e.target.value ? parseInt(e.target.value) : null })
+                      }
+                      placeholder="45"
+                    />
+                    <span className="text-sm text-muted-foreground">min</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Se muestra en la tienda (ej: "~30-45 min"). Dejalo vacío si no querés mostrarlo.
+                  </p>
+                </div>
               )}
             </div>
             

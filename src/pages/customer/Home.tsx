@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Heart, Search, Star, Store, Tag } from "lucide-react";
+import { Clock, Heart, Search, Star, Store, Tag } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,6 +23,15 @@ interface VendorRow {
   opening_time: string | null;
   closing_time: string | null;
   days_open: string[] | null;
+  eta_min_minutes: number | null;
+  eta_max_minutes: number | null;
+}
+
+/** "~30-45 min" / "~45 min" / null si no hay ETA configurado. */
+function etaLabel(min: number | null, max: number | null): string | null {
+  if (!max) return null;
+  if (min && min !== max) return `~${min}-${max} min`;
+  return `~${max} min`;
 }
 
 interface OfferRow {
@@ -51,7 +60,7 @@ export default function Home() {
         supabase
           .from("public_vendors")
           .select(
-            "id, slug, name, category, image, rating, average_rating, is_featured, opening_time, closing_time, days_open",
+            "id, slug, name, category, image, rating, average_rating, is_featured, opening_time, closing_time, days_open, eta_min_minutes, eta_max_minutes",
           )
           .order("name"),
         supabase
@@ -120,6 +129,11 @@ export default function Home() {
               </Badge>
             </div>
             <p className="truncate text-sm capitalize text-muted-foreground">{v.category}</p>
+            {etaLabel(v.eta_min_minutes, v.eta_max_minutes) && (
+              <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Clock className="h-3 w-3" /> {etaLabel(v.eta_min_minutes, v.eta_max_minutes)}
+              </p>
+            )}
           </div>
           {rating > 0 && (
             <div className="flex shrink-0 items-center gap-1 text-sm text-muted-foreground">

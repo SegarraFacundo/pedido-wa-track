@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { Bell, Check, Loader2, Star } from "lucide-react";
+import { Bell, Check, Clock, Loader2, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -68,6 +68,7 @@ interface OrderRow {
   payment_method: string | null;
   payment_status: string | null;
   delivery_type: string | null;
+  estimated_delivery: string | null;
   items: any;
   vendor_id: string;
   vendors?: { name: string } | null;
@@ -182,7 +183,7 @@ export default function OrderStatus() {
     const load = async () => {
       const { data } = await supabase
         .from("orders")
-        .select("id, status, total, address, payment_method, payment_status, delivery_type, items, vendor_id, vendors(name)")
+        .select("id, status, total, address, payment_method, payment_status, delivery_type, estimated_delivery, items, vendor_id, vendors(name)")
         .eq("id", orderId)
         .maybeSingle();
       setOrder((data as OrderRow) ?? null);
@@ -253,6 +254,13 @@ export default function OrderStatus() {
           <div className="rounded-xl bg-gradient-to-br from-primary to-secondary p-5 text-center text-primary-foreground shadow-md">
             <p className="text-lg font-semibold">{STATUS_MSG[order.status] ?? "Tu pedido está en proceso"}</p>
           </div>
+
+          {order.estimated_delivery && order.status !== "delivered" && (
+            <p className="flex items-center justify-center gap-1 text-sm text-muted-foreground">
+              <Clock className="h-4 w-4" /> Entrega estimada: ~
+              {new Date(order.estimated_delivery).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
+            </p>
+          )}
 
           {/* Línea de tiempo del pedido */}
           <Card>
