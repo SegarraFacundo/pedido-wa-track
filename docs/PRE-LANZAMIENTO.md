@@ -30,7 +30,7 @@ Cada negocio conecta **su propia** cuenta de MP (OAuth desde su panel → Pagos)
 - [x] ~~`APP_URL`~~ → **corregido a `https://lapacho.ar`** (estaba en `plataforma.lapacho.ar`, rompía el retorno del pago del cliente). `MP_REDIRECT_URI` y `MP_CLIENT_ID` OK.
 - [ ] Que cada negocio real conecte su cuenta de MercadoPago.
 - [ ] Probar un **pago real** de punta a punta (checkout → pago → webhook → estado del pedido actualizado).
-- [ ] (Menor) El redirect post-conexión de MP del vendedor va a `/vendor`; la ruta real es `/vendor-dashboard` — revisar.
+- [x] ~~(Menor) El redirect post-conexión de MP del vendedor iba a `/vendor` (ruta inexistente → 404 al recargar)~~ → corregido a `/vendor-dashboard` en front (`VendorDashboard.tsx`, `VendorPaymentSettings.tsx`, ya en main) y en la edge function `mercadopago-oauth-callback` (editada; **falta redeployar** la function — bloqueado pide confirmación).
 
 ### 3. Login por email (SMTP) ✅ funciona (mejorar deliverability)
 - [x] SMTP de Resend cargado y **probado**: el magic link llega y el login entra. Dominio `lapacho.ar` verificado en Resend (DKIM ✅), remitente `soporte@lapacho.ar`, rate limit 30/h.
@@ -40,7 +40,7 @@ Cada negocio conecta **su propia** cuenta de MP (OAuth desde su panel → Pagos)
 - [ ] Mejoras opcionales:
   - [ ] Agregar **SPF** en el dominio raíz `lapacho.ar` (secundario; el DKIM ya alinea DMARC).
   - [ ] (Opcional) subdominio de **tracking** en Resend.
-  - [ ] Agregar el **logo** (hoja) al header de los emails (ya está aplicado en toda la app: landing, headers, auth, paneles, favicon y PWA icon).
+  - [x] ~~Agregar el **logo** (hoja) al header de los emails~~ → **hecho**: header blanco con borde rosa y el logo (`https://lapacho.ar/email-logo.png`) en los 6 templates de Auth. El preview de Supabase no muestra la imagen (CSP del iframe), pero en los clientes de correo reales carga.
 - [ ] **Para producción (profesionalizar)**: cuenta de Resend propia de Lapacho (hoy se usa la compartida con Órbita) con subdominio de envío propio.
 - Mientras tanto, **Google funciona 100%**.
 
