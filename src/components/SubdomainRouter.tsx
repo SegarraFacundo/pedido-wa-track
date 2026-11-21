@@ -27,8 +27,9 @@ const SubdomainRouter = ({ children }: { children: React.ReactNode }) => {
         }
         break;
       case 'soporte':
-        // Si no está en /soporte, redirigir
-        if (location.pathname !== '/soporte') {
+        // Si no está en /soporte o /soporte-auth, redirigir
+        // (permitir /soporte-auth evita el loop: /soporte manda a /soporte-auth cuando no hay sesión válida)
+        if (location.pathname !== '/soporte' && location.pathname !== '/soporte-auth') {
           navigate('/soporte');
         }
         break;
