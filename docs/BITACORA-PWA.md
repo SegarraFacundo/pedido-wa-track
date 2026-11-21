@@ -13,6 +13,7 @@
 - **5 dominios conectados a Pages**, todos con SSL activo (HTTPS 200):
   `lapacho.ar`, `www.lapacho.ar`, `admin.lapacho.ar`, `soporte.lapacho.ar`, `plataforma.lapacho.ar`.
 - Apps reales intactas (DNS-only): `evolution.lapacho.ar`, `gestion-turnos-hospital.lapacho.ar`.
+- **Dominio canónico `lapacho.ar`**: `www` redirige 301 a la raíz (Redirect Rule de Cloudflare, plantilla "WWW to root"), y el deploy `pedido-wa-track.pages.dev` redirige a `lapacho.ar` (script en index.html). HTTP→HTTPS automático.
 - **Video del hero** comprimido 64 MB → 1,5 MB (1280px, sin audio) y sirviéndose en vivo.
 
 ### Auth / Cuentas
