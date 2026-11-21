@@ -33,6 +33,12 @@ const SubdomainRouter = ({ children }: { children: React.ReactNode }) => {
           navigate('/soporte');
         }
         break;
+      case 'repartidor':
+        // Permitir /repartidor y /repartidor-auth (mismo criterio que soporte, sin loop).
+        if (location.pathname !== '/repartidor' && location.pathname !== '/repartidor-auth') {
+          navigate('/repartidor');
+        }
+        break;
       case 'plataforma':
         // Si no está en /vendor-auth o /vendor-dashboard, redirigir
         if (location.pathname !== '/vendor-auth' && location.pathname !== '/vendor-dashboard') {

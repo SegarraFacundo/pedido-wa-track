@@ -98,6 +98,9 @@
         if (path.includes('/vendor') || path.includes('/dashboard')) {
           manifestLink.href = '/manifest-vendor.json';
           themeColor.content = '#8B5CF6';
+        } else if (path.includes('/repartidor')) {
+          manifestLink.href = '/manifest-repartidor.json';
+          themeColor.content = '#16A34A';
         } else if (path.includes('/soporte')) {
           manifestLink.href = '/manifest-soporte.json';
           themeColor.content = '#0EA5E9';

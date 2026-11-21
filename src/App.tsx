@@ -28,6 +28,8 @@ import Checkout from "./pages/customer/Checkout";
 import OrderStatus from "./pages/customer/OrderStatus";
 import MyOrders from "./pages/customer/MyOrders";
 import Addresses from "./pages/customer/Addresses";
+import RepartidorAuth from "./pages/RepartidorAuth";
+import Repartidor from "./pages/Repartidor";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -47,6 +49,8 @@ const App = () => (
             <Route path="/admin" element={<Admin />} />
             <Route path="/soporte-auth" element={<SoporteAuth />} />
             <Route path="/soporte" element={<Soporte />} />
+            <Route path="/repartidor-auth" element={<RepartidorAuth />} />
+            <Route path="/repartidor" element={<Repartidor />} />
             <Route path="/payment-confirmation" element={<PaymentConfirmation />} />
             <Route path="/terminos" element={<Terminos />} />
             <Route path="/privacidad" element={<Privacidad />} />

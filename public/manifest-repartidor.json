@@ -1,0 +1,35 @@
+{
+  "name": "Lapacho - Repartidor",
+  "short_name": "Repartidor",
+  "description": "Panel de repartidor - Tomá y entregá pedidos",
+  "start_url": "/repartidor?utm_source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#16A34A",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-repartidor.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-repartidor.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Pedidos",
+      "short_name": "Pedidos",
+      "description": "Ver pedidos disponibles",
+      "url": "/repartidor?utm_source=pwa_shortcut",
+      "icons": [{ "src": "/icon-repartidor.png", "sizes": "96x96" }]
+    }
+  ]
+}
