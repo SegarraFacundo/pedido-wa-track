@@ -242,34 +242,54 @@ export default function OrderStatus() {
 
       {cancelled ? (
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="flex items-center gap-2 p-4">
             <Badge variant="destructive">Cancelado</Badge>
+            <span className="text-sm text-muted-foreground">Este pedido fue cancelado.</span>
           </CardContent>
         </Card>
       ) : (
-        <Card>
-          <CardContent className="space-y-3 p-4">
-            {STEPS.map((step, idx) => {
-              const done = idx <= currentIdx;
-              const active = idx === currentIdx;
-              return (
-                <div key={step.key} className="flex items-center gap-3">
-                  <div
-                    className={cn(
-                      "flex h-7 w-7 items-center justify-center rounded-full border text-xs",
-                      done ? "border-primary bg-primary text-primary-foreground" : "border-muted text-muted-foreground",
-                    )}
-                  >
-                    {done ? <Check className="h-4 w-4" /> : idx + 1}
+        <>
+          {/* Estado actual, destacado */}
+          <div className="rounded-xl bg-gradient-to-br from-primary to-secondary p-5 text-center text-primary-foreground shadow-md">
+            <p className="text-lg font-semibold">{STATUS_MSG[order.status] ?? "Tu pedido está en proceso"}</p>
+          </div>
+
+          {/* Línea de tiempo del pedido */}
+          <Card>
+            <CardContent className="p-4">
+              {STEPS.map((step, idx) => {
+                const done = idx <= currentIdx;
+                const active = idx === currentIdx;
+                const isLast = idx === STEPS.length - 1;
+                return (
+                  <div key={step.key} className="flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <div
+                        className={cn(
+                          "flex h-7 w-7 items-center justify-center rounded-full border text-xs",
+                          done ? "border-primary bg-primary text-primary-foreground" : "border-muted text-muted-foreground",
+                        )}
+                      >
+                        {done ? <Check className="h-4 w-4" /> : idx + 1}
+                      </div>
+                      {!isLast && (
+                        <div className={cn("min-h-[1.5rem] w-0.5 flex-1", idx < currentIdx ? "bg-primary" : "bg-muted")} />
+                      )}
+                    </div>
+                    <span
+                      className={cn(
+                        "pb-6 text-sm",
+                        active ? "font-semibold text-foreground" : done ? "text-foreground" : "text-muted-foreground",
+                      )}
+                    >
+                      {step.label}
+                    </span>
                   </div>
-                  <span className={cn("text-sm", active ? "font-semibold" : done ? "" : "text-muted-foreground")}>
-                    {step.label}
-                  </span>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
+                );
+              })}
+            </CardContent>
+          </Card>
+        </>
       )}
 
       {permission !== "denied" && !pushDone && !cancelled && order.status !== "delivered" && (

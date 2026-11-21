@@ -1,8 +1,7 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { useLocalePath } from "@/hooks/useLocalePath";
 import { useCart } from "@/hooks/useCart";
 
@@ -27,7 +26,7 @@ export default function Cart() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-36">
       <button onClick={() => navigate(-1)} className="flex items-center gap-1 text-sm text-muted-foreground">
         <ArrowLeft className="h-4 w-4" /> Seguir pidiendo
       </button>
@@ -63,21 +62,29 @@ export default function Cart() {
         ))}
       </div>
 
-      <Separator />
+      <button
+        onClick={clear}
+        className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-destructive"
+      >
+        <Trash2 className="h-4 w-4" /> Vaciar carrito
+      </button>
 
-      <div className="flex items-center justify-between text-lg font-semibold">
-        <span>Subtotal</span>
-        <span>{money(subtotal)}</span>
-      </div>
-      <p className="text-xs text-muted-foreground">El costo de envío se calcula en el siguiente paso.</p>
-
-      <div className="flex gap-2">
-        <Button variant="outline" onClick={clear}>
-          Vaciar
-        </Button>
-        <Button className="flex-1" onClick={() => navigate(localePath("/checkout"))}>
-          Continuar
-        </Button>
+      {/* Barra inferior fija con el total y el CTA (patrón apps de delivery) */}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 p-3 backdrop-blur">
+        <div className="mx-auto max-w-3xl space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">
+              Subtotal · {count} {count === 1 ? "producto" : "productos"}
+            </span>
+            <span className="font-semibold">{money(subtotal)}</span>
+          </div>
+          <Button className="w-full" size="lg" onClick={() => navigate(localePath("/checkout"))}>
+            Continuar <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+          <p className="text-center text-xs text-muted-foreground">
+            El costo de envío se calcula en el siguiente paso.
+          </p>
+        </div>
       </div>
     </div>
   );

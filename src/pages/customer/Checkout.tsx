@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, Truck, User, Wallet, Receipt, Banknote, Landmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +17,11 @@ const PAYMENT_LABEL: Record<Payment, string> = {
   efectivo: "Efectivo",
   transferencia: "Transferencia",
   mercadopago: "MercadoPago",
+};
+const PAYMENT_ICON: Record<Payment, typeof Wallet> = {
+  efectivo: Banknote,
+  transferencia: Landmark,
+  mercadopago: Wallet,
 };
 
 interface VendorConfig {
@@ -153,7 +158,7 @@ export default function Checkout() {
   }
 
   return (
-    <div className="space-y-4 pb-6">
+    <div className="space-y-4 pb-28">
       <button onClick={() => navigate(localePath("/carrito"))} className="flex items-center gap-1 text-sm text-muted-foreground">
         <ArrowLeft className="h-4 w-4" /> Volver al carrito
       </button>
@@ -162,7 +167,9 @@ export default function Checkout() {
       {/* Entrega */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Entrega</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Truck className="h-4 w-4 text-primary" /> Entrega
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex gap-2">
@@ -201,7 +208,9 @@ export default function Checkout() {
       {/* Datos */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Tus datos</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <User className="h-4 w-4 text-primary" /> Tus datos
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-1">
@@ -218,23 +227,28 @@ export default function Checkout() {
       {/* Pago */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Pago</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Wallet className="h-4 w-4 text-primary" /> Pago
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           {paymentMethods.length === 0 ? (
             <p className="text-sm text-muted-foreground">Este negocio no tiene métodos de pago configurados.</p>
           ) : (
-            paymentMethods.map((m) => (
-              <Button
-                key={m}
-                type="button"
-                variant={payment === m ? "default" : "outline"}
-                className="w-full justify-start"
-                onClick={() => setPayment(m)}
-              >
-                {PAYMENT_LABEL[m]}
-              </Button>
-            ))
+            paymentMethods.map((m) => {
+              const Icon = PAYMENT_ICON[m];
+              return (
+                <Button
+                  key={m}
+                  type="button"
+                  variant={payment === m ? "default" : "outline"}
+                  className="w-full justify-start gap-2"
+                  onClick={() => setPayment(m)}
+                >
+                  <Icon className="h-4 w-4" /> {PAYMENT_LABEL[m]}
+                </Button>
+              );
+            })
           )}
         </CardContent>
       </Card>
@@ -242,7 +256,9 @@ export default function Checkout() {
       {/* Resumen */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Resumen</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Receipt className="h-4 w-4 text-primary" /> Resumen
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-1 text-sm">
           {cart.items.map((i) => (
@@ -263,10 +279,15 @@ export default function Checkout() {
         </CardContent>
       </Card>
 
-      <Button className="w-full" size="lg" disabled={submitting || paymentMethods.length === 0} onClick={submit}>
-        {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-        Confirmar pedido · {money(total)}
-      </Button>
+      {/* Confirmar fijo abajo */}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 p-3 backdrop-blur">
+        <div className="mx-auto max-w-3xl">
+          <Button className="w-full" size="lg" disabled={submitting || paymentMethods.length === 0} onClick={submit}>
+            {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Confirmar pedido · {money(total)}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
