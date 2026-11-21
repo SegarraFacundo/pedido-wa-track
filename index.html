@@ -10,6 +10,17 @@
         }
       })();
     </script>
+    <!-- Login (magic link / OAuth): colapsa "##access_token" a "#access_token" antes de que cargue la app,
+         para que Supabase pueda leer el token y crear la sesión. -->
+    <script>
+      (function () {
+        var h = location.hash;
+        if (h.length > 1 && h.charAt(1) === "#") {
+          var fixed = "#" + h.replace(/^#+/, "");
+          history.replaceState(null, "", location.pathname + location.search + fixed);
+        }
+      })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="mobile-web-app-capable" content="yes">

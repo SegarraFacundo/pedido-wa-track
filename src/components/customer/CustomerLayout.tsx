@@ -41,7 +41,7 @@ export function CustomerLayout() {
   if (needsLogin) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-background px-4">
-        <CustomerLogin redirectTo={window.location.href} />
+        <CustomerLogin redirectTo={window.location.origin + window.location.pathname + window.location.search} />
         <button
           onClick={() => setSupportOpen(true)}
           className="text-xs text-muted-foreground underline-offset-2 hover:underline"

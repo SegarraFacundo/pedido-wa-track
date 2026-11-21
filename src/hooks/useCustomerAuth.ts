@@ -2,6 +2,10 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Session, User } from "@supabase/supabase-js";
 
+/** URL actual SIN hash: evita el "##access_token" que rompe el login al volver del magic link/OAuth. */
+const currentUrlNoHash = () =>
+  window.location.origin + window.location.pathname + window.location.search;
+
 /**
  * Auth del CLIENTE de la PWA.
  * Login OBLIGATORIO: Google (OAuth, un toque) o email (magic link, sin contraseña).
@@ -37,7 +41,7 @@ export function useCustomerAuth() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: redirectTo ?? window.location.href,
+        redirectTo: redirectTo ?? currentUrlNoHash(),
         queryParams: { prompt: "select_account" },
       },
     });
@@ -52,7 +56,7 @@ export function useCustomerAuth() {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: redirectTo ?? window.location.href,
+        emailRedirectTo: redirectTo ?? currentUrlNoHash(),
         shouldCreateUser: true,
       },
     });
@@ -70,7 +74,7 @@ export function useCustomerAuth() {
   const linkGoogle = useCallback(async (redirectTo?: string) => {
     const { error } = await supabase.auth.linkIdentity({
       provider: "google",
-      options: { redirectTo: redirectTo ?? window.location.href },
+      options: { redirectTo: redirectTo ?? currentUrlNoHash() },
     });
     if (error) throw error;
   }, []);
