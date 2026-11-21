@@ -10,7 +10,6 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useLocalePath } from "@/hooks/useLocalePath";
 import { useCart } from "@/hooks/useCart";
-import { useCustomerAuth } from "@/hooks/useCustomerAuth";
 
 const money = (n: number) => "$ " + Math.round(n).toLocaleString("es-AR");
 type Payment = "efectivo" | "transferencia" | "mercadopago";
@@ -35,7 +34,6 @@ export default function Checkout() {
   const localePath = useLocalePath();
   const { toast } = useToast();
   const { cart, subtotal, count, clear } = useCart();
-  const { continueAsGuest } = useCustomerAuth();
 
   const [vendor, setVendor] = useState<VendorConfig | null>(null);
   const [loading, setLoading] = useState(true);
@@ -98,10 +96,12 @@ export default function Checkout() {
 
     setSubmitting(true);
     try {
-      // Asegurar sesión: invitado si todavía no hay (fricción cero).
+      // Login obligatorio: el pedido queda atado a una cuenta real (no invitado).
       const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session) {
-        await continueAsGuest();
+      if (!sessionData.session || sessionData.session.user.is_anonymous) {
+        toast({ title: "Iniciá sesión para confirmar el pedido", variant: "destructive" });
+        setSubmitting(false);
+        return;
       }
 
       const { data, error } = await supabase.functions.invoke("crear-pedido", {

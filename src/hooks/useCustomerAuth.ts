@@ -4,12 +4,13 @@ import type { Session, User } from "@supabase/supabase-js";
 
 /**
  * Auth del CLIENTE de la PWA.
- * Login primario: Google (OAuth, un toque). Fallback: invitado (anonymous sign-in).
+ * Login OBLIGATORIO: Google (OAuth, un toque) o email (magic link, sin contraseña).
+ * No hay modo invitado: toda orden queda atada a una cuenta identificable.
  * El teléfono NO se pide acá: se captura en el checkout (se necesita para el delivery).
  *
  * Requiere en Supabase:
  *   - Provider Google habilitado (Authentication > Providers)
- *   - Anonymous sign-ins habilitado (Authentication > Providers > Anonymous)
+ *   - Provider Email habilitado (Authentication > Providers > Email) — ya lo usan los paneles
  */
 export function useCustomerAuth() {
   const [session, setSession] = useState<Session | null>(null);
@@ -43,7 +44,22 @@ export function useCustomerAuth() {
     if (error) throw error;
   }, []);
 
-  /** Continuar como invitado (sesión anónima). Puede vincular Google después sin perder el carrito. */
+  /**
+   * Login/registro con email vía magic link (sin contraseña).
+   * Crea la cuenta si no existe y manda un enlace al correo. Al abrirlo, queda logueado.
+   */
+  const signInWithEmailOtp = useCallback(async (email: string, redirectTo?: string) => {
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: redirectTo ?? window.location.href,
+        shouldCreateUser: true,
+      },
+    });
+    if (error) throw error;
+  }, []);
+
+  /** Continuar como invitado (sesión anónima). Se mantiene sólo para el chat de soporte sin login. */
   const continueAsGuest = useCallback(async () => {
     const { data, error } = await supabase.auth.signInAnonymously();
     if (error) throw error;
@@ -70,6 +86,7 @@ export function useCustomerAuth() {
     isAuthenticated: !!user,
     isGuest: !!user?.is_anonymous,
     signInWithGoogle,
+    signInWithEmailOtp,
     continueAsGuest,
     linkGoogle,
     signOut,

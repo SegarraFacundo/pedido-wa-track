@@ -1,17 +1,16 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useCustomerAuth } from "@/hooks/useCustomerAuth";
-import { User } from "lucide-react";
+import { Mail, MailCheck } from "lucide-react";
 import lapachoIcon from "@/assets/lapacho-icon.png";
 
 interface CustomerLoginProps {
-  /** Se llama cuando el invitado entra (Google redirige, así que ahí no aplica). */
-  onDone?: () => void;
   title?: string;
   description?: string;
-  /** URL de retorno tras el login con Google. Por defecto, la actual. */
+  /** URL de retorno tras el login (Google y magic link). Por defecto, la actual. */
   redirectTo?: string;
 }
 
@@ -27,16 +26,18 @@ function GoogleIcon() {
   );
 }
 
-export function CustomerLogin({ onDone, title, description, redirectTo }: CustomerLoginProps) {
-  const { signInWithGoogle, continueAsGuest } = useCustomerAuth();
+export function CustomerLogin({ title, description, redirectTo }: CustomerLoginProps) {
+  const { signInWithGoogle, signInWithEmailOtp } = useCustomerAuth();
   const { toast } = useToast();
-  const [loading, setLoading] = useState<null | "google" | "guest">(null);
+  const [loading, setLoading] = useState<null | "google" | "email">(null);
+  const [email, setEmail] = useState("");
+  const [sentTo, setSentTo] = useState<string | null>(null);
 
   const handleGoogle = async () => {
     setLoading("google");
     try {
       await signInWithGoogle(redirectTo);
-      // signInWithOAuth redirige: no hace falta onDone acá.
+      // signInWithOAuth redirige: no sigue acá.
     } catch (e) {
       console.error(e);
       toast({ title: "No se pudo iniciar sesión con Google", variant: "destructive" });
@@ -44,14 +45,20 @@ export function CustomerLogin({ onDone, title, description, redirectTo }: Custom
     }
   };
 
-  const handleGuest = async () => {
-    setLoading("guest");
+  const handleEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const value = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+      toast({ title: "Ingresá un email válido", variant: "destructive" });
+      return;
+    }
+    setLoading("email");
     try {
-      await continueAsGuest();
-      onDone?.();
+      await signInWithEmailOtp(value, redirectTo);
+      setSentTo(value);
     } catch (e) {
       console.error(e);
-      toast({ title: "No se pudo continuar como invitado", variant: "destructive" });
+      toast({ title: "No se pudo enviar el enlace", description: "Probá de nuevo en un momento.", variant: "destructive" });
     } finally {
       setLoading(null);
     }
@@ -63,33 +70,60 @@ export function CustomerLogin({ onDone, title, description, redirectTo }: Custom
         <img src={lapachoIcon} alt="Lapacho" className="h-12 w-12 mx-auto mb-2" />
         <CardTitle>{title ?? "Ingresá a Lapacho"}</CardTitle>
         <CardDescription>
-          {description ?? "Entrá con Google o seguí como invitado para hacer tu pedido."}
+          {description ?? "Entrá para hacer tu pedido y seguirlo."}
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <Button
-          variant="outline"
-          className="w-full gap-2"
-          onClick={handleGoogle}
-          disabled={loading !== null}
-        >
-          <GoogleIcon />
-          {loading === "google" ? "Abriendo Google…" : "Continuar con Google"}
-        </Button>
+      <CardContent className="space-y-4">
+        {sentTo ? (
+          <div className="flex flex-col items-center gap-2 py-2 text-center">
+            <MailCheck className="h-10 w-10 text-primary" />
+            <p className="text-sm font-medium">Te enviamos un enlace a {sentTo}</p>
+            <p className="text-xs text-muted-foreground">
+              Abrilo desde este dispositivo para entrar. Revisá también el spam.
+            </p>
+            <Button variant="ghost" size="sm" className="mt-1" onClick={() => setSentTo(null)}>
+              Usar otro email
+            </Button>
+          </div>
+        ) : (
+          <>
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={handleGoogle}
+              disabled={loading !== null}
+            >
+              <GoogleIcon />
+              {loading === "google" ? "Abriendo Google…" : "Continuar con Google"}
+            </Button>
 
-        <Button
-          variant="ghost"
-          className="w-full gap-2"
-          onClick={handleGuest}
-          disabled={loading !== null}
-        >
-          <User className="h-4 w-4" />
-          {loading === "guest" ? "Entrando…" : "Seguir como invitado"}
-        </Button>
+            <div className="flex items-center gap-3">
+              <span className="h-px flex-1 bg-border" />
+              <span className="text-xs text-muted-foreground">o</span>
+              <span className="h-px flex-1 bg-border" />
+            </div>
 
-        <p className="text-xs text-muted-foreground text-center pt-1">
-          Como invitado podés pedir igual. El teléfono te lo pedimos al confirmar el pedido.
-        </p>
+            <form onSubmit={handleEmail} className="space-y-2">
+              <Input
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                placeholder="tu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={loading !== null}
+              />
+              <Button type="submit" className="w-full gap-2" disabled={loading !== null}>
+                <Mail className="h-4 w-4" />
+                {loading === "email" ? "Enviando…" : "Enviarme un enlace"}
+              </Button>
+            </form>
+
+            <p className="text-xs text-muted-foreground text-center">
+              Necesitás una cuenta para pedir. El teléfono te lo pedimos al confirmar el pedido.
+            </p>
+          </>
+        )}
       </CardContent>
     </Card>
   );

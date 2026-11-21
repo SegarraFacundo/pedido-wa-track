@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { Link, Outlet, useNavigate } from "react-router-dom";
-import { ShoppingCart, User, LogOut } from "lucide-react";
+import { ShoppingCart, User, LogOut, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,11 +22,36 @@ export function CustomerLayout() {
   const localePath = useLocalePath();
   const navigate = useNavigate();
   const { count } = useCart();
-  const { isAuthenticated, isGuest, user, signInWithGoogle, signOut } = useCustomerAuth();
-  const [loginOpen, setLoginOpen] = useState(false);
+  const { isAuthenticated, isGuest, user, loading, signOut } = useCustomerAuth();
   const [supportOpen, setSupportOpen] = useState(false);
 
-  const accountLabel = isGuest ? "Invitado" : user?.email ?? "Mi cuenta";
+  const accountLabel = user?.email ?? "Mi cuenta";
+
+  // Login obligatorio: sin cuenta real (o con sesión anónima vieja) no se entra a la tienda.
+  const needsLogin = !loading && (!isAuthenticated || isGuest);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (needsLogin) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-background px-4">
+        <CustomerLogin redirectTo={window.location.href} />
+        <button
+          onClick={() => setSupportOpen(true)}
+          className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+        >
+          ¿Necesitás ayuda?
+        </button>
+        <SupportDialog open={supportOpen} onOpenChange={setSupportOpen} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -60,33 +84,19 @@ export function CustomerLayout() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {isAuthenticated ? (
-                  <>
-                    <DropdownMenuItem disabled className="opacity-100">
-                      <span className="truncate text-sm font-medium">{accountLabel}</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => navigate(localePath("/mis-pedidos"))}>
-                      Mis pedidos
-                    </DropdownMenuItem>
-                    {isGuest && (
-                      <DropdownMenuItem onClick={() => signInWithGoogle()}>
-                        Entrar con Google
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem onClick={() => setSupportOpen(true)}>Ayuda y soporte</DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => signOut()}>
-                      <LogOut className="mr-2 h-4 w-4" />
-                      Cerrar sesión
-                    </DropdownMenuItem>
-                  </>
-                ) : (
-                  <>
-                    <DropdownMenuItem onClick={() => setLoginOpen(true)}>Ingresar</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setSupportOpen(true)}>Ayuda y soporte</DropdownMenuItem>
-                  </>
-                )}
+                <DropdownMenuItem disabled className="opacity-100">
+                  <span className="truncate text-sm font-medium">{accountLabel}</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate(localePath("/mis-pedidos"))}>
+                  Mis pedidos
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSupportOpen(true)}>Ayuda y soporte</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => signOut()}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Cerrar sesión
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -96,12 +106,6 @@ export function CustomerLayout() {
       <main className="mx-auto max-w-3xl px-4 py-4">
         <Outlet />
       </main>
-
-      <Dialog open={loginOpen} onOpenChange={setLoginOpen}>
-        <DialogContent className="max-w-sm border-0 bg-transparent p-0 shadow-none">
-          <CustomerLogin onDone={() => setLoginOpen(false)} />
-        </DialogContent>
-      </Dialog>
 
       <SupportDialog open={supportOpen} onOpenChange={setSupportOpen} />
       <PWAInstallPrompt userType="cliente" />
