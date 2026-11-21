@@ -26,19 +26,11 @@
 - **Buscador + categorías dentro de cada negocio** (patrón apps de delivery: menú agrupado por categoría, barra de chips sticky con scroll-spy, buscador que filtra).
 - **Links legibles por negocio** con slug: `/tienda/pizzeria-don-luigi` (los links por uuid siguen funcionando).
 - **Home**: sección **Destacados** (negocios que pagan), sección **Promociones** (ofertas/descuentos activos), y negocios **abiertos primero**.
+- **Landing page rediseñada**: enfocada en la PWA (sin el bot de WhatsApp), con branding (rosa/morado), sección "cómo funciona", **ventajas para clientes** y **para negocios**, y CTAs a la tienda / sumar negocio. Metadatos (title, Open Graph, Twitter) actualizados. *(Se hardcodeó el copy en español; el multi-idioma es/en/pt se puede re-agregar si se quiere.)*
 
 ---
 
 ## ⏳ Pendiente
-
-### Landing page (próximo paso grande)
-Rediseñarla porque **el bot de WhatsApp ya no existe**: todo va a la PWA.
-- Quitar el discurso de "pedí por WhatsApp" y apuntar a la tienda online / PWA.
-- Branding + buenas prácticas de UX/UI para plataformas tipo marketplace de delivery.
-- Sección de **ventajas de usar Lapacho**:
-  - Por qué conviene **como cliente**.
-  - Por qué conviene **sumarse como negocio**.
-- CTAs claros: entrar a la tienda / registrar mi negocio.
 
 ### Auth / producción
 - **SMTP propio (Resend/SES)** para que el login por email entregue los mails de verdad (el default de Supabase manda ~2/h y cae en spam).
