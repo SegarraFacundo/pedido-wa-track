@@ -34,10 +34,11 @@ Cada negocio conecta **su propia** cuenta de MP (OAuth desde su panel → Pagos)
 
 ### 3. Login por email (SMTP) ✅ funciona (mejorar deliverability)
 - [x] SMTP de Resend cargado y **probado**: el magic link llega y el login entra. Dominio `lapacho.ar` verificado en Resend (DKIM ✅), remitente `soporte@lapacho.ar`, rate limit 30/h.
-- [ ] **Sale a spam** → mejorar deliverability:
-  - [ ] Completar **Forge**: borrar el **MX viejo de Amazon SES** en `send.lapacho.ar` (`feedback-smtp.sa-east-1.amazonses.com`) para que el CNAME `send → send.forge.rmta.net` quede válido y el envío pase a la infra dedicada de Resend.
-  - [ ] Agregar **SPF** en el dominio raíz `lapacho.ar` (no existe).
-  - Con dominio nuevo, la reputación también mejora con el tiempo/uso.
+- [x] **Deliverability**: se limpió el DKIM duplicado y se borraron el MX/TXT viejos de SES en `send.lapacho.ar`. **Resend Forge = Ready** y dominio **Verified**. Forge enruta automáticamente a medida que el dominio gana reputación (warm-up). El spam debería irse con el uso.
+- [ ] Mejoras opcionales de deliverability/UX:
+  - [ ] **Traducir/branding los templates** de email de Supabase (hoy el magic link está en inglés y muy escueto).
+  - [ ] Agregar **SPF** en el dominio raíz `lapacho.ar` (secundario; el DKIM ya alinea DMARC).
+  - [ ] (Opcional) subdominio de **tracking** en Resend.
 - [ ] **Para producción (profesionalizar)**: cuenta de Resend propia de Lapacho (hoy se usa la compartida con Órbita) con subdominio de envío propio.
 - Mientras tanto, **Google funciona 100%**.
 
