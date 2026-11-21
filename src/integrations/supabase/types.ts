@@ -1929,6 +1929,7 @@ export type Database = {
           id: string
           image: string | null
           is_active: boolean | null
+          is_featured: boolean
           joined_at: string | null
           last_payment_date: string | null
           latitude: number | null
@@ -1967,6 +1968,7 @@ export type Database = {
           id?: string
           image?: string | null
           is_active?: boolean | null
+          is_featured?: boolean
           joined_at?: string | null
           last_payment_date?: string | null
           latitude?: number | null
@@ -2005,6 +2007,7 @@ export type Database = {
           id?: string
           image?: string | null
           is_active?: boolean | null
+          is_featured?: boolean
           joined_at?: string | null
           last_payment_date?: string | null
           latitude?: number | null
@@ -2048,6 +2051,7 @@ export type Database = {
           id: string | null
           image: string | null
           is_active: boolean | null
+          is_featured: boolean | null
           joined_at: string | null
           name: string | null
           opening_time: string | null
@@ -2074,6 +2078,7 @@ export type Database = {
           id?: string | null
           image?: string | null
           is_active?: boolean | null
+          is_featured?: boolean | null
           joined_at?: string | null
           name?: string | null
           opening_time?: string | null
@@ -2100,6 +2105,7 @@ export type Database = {
           id?: string | null
           image?: string | null
           is_active?: boolean | null
+          is_featured?: boolean | null
           joined_at?: string | null
           name?: string | null
           opening_time?: string | null
