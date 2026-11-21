@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Clock, MapPin, Minus, Plus, Store as StoreIcon, Tag } from "lucide-react";
+import { ArrowLeft, Clock, MapPin, Minus, Plus, Search, Store as StoreIcon, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -19,8 +20,25 @@ import { supabase } from "@/integrations/supabase/client";
 import { useLocalePath } from "@/hooks/useLocalePath";
 import { useCart } from "@/hooks/useCart";
 import { isVendorOpen } from "@/lib/timezone";
+import { cn } from "@/lib/utils";
 
 const money = (n: number) => "$ " + Math.round(n).toLocaleString("es-AR");
+
+const SIN_CATEGORIA = "Otros";
+
+/**
+ * La categoría del producto viene con formato inconsistente en los datos:
+ * puede ser ["Bebidas"], [["Pizzas"]], "Postres" o null. Normalizamos a un
+ * único string (la primera categoría encontrada) para poder agrupar/filtrar.
+ */
+function productCategory(raw: unknown): string {
+  const flatten = (v: unknown): string[] => {
+    if (Array.isArray(v)) return v.flatMap(flatten);
+    if (typeof v === "string" && v.trim()) return [v.trim()];
+    return [];
+  };
+  return flatten(raw)[0] ?? SIN_CATEGORIA;
+}
 
 interface Vendor {
   id: string;
@@ -44,6 +62,7 @@ interface Product {
   is_available: boolean | null;
   stock_enabled: boolean | null;
   stock_quantity: number | null;
+  category: unknown;
 }
 
 interface Offer {
@@ -67,6 +86,63 @@ export default function Store() {
   const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
   const [conflict, setConflict] = useState<Product | null>(null);
+  const [search, setSearch] = useState("");
+  const [activeCat, setActiveCat] = useState<string>(""); // categoría resaltada (scroll-spy)
+  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
+  const searching = search.trim().length > 0;
+
+  // Categorías presentes en este negocio (ordenadas, "Otros" al final).
+  const categories = useMemo(() => {
+    const set = new Set(products.map((p) => productCategory(p.category)));
+    return Array.from(set).sort((a, b) =>
+      a === SIN_CATEGORIA ? 1 : b === SIN_CATEGORIA ? -1 : a.localeCompare(b, "es"),
+    );
+  }, [products]);
+
+  // Menú agrupado por categoría (patrón apps de delivery: se muestra todo, no se oculta).
+  const grouped = useMemo(
+    () =>
+      categories
+        .map((cat) => ({ cat, items: products.filter((p) => productCategory(p.category) === cat) }))
+        .filter((g) => g.items.length > 0),
+    [categories, products],
+  );
+
+  // Resultados del buscador (filtra por nombre/descripción).
+  const searchResults = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return [];
+    return products.filter(
+      (p) => p.name.toLowerCase().includes(q) || (p.description ?? "").toLowerCase().includes(q),
+    );
+  }, [products, search]);
+
+  const showCategoryNav = !searching && grouped.length > 1;
+
+  // Scroll-spy: resalta en la barra la categoría que se está viendo.
+  useEffect(() => {
+    if (!showCategoryNav) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        const cat = visible[0]?.target.getAttribute("data-cat");
+        if (cat) setActiveCat(cat);
+      },
+      { rootMargin: "-140px 0px -65% 0px", threshold: 0 },
+    );
+    grouped.forEach((g) => {
+      const el = sectionRefs.current[g.cat];
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, [showCategoryNav, grouped]);
+
+  const scrollToCat = (cat: string) => {
+    setActiveCat(cat);
+    sectionRefs.current[cat]?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   useEffect(() => {
     if (!vendorId) return;
@@ -81,7 +157,7 @@ export default function Store() {
           .maybeSingle(),
         supabase
           .from("products")
-          .select("id, name, description, price, image, is_available, stock_enabled, stock_quantity")
+          .select("id, name, description, price, image, is_available, stock_enabled, stock_quantity, category")
           .eq("vendor_id", vendorId)
           .order("name"),
         supabase
@@ -140,6 +216,44 @@ export default function Store() {
   }
 
   const open = isVendorOpen(vendor.days_open, vendor.opening_time, vendor.closing_time, false);
+
+  const renderProduct = (p: Product) => {
+    const qty = qtyOf(p.id);
+    const noStock = p.stock_enabled && (p.stock_quantity ?? 0) <= 0;
+    return (
+      <Card key={p.id}>
+        <CardContent className="flex items-center gap-3 p-3">
+          {p.image && (
+            <img src={p.image} alt={p.name} className="h-14 w-14 shrink-0 rounded-md object-cover" />
+          )}
+          <div className="min-w-0 flex-1">
+            <h3 className="font-medium">{p.name}</h3>
+            {p.description && (
+              <p className="line-clamp-2 text-sm text-muted-foreground">{p.description}</p>
+            )}
+            <p className="mt-0.5 font-semibold">{money(Number(p.price))}</p>
+          </div>
+          {noStock ? (
+            <Badge variant="secondary">Sin stock</Badge>
+          ) : qty > 0 ? (
+            <div className="flex items-center gap-2">
+              <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => setQuantity(p.id, qty - 1)}>
+                <Minus className="h-4 w-4" />
+              </Button>
+              <span className="w-5 text-center font-medium">{qty}</span>
+              <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => tryAdd(p)}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <Button size="sm" onClick={() => tryAdd(p)}>
+              Agregar
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="space-y-4 pb-24">
@@ -203,49 +317,75 @@ export default function Store() {
         </div>
       )}
 
-      <div className="space-y-2">
-        {products.length === 0 ? (
-          <p className="py-6 text-center text-muted-foreground">Este negocio todavía no cargó productos.</p>
-        ) : (
-          products.map((p) => {
-            const qty = qtyOf(p.id);
-            const noStock = p.stock_enabled && (p.stock_quantity ?? 0) <= 0;
-            return (
-              <Card key={p.id}>
-                <CardContent className="flex items-center gap-3 p-3">
-                  {p.image && (
-                    <img src={p.image} alt={p.name} className="h-14 w-14 shrink-0 rounded-md object-cover" />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-medium">{p.name}</h3>
-                    {p.description && (
-                      <p className="line-clamp-2 text-sm text-muted-foreground">{p.description}</p>
+      {products.length === 0 ? (
+        <p className="py-6 text-center text-muted-foreground">Este negocio todavía no cargó productos.</p>
+      ) : (
+        <>
+          {/* Buscador del menú */}
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar en el menú…"
+              className="pl-9"
+            />
+          </div>
+
+          {/* Barra de categorías sticky (se resalta la que estás viendo; al tocar, salta) */}
+          {showCategoryNav && (
+            <div className="sticky top-14 z-30 -mx-4 border-b bg-background/95 px-4 py-2 backdrop-blur">
+              <div className="flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {grouped.map((g) => (
+                  <button
+                    key={g.cat}
+                    onClick={() => scrollToCat(g.cat)}
+                    className={cn(
+                      "whitespace-nowrap rounded-full border px-3 py-1 text-sm transition-colors",
+                      activeCat === g.cat
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "bg-background text-foreground hover:bg-muted",
                     )}
-                    <p className="mt-0.5 font-semibold">{money(Number(p.price))}</p>
-                  </div>
-                  {noStock ? (
-                    <Badge variant="secondary">Sin stock</Badge>
-                  ) : qty > 0 ? (
-                    <div className="flex items-center gap-2">
-                      <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => setQuantity(p.id, qty - 1)}>
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                      <span className="w-5 text-center font-medium">{qty}</span>
-                      <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => tryAdd(p)}>
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button size="sm" onClick={() => tryAdd(p)}>
-                      Agregar
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })
-        )}
-      </div>
+                  >
+                    {g.cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Resultados: búsqueda (lista plana) o menú agrupado por categoría */}
+          {searching ? (
+            searchResults.length === 0 ? (
+              <p className="py-10 text-center text-muted-foreground">
+                No encontramos productos para “{search.trim()}”.
+              </p>
+            ) : (
+              <div className="space-y-2">{searchResults.map(renderProduct)}</div>
+            )
+          ) : grouped.length > 1 ? (
+            <div className="space-y-6">
+              {grouped.map((g) => (
+                <section
+                  key={g.cat}
+                  data-cat={g.cat}
+                  ref={(el) => {
+                    sectionRefs.current[g.cat] = el;
+                  }}
+                  className="scroll-mt-32 space-y-2"
+                >
+                  <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
+                    {g.cat}
+                  </h2>
+                  {g.items.map(renderProduct)}
+                </section>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2">{products.map(renderProduct)}</div>
+          )}
+        </>
+      )}
 
       {count > 0 && cart.vendor_id === vendorId && (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background p-3">
