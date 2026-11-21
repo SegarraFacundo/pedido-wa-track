@@ -230,8 +230,8 @@ export function VendorPaymentSettings({ vendorId }: VendorPaymentSettingsProps) 
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <CreditCard className="h-5 w-5" />
-            💰 Configuración de Pagos
+            <CreditCard className="h-5 w-5 flex-shrink-0 text-primary" />
+            Configuración de Pagos
           </CardTitle>
           <CardDescription>
             Configura los medios de pago que aceptarás en tu negocio
@@ -240,21 +240,21 @@ export function VendorPaymentSettings({ vendorId }: VendorPaymentSettingsProps) 
         <CardContent className="space-y-6">
           {/* MercadoPago */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 space-y-1">
                 <Label className="text-base font-semibold">MercadoPago</Label>
                 <p className="text-sm text-muted-foreground">
                   Acepta pagos online con tarjeta y otros medios
                 </p>
               </div>
               {settings.mercadoPago.activo ? (
-                <div className="flex items-center gap-2 text-sm text-green-600">
-                  <Check className="h-4 w-4" />
+                <div className="flex flex-shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">
+                  <Check className="h-3.5 w-3.5" />
                   Conectado
                 </div>
               ) : (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <X className="h-4 w-4" />
+                <div className="flex flex-shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                  <X className="h-3.5 w-3.5" />
                   No conectado
                 </div>
               )}
