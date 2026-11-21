@@ -6,11 +6,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useLocalePath } from "@/hooks/useLocalePath";
 import { useCart } from "@/hooks/useCart";
+import { useAddresses } from "@/hooks/useAddresses";
+import { cn } from "@/lib/utils";
 
 const money = (n: number) => "$ " + Math.round(n).toLocaleString("es-AR");
 type Payment = "efectivo" | "transferencia" | "mercadopago";
@@ -45,8 +48,12 @@ export default function Checkout() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
+  const { addresses, addAddress } = useAddresses();
   const [deliveryType, setDeliveryType] = useState<"delivery" | "pickup">("delivery");
   const [address, setAddress] = useState("");
+  const [selectedAddrId, setSelectedAddrId] = useState<string | null>(null);
+  const [addingNew, setAddingNew] = useState(false);
+  const [saveNew, setSaveNew] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
@@ -73,6 +80,18 @@ export default function Checkout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cart.vendor_id]);
 
+  // Preseleccionar la dirección principal guardada.
+  useEffect(() => {
+    if (addresses.length > 0 && selectedAddrId === null && !addingNew) {
+      const def = addresses.find((a) => a.is_default) ?? addresses[0];
+      setSelectedAddrId(def.id);
+    }
+  }, [addresses, selectedAddrId, addingNew]);
+
+  const chosenAddress = selectedAddrId ? addresses.find((a) => a.id === selectedAddrId) ?? null : null;
+  const effectiveAddress =
+    deliveryType === "delivery" ? (chosenAddress ? chosenAddress.address : address.trim()) : "";
+
   const paymentMethods = useMemo<Payment[]>(() => {
     const list: Payment[] = [];
     if (vendor?.accepts_cash) list.push("efectivo");
@@ -88,7 +107,7 @@ export default function Checkout() {
 
   const submit = async () => {
     if (!cart.vendor_id) return;
-    if (deliveryType === "delivery" && address.trim().length < 4) {
+    if (deliveryType === "delivery" && effectiveAddress.length < 4) {
       toast({ title: "Ingresá una dirección de entrega", variant: "destructive" });
       return;
     }
@@ -116,7 +135,7 @@ export default function Checkout() {
           vendor_id: cart.vendor_id,
           items: cart.items.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
           delivery_type: deliveryType,
-          address: deliveryType === "delivery" ? address.trim() : undefined,
+          address: deliveryType === "delivery" ? effectiveAddress : undefined,
           payment_method: payment,
           customer_name: name.trim() || undefined,
           customer_phone: phone.trim(),
@@ -135,6 +154,15 @@ export default function Checkout() {
       }
 
       clear();
+
+      // Guardar la dirección nueva para la próxima (si el cliente lo pidió).
+      if (deliveryType === "delivery" && !chosenAddress && saveNew && effectiveAddress.length >= 4) {
+        try {
+          await addAddress({ address: effectiveAddress });
+        } catch (e) {
+          console.error("No se pudo guardar la dirección:", e);
+        }
+      }
 
       if (data?.payment_link) {
         window.location.href = data.payment_link as string;
@@ -198,9 +226,69 @@ export default function Checkout() {
             )}
           </div>
           {deliveryType === "delivery" ? (
-            <div className="space-y-1">
-              <Label htmlFor="address">Dirección de entrega</Label>
-              <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Calle y número" />
+            <div className="space-y-3">
+              {addresses.length > 0 && (
+                <div className="space-y-2">
+                  {addresses.map((a) => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedAddrId(a.id);
+                        setAddingNew(false);
+                      }}
+                      className={cn(
+                        "w-full rounded-lg border p-3 text-left transition",
+                        selectedAddrId === a.id && !addingNew ? "border-primary bg-primary/5" : "hover:bg-muted/50",
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{a.label || "Dirección"}</span>
+                        {a.is_default && (
+                          <Badge variant="secondary" className="text-[11px]">Principal</Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">{a.address}</p>
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAddingNew(true);
+                      setSelectedAddrId(null);
+                    }}
+                    className={cn(
+                      "w-full rounded-lg border border-dashed p-3 text-left text-sm transition",
+                      addingNew ? "border-primary text-foreground" : "text-muted-foreground hover:bg-muted/50",
+                    )}
+                  >
+                    + Usar otra dirección
+                  </button>
+                </div>
+              )}
+
+              {(addingNew || addresses.length === 0) && (
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="address">Dirección de entrega</Label>
+                    <Input
+                      id="address"
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      placeholder="Calle y número (depto, piso, referencia)"
+                    />
+                  </div>
+                  <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={saveNew}
+                      onChange={(e) => setSaveNew(e.target.checked)}
+                      className="h-4 w-4 rounded border-input accent-[hsl(var(--primary))]"
+                    />
+                    Guardar esta dirección para la próxima
+                  </label>
+                </div>
+              )}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">Retirás en: {vendor?.address}</p>

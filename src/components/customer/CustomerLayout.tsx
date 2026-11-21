@@ -91,6 +91,9 @@ export function CustomerLayout() {
                 <DropdownMenuItem onClick={() => navigate(localePath("/mis-pedidos"))}>
                   Mis pedidos
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate(localePath("/direcciones"))}>
+                  Mis direcciones
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setSupportOpen(true)}>Ayuda y soporte</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => signOut()}>

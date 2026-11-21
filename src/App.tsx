@@ -27,6 +27,7 @@ import Cart from "./pages/customer/Cart";
 import Checkout from "./pages/customer/Checkout";
 import OrderStatus from "./pages/customer/OrderStatus";
 import MyOrders from "./pages/customer/MyOrders";
+import Addresses from "./pages/customer/Addresses";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -60,6 +61,7 @@ const App = () => (
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/pedido/:orderId" element={<OrderStatus />} />
               <Route path="/mis-pedidos" element={<MyOrders />} />
+              <Route path="/direcciones" element={<Addresses />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
