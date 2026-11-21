@@ -20,11 +20,11 @@
 ---
 
 ## 🔴 Prioridad 1 — Alto impacto, esfuerzo razonable
-- [ ] **Aclaraciones del pedido** 🟢 — campo de notas en el checkout ("sin cebolla", "dejar en portería", "timbre no anda"). Hoy no existe. Muy usado, muy fácil.
+- [x] **Aclaraciones del pedido** 🟢 — ✅ **hecho** (2026-11-21): campo "Aclaraciones" en el checkout → `orders.notes` → se muestra destacado al negocio en el pedido.
 - [ ] **Opciones / variantes de producto** 🔴 — tamaño, agregados, sabor, "sin X". Hoy los productos son planos (nombre/precio). Es el más grande pero el que más diferencia para gastronomía.
 - [ ] **Direcciones guardadas + mapa** 🟡 — hoy la dirección es texto libre (propenso a errores de entrega). Guardar "Casa/Trabajo" y elegir pin en un mapa con autocompletado.
 - [ ] **Tiempo estimado de entrega (ETA)** 🟡 — "llega en 30-40 min". Expectativa básica del cliente (puede ser un rango configurable por negocio para empezar).
-- [ ] **"Pedir de nuevo" (reordenar)** 🟢 — desde *Mis Pedidos*, en 1 toque. Aumenta la recompra.
+- [x] **"Pedir de nuevo" (reordenar)** 🟢 — ✅ **hecho** (2026-11-21): botón en *Mis Pedidos* que rearma el carrito con los productos actuales del negocio (precio/stock de ahora) y avisa si alguno ya no está.
 - [ ] **Cupones / código de descuento** 🟡 — canjeable en el checkout (y descuento de primer pedido). Hoy hay ofertas por negocio, pero no código.
 - [ ] **Favoritos** 🟢 — negocios y productos.
 

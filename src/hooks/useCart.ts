@@ -89,10 +89,15 @@ export function useCart() {
     write(items.length ? { ...current, items } : EMPTY_CART);
   }, []);
 
+  /** Reemplaza el carrito completo (p. ej. "pedir de nuevo" desde Mis Pedidos). */
+  const replaceCart = useCallback((next: CustomerCart) => {
+    write(next.items.length ? next : EMPTY_CART);
+  }, []);
+
   const clear = useCallback(() => write(EMPTY_CART), []);
 
   const count = cart.items.reduce((n, i) => n + i.quantity, 0);
   const subtotal = cart.items.reduce((s, i) => s + i.price * i.quantity, 0);
 
-  return { cart, count, subtotal, addItem, replaceVendor, setQuantity, removeItem, clear };
+  return { cart, count, subtotal, addItem, replaceVendor, replaceCart, setQuantity, removeItem, clear };
 }
