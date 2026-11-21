@@ -80,7 +80,7 @@ export function VendorDashboardWithRealtime({ vendor }: VendorDashboardWithRealt
     },
     {
       title: "Ingresos Hoy",
-      value: `$${todayRevenue.toLocaleString()}`,
+      value: "$ " + Math.round(todayRevenue).toLocaleString("es-AR"),
       icon: DollarSign,
       color: "text-green-600",
       bgColor: "bg-green-100",

@@ -27,6 +27,7 @@
 - **Links legibles por negocio** con slug: `/tienda/pizzeria-don-luigi` (los links por uuid siguen funcionando).
 - **Home**: sección **Destacados** (negocios que pagan), sección **Promociones** (ofertas/descuentos activos), y negocios **abiertos primero**.
 - **Flujo del cliente pulido** (UX/branding): carrito con barra inferior fija, checkout con íconos por sección y confirmar fijo, seguimiento con banner de estado (gradiente de marca) y línea de tiempo.
+- **Panel del vendedor**: formato de precios unificado con el del cliente ("$ 65.000" en vez de "$65000.00"), en las tarjetas de pedido y en "Ingresos Hoy".
 - **Landing page rediseñada**: enfocada en la PWA (sin el bot de WhatsApp), con branding (rosa/morado), sección "cómo funciona", **ventajas para clientes** y **para negocios**, y CTAs a la tienda / sumar negocio. Metadatos (title, Open Graph, Twitter) actualizados. *(Se hardcodeó el copy en español; el multi-idioma es/en/pt se puede re-agregar si se quiere.)*
 
 ---

@@ -23,6 +23,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { canMarkAsPaid, canMarkAsUnpaid } from "@/lib/paymentValidation";
 
+// Formato de moneda unificado con la PWA del cliente: "$ 65.000" (sin decimales).
+const money = (n: number) => "$ " + Math.round(Number(n) || 0).toLocaleString("es-AR");
+
 interface OrderCardProps {
   order: Order;
   onStatusChange?: (orderId: string, newStatus: OrderStatus) => void;
@@ -337,13 +340,13 @@ export function OrderCard({
                       <div className="text-right ml-2">
                         <p className="text-sm font-medium">{item.quantity}x</p>
                         <p className="text-sm text-muted-foreground">
-                          ${item.price.toFixed(2)}
+                          {money(item.price)}
                         </p>
                       </div>
                     </div>
                     <div className="text-right mt-1">
                       <p className="font-semibold text-sm">
-                        ${(item.price * item.quantity).toFixed(2)}
+                        {money(item.price * item.quantity)}
                       </p>
                     </div>
                   </div>
@@ -477,7 +480,7 @@ export function OrderCard({
           <div className="flex justify-between pt-2 border-t font-semibold">
             <span>Total</span>
             <span className="text-primary text-lg">
-              ${order.total.toFixed(2)}
+              {money(order.total)}
             </span>
           </div>
         </div>
