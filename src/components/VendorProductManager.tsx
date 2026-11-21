@@ -394,66 +394,67 @@ export function VendorProductManager({ vendorId }: VendorProductManagerProps) {
           <div className="grid gap-3">
             {filteredProducts.map(product => (
               <Card key={product.id} className={!product.is_available ? 'opacity-60' : ''}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-4">
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex gap-3">
                     {product.image && (
-                      <img 
-                        src={product.image} 
+                      <img
+                        src={product.image}
                         alt={product.name}
-                        className="w-20 h-20 object-cover rounded-lg"
+                        className="h-16 w-16 flex-shrink-0 rounded-lg object-cover"
                       />
                     )}
-                    <div className="flex-1">
-                      <div className="flex items-start gap-2 mb-1">
-                        <h3 className="font-semibold">{product.name}</h3>
-                        <div className="flex flex-wrap gap-1">
-                          {(Array.isArray(product.category) ? product.category : [product.category]).map(cat => (
-                            <span key={cat} className="text-xs px-2 py-1 bg-secondary rounded-full">
-                              {cat}
-                            </span>
-                          ))}
-                        </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-semibold leading-tight line-clamp-1">{product.name}</h3>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {(Array.isArray(product.category) ? product.category : [product.category]).map(cat => (
+                          <span key={cat} className="rounded-full bg-secondary/15 px-2 py-0.5 text-[11px] font-medium text-secondary">
+                            {cat}
+                          </span>
+                        ))}
                       </div>
                       {product.description && (
-                        <p className="text-sm text-muted-foreground mb-2">{product.description}</p>
+                        <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{product.description}</p>
                       )}
-                      <div className="flex items-center gap-3">
-                        <p className="text-lg font-bold text-primary">
-                          ${product.price.toLocaleString('es-AR')}
-                        </p>
-                        {product.stock_enabled && (
-                          <span className={`text-xs px-2 py-1 rounded-full ${
-                            (product.stock_quantity || 0) === 0 
-                              ? 'bg-red-100 text-red-700' 
-                              : (product.stock_quantity || 0) < 5
-                              ? 'bg-yellow-100 text-yellow-700'
-                              : 'bg-green-100 text-green-700'
-                          }`}>
-                            Stock: {product.stock_quantity || 0}
-                          </span>
-                        )}
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <p className="text-base font-bold text-primary">
+                            ${product.price.toLocaleString('es-AR')}
+                          </p>
+                          {product.stock_enabled && (
+                            <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] ${
+                              (product.stock_quantity || 0) === 0
+                                ? 'bg-red-100 text-red-700'
+                                : (product.stock_quantity || 0) < 5
+                                ? 'bg-yellow-100 text-yellow-700'
+                                : 'bg-green-100 text-green-700'
+                            }`}>
+                              Stock: {product.stock_quantity || 0}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-shrink-0 items-center gap-0.5">
+                          <Switch
+                            checked={product.is_available}
+                            onCheckedChange={() => handleToggleAvailability(product)}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => startEditProduct(product)}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => requestDeleteProduct(product.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={product.is_available}
-                        onCheckedChange={() => handleToggleAvailability(product)}
-                      />
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => startEditProduct(product)}
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => requestDeleteProduct(product.id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
                     </div>
                   </div>
                 </CardContent>

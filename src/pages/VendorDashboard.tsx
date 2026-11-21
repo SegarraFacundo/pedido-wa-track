@@ -214,7 +214,7 @@ export default function VendorDashboard() {
       </div>
       
       {/* Dashboard tabs */}
-      <div className="container mx-auto p-4">
+      <div className="container mx-auto py-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           {/* TabsList solo visible en desktop */}
           <TabsList className="hidden lg:flex flex-wrap gap-2 h-auto p-1 mb-6">

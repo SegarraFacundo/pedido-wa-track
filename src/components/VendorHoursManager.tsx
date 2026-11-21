@@ -248,12 +248,12 @@ export function VendorHoursManager({ vendorId }: VendorHoursManagerProps) {
 
           return (
             <div key={day.value} className="space-y-3 p-4 bg-secondary/10 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div className="font-medium">{day.label}</div>
-                
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                <div className="font-semibold">{day.label}</div>
+
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
-                    <Label htmlFor={`${day.value}-24h`} className="text-sm">
+                    <Label htmlFor={`${day.value}-24h`} className="whitespace-nowrap text-sm">
                       24 horas
                     </Label>
                     <Switch
@@ -263,9 +263,9 @@ export function VendorHoursManager({ vendorId }: VendorHoursManagerProps) {
                       disabled={dayData.is_closed}
                     />
                   </div>
-                  
+
                   <div className="flex items-center gap-2">
-                    <Label htmlFor={`${day.value}-closed`} className="text-sm">
+                    <Label htmlFor={`${day.value}-closed`} className="whitespace-nowrap text-sm">
                       Cerrado
                     </Label>
                     <Switch
@@ -280,35 +280,35 @@ export function VendorHoursManager({ vendorId }: VendorHoursManagerProps) {
               {!dayData.is_closed && !dayData.is_open_24_hours && (
                 <div className="space-y-2">
                   {dayData.time_slots.map((slot, index) => (
-                    <div key={slot.slot_number} className="flex items-center gap-2">
-                      <div className="flex-1 grid grid-cols-2 gap-2">
-                        <div className="flex items-center gap-2">
-                          <Label className="text-xs whitespace-nowrap">Abre:</Label>
+                    <div key={slot.slot_number} className="flex items-end gap-2">
+                      <div className="grid flex-1 grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Abre</Label>
                           <Input
                             type="time"
                             value={slot.opening_time}
                             onChange={(e) => updateTimeSlot(day.value, slot.slot_number, 'opening_time', e.target.value)}
-                            className="flex-1"
+                            className="w-full"
                           />
                         </div>
-                        
-                        <div className="flex items-center gap-2">
-                          <Label className="text-xs whitespace-nowrap">Cierra:</Label>
+
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Cierra</Label>
                           <Input
                             type="time"
                             value={slot.closing_time}
                             onChange={(e) => updateTimeSlot(day.value, slot.slot_number, 'closing_time', e.target.value)}
-                            className="flex-1"
+                            className="w-full"
                           />
                         </div>
                       </div>
-                      
+
                       {dayData.time_slots.length > 1 && (
                         <Button
                           size="icon"
                           variant="ghost"
                           onClick={() => removeTimeSlot(day.value, slot.slot_number)}
-                          className="h-8 w-8 text-destructive"
+                          className="h-9 w-9 flex-shrink-0 text-destructive"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
