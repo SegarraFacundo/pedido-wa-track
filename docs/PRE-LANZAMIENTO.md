@@ -48,8 +48,8 @@ Cada negocio conecta **su propia** cuenta de MP (OAuth desde su panel → Pagos)
 - [x] ~~Confirmar que la **pantalla de consentimiento esté publicada / "In production"**~~ → **hecho**: proyecto `Lapacho` en Google Cloud, OAuth **publicado "En producción"**. Cualquier cuenta de Google puede entrar, sin "app no verificada" (scopes básicos → no requiere verificación). Se completó la marca (nombre, emails, links a lapacho.ar/privacidad/terminos) y los dominios autorizados (lapacho.ar + supabase.co). **No subir logo** al consent screen (gatilla verificación).
 
 ### 5. Notificaciones 🟡
-- [ ] Probar **web-push real** (cliente activa permiso → el negocio cambia el estado → llega el aviso con la app cerrada). Las VAPID keys ya están.
-- [ ] Confirmar que al negocio le **llegue el aviso de pedido nuevo** (realtime + sonido/push).
+- [x] ~~Probar **web-push real**~~ → **funciona** (el cliente recibe el aviso del pedido). Se corrigió el **ícono** de la notificación: salía un cuadrado blanco (`/favicon.ico`); ahora es la **hoja** (`/lapacho-icon.png`) tanto en el default del SW (bump a cache `v4`) como en el payload de `send-push`. Para verlo, el SW se actualiza al recargar la PWA. **Falta redeployar `send-push`** (opcional; el fix del SW ya alcanza).
+- [ ] Confirmar que al negocio le **llegue el aviso de pedido nuevo** (el aviso al negocio va por **WhatsApp** vía `notify-vendor` + realtime/sonido en el panel; el web-push es solo para el cliente).
 
 ### 6. Contenido y configuración por negocio 🟡
 - [ ] Cada negocio: **horarios reales**, **zona/costo de envío**, **métodos de pago** y productos con precio/stock.
@@ -58,6 +58,7 @@ Cada negocio conecta **su propia** cuenta de MP (OAuth desde su panel → Pagos)
 ---
 
 ## 🗒️ Notas
+- **Fix (2026-11-21)**: loop infinito de redirección en `soporte.lapacho.ar` — `SubdomainRouter` no permitía `/soporte-auth`, así que rebotaba `/soporte` ↔ `/soporte-auth`. Corregido y verificado en vivo.
 - El estado general de la migración está en `docs/BITACORA-PWA.md`.
 - Google OAuth no depende del dominio (el redirect va a Supabase), así que el cambio a lapacho.ar no lo afecta.
 - Prioridad sugerida para abrir: **1 (limpiar datos) → 2 (MercadoPago + APP_URL) → 4 (Google en producción) → 3 (SMTP) → 5/6**.
