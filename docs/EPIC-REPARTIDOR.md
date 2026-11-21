@@ -1,7 +1,7 @@
 # 🛵 Epic: App de repartidores (logística propia)
 
 > Diseño para sumar **repartidores** (cadetes) a Lapacho: una app donde ven pedidos, los toman, retiran y entregan — como PedidosYa/Rappi. Cadetes **subcontratados como monotributistas**.
-> Fecha: 2026-11-21. Estado: **diseño / a validar** (todavía no se codeó nada).
+> Fecha: 2026-11-21. Estado: **Fase 1 implementada y en producción** ✅ (ver sección 11).
 > Relacionado: `docs/ROADMAP.md`, `docs/BITACORA-PWA.md`.
 
 ---
@@ -90,7 +90,7 @@ Retiro en local (pickup) **no** genera delivery.
 - `SubdomainRouter`, manifests, íconos: sumar el rol repartidor.
 
 ## 11. Fases
-- **Fase 1 (MVP)**: rol + tabla couriers/deliveries, alta de repartidores (admin), app con pool "tomar" + estados + historial, tarifa por envío manual. Sin mapa en vivo (usar deep-link a Google Maps).
+- **Fase 1 (MVP)** ✅ **HECHO (2026-11-21)**: rol `repartidor`, tablas couriers/deliveries/courier_payouts + trigger (pool al marcar "ready"), alta de repartidores en el admin, app `/repartidor` (online, pool "tomar", estados retiré/en camino/entregué, ganancias del día), tarifa por envío manual, subdominio + manifest + ícono. Sin mapa en vivo (deep-link a Google Maps). **Para usar**: Admin → Repartidores (crear con email/contraseña/tarifa) → el repartidor entra en `/repartidor-auth` (o `repartidor.lapacho.ar`), se pone "Disponible", y cuando un negocio marca un pedido "Listo" aparece en el pool.
 - **Fase 2**: ubicación en vivo + pin del repartidor en el seguimiento del cliente, asignación automática por cercanía, liquidaciones automatizadas.
 - **Fase 3**: navegación integrada, ratings del repartidor, zonas, turnos.
 

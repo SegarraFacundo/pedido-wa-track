@@ -39,7 +39,7 @@
 - [ ] **Calificar al repartidor** y **reseñas con foto** 🟡.
 
 ## ⚪ Prioridad 3 — Más adelante / según modelo de negocio
-- [ ] **App del repartidor / logística propia** 🔴 — **pedido del dueño (2026-11-21)**: app nueva para repartidores que ven pedidos disponibles, los toman, retiran y entregan (como PedidosYa/Rappi). Nuevo actor: cadetes **subcontratados como monotributistas**. Implica: rol `repartidor` (auth + RLS), asignación de pedidos (manual o automática), estados de reparto (asignado → retirado → en camino → entregado), ubicación en vivo del cadete (mapa), y **liquidaciones/pagos al repartidor** (comisión o tarifa por envío, facturación monotributo). Es un epic aparte: conviene diseñarlo con una bitácora antes de codear.
+- [~] **App del repartidor / logística propia** 🔴 — **Fase 1 HECHA (2026-11-21)** ✅ (rol, tablas, app /repartidor con pool/estados, alta en admin; ver `docs/EPIC-REPARTIDOR.md`). Faltan Fase 2 (mapa en vivo, auto-asignación, liquidaciones) y Fase 3. **Pedido original del dueño**: app nueva para repartidores que ven pedidos disponibles, los toman, retiran y entregan (como PedidosYa/Rappi). Nuevo actor: cadetes **subcontratados como monotributistas**. Implica: rol `repartidor` (auth + RLS), asignación de pedidos (manual o automática), estados de reparto (asignado → retirado → en camino → entregado), ubicación en vivo del cadete (mapa), y **liquidaciones/pagos al repartidor** (comisión o tarifa por envío, facturación monotributo). Es un epic aparte: conviene diseñarlo con una bitácora antes de codear.
 - [ ] **Suscripción tipo Plus/Prime** 🔴 — envío gratis con cuota (dudoso para ciudad chica).
 - [ ] **Puntos / fidelidad** 🟡.
 - [ ] **Referidos** 🟡 — invitá y ganá crédito.
