@@ -33,7 +33,10 @@ Cada negocio conecta **su propia** cuenta de MP (OAuth desde su panel → Pagos)
 - [ ] (Menor) El redirect post-conexión de MP del vendedor va a `/vendor`; la ruta real es `/vendor-dashboard` — revisar.
 
 ### 3. Login por email (SMTP) 🟠
-- [ ] Configurar **SMTP propio** (Resend) en Supabase → Auth. Sin esto, los magic links casi no llegan (hoy ~2/h y caen en spam). Mientras tanto, **Google funciona 100%**.
+- [x] SMTP de Resend cargado en Supabase → Auth → Emails (host `smtp.resend.com`, puerto 465, usuario `resend`, remitente `soporte@lapacho.ar`). Al activar custom SMTP el rate limit sube solo a 30 emails/h.
+- [ ] Pegar la **API key de Resend** en Password y **Save changes** (lo hace el dueño; la key no la maneja Claude).
+- [ ] **Para producción (profesionalizar)**: mover a una **cuenta de Resend propia de Lapacho** (hoy se usa la compartida con Órbita, donde lapacho.ar ya está verificado). Al separar, verificar un **subdominio de envío propio** (ej. `mail.lapacho.ar`) y enviar desde ahí.
+- Mientras tanto, **Google funciona 100%**.
 
 ### 4. Google OAuth 🟠
 - [ ] Confirmar que la **pantalla de consentimiento esté publicada / "In production"** en Google Cloud (si está en "Testing", solo entran usuarios de prueba y muestra "app no verificada").
