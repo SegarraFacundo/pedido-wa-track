@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Headphones } from "lucide-react";
-import lapachoLogo from "@/assets/lapacho-logo.png";
+import lapachoLogo from "@/assets/logo-text-light.svg";
 
 export default function SoporteAuth() {
   const [email, setEmail] = useState("");

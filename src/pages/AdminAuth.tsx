@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Lock } from "lucide-react";
-import lapachoIcon from "@/assets/lapacho-icon.png";
+import lapachoIcon from "@/assets/logo-icon-light.svg";
 
 export default function AdminAuth() {
   const [email, setEmail] = useState("");

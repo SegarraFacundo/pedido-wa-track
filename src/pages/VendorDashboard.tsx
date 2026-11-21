@@ -30,7 +30,7 @@ import {
   MessageCircle, LifeBuoy, CreditCard, Heart, BarChart3, Menu, LogOut 
 } from 'lucide-react';
 import { PWAInstallPrompt } from '@/components/PWAInstallPrompt';
-import lapachoIcon from "@/assets/lapacho-icon.png";
+import lapachoIcon from "@/assets/logo-icon-light.svg";
 import { cn } from "@/lib/utils";
 
 const menuItems = [

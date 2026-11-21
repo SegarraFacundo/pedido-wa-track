@@ -11,8 +11,8 @@ import { Store } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useRealtimeOrders } from "@/hooks/useRealtimeOrders";
-import lapachoLogo from "@/assets/lapacho-logo.png";
-import lapachoIcon from "@/assets/lapacho-icon.png";
+import lapachoLogo from "@/assets/logo-text-light.svg";
+import lapachoIcon from "@/assets/logo-icon-light.svg";
 
 const Platform = () => {
   const [vendors, setVendors] = useState<Vendor[]>([]);

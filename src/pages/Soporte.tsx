@@ -6,8 +6,8 @@ import { useToast } from "@/hooks/use-toast";
 import { LogOut, Headphones } from "lucide-react";
 import SupportPanel from "@/components/admin/SupportPanel";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
-import lapachoLogo from "@/assets/lapacho-logo.png";
-import lapachoIcon from "@/assets/lapacho-icon.png";
+import lapachoLogo from "@/assets/logo-text-light.svg";
+import lapachoIcon from "@/assets/logo-icon-light.svg";
 
 export default function Soporte() {
   const [loading, setLoading] = useState(true);

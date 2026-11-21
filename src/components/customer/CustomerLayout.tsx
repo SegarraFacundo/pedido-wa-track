@@ -16,7 +16,7 @@ import { useCustomerAuth } from "@/hooks/useCustomerAuth";
 import { CustomerLogin } from "@/components/customer/CustomerLogin";
 import { SupportDialog } from "@/components/customer/SupportDialog";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
-import lapachoLogo from "@/assets/lapacho-logo.png";
+import lapachoLogo from "@/assets/logo-text-light.svg";
 
 export function CustomerLayout() {
   const localePath = useLocalePath();

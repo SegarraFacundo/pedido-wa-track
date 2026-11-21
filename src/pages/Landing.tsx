@@ -16,7 +16,8 @@ import {
   Star,
   Instagram,
 } from "lucide-react";
-import lapachoLogo from "@/assets/lapacho-logo.png";
+import lapachoLogo from "@/assets/logo-text-light.svg";
+import logoFullDark from "@/assets/logo-full-dark.svg";
 
 // Contacto comercial para negocios que quieren sumarse (no es el bot de pedidos).
 const BUSINESS_WA = "5493464448309";
@@ -228,11 +229,7 @@ export default function Landing() {
         <div className="container mx-auto px-4">
           <div className="flex flex-col items-center justify-between gap-8 md:flex-row">
             <div className="text-center md:text-left">
-              <div className="mb-2 flex items-center justify-center gap-2 md:justify-start">
-                <Leaf className="h-6 w-6 text-primary" />
-                <span className="text-xl font-semibold text-primary">Lapacho</span>
-              </div>
-              <p className="text-sm opacity-70">Simple por naturaleza.</p>
+              <img src={logoFullDark} alt="Lapacho — Simple por naturaleza" className="mx-auto h-16 md:mx-0" />
             </div>
 
             <div className="flex flex-col items-center gap-4 text-sm sm:flex-row sm:gap-8">

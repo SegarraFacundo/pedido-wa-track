@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { useCustomerAuth } from "@/hooks/useCustomerAuth";
 import { Mail, MailCheck } from "lucide-react";
-import lapachoIcon from "@/assets/lapacho-icon.png";
+import lapachoIcon from "@/assets/logo-icon-light.svg";
 
 interface CustomerLoginProps {
   title?: string;

@@ -27,3 +27,5 @@ supabase/.temp
 
 .env
 backups/
+# Credenciales de prueba (no subir)
+CREDENCIALES-PRUEBA.md

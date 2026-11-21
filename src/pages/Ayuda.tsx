@@ -2,7 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { MessageCircle, ShoppingCart, Phone, Clock, MapPin, CreditCard, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import lapachoLogo from "@/assets/lapacho-logo.png";
+import lapachoLogo from "@/assets/logo-text-light.svg";
 
 const Ayuda = () => {
   return (

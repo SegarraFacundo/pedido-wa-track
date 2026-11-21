@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { User } from '@supabase/supabase-js';
 import { MessageSquare } from 'lucide-react';
-import lapachoIcon from '@/assets/lapacho-icon.png';
+import lapachoIcon from '@/assets/logo-icon-light.svg';
 
 export default function VendorAuth() {
   const [email, setEmail] = useState('');
