@@ -23,7 +23,7 @@
 - [x] **Aclaraciones del pedido** 🟢 — ✅ **hecho** (2026-11-21): campo "Aclaraciones" en el checkout → `orders.notes` → se muestra destacado al negocio en el pedido.
 - [ ] **Opciones / variantes de producto** 🔴 — tamaño, agregados, sabor, "sin X". Hoy los productos son planos (nombre/precio). Es el más grande pero el que más diferencia para gastronomía.
 - [x] **Direcciones guardadas** (sin mapa) 🟡 — ✅ **hecho** (2026-11-21): tabla `customer_addresses`, selector en el checkout (elegir guardada o nueva + "guardar"), y página "Mis direcciones". ⬜ **Falta fase 2: elegir pin en mapa** (falta decidir proveedor: Leaflet+OSM gratis / Google / Mapbox).
-- [ ] **Tiempo estimado de entrega (ETA)** 🟡 — "llega en 30-40 min". Expectativa básica del cliente (puede ser un rango configurable por negocio para empezar).
+- [x] **Tiempo estimado de entrega (ETA)** 🟡 — ✅ **hecho** (2026-11-21): el negocio configura un rango (min–max min) en Ajustes; se muestra en la tienda ("~30-45 min") y al confirmar el pedido se calcula `estimated_delivery`, que el cliente ve en el seguimiento.
 - [x] **"Pedir de nuevo" (reordenar)** 🟢 — ✅ **hecho** (2026-11-21): botón en *Mis Pedidos* que rearma el carrito con los productos actuales del negocio (precio/stock de ahora) y avisa si alguno ya no está.
 - [ ] **Cupones / código de descuento** 🟡 — canjeable en el checkout (y descuento de primer pedido). Hoy hay ofertas por negocio, pero no código.
 - [x] **Favoritos** 🟢 — ✅ **hecho** (2026-11-21): corazón para marcar negocios favoritos + sección "Favoritos" arriba en la tienda. (Productos favoritos: pendiente, opcional.)
