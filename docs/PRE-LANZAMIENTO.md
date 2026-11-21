@@ -44,8 +44,8 @@ Cada negocio conecta **su propia** cuenta de MP (OAuth desde su panel → Pagos)
 - [ ] **Para producción (profesionalizar)**: cuenta de Resend propia de Lapacho (hoy se usa la compartida con Órbita) con subdominio de envío propio.
 - Mientras tanto, **Google funciona 100%**.
 
-### 4. Google OAuth 🟠
-- [ ] Confirmar que la **pantalla de consentimiento esté publicada / "In production"** en Google Cloud (si está en "Testing", solo entran usuarios de prueba y muestra "app no verificada").
+### 4. Google OAuth ✅
+- [x] ~~Confirmar que la **pantalla de consentimiento esté publicada / "In production"**~~ → **hecho**: proyecto `Lapacho` en Google Cloud, OAuth **publicado "En producción"**. Cualquier cuenta de Google puede entrar, sin "app no verificada" (scopes básicos → no requiere verificación). Se completó la marca (nombre, emails, links a lapacho.ar/privacidad/terminos) y los dominios autorizados (lapacho.ar + supabase.co). **No subir logo** al consent screen (gatilla verificación).
 
 ### 5. Notificaciones 🟡
 - [ ] Probar **web-push real** (cliente activa permiso → el negocio cambia el estado → llega el aviso con la app cerrada). Las VAPID keys ya están.
