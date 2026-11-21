@@ -44,6 +44,16 @@ interface OfferRow {
   valid_until: string | null;
 }
 
+interface ProductHit {
+  id: string;
+  name: string;
+  price: number;
+  image: string | null;
+  vendor_id: string;
+}
+
+const money = (n: number) => "$ " + Math.round(n).toLocaleString("es-AR");
+
 export default function Home() {
   const navigate = useNavigate();
   const localePath = useLocalePath();
@@ -55,6 +65,7 @@ export default function Home() {
   const { isFavorite, toggle: toggleFavorite, favorites } = useFavorites();
   const [sortBy, setSortBy] = useState<"recomendados" | "rapidos" | "puntuados">("recomendados");
   const [onlyOpen, setOnlyOpen] = useState(false);
+  const [productResults, setProductResults] = useState<ProductHit[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -76,6 +87,29 @@ export default function Home() {
       setLoading(false);
     })();
   }, []);
+
+  // Búsqueda global de productos (en todos los negocios), con debounce.
+  useEffect(() => {
+    const term = search.trim();
+    if (term.length < 2) {
+      setProductResults([]);
+      return;
+    }
+    let active = true;
+    const t = setTimeout(async () => {
+      const { data } = await supabase
+        .from("products")
+        .select("id, name, price, image, vendor_id")
+        .ilike("name", `%${term}%`)
+        .eq("is_available", true)
+        .limit(30);
+      if (active) setProductResults((data as ProductHit[]) ?? []);
+    }, 250);
+    return () => {
+      active = false;
+      clearTimeout(t);
+    };
+  }, [search]);
 
   const isOpen = (v: VendorRow) => isVendorOpen(v.days_open, v.opening_time, v.closing_time, false);
   // Abiertos primero; dentro de cada grupo se mantiene el orden por nombre.
@@ -124,7 +158,37 @@ export default function Home() {
       .filter((x): x is { offer: OfferRow; vendor: VendorRow } => !!x.vendor);
   }, [offers, vendors]);
 
+  const byId = useMemo(() => new Map(vendors.map((v) => [v.id, v])), [vendors]);
+  // Solo productos de negocios activos (presentes en public_vendors).
+  const productHits = useMemo(
+    () => productResults.filter((p) => byId.has(p.vendor_id)),
+    [productResults, byId],
+  );
+
   const goToVendor = (v: VendorRow) => navigate(localePath(`/tienda/${v.slug ?? v.id}`));
+
+  const renderProductHit = (p: ProductHit) => {
+    const v = byId.get(p.vendor_id);
+    if (!v) return null;
+    return (
+      <Card key={p.id} className="cursor-pointer transition hover:shadow-md" onClick={() => goToVendor(v)}>
+        <CardContent className="flex items-center gap-3 p-3">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
+            {p.image ? (
+              <img src={p.image} alt={p.name} className="h-full w-full object-cover" />
+            ) : (
+              <Store className="h-6 w-6 text-muted-foreground" />
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="truncate font-semibold">{p.name}</h3>
+            <p className="truncate text-sm text-muted-foreground">{v.name}</p>
+          </div>
+          <div className="shrink-0 font-semibold text-primary">{money(p.price)}</div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   const renderVendor = (v: VendorRow) => {
     const open = isOpen(v);
@@ -235,12 +299,30 @@ export default function Home() {
           ))}
         </div>
       ) : isFiltering ? (
-        // Con búsqueda o categoría elegida: lista plana (abiertos primero).
-        filtered.length === 0 ? (
-          <p className="py-10 text-center text-muted-foreground">No encontramos negocios.</p>
-        ) : (
-          <div className="space-y-3">{filtered.map(renderVendor)}</div>
-        )
+        <div className="space-y-6">
+          {/* Negocios que coinciden */}
+          {filtered.length > 0 && (
+            <section className="space-y-3">
+              {q && (
+                <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Negocios</h2>
+              )}
+              {filtered.map(renderVendor)}
+            </section>
+          )}
+
+          {/* Productos en todos los negocios (sólo con búsqueda de texto) */}
+          {q && productHits.length > 0 && (
+            <section className="space-y-3">
+              <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Productos</h2>
+              {productHits.map(renderProductHit)}
+            </section>
+          )}
+
+          {/* Sin resultados */}
+          {filtered.length === 0 && !(q && productHits.length > 0) && (
+            <p className="py-10 text-center text-muted-foreground">No encontramos resultados.</p>
+          )}
+        </div>
       ) : (
         <div className="space-y-6">
           {/* Favoritos del cliente */}
