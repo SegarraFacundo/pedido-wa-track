@@ -1,5 +1,5 @@
 // Service Worker para Lapacho PWA
-const CACHE_NAME = 'lapacho-v3';
+const CACHE_NAME = 'lapacho-v4';
 const urlsToCache = [
   '/',
   '/tienda',
@@ -7,7 +7,6 @@ const urlsToCache = [
   '/soporte',
   '/admin',
   '/lapacho-icon.png',
-  '/lapacho-logo.png',
   '/manifest-cliente.json',
   '/sounds/notification.mp3'
 ];
@@ -48,8 +47,8 @@ self.addEventListener('push', (event) => {
   let data = {
     title: 'Lapacho',
     body: 'Tienes una nueva notificación',
-    icon: '/favicon.ico',
-    badge: '/favicon.ico',
+    icon: '/lapacho-icon.png',
+    badge: '/lapacho-icon.png',
     url: '/vendor-dashboard'
   };
   
@@ -63,8 +62,8 @@ self.addEventListener('push', (event) => {
   
   const options = {
     body: data.body,
-    icon: data.icon || '/favicon.ico',
-    badge: data.badge || '/favicon.ico',
+    icon: data.icon || '/lapacho-icon.png',
+    badge: data.badge || '/lapacho-icon.png',
     vibrate: [200, 100, 200],
     data: { url: data.url || '/vendor-dashboard' },
     actions: [

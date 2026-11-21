@@ -64,6 +64,8 @@ serve(async (req) => {
     const payload = JSON.stringify({
       title: title || "Lapacho",
       body: message,
+      icon: "https://lapacho.ar/lapacho-icon.png",
+      badge: "https://lapacho.ar/lapacho-icon.png",
       url: `/pedido/${order_id}`,
     });
 
