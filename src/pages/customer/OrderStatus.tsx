@@ -22,6 +22,7 @@ import { useLocalePath } from "@/hooks/useLocalePath";
 import { useNotificationPermission } from "@/hooks/useNotificationPermission";
 import { enablePushNotifications } from "@/lib/push";
 import { OrderChat } from "@/components/customer/OrderChat";
+import { CourierMap } from "@/components/customer/CourierMap";
 import { cn } from "@/lib/utils";
 
 const CANCELABLE = ["pending", "confirmed", "preparing"];
@@ -71,6 +72,7 @@ interface OrderRow {
   estimated_delivery: string | null;
   discount: number | null;
   coupon_code: string | null;
+  coordinates: any;
   items: any;
   vendor_id: string;
   vendors?: { name: string } | null;
@@ -185,7 +187,7 @@ export default function OrderStatus() {
     const load = async () => {
       const { data } = await supabase
         .from("orders")
-        .select("id, status, total, address, payment_method, payment_status, delivery_type, estimated_delivery, discount, coupon_code, items, vendor_id, vendors(name)")
+        .select("id, status, total, address, payment_method, payment_status, delivery_type, estimated_delivery, discount, coupon_code, coordinates, items, vendor_id, vendors(name)")
         .eq("id", orderId)
         .maybeSingle();
       setOrder((data as OrderRow) ?? null);
@@ -262,6 +264,17 @@ export default function OrderStatus() {
               <Clock className="h-4 w-4" /> Entrega estimada: ~
               {new Date(order.estimated_delivery).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
             </p>
+          )}
+
+          {order.status === "delivering" && (
+            <CourierMap
+              orderId={order.id}
+              destination={
+                order.coordinates && order.coordinates.lat != null
+                  ? { lat: Number(order.coordinates.lat), lng: Number(order.coordinates.lng) }
+                  : null
+              }
+            />
           )}
 
           {/* Línea de tiempo del pedido */}

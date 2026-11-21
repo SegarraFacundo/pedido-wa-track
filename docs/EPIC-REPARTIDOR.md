@@ -91,7 +91,7 @@ Retiro en local (pickup) **no** genera delivery.
 
 ## 11. Fases
 - **Fase 1 (MVP)** ✅ **HECHO (2026-11-21)**: rol `repartidor`, tablas couriers/deliveries/courier_payouts + trigger (pool al marcar "ready"), alta de repartidores en el admin, app `/repartidor` (online, pool "tomar", estados retiré/en camino/entregué, ganancias del día), tarifa por envío manual, subdominio + manifest + ícono. Sin mapa en vivo (deep-link a Google Maps). **Para usar**: Admin → Repartidores (crear con email/contraseña/tarifa) → el repartidor entra en `/repartidor-auth` (o `repartidor.lapacho.ar`), se pone "Disponible", y cuando un negocio marca un pedido "Listo" aparece en el pool.
-- **Fase 2** (en curso): ✅ **liquidaciones** (admin: "Liquidaciones" junta las entregas no liquidadas por repartidor → genera el pago → marcar pagada; `deliveries.payout_id` evita re-liquidar). ⬜ Falta: ubicación en vivo + pin del repartidor en el seguimiento del cliente, y asignación automática por cercanía.
+- **Fase 2** (en curso): ✅ **liquidaciones** (admin); ✅ **mapa en vivo** (el repartidor comparte ubicación con `geolocation` mientras tiene un reparto activo → `couriers.current_lat/lng`; el cliente ve el pin en el seguimiento cuando el pedido está "en camino", vía la edge function `order-courier-location` + Leaflet/OpenStreetMap). ⬜ Falta: asignación automática por cercanía.
 - **Fase 3**: navegación integrada, ratings del repartidor, zonas, turnos.
 
 ## 12. Próximo paso

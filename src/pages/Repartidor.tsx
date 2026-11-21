@@ -60,6 +60,28 @@ export default function Repartidor() {
     return () => clearInterval(t);
   }, [loadFeed, navigate]);
 
+  // Compartir ubicación en vivo mientras hay un reparto activo (para que el cliente vea el pin).
+  useEffect(() => {
+    const hasActive = (feed?.active.length ?? 0) > 0;
+    const courierId = feed?.courier.id;
+    if (!hasActive || !courierId || typeof navigator === "undefined" || !("geolocation" in navigator)) return;
+    let last = 0;
+    const watch = navigator.geolocation.watchPosition(
+      (pos) => {
+        const now = Date.now();
+        if (now - last < 12000) return; // throttle ~12s
+        last = now;
+        supabase
+          .from("couriers")
+          .update({ current_lat: pos.coords.latitude, current_lng: pos.coords.longitude })
+          .eq("id", courierId);
+      },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 },
+    );
+    return () => navigator.geolocation.clearWatch(watch);
+  }, [feed]);
+
   const toggleOnline = async (v: boolean) => {
     if (!feed) return;
     setOnline(v);
