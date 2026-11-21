@@ -26,7 +26,7 @@
 - [ ] **Tiempo estimado de entrega (ETA)** 🟡 — "llega en 30-40 min". Expectativa básica del cliente (puede ser un rango configurable por negocio para empezar).
 - [x] **"Pedir de nuevo" (reordenar)** 🟢 — ✅ **hecho** (2026-11-21): botón en *Mis Pedidos* que rearma el carrito con los productos actuales del negocio (precio/stock de ahora) y avisa si alguno ya no está.
 - [ ] **Cupones / código de descuento** 🟡 — canjeable en el checkout (y descuento de primer pedido). Hoy hay ofertas por negocio, pero no código.
-- [ ] **Favoritos** 🟢 — negocios y productos.
+- [x] **Favoritos** 🟢 — ✅ **hecho** (2026-11-21): corazón para marcar negocios favoritos + sección "Favoritos" arriba en la tienda. (Productos favoritos: pendiente, opcional.)
 
 ## 🟠 Prioridad 2 — Medio plazo
 - [ ] **Seguimiento del repartidor en mapa** 🔴 — si el negocio usa cadete (requiere ubicación del repartidor).

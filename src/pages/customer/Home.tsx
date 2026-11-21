@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Star, Store, Tag } from "lucide-react";
+import { Heart, Search, Star, Store, Tag } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useLocalePath } from "@/hooks/useLocalePath";
+import { useFavorites } from "@/hooks/useFavorites";
 import { isVendorOpen } from "@/lib/timezone";
+import { cn } from "@/lib/utils";
 
 interface VendorRow {
   id: string;
@@ -40,6 +42,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
+  const { isFavorite, toggle: toggleFavorite, favorites } = useFavorites();
 
   useEffect(() => {
     (async () => {
@@ -80,6 +83,11 @@ export default function Home() {
   const filtered = useMemo(() => vendors.filter(matches).sort(byOpen), [vendors, q, category]);
   const featured = useMemo(() => vendors.filter((v) => v.is_featured).sort(byOpen), [vendors]);
   const regular = useMemo(() => vendors.filter((v) => !v.is_featured).sort(byOpen), [vendors]);
+  const favoriteVendors = useMemo(
+    () => vendors.filter((v) => isFavorite(v.id)).sort(byOpen),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [vendors, favorites],
+  );
 
   // Promos: sólo de negocios activos (presentes en public_vendors).
   const promos = useMemo(() => {
@@ -119,6 +127,17 @@ export default function Home() {
               {Number(rating).toFixed(1)}
             </div>
           )}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleFavorite(v.id);
+            }}
+            className="shrink-0 rounded-full p-1.5 text-muted-foreground transition hover:bg-muted"
+            aria-label={isFavorite(v.id) ? "Quitar de favoritos" : "Agregar a favoritos"}
+          >
+            <Heart className={cn("h-5 w-5", isFavorite(v.id) && "fill-primary text-primary")} />
+          </button>
         </CardContent>
       </Card>
     );
@@ -171,6 +190,16 @@ export default function Home() {
         )
       ) : (
         <div className="space-y-6">
+          {/* Favoritos del cliente */}
+          {favoriteVendors.length > 0 && (
+            <section className="space-y-3">
+              <h2 className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+                <Heart className="h-4 w-4 fill-primary text-primary" /> Favoritos
+              </h2>
+              {favoriteVendors.map(renderVendor)}
+            </section>
+          )}
+
           {/* Destacados (negocios que pagan por aparecer arriba) */}
           {featured.length > 0 && (
             <section className="space-y-3">
