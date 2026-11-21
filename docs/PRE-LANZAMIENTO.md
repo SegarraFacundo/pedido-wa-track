@@ -55,6 +55,9 @@ Cada negocio conecta **su propia** cuenta de MP (OAuth desde su panel → Pagos)
 - [ ] Cada negocio: **horarios reales**, **zona/costo de envío**, **métodos de pago** y productos con precio/stock.
 - [ ] Revisar **/terminos** y **/privacidad** (que el texto sea el definitivo).
 
+### 7. Equipo y sociedad 🟡
+- [ ] Definir roles, ritmo de trabajo y formalizar la sociedad (SAS, acuerdo de socios, vesting, cesión de PI). Ver `docs/ROLES-Y-RITMO.md`.
+
 ---
 
 ## 🗒️ Notas
