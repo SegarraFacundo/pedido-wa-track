@@ -32,10 +32,13 @@ Cada negocio conecta **su propia** cuenta de MP (OAuth desde su panel → Pagos)
 - [ ] Probar un **pago real** de punta a punta (checkout → pago → webhook → estado del pedido actualizado).
 - [ ] (Menor) El redirect post-conexión de MP del vendedor va a `/vendor`; la ruta real es `/vendor-dashboard` — revisar.
 
-### 3. Login por email (SMTP) 🟠
-- [x] SMTP de Resend cargado en Supabase → Auth → Emails (host `smtp.resend.com`, puerto 465, usuario `resend`, remitente `soporte@lapacho.ar`). Al activar custom SMTP el rate limit sube solo a 30 emails/h.
-- [ ] Pegar la **API key de Resend** en Password y **Save changes** (lo hace el dueño; la key no la maneja Claude).
-- [ ] **Para producción (profesionalizar)**: mover a una **cuenta de Resend propia de Lapacho** (hoy se usa la compartida con Órbita, donde lapacho.ar ya está verificado). Al separar, verificar un **subdominio de envío propio** (ej. `mail.lapacho.ar`) y enviar desde ahí.
+### 3. Login por email (SMTP) ✅ funciona (mejorar deliverability)
+- [x] SMTP de Resend cargado y **probado**: el magic link llega y el login entra. Dominio `lapacho.ar` verificado en Resend (DKIM ✅), remitente `soporte@lapacho.ar`, rate limit 30/h.
+- [ ] **Sale a spam** → mejorar deliverability:
+  - [ ] Completar **Forge**: borrar el **MX viejo de Amazon SES** en `send.lapacho.ar` (`feedback-smtp.sa-east-1.amazonses.com`) para que el CNAME `send → send.forge.rmta.net` quede válido y el envío pase a la infra dedicada de Resend.
+  - [ ] Agregar **SPF** en el dominio raíz `lapacho.ar` (no existe).
+  - Con dominio nuevo, la reputación también mejora con el tiempo/uso.
+- [ ] **Para producción (profesionalizar)**: cuenta de Resend propia de Lapacho (hoy se usa la compartida con Órbita) con subdominio de envío propio.
 - Mientras tanto, **Google funciona 100%**.
 
 ### 4. Google OAuth 🟠
