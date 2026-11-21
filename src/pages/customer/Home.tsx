@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useLocalePath } from "@/hooks/useLocalePath";
 import { useFavorites } from "@/hooks/useFavorites";
@@ -52,6 +53,8 @@ export default function Home() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
   const { isFavorite, toggle: toggleFavorite, favorites } = useFavorites();
+  const [sortBy, setSortBy] = useState<"recomendados" | "rapidos" | "puntuados">("recomendados");
+  const [onlyOpen, setOnlyOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -84,12 +87,27 @@ export default function Home() {
   );
 
   const q = search.trim().toLowerCase();
-  const isFiltering = q.length > 0 || category !== "all";
+  const isFiltering = q.length > 0 || category !== "all" || onlyOpen || sortBy !== "recomendados";
 
   const matches = (v: VendorRow) =>
-    (category === "all" || v.category === category) && (!q || v.name.toLowerCase().includes(q));
+    (category === "all" || v.category === category) &&
+    (!q || v.name.toLowerCase().includes(q)) &&
+    (!onlyOpen || isOpen(v));
 
-  const filtered = useMemo(() => vendors.filter(matches).sort(byOpen), [vendors, q, category]);
+  const etaVal = (v: VendorRow) => v.eta_max_minutes ?? 9999;
+  const ratingVal = (v: VendorRow) => v.average_rating ?? v.rating ?? 0;
+  const sortFns: Record<typeof sortBy, (a: VendorRow, b: VendorRow) => number> = {
+    recomendados: (a, b) =>
+      byOpen(a, b) || Number(!!b.is_featured) - Number(!!a.is_featured) || a.name.localeCompare(b.name, "es"),
+    rapidos: (a, b) => etaVal(a) - etaVal(b) || byOpen(a, b),
+    puntuados: (a, b) => ratingVal(b) - ratingVal(a) || byOpen(a, b),
+  };
+
+  const filtered = useMemo(
+    () => vendors.filter(matches).sort(sortFns[sortBy]),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [vendors, q, category, onlyOpen, sortBy],
+  );
   const featured = useMemo(() => vendors.filter((v) => v.is_featured).sort(byOpen), [vendors]);
   const regular = useMemo(() => vendors.filter((v) => !v.is_featured).sort(byOpen), [vendors]);
   const favoriteVendors = useMemo(
@@ -188,6 +206,27 @@ export default function Home() {
           ))}
         </div>
       )}
+
+      {/* Orden y filtro */}
+      <div className="flex items-center gap-2">
+        <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+          <SelectTrigger className="h-9 w-auto gap-1 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="z-50 bg-background">
+            <SelectItem value="recomendados">Recomendados</SelectItem>
+            <SelectItem value="rapidos">Más rápidos</SelectItem>
+            <SelectItem value="puntuados">Mejor puntuados</SelectItem>
+          </SelectContent>
+        </Select>
+        <Badge
+          variant={onlyOpen ? "default" : "outline"}
+          className="cursor-pointer"
+          onClick={() => setOnlyOpen((o) => !o)}
+        >
+          Abiertos ahora
+        </Badge>
+      </div>
 
       {loading ? (
         <div className="space-y-3">

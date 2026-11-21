@@ -35,7 +35,7 @@
 - [ ] **Envío por distancia/zona** 🟡 — hoy es precio fijo (`delivery_fixed_price`).
 - [ ] **Comprobante al cliente** 🟡 — email/PDF del pedido (ya hay facturación interna, falta el comprobante al cliente).
 - [ ] **Avisos de estado por email** 🟢 — además del push.
-- [ ] **Filtros/orden en la tienda** 🟢 — por envío gratis, rating, precio; y **búsqueda global de productos** (no solo de negocios).
+- [x] **Orden/filtro en la tienda** 🟢 — ✅ **hecho** (2026-11-21): ordenar por Recomendados / Más rápidos (ETA) / Mejor puntuados + filtro "Abiertos ahora". ⬜ Falta: **búsqueda global de productos** (no solo de negocios).
 - [ ] **Calificar al repartidor** y **reseñas con foto** 🟡.
 
 ## ⚪ Prioridad 3 — Más adelante / según modelo de negocio
