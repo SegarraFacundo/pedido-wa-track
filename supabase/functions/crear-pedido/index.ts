@@ -34,6 +34,8 @@ interface CrearPedidoBody {
   coordinates?: { lat: number; lng: number } | null;
   // Aclaraciones del cliente ("timbre roto", "dejar en portería", "sin sal", etc.)
   notes?: string;
+  // Código de cupón de descuento (opcional).
+  coupon_code?: string;
 }
 
 function json(body: unknown, status = 200) {
@@ -209,8 +211,36 @@ serve(async (req) => {
       estimatedDelivery = new Date(Date.now() + Number(vendor.eta_max_minutes) * 60000).toISOString();
     }
 
+    // ── Cupón de descuento (opcional) — se revalida acá (autoritativo) ──
+    let discount = 0;
+    let appliedCoupon: string | null = null;
+    let couponId: string | null = null;
+    let couponUses = 0;
+    if (body.coupon_code && body.coupon_code.trim()) {
+      const code = body.coupon_code.trim().toUpperCase();
+      const { data: coupon } = await supabase.from("coupons").select("*").eq("code", code).maybeSingle();
+      const now = Date.now();
+      const valid =
+        coupon &&
+        coupon.is_active &&
+        (!coupon.valid_until || new Date(coupon.valid_until).getTime() >= now) &&
+        (coupon.min_order == null || subtotal >= Number(coupon.min_order)) &&
+        (coupon.max_uses == null || coupon.uses_count < coupon.max_uses);
+      if (!valid) {
+        return json({ error: "El cupón no es válido o venció", coupon_error: true }, 409);
+      }
+      discount =
+        coupon.discount_type === "percent"
+          ? Math.round((subtotal * Number(coupon.discount_value)) / 100)
+          : Math.round(Number(coupon.discount_value));
+      discount = Math.min(discount, subtotal);
+      appliedCoupon = code;
+      couponId = coupon.id;
+      couponUses = coupon.uses_count;
+    }
+
     // ── Crear el pedido ──
-    const total = subtotal + deliveryCost;
+    const total = subtotal - discount + deliveryCost;
     const { data: order, error: orderError } = await supabase
       .from("orders")
       .insert({
@@ -228,6 +258,8 @@ serve(async (req) => {
         coordinates: body.coordinates ?? null,
         notes: (body.notes || "").trim().slice(0, 500) || null,
         estimated_delivery: estimatedDelivery,
+        coupon_code: appliedCoupon,
+        discount,
       })
       .select()
       .single();
@@ -244,6 +276,11 @@ serve(async (req) => {
       amount: total,
       status: "pending",
     });
+
+    // Incrementar el uso del cupón (best-effort).
+    if (couponId) {
+      await supabase.from("coupons").update({ uses_count: couponUses + 1 }).eq("id", couponId);
+    }
 
     // Vaciar el carrito del cliente
     await supabase.from("carts").delete().eq("user_id", userId);
@@ -263,6 +300,7 @@ serve(async (req) => {
       order_id: order.id,
       total,
       subtotal,
+      discount,
       delivery_cost: deliveryCost,
       delivery_type,
       payment_method,

@@ -4,9 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Store, DollarSign, BarChart3, LogOut, Headphones, Bot, Star, 
-  TrendingUp, Users, Wrench, AlertTriangle, Menu, FileText, TestTube2
+import {
+  Store, DollarSign, BarChart3, LogOut, Headphones, Bot, Star,
+  TrendingUp, Users, Wrench, AlertTriangle, Menu, FileText, TestTube2, Ticket
 } from "lucide-react";
 import {
   Sheet,
@@ -30,6 +30,7 @@ import PharmacyProductLoader from "@/components/admin/PharmacyProductLoader";
 import EmergencyControl from "@/components/admin/EmergencyControl";
 import BotInteractionReview from "@/components/admin/BotInteractionReview";
 import BotQATester from "@/components/admin/BotQATester";
+import CouponsManager from "@/components/admin/CouponsManager";
 import lapachoLogo from "@/assets/logo-text-light.svg";
 import lapachoIcon from "@/assets/logo-icon-light.svg";
 import { cn } from "@/lib/utils";
@@ -42,6 +43,7 @@ const menuItems = [
   { value: "invoices", label: "Facturación", icon: FileText },
   { value: "reports", label: "Reportes", icon: BarChart3 },
   { value: "reviews", label: "Reseñas", icon: Star },
+  { value: "coupons", label: "Cupones", icon: Ticket },
   { value: "support", label: "Tickets Soporte", icon: Headphones },
   { value: "soporte-users", label: "Usuarios Soporte", icon: Users },
   { value: "evolution", label: "Agente IA", icon: Bot },
@@ -230,6 +232,10 @@ export default function Admin() {
 
           <TabsContent value="reviews">
             <PlatformReviewsPanel />
+          </TabsContent>
+
+          <TabsContent value="coupons">
+            <CouponsManager />
           </TabsContent>
 
           <TabsContent value="support">

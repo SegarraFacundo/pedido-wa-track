@@ -69,6 +69,8 @@ interface OrderRow {
   payment_status: string | null;
   delivery_type: string | null;
   estimated_delivery: string | null;
+  discount: number | null;
+  coupon_code: string | null;
   items: any;
   vendor_id: string;
   vendors?: { name: string } | null;
@@ -183,7 +185,7 @@ export default function OrderStatus() {
     const load = async () => {
       const { data } = await supabase
         .from("orders")
-        .select("id, status, total, address, payment_method, payment_status, delivery_type, estimated_delivery, items, vendor_id, vendors(name)")
+        .select("id, status, total, address, payment_method, payment_status, delivery_type, estimated_delivery, discount, coupon_code, items, vendor_id, vendors(name)")
         .eq("id", orderId)
         .maybeSingle();
       setOrder((data as OrderRow) ?? null);
@@ -368,6 +370,12 @@ export default function OrderStatus() {
               <span>{money(i.price * i.quantity)}</span>
             </div>
           ))}
+          {order.discount ? (
+            <div className="flex justify-between text-primary">
+              <span>Descuento{order.coupon_code ? ` (${order.coupon_code})` : ""}</span>
+              <span>-{money(order.discount)}</span>
+            </div>
+          ) : null}
           <Separator className="my-2" />
           <div className="flex justify-between font-semibold"><span>Total</span><span>{money(order.total)}</span></div>
           <div className="pt-2 text-muted-foreground">

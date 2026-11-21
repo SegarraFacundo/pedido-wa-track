@@ -24,6 +24,8 @@ export const formatOrder = (data: any): Order => ({
   createdAt: new Date(data.created_at),
   updatedAt: new Date(data.updated_at),
   notes: data.notes,
+  discount: Number(data.discount) || 0,
+  coupon_code: data.coupon_code ?? undefined,
   deliveryPersonName: data.delivery_person_name,
   deliveryPersonPhone: data.delivery_person_phone,
   payment_receipt_url: data.payment_receipt_url,

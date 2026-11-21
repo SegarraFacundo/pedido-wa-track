@@ -35,6 +35,8 @@ export interface Order {
   createdAt: Date;
   updatedAt: Date;
   notes?: string;
+  discount?: number;
+  coupon_code?: string;
   deliveryPersonName?: string;
   deliveryPersonPhone?: string;
   payment_receipt_url?: string;

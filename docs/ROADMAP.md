@@ -25,7 +25,7 @@
 - [x] **Direcciones guardadas** (sin mapa) 🟡 — ✅ **hecho** (2026-11-21): tabla `customer_addresses`, selector en el checkout (elegir guardada o nueva + "guardar"), y página "Mis direcciones". ⬜ **Falta fase 2: elegir pin en mapa** (falta decidir proveedor: Leaflet+OSM gratis / Google / Mapbox).
 - [x] **Tiempo estimado de entrega (ETA)** 🟡 — ✅ **hecho** (2026-11-21): el negocio configura un rango (min–max min) en Ajustes; se muestra en la tienda ("~30-45 min") y al confirmar el pedido se calcula `estimated_delivery`, que el cliente ve en el seguimiento.
 - [x] **"Pedir de nuevo" (reordenar)** 🟢 — ✅ **hecho** (2026-11-21): botón en *Mis Pedidos* que rearma el carrito con los productos actuales del negocio (precio/stock de ahora) y avisa si alguno ya no está.
-- [ ] **Cupones / código de descuento** 🟡 — canjeable en el checkout (y descuento de primer pedido). Hoy hay ofertas por negocio, pero no código.
+- [x] **Cupones / código de descuento** 🟡 — ✅ **hecho** (2026-11-21): tabla `coupons` (porcentaje o monto fijo, mínimo, vencimiento, usos máx), ABM en el admin, código canjeable en el checkout (preview del descuento) y revalidación/aplicación en `crear-pedido`. (Pendiente opcional: descuento automático de primer pedido.)
 - [x] **Favoritos** 🟢 — ✅ **hecho** (2026-11-21): corazón para marcar negocios favoritos + sección "Favoritos" arriba en la tienda. (Productos favoritos: pendiente, opcional.)
 
 ## 🟠 Prioridad 2 — Medio plazo
@@ -39,7 +39,7 @@
 - [ ] **Calificar al repartidor** y **reseñas con foto** 🟡.
 
 ## ⚪ Prioridad 3 — Más adelante / según modelo de negocio
-- [ ] **App/panel del repartidor** 🔴 — si suman logística propia.
+- [ ] **App del repartidor / logística propia** 🔴 — **pedido del dueño (2026-11-21)**: app nueva para repartidores que ven pedidos disponibles, los toman, retiran y entregan (como PedidosYa/Rappi). Nuevo actor: cadetes **subcontratados como monotributistas**. Implica: rol `repartidor` (auth + RLS), asignación de pedidos (manual o automática), estados de reparto (asignado → retirado → en camino → entregado), ubicación en vivo del cadete (mapa), y **liquidaciones/pagos al repartidor** (comisión o tarifa por envío, facturación monotributo). Es un epic aparte: conviene diseñarlo con una bitácora antes de codear.
 - [ ] **Suscripción tipo Plus/Prime** 🔴 — envío gratis con cuota (dudoso para ciudad chica).
 - [ ] **Puntos / fidelidad** 🟡.
 - [ ] **Referidos** 🟡 — invitá y ganá crédito.

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Loader2, Truck, User, Wallet, Receipt, Banknote, Landmark } from "lucide-react";
+import { ArrowLeft, Loader2, Truck, User, Wallet, Receipt, Banknote, Landmark, Ticket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -58,6 +58,9 @@ export default function Checkout() {
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
   const [payment, setPayment] = useState<Payment | "">("");
+  const [couponInput, setCouponInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number } | null>(null);
+  const [couponChecking, setCouponChecking] = useState(false);
 
   useEffect(() => {
     if (count === 0 || !cart.vendor_id) {
@@ -101,9 +104,53 @@ export default function Checkout() {
   }, [vendor]);
 
   const deliveryCost = deliveryType === "pickup" ? 0 : Math.round(vendor?.delivery_fixed_price ?? 0);
-  const total = subtotal + deliveryCost;
+  const discount = appliedCoupon?.discount ?? 0;
+  const total = subtotal - discount + deliveryCost;
   const canPickup = !!vendor?.allows_pickup;
   const canDelivery = vendor?.allows_delivery !== false;
+
+  const applyCoupon = async () => {
+    const code = couponInput.trim().toUpperCase();
+    if (!code) return;
+    setCouponChecking(true);
+    try {
+      const { data } = await (supabase as any)
+        .from("coupons")
+        .select("*")
+        .eq("code", code)
+        .eq("is_active", true)
+        .maybeSingle();
+      if (!data) {
+        setAppliedCoupon(null);
+        toast({ title: "Cupón inválido", variant: "destructive" });
+        return;
+      }
+      if (data.valid_until && new Date(data.valid_until).getTime() < Date.now()) {
+        setAppliedCoupon(null);
+        toast({ title: "El cupón venció", variant: "destructive" });
+        return;
+      }
+      if (data.min_order != null && subtotal < Number(data.min_order)) {
+        setAppliedCoupon(null);
+        toast({ title: `Requiere un mínimo de ${money(Number(data.min_order))}`, variant: "destructive" });
+        return;
+      }
+      if (data.max_uses != null && data.uses_count >= data.max_uses) {
+        setAppliedCoupon(null);
+        toast({ title: "El cupón ya no está disponible", variant: "destructive" });
+        return;
+      }
+      const disc =
+        data.discount_type === "percent"
+          ? Math.round((subtotal * Number(data.discount_value)) / 100)
+          : Math.round(Number(data.discount_value));
+      const finalDisc = Math.min(disc, subtotal);
+      setAppliedCoupon({ code, discount: finalDisc });
+      toast({ title: "Cupón aplicado", description: `Descuento de ${money(finalDisc)}` });
+    } finally {
+      setCouponChecking(false);
+    }
+  };
 
   const submit = async () => {
     if (!cart.vendor_id) return;
@@ -140,11 +187,13 @@ export default function Checkout() {
           customer_name: name.trim() || undefined,
           customer_phone: phone.trim(),
           notes: notes.trim() || undefined,
+          coupon_code: appliedCoupon?.code,
         },
       });
 
       if (error) throw error;
       if (data?.error) {
+        if (data.coupon_error) setAppliedCoupon(null);
         toast({
           title: "No se pudo crear el pedido",
           description: data.stock_issues?.join(" · ") || data.error,
@@ -355,6 +404,45 @@ export default function Checkout() {
         </CardContent>
       </Card>
 
+      {/* Cupón */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Ticket className="h-4 w-4 text-primary" /> Cupón
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {appliedCoupon ? (
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm">
+                Cupón <b>{appliedCoupon.code}</b> aplicado (−{money(appliedCoupon.discount)})
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setAppliedCoupon(null);
+                  setCouponInput("");
+                }}
+              >
+                Quitar
+              </Button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <Input
+                value={couponInput}
+                onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                placeholder="Código de descuento"
+              />
+              <Button variant="outline" onClick={applyCoupon} disabled={couponChecking || !couponInput.trim()}>
+                {couponChecking ? <Loader2 className="h-4 w-4 animate-spin" /> : "Aplicar"}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Resumen */}
       <Card>
         <CardHeader className="pb-2">
@@ -371,6 +459,12 @@ export default function Checkout() {
           ))}
           <Separator className="my-2" />
           <div className="flex justify-between"><span>Subtotal</span><span>{money(subtotal)}</span></div>
+          {discount > 0 && (
+            <div className="flex justify-between text-primary">
+              <span>Descuento {appliedCoupon ? `(${appliedCoupon.code})` : ""}</span>
+              <span>-{money(discount)}</span>
+            </div>
+          )}
           <div className="flex justify-between">
             <span>Envío</span>
             <span>{deliveryType === "pickup" ? "Gratis" : money(deliveryCost)}</span>

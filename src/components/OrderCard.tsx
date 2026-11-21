@@ -487,6 +487,13 @@ export function OrderCard({
             </div>
           )}
 
+          {order.discount ? (
+            <div className="flex justify-between pt-2 text-sm text-primary">
+              <span>Descuento{order.coupon_code ? ` (${order.coupon_code})` : ""}</span>
+              <span>-{money(order.discount)}</span>
+            </div>
+          ) : null}
+
           <div className="flex justify-between pt-2 border-t font-semibold">
             <span>Total</span>
             <span className="text-primary text-lg">
