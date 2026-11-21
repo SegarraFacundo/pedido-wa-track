@@ -36,10 +36,11 @@ Cada negocio conecta **su propia** cuenta de MP (OAuth desde su panel → Pagos)
 - [x] SMTP de Resend cargado y **probado**: el magic link llega y el login entra. Dominio `lapacho.ar` verificado en Resend (DKIM ✅), remitente `soporte@lapacho.ar`, rate limit 30/h.
 - [x] **Deliverability**: se limpió el DKIM duplicado y se borraron el MX/TXT viejos de SES en `send.lapacho.ar`. **Resend Forge = Ready** y dominio **Verified**. Forge enruta automáticamente a medida que el dominio gana reputación (warm-up). El spam debería irse con el uso.
 - [x] **Template del Magic Link** en español + branding (header rosa, botón, slogan). Probado: **llega a Recibidos (no spam)**.
+- [x] **Todos los templates de Auth** en español + branding (magic link, confirmar cuenta, restablecer contraseña, invitación, cambio de email, reautenticación).
 - [ ] Mejoras opcionales:
-  - [ ] Aplicar el mismo branding a los otros templates (reset password, confirmar cuenta, etc.).
   - [ ] Agregar **SPF** en el dominio raíz `lapacho.ar` (secundario; el DKIM ya alinea DMARC).
   - [ ] (Opcional) subdominio de **tracking** en Resend.
+  - [ ] Agregar el **logo** a los emails cuando esté definido.
 - [ ] **Para producción (profesionalizar)**: cuenta de Resend propia de Lapacho (hoy se usa la compartida con Órbita) con subdominio de envío propio.
 - Mientras tanto, **Google funciona 100%**.
 
