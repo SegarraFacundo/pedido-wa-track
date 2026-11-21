@@ -40,7 +40,7 @@ Cada negocio conecta **su propia** cuenta de MP (OAuth desde su panel → Pagos)
 - [ ] Mejoras opcionales:
   - [ ] Agregar **SPF** en el dominio raíz `lapacho.ar` (secundario; el DKIM ya alinea DMARC).
   - [ ] (Opcional) subdominio de **tracking** en Resend.
-  - [ ] Agregar el **logo** a los emails cuando esté definido.
+  - [ ] Agregar el **logo** (hoja) al header de los emails (ya está aplicado en toda la app: landing, headers, auth, paneles, favicon y PWA icon).
 - [ ] **Para producción (profesionalizar)**: cuenta de Resend propia de Lapacho (hoy se usa la compartida con Órbita) con subdominio de envío propio.
 - Mientras tanto, **Google funciona 100%**.
 
