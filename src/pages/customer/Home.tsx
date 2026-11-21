@@ -11,6 +11,7 @@ import { isVendorOpen } from "@/lib/timezone";
 
 interface VendorRow {
   id: string;
+  slug: string | null;
   name: string;
   category: string;
   image: string | null;
@@ -33,7 +34,7 @@ export default function Home() {
     (async () => {
       const { data, error } = await supabase
         .from("public_vendors")
-        .select("id, name, category, image, rating, average_rating, opening_time, closing_time, days_open")
+        .select("id, slug, name, category, image, rating, average_rating, opening_time, closing_time, days_open")
         .order("name");
       if (!error && data) setVendors(data as VendorRow[]);
       setLoading(false);
@@ -102,7 +103,7 @@ export default function Home() {
               <Card
                 key={v.id}
                 className="cursor-pointer transition hover:shadow-md"
-                onClick={() => navigate(localePath(`/tienda/${v.id}`))}
+                onClick={() => navigate(localePath(`/tienda/${v.slug ?? v.id}`))}
               >
                 <CardContent className="flex items-center gap-3 p-3">
                   <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">

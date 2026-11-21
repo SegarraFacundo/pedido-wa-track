@@ -1941,6 +1941,7 @@ export type Database = {
           phone: string
           pickup_instructions: string | null
           rating: number | null
+          slug: string | null
           suspended_reason: string | null
           total_orders: number | null
           total_reviews: number | null
@@ -1978,6 +1979,7 @@ export type Database = {
           phone: string
           pickup_instructions?: string | null
           rating?: number | null
+          slug?: string | null
           suspended_reason?: string | null
           total_orders?: number | null
           total_reviews?: number | null
@@ -2015,6 +2017,7 @@ export type Database = {
           phone?: string
           pickup_instructions?: string | null
           rating?: number | null
+          slug?: string | null
           suspended_reason?: string | null
           total_orders?: number | null
           total_reviews?: number | null
@@ -2050,6 +2053,7 @@ export type Database = {
           opening_time: string | null
           pickup_instructions: string | null
           rating: number | null
+          slug: string | null
           total_orders: number | null
         }
         Insert: {
@@ -2075,6 +2079,7 @@ export type Database = {
           opening_time?: string | null
           pickup_instructions?: string | null
           rating?: number | null
+          slug?: string | null
           total_orders?: number | null
         }
         Update: {
@@ -2100,6 +2105,7 @@ export type Database = {
           opening_time?: string | null
           pickup_instructions?: string | null
           rating?: number | null
+          slug?: string | null
           total_orders?: number | null
         }
         Relationships: []
@@ -2420,6 +2426,7 @@ export type Database = {
       link_vendor_to_user: { Args: { vendor_email: string }; Returns: string }
       make_user_admin: { Args: { user_email: string }; Returns: string }
       make_user_soporte: { Args: { user_email: string }; Returns: string }
+      slugify: { Args: { txt: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "vendor" | "customer" | "soporte"

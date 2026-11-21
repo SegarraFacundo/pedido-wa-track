@@ -148,25 +148,33 @@ export default function Store() {
     if (!vendorId) return;
     (async () => {
       setLoading(true);
+      // El parámetro puede ser el slug (links lindos) o el uuid (compatibilidad).
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(vendorId);
+      const { data: v } = await supabase
+        .from("public_vendors")
+        .select("id, slug, name, category, image, address, opening_time, closing_time, days_open, allows_pickup, allows_delivery")
+        .eq(isUuid ? "id" : "slug", vendorId)
+        .maybeSingle();
+      if (!v) {
+        setVendor(null);
+        setLoading(false);
+        return;
+      }
+      const vid = (v as Vendor).id;
       const nowIso = new Date().toISOString();
-      const [{ data: v }, { data: p }, { data: o }] = await Promise.all([
-        supabase
-          .from("public_vendors")
-          .select("id, name, category, image, address, opening_time, closing_time, days_open, allows_pickup, allows_delivery")
-          .eq("id", vendorId)
-          .maybeSingle(),
+      const [{ data: p }, { data: o }] = await Promise.all([
         supabase
           .from("products")
           .select("id, name, description, price, image, is_available, stock_enabled, stock_quantity, category")
-          .eq("vendor_id", vendorId)
+          .eq("vendor_id", vid)
           .order("name"),
         supabase
           .from("vendor_offers")
           .select("id, title, description, discount_percentage, offer_price, original_price, valid_until")
-          .eq("vendor_id", vendorId)
+          .eq("vendor_id", vid)
           .eq("is_active", true),
       ]);
-      setVendor((v as Vendor) ?? null);
+      setVendor(v as Vendor);
       setProducts(((p as Product[]) ?? []).filter((x) => x.is_available !== false));
       setOffers(((o as Offer[]) ?? []).filter((x) => !x.valid_until || x.valid_until >= nowIso));
       setLoading(false);
@@ -174,7 +182,7 @@ export default function Store() {
   }, [vendorId]);
 
   const qtyOf = (productId: string) =>
-    cart.vendor_id === vendorId ? cart.items.find((i) => i.product_id === productId)?.quantity ?? 0 : 0;
+    cart.vendor_id === vendor?.id ? cart.items.find((i) => i.product_id === productId)?.quantity ?? 0 : 0;
 
   const tryAdd = (p: Product) => {
     if (!vendor) return;
@@ -387,7 +395,7 @@ export default function Store() {
         </>
       )}
 
-      {count > 0 && cart.vendor_id === vendorId && (
+      {count > 0 && cart.vendor_id === vendor.id && (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background p-3">
           <div className="mx-auto flex max-w-3xl items-center gap-3">
             <Button className="flex-1 justify-between" onClick={() => navigate(localePath("/carrito"))}>
