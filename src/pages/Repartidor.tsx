@@ -60,11 +60,12 @@ export default function Repartidor() {
     return () => clearInterval(t);
   }, [loadFeed, navigate]);
 
-  // Compartir ubicación en vivo mientras hay un reparto activo (para que el cliente vea el pin).
+  // Compartir ubicación en vivo mientras está online o con un reparto activo:
+  // online → habilita la auto-asignación por cercanía; activo → el cliente ve el pin.
   useEffect(() => {
-    const hasActive = (feed?.active.length ?? 0) > 0;
     const courierId = feed?.courier.id;
-    if (!hasActive || !courierId || typeof navigator === "undefined" || !("geolocation" in navigator)) return;
+    const shouldShare = online || (feed?.active.length ?? 0) > 0;
+    if (!shouldShare || !courierId || typeof navigator === "undefined" || !("geolocation" in navigator)) return;
     let last = 0;
     const watch = navigator.geolocation.watchPosition(
       (pos) => {
@@ -80,7 +81,8 @@ export default function Repartidor() {
       { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 },
     );
     return () => navigator.geolocation.clearWatch(watch);
-  }, [feed]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [online, feed?.courier.id, feed?.active.length]);
 
   const toggleOnline = async (v: boolean) => {
     if (!feed) return;
