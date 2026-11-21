@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Loader2, Truck, User, Wallet, Receipt, Banknote, Landmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -48,6 +49,7 @@ export default function Checkout() {
   const [address, setAddress] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [notes, setNotes] = useState("");
   const [payment, setPayment] = useState<Payment | "">("");
 
   useEffect(() => {
@@ -118,6 +120,7 @@ export default function Checkout() {
           payment_method: payment,
           customer_name: name.trim() || undefined,
           customer_phone: phone.trim(),
+          notes: notes.trim() || undefined,
         },
       });
 
@@ -220,6 +223,17 @@ export default function Checkout() {
           <div className="space-y-1">
             <Label htmlFor="name">Nombre (opcional)</Label>
             <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Cómo te llamás" />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="notes">Aclaraciones (opcional)</Label>
+            <Textarea
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Ej: timbre roto (golpear), dejar en portería, sin sal…"
+              rows={2}
+              maxLength={300}
+            />
           </div>
         </CardContent>
       </Card>

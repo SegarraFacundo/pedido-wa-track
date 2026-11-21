@@ -32,6 +32,8 @@ interface CrearPedidoBody {
   // El teléfono se captura en el checkout (el login es Google/invitado, sin teléfono).
   customer_phone: string;
   coordinates?: { lat: number; lng: number } | null;
+  // Aclaraciones del cliente ("timbre roto", "dejar en portería", "sin sal", etc.)
+  notes?: string;
 }
 
 function json(body: unknown, status = 200) {
@@ -218,6 +220,7 @@ serve(async (req) => {
         address_is_manual: true,
         delivery_type,
         coordinates: body.coordinates ?? null,
+        notes: (body.notes || "").trim().slice(0, 500) || null,
       })
       .select()
       .single();
