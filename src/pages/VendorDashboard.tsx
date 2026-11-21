@@ -67,7 +67,7 @@ export default function VendorDashboard() {
         description: 'Tu cuenta de MercadoPago se conectó exitosamente',
       });
       // Clean URL
-      window.history.replaceState({}, '', '/vendor');
+      window.history.replaceState({}, '', '/vendor-dashboard');
     }
   }, []);
 

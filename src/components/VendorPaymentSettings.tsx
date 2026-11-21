@@ -68,7 +68,7 @@ export function VendorPaymentSettings({ vendorId }: VendorPaymentSettingsProps) 
       });
       loadSettings(); // Recargar settings para ver la conexión
       // Limpiar URL
-      window.history.replaceState({}, '', '/vendor');
+      window.history.replaceState({}, '', '/vendor-dashboard');
     }
 
     if (mpError) {
@@ -78,7 +78,7 @@ export function VendorPaymentSettings({ vendorId }: VendorPaymentSettingsProps) 
         variant: 'destructive',
       });
       // Limpiar URL
-      window.history.replaceState({}, '', '/vendor');
+      window.history.replaceState({}, '', '/vendor-dashboard');
     }
   }, []);
 

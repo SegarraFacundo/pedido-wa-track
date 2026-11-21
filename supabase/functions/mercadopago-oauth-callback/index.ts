@@ -26,7 +26,7 @@ serve(async (req) => {
         status: 302,
         headers: {
           ...corsHeaders,
-          'Location': `${appUrl}/vendor?mp_error=${encodeURIComponent('Autorización cancelada o denegada')}`,
+          'Location': `${appUrl}/vendor-dashboard?mp_error=${encodeURIComponent('Autorización cancelada o denegada')}`,
         },
       });
     }
@@ -136,7 +136,7 @@ serve(async (req) => {
       status: 302,
       headers: {
         ...corsHeaders,
-        'Location': `${appUrl}/vendor?mp_connected=true`,
+        'Location': `${appUrl}/vendor-dashboard?mp_connected=true`,
       },
     });
 
@@ -147,7 +147,7 @@ serve(async (req) => {
       status: 302,
       headers: {
         ...corsHeaders,
-        'Location': `${appUrl}/vendor?mp_error=${encodeURIComponent(error.message)}`,
+        'Location': `${appUrl}/vendor-dashboard?mp_error=${encodeURIComponent(error.message)}`,
       },
     });
   }
