@@ -27,9 +27,10 @@ Hoy la base tiene datos de demo: **9 negocios**, **48 productos**, pedidos de pr
 
 ### 2. MercadoPago 🟠
 Cada negocio conecta **su propia** cuenta de MP (OAuth desde su panel → Pagos). Usa la API de producción.
-- [ ] Confirmar los secrets en Supabase: `MP_CLIENT_ID`, `MP_REDIRECT_URI`, `APP_URL` → que **`APP_URL` sea `https://lapacho.ar`** (no pages.dev ni lovable; afecta los redirects de pago).
+- [x] ~~`APP_URL`~~ → **corregido a `https://lapacho.ar`** (estaba en `plataforma.lapacho.ar`, rompía el retorno del pago del cliente). `MP_REDIRECT_URI` y `MP_CLIENT_ID` OK.
 - [ ] Que cada negocio real conecte su cuenta de MercadoPago.
 - [ ] Probar un **pago real** de punta a punta (checkout → pago → webhook → estado del pedido actualizado).
+- [ ] (Menor) El redirect post-conexión de MP del vendedor va a `/vendor`; la ruta real es `/vendor-dashboard` — revisar.
 
 ### 3. Login por email (SMTP) 🟠
 - [ ] Configurar **SMTP propio** (Resend) en Supabase → Auth. Sin esto, los magic links casi no llegan (hoy ~2/h y caen en spam). Mientras tanto, **Google funciona 100%**.
